@@ -1,0 +1,200 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
+@font-face {
+  font-family: 'Poppins', sans-serif;
+}
+
+
+
+body {
+
+  background-color: #F3F3F3;
+
+  font-family: math;
+
+
+}
+
+/* svg {
+      fill: #0d77cb;
+    } */
+:root {
+  --bs-breakpoint-xs: 0;
+  --bs-breakpoint-sm: 576px;
+  --bs-breakpoint-md: 768px;
+  --bs-breakpoint-lg: 992px;
+  --bs-breakpoint-xl: 1200px;
+  --bs-breakpoint-xxl: 1400px;
+}
+
+:root {
+
+  --spi-primary: linear-gradient(to right, #13539d 0%, #1d71ce 100%);
+  --spi-white: #ffffff;
+  --spi-blue-dark: #152036;
+  --spi-blue-dark: #1A202C;
+  --spi-bg-green: #278557;
+  --spi-search-border: #CBCBCB;
+  --spi-black: #000000;
+  --spi-gray: #4A5568;
+  --spi-br-dark-bg: #00553c;
+  --spi-gradient: transparent linear-gradient(180deg, #1973D8 0%, #0B488F 100%);
+
+  --spi-org: #ffaa18;
+
+  /* custom padding abr margin*/
+  --spi-space-0: 0px;
+  --spi-space-25: 1px;
+  --spi-space-50: 2px;
+  --spi-space-100: 4px;
+  --spi-space-175: 5px;
+  --spi-space-150: 6px;
+  --spi-space-200: 8px;
+  --spi-space-250: 10px;
+  --spi-space-300: 12px;
+  --spi-space-350: 14px;
+  --spi-space-400: 16px;
+  --spi-space-450: 18px;
+  --spi-space-500: 20px;
+  --spi-space-550: 22px;
+  --spi-space-600: 24px;
+  --spi-space-650: 25px;
+  --spi-space-700: 28px;
+  --spi-space-750: 30px;
+  --spi-space-800: 32px;
+  --spi-space-900: 36px;
+  --spi-space-950: 36px;
+  --spi-space-1000: 40px;
+  --spi-space-1100: 44px;
+  --spi-space-1200: 48px;
+}
+
+.card-header{
+  background-color: #1b4a8f !important;
+  color: #fff !important;
+}
+.contact-img h1{
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: #1b4a8f;
+
+}
+.submit-btn{
+  font-size: 10px !important;
+  background-color: #0B488F;
+}
+.company-btn{
+  background-color: #1b4a8f !important;
+  color: white;
+  border: none;
+  padding: 10px 30px;
+  border-radius: 25px;
+  font-size: 10px !important;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.company-name{
+  font-size: 12px;
+}
+.box-style h3 {
+ font-size: 14px;
+ color:#000;
+ font-weight: 600;
+}
+.qr-heading h1{
+  font-size: 18px;
+  font-weight: 600;
+  color: #1b4a8f;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.qr-heading img{
+  text-align: center;
+}
+.contact-img ul li{
+  font-size: 16px;
+  color: #5a5c69;
+  margin-bottom: 0.5rem;
+}
+.company-name{
+  color: #0B488F !important;
+  font-weight: bold;
+  font-size: 14px !important;
+
+}
+.btn-book{
+  background-color: #1b4a8f !important;
+  color: white;
+  border: none;
+  width: 160px !important;
+  padding: 10px 30px;
+  border-radius: 25px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.registration-page h2{
+  font-size: 20px;
+  font-weight: 600;
+  color: #1b4a8f;
+  text-align: center;
+}
+.reg-fully{
+  font-size: 12px;
+}
+.registration-page p{
+  font-size: 16px;
+}
+.api-star{
+  color: red;
+}
+.container-box{
+  background-color: #fff;
+  border-radius: 10px;
+  padding: 30px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+.a.nav-item.nav-link {
+    color: #fff !important;
+}
+@media (max-width: 568px) {
+ 
+
+.carousel-caption-custom {
+    position: absolute;
+    top: 50% !important;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 2;
+    width: 100%;
+    padding: 0 20px;
+}
+
+
+.carousel-control-prev, .carousel-control-next {
+    position: absolute;
+    top: 60% !important;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    margin-top: -30px;
+    background-color: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    pointer-events: auto;
+}
+.password-toggle-btn {
+    position: absolute !important;
+    right: 10px !important;
+}
+}

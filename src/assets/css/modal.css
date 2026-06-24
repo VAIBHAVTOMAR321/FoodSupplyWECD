@@ -1,0 +1,148 @@
+/* Basic Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+
+.modal-content h2 {
+  margin-bottom: 20px;
+  color: #333;
+  font-size: 1.8em;
+}
+
+.modal-content .form-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.modal-content .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #555;
+}
+
+.modal-content .input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 8px 12px;
+}
+
+.modal-content .input-wrapper input {
+  flex-grow: 1;
+  border: none;
+  outline: none;
+  padding: 5px 0;
+  font-size: 1em;
+}
+
+.modal-content .input-wrapper .password-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 5px;
+  color: #888;
+}
+
+.modal-content .input-wrapper .bi {
+  margin-right: 10px;
+  color: #888;
+}
+
+.modal-content .disabled-input {
+  background-color: #f0f0f0;
+  color: #777;
+  cursor: not-allowed;
+  border: 1px solid #eee;
+  padding: 10px;
+  border-radius: 5px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.modal-content .login-btn,
+.modal-content .cancel-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 5px;
+  font-size: 1.1em;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-top: 10px;
+}
+
+.modal-content .login-btn {
+  background-color: #007bff; /* Primary blue */
+  color: white;
+}
+
+.modal-content .login-btn:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.modal-content .login-btn:disabled {
+  background-color: #a0c8f5;
+  cursor: not-allowed;
+}
+
+.modal-content .cancel-btn {
+  background-color: #6c757d; /* Grey */
+  color: white;
+}
+
+.modal-content .cancel-btn:hover {
+  background-color: #5a6268;
+}
+
+.modal-content .alert-message.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  font-size: 0.9em;
+}
+
+.modal-content .alert-message.error .bi {
+  margin-right: 8px;
+  font-size: 1.2em;
+}
+
+.spinner {
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top: 3px solid #fff;
+  width: 20px;
+  height: 20px;
+  -webkit-animation: spin 1s linear infinite;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+@-webkit-keyframes spin {
+  0% { -webkit-transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

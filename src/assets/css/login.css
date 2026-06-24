@@ -1,0 +1,713 @@
+/* ==========================================
+   Login Theme - White & Yellow
+   ========================================== */
+
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  position: relative;
+  overflow: hidden;
+  margin-top: 60px;
+  min-height: calc(100vh - 120px);
+  background: #FFFDE7;
+}
+
+.login-bg-pattern {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    radial-gradient(circle at 20% 80%, rgba(255, 193, 7, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(245, 158, 11, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(255, 249, 196, 0.3) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.login-container {
+  display: flex;
+  max-width: 1000px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow:
+    0 25px 60px -12px rgba(245, 158, 11, 0.2),
+    0 0 0 1px rgba(255, 193, 7, 0.3);
+  position: relative;
+  z-index: 1;
+}
+
+.login-left {
+  flex: 1;
+  min-width: 0;
+  background: #FFFFFF;
+}
+
+.login-right {
+  width: 320px;
+  background: linear-gradient(135deg, #FFFDE7 0%, #FFF8E1 50%, #FFECB3 100%);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-content {
+  padding: 30px 36px;
+}
+
+/* ---- Header ---- */
+.login-header {
+  text-align: center;
+  margin-bottom: 28px;
+  position: relative;
+}
+
+.login-header::after {
+  content: '';
+  position: absolute;
+  bottom: -14px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #FFC107, transparent);
+}
+
+.brand-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  background: linear-gradient(135deg, #FFC107 0%, #FFA000 100%);
+  box-shadow: 0 6px 20px rgba(255, 160, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-logo::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.brand-logo i {
+  font-size: 26px;
+  color: white;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+
+.login-header h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: #5D4037;
+  margin: 0 0 2px;
+  letter-spacing: 0.5px;
+}
+
+.login-header h1 span {
+  color: #F57F17;
+}
+
+.login-header p {
+  font-size: 12px;
+  color: #8D6E63;
+  margin: 0;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+/* ---- Welcome ---- */
+.welcome-section {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.welcome-section h2 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #3E2723;
+  margin: 0 0 3px;
+}
+
+.welcome-section p {
+  font-size: 12px;
+  color: #8D6E63;
+  margin: 0;
+}
+
+/* ---- Role Selector (Radio Buttons) ---- */
+.role-selector {
+  margin-bottom: 20px;
+}
+
+.role-selector-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6D4C41;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 12px;
+}
+
+.radio-selection {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 10px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  border: 1px solid #FFE082;
+  background: #FFFDE7;
+}
+
+.radio-option:hover {
+  background: #FFF8E1;
+  border-color: #FFA000;
+}
+
+.radio-option input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #FFA000;
+}
+
+.radio-option:has(input[type="radio"]:checked) {
+  background: #FFF8E1;
+  border-color: #FFA000;
+  box-shadow: 0 0 0 2px rgba(255, 160, 0, 0.2);
+}
+
+.radio-label {
+  font-size: 10px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+/* ---- Form ---- */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.alert-message {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: shakeX 0.4s ease;
+}
+
+.alert-message.error {
+  background: #FFF3E0;
+  color: #E65100;
+  border: 1px solid #FFE082;
+}
+
+@keyframes shakeX {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.custom-login-select{
+  font-size: 10px !important;
+}
+.form-group label {
+  font-size: 10px;
+  font-weight: 550;
+  letter-spacing: 0.3px;
+  text-align: left;
+  color: #5D4037;
+}
+
+/* ---- Location Selector (Cascading Dropdowns) ---- */
+.location-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 8px;
+  padding: 18px 16px;
+  background: linear-gradient(135deg, #FFFDE7 0%, #FFFFFF 100%);
+  border-radius: 12px;
+  border: 1px solid #FFE082;
+  animation: fadeInUp 0.4s ease 0.2s both;
+}
+
+.location-selector .form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5D4037;
+  letter-spacing: 0.3px;
+  text-align: left;
+}
+
+.location-selector .input-wrapper select {
+  width: 100%;
+  padding: 11px 36px 11px 36px;
+  border: 2px solid #FFE082;
+  border-radius: 10px;
+  font-size: 13px;
+  transition: all 0.25s ease;
+  background: #FFFDE7;
+  color: #3E2723;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23FFA000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.location-selector .input-wrapper select:focus {
+  outline: none;
+  border-color: #FFA000;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(255, 160, 0, 0.15);
+}
+
+.location-selector .input-wrapper select:disabled {
+  background-color: #FFF8E1;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.input-wrapper-text input {
+  width: 100%;
+  padding: 11px 11px 11px 42px;
+  border: 2px solid #FFE082;
+  border-radius: 10px;
+  font-size: 13px;
+  transition: all 0.25s ease;
+  background: #FFFDE7;
+  color: #3E2723;
+}
+
+.input-wrapper-text input:focus {
+  outline: none;
+  border-color: #FFA000;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(255, 160, 0, 0.15);
+}
+
+.input-wrapper-text input::placeholder {
+  color: #FFB300;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-wrapper i:first-of-type {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #FFA000;
+  font-size: 15px;
+  transition: color 0.2s ease;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.input-wrapper input:focus ~ i:first-of-type {
+  color: #F57F17;
+}
+
+.input-wrapper input {
+  width: 100%;
+  padding: 11px 42px 11px 38px;
+  border: 2px solid #FFE082;
+  border-radius: 10px;
+  font-size: 13px;
+  transition: all 0.25s ease;
+  background: #FFFDE7;
+  color: #3E2723;
+}
+
+.input-wrapper input:focus {
+  outline: none;
+  border-color: #FFA000;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(255, 160, 0, 0.15);
+}
+
+.input-wrapper input::placeholder {
+  color: #FFB300;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #FFA000;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  font-size: 15px;
+  transition: color 0.2s ease;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-toggle i {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.password-toggle:hover {
+  color: #F57F17;
+}
+
+/* ---- Options ---- */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #6D4C41;
+}
+
+.remember-me input {
+  width: 15px;
+  height: 15px;
+  accent-color: #FFA000;
+  cursor: pointer;
+}
+
+.forgot-link {
+  font-size: 12px;
+  color: #F57F17;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.forgot-link:hover {
+  color: #FF6F00;
+}
+
+/* ---- Login Button ---- */
+.login-btn {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, #FFC107 0%, #FFA000 50%, #FF8F00 100%);
+  background-size: 200% 100%;
+  background-position: 0% 50%;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #3E2723;
+  cursor: pointer;
+  transition: all 0.4s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(255, 160, 0, 0.3);
+}
+
+.login-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s ease;
+}
+
+.login-btn:hover::before {
+  left: 100%;
+}
+
+.login-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 160, 0, 0.45);
+  background-position: 100% 50%;
+}
+
+.login-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.login-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2.5px solid rgba(62, 39, 35, 0.3);
+  border-top-color: #3E2723;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Footer ---- */
+.login-footer {
+  text-align: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #FFE082;
+}
+
+.login-footer p {
+  font-size: 12px;
+  color: #8D6E63;
+  margin: 0;
+}
+
+.login-footer a {
+  color: #F57F17;
+  text-decoration: none;
+  font-weight: 700;
+  transition: color 0.2s ease;
+}
+
+.login-footer a:hover {
+  color: #FF6F00;
+}
+
+/* ---- Right Panel (Uttarakhand Logo) ---- */
+.login-right {
+  padding: 40px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-right::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -20%;
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(255, 193, 7, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.login-right::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  left: -15%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255, 167, 38, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.uttarakhand-section {
+  text-align: center;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.uttarakhand-logo {
+  width: 100px;
+  height: 100px;
+  filter: brightness(1.1) drop-shadow(0 4px 12px rgba(255, 160, 0, 0.5));
+}
+
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.uttarakhand-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #3E2723;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.uttarakhand-subtitle {
+  font-size: 11px;
+  color: rgba(62, 39, 35, 0.85);
+  margin: 0;
+  line-height: 1.6;
+  letter-spacing: 0.3px;
+  text-align: center;
+}
+
+.login-highlights {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 2;
+}
+
+.highlight-item {
+  text-align: center;
+  padding: 14px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 193, 7, 0.4);
+  transition: all 0.3s ease;
+}
+
+.highlight-item:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
+  border-color: rgba(255, 160, 0, 0.5);
+}
+
+.highlight-item i {
+  font-size: 22px;
+  background: linear-gradient(135deg, #FFC107 0%, #FF8F00 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 2px 4px rgba(255, 143, 0, 0.3));
+}
+
+.highlight-item h3 {
+  font-size: 13px;
+  margin: 0 0 4px;
+  letter-spacing: 0.3px;
+  color: #3E2723;
+}
+
+.highlight-item p {
+  font-size: 10px;
+  color: #6D4C41;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ==========================================
+   ANIMATIONS
+   ========================================== */
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.login-header { animation: fadeInUp 0.4s ease 0.05s both; }
+.welcome-section { animation: fadeInUp 0.4s ease 0.1s both; }
+.role-selector { animation: fadeInUp 0.4s ease 0.15s both; }
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width: 768px) {
+  .login-container { flex-direction: column; border-radius: 20px; }
+  .login-right { width: 100%; padding: 24px 20px; order: -1; }
+  .login-content { padding: 24px 22px; }
+  .login-header { margin-bottom: 22px; }
+  .login-header::after { left: 5%; right: 5%; }
+  .radio-selection { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .radio-option { padding: 8px 10px; }
+  .radio-label { font-size: 12px; }
+  .uttarakhand-logo { width: 80px; height: 80px; }
+  .uttarakhand-title { font-size: 18px; }
+  .highlight-item { padding: 12px 10px; }
+  .highlight-item i { font-size: 20px; }
+  .highlight-item h3 { font-size: 13px; }
+  .highlight-item p { font-size: 10px; }
+}
+
+@media (max-width: 480px) {
+  .login-page { padding: 8px; margin-top: 50px; }
+  .login-content { padding: 20px 16px; }
+  .brand-logo { width: 48px; height: 48px; border-radius: 13px; }
+  .brand-logo i { font-size: 22px; }
+  .login-header h1 { font-size: 20px; }
+  .role-selector-title { font-size: 11px; margin-bottom: 10px; }
+  .radio-selection { grid-template-columns: 1fr; gap: 6px; }
+  .radio-option { padding: 8px 10px; border-radius: 6px; }
+  .radio-option input[type="radio"] { width: 14px; height: 14px; }
+  .radio-label { font-size: 11px; }
+  .input-wrapper input { padding: 10px 38px 10px 36px; font-size: 12px; }
+  .login-btn { padding: 12px; font-size: 13px; letter-spacing: 0.3px; }
+  .login-right { padding: 20px 16px; }
+  .uttarakhand-logo { width: 70px; height: 70px; }
+  .uttarakhand-title { font-size: 16px; }
+  .highlight-item { padding: 10px 8px; }
+  .highlight-item i { font-size: 18px; }
+  .highlight-item h3 { font-size: 12px; }
+  .highlight-item p { font-size: 9px; }
+}
+
+@media (max-width: 360px) {
+  .login-content { padding: 16px 12px; }
+  .brand-logo { width: 44px; height: 44px; }
+  .login-header h1 { font-size: 18px; }
+  .login-right { padding: 16px 12px; }
+  .uttarakhand-logo { width: 60px; height: 60px; }
+}

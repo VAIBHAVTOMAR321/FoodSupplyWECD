@@ -1,0 +1,664 @@
+/* ==========================================
+   GyanDhara Government Portal Theme
+   Inspired by indian.gov.in - Official Government UI
+   Colors: Saffron (#FF9933), White (#FFFFFF), Green (#138808), Blue (#000080)
+   ========================================== */
+
+:root {
+  /* Government Portal Colors */
+  --gov-saffron: #FF9933;
+  --gov-saffron-dark: #E68A00;
+  --gov-white: #FFFFFF;
+  --gov-green: #138808;
+  --gov-green-dark: #0F6B06;
+  --gov-blue: #000080;
+  --gov-blue-light: #1E3A8A;
+  --gov-gray-light: #F5F5F5;
+  --gov-gray: #E0E0E0;
+  --gov-text-dark: #1A1A1A;
+  --gov-text: #333333;
+  --gov-text-light: #666666;
+  --gov-border: #D1D1D1;
+  --gov-shadow: rgba(0, 0, 0, 0.1);
+  --gov-shadow-sm: rgba(0, 0, 0, 0.05);
+  --gov-radius: 8px;
+  --gov-radius-sm: 4px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+  color: var(--gov-text);
+}
+
+/* ==========================================
+   HOME WRAPPER
+   ========================================== */
+
+.home-wrapper {
+  background: var(--gov-white);
+  min-height: 100vh;
+  margin-top: 0;
+}
+
+.home-container {
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  padding: 0;
+}
+
+/* ==========================================
+   GOVERNMENT HEADER BAR
+   ========================================== */
+
+.gov-header-bar {
+  background: linear-gradient(135deg, var(--gov-saffron) 0%, var(--gov-saffron-dark) 100%);
+  padding: 12px 0;
+  color: var(--gov-white);
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px var(--gov-shadow-sm);
+}
+
+.gov-emblem-placeholder {
+  width: 50px;
+  height: 50px;
+  background: var(--gov-white);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gov-saffron);
+}
+
+.gov-header-bar a {
+  color: var(--gov-white);
+  transition: opacity 0.2s ease;
+  font-size: 0.85rem;
+}
+
+.gov-header-bar a:hover {
+  opacity: 0.8;
+  color: var(--gov-white);
+}
+
+/* ==========================================
+   HERO SECTION - Government Style
+   ========================================== */
+
+.hero-section-gov {
+  padding: 60px 0;
+  background: linear-gradient(135deg, var(--gov-gray-light) 0%, var(--gov-white) 100%);
+  border-bottom: 3px solid var(--gov-saffron);
+}
+
+.hero-content-gov {
+  padding-left: 20px;
+}
+
+.badge-gov {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--gov-white);
+  padding: 8px 20px;
+  border-radius: var(--gov-radius);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gov-blue);
+  border: 1px solid var(--gov-border);
+  box-shadow: 0 2px 8px var(--gov-shadow-sm);
+}
+
+.hero-title-gov {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--gov-blue);
+  margin-bottom: 20px;
+  line-height: 1.2;
+}
+
+.hero-subtitle-gov {
+  font-size: 1.1rem;
+  color: var(--gov-text-light);
+  line-height: 1.6;
+  margin-bottom: 30px;
+}
+
+.hero-image-container-gov {
+  padding: 20px;
+}
+
+.hero-image-container-gov img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--gov-radius);
+  box-shadow: 0 8px 30px var(--gov-shadow);
+}
+
+/* Government Buttons */
+.btn-gov-primary {
+  background: var(--gov-blue);
+  color: var(--gov-white);
+  padding: 14px 32px;
+  border-radius: var(--gov-radius);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  border: 2px solid var(--gov-blue);
+}
+
+.btn-gov-primary:hover {
+  background: var(--gov-blue-light);
+  border-color: var(--gov-blue-light);
+  color: var(--gov-white);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 128, 0.3);
+}
+
+.btn-gov-outline {
+  background: transparent;
+  color: var(--gov-blue);
+  padding: 14px 32px;
+  border-radius: var(--gov-radius);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  border: 2px solid var(--gov-blue);
+}
+
+.btn-gov-outline:hover {
+  background: var(--gov-blue);
+  color: var(--gov-white);
+  transform: translateY(-2px);
+}
+
+/* ==========================================
+   SECTION TITLES
+   ========================================== */
+
+.section-title-gov {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--gov-blue);
+  position: relative;
+  margin-bottom: 10px;
+  padding-bottom: 12px;
+}
+
+.section-title-gov::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--gov-saffron) 0%, var(--gov-green) 100%);
+  border-radius: 2px;
+}
+
+.section-subtitle {
+  font-size: 1rem;
+  color: var(--gov-text-light);
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* ==========================================
+   STATISTICS SECTION - Yellow Highlighted
+   ========================================== */
+
+.stats-section {
+  background: linear-gradient(135deg, #FFFFF0 0%, #FFFACD 100%);
+  border-top: 0px solid var(--gov-saffron);
+  border-bottom: 2px solid var(--gov-saffron);
+}
+
+.stat-card {
+  background: var(--gov-white);
+  border: 1px solid var(--gov-border);
+  border-radius: var(--gov-radius);
+  padding: 20px 15px;
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--gov-blue);
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 25px var(--gov-shadow);
+  border-color: var(--gov-blue-light);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--gov-blue);
+  margin-bottom: 5px;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--gov-text-light);
+  margin-bottom: 5px;
+  line-height: 1.3;
+}
+
+.stat-change {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.stat-saffron::before { background: var(--gov-saffron); }
+.stat-green::before { background: var(--gov-green); }
+.stat-blue::before { background: var(--gov-blue); }
+.stat-orange::before { background: var(--gov-saffron-dark); }
+.stat-teal::before { background: #008080; }
+.stat-red::before { background: #DC2626; }
+
+/* ==========================================
+   LIFE STAGES SECTION
+   ========================================== */
+
+.life-stages-section {
+  padding: 60px 0;
+  background: var(--gov-white);
+}
+
+.life-card {
+  border-radius: var(--gov-radius);
+  transition: all 0.3s ease;
+  border: 1px solid var(--gov-gray);
+}
+
+.life-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 25px var(--gov-shadow);
+  border-color: var(--gov-saffron);
+}
+
+.highlight-border {
+  border: 2px solid var(--gov-saffron) !important;
+  background: linear-gradient(135deg, #FFF8F0 0%, var(--gov-white) 100%);
+}
+
+.icon-wrapper {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 15px;
+  font-size: 1.5rem;
+}
+
+.icon-saffron {
+  background: rgba(255, 153, 51, 0.15);
+  color: var(--gov-saffron-dark);
+}
+
+.icon-blue {
+  background: rgba(0, 0, 128, 0.1);
+  color: var(--gov-blue);
+}
+
+.icon-green {
+  background: rgba(19, 136, 8, 0.15);
+  color: var(--gov-green);
+}
+
+.icon-orange {
+  background: rgba(255, 153, 51, 0.2);
+  color: var(--gov-saffron);
+}
+
+.icon-teal {
+  background: rgba(0, 128, 128, 0.15);
+  color: #008080;
+}
+
+.icon-purple {
+  background: rgba(128, 0, 128, 0.15);
+  color: #800080;
+}
+
+/* ==========================================
+   SERVICES SECTION
+   ========================================== */
+
+.services-section {
+  padding: 60px 0;
+  background: var(--gov-gray-light);
+}
+
+.service-card {
+  border-radius: var(--gov-radius);
+  transition: all 0.3s ease;
+  background: var(--gov-white);
+}
+
+.service-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 25px var(--gov-shadow);
+  border-color: var(--gov-green);
+}
+
+.service-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.service-items .badge {
+  font-size: 0.75rem;
+  padding: 5px 10px;
+  border-radius: var(--gov-radius-sm);
+  background: var(--gov-gray-light);
+  color: var(--gov-text);
+  border: 1px solid var(--gov-border);
+}
+
+/* ==========================================
+   NEW FEATURES SECTION - Yellow Highlighted
+   ========================================== */
+
+.features-section {
+  padding: 60px 0;
+  background: linear-gradient(135deg, #FFF8DC 0%, #FFFACD 100%);
+  border-top: 3px dashed var(--gov-saffron);
+  border-bottom: 3px dashed var(--gov-saffron);
+}
+
+.feature-card {
+  border-radius: var(--gov-radius);
+  transition: all 0.3s ease;
+  background: var(--gov-white);
+  border-left: 4px solid var(--gov-saffron);
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 25px var(--gov-shadow);
+}
+
+.feature-card .icon-wrapper {
+  border: 2px solid var(--gov-saffron);
+  background: transparent;
+}
+
+/* ==========================================
+   BENEFITS SECTION
+   ========================================== */
+
+.benefits-section {
+  padding: 60px 0;
+  background: var(--gov-white);
+}
+
+.benefit-card {
+  border-radius: var(--gov-radius);
+  transition: all 0.3s ease;
+  border: 1px solid var(--gov-gray);
+  text-align: center;
+}
+
+.benefit-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 25px var(--gov-shadow);
+  border-color: var(--gov-saffron);
+  background: linear-gradient(135deg, var(--gov-white) 0%, var(--gov-gray-light) 100%);
+}
+
+.benefit-card .icon-wrapper {
+  margin-bottom: 15px;
+}
+
+/* ==========================================
+   QUICK LINKS SECTION
+   ========================================== */
+
+.quick-links-section {
+  padding: 40px 0;
+  background: var(--gov-white);
+  border-top: 1px solid var(--gov-border);
+}
+
+.quick-links-section .btn {
+  border-radius: var(--gov-radius-sm);
+  font-weight: 500;
+  padding: 8px 20px;
+}
+
+/* ==========================================
+   FINAL CTA SECTION
+   ========================================== */
+
+.final-cta-gov {
+  padding: 70px 0;
+  background: linear-gradient(135deg, var(--gov-blue) 0%, var(--gov-blue-light) 100%);
+  color: var(--gov-white);
+  text-align: center;
+}
+
+.final-cta-gov h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 15px;
+}
+
+.final-cta-gov .lead {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+.final-cta-gov .btn-light {
+  background: var(--gov-white);
+  color: var(--gov-blue);
+  font-weight: 600;
+  padding: 14px 36px;
+  border-radius: var(--gov-radius);
+  border: 2px solid var(--gov-white);
+}
+
+.final-cta-gov .btn-light:hover {
+  background: transparent;
+  color: var(--gov-white);
+}
+
+.final-cta-gov .btn-outline-light {
+  border: 2px solid var(--gov-white);
+  color: var(--gov-white);
+  padding: 14px 36px;
+  border-radius: var(--gov-radius);
+  font-weight: 600;
+}
+
+.final-cta-gov .btn-outline-light:hover {
+  background: var(--gov-white);
+  color: var(--gov-blue);
+}
+
+
+
+/* ==========================================
+   RESPONSIVE DESIGN
+   ========================================== */
+
+@media (max-width: 992px) {
+  .hero-title-gov {
+    font-size: 2rem;
+  }
+  
+  .hero-subtitle-gov {
+    font-size: 1rem;
+  }
+  
+  .section-title-gov {
+    font-size: 1.6rem;
+  }
+  
+  .hero-content-gov {
+    padding-left: 0;
+    text-align: center;
+  }
+  
+  .badge-gov {
+    margin: 0 auto;
+  }
+  
+  .hero-buttons-gov {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-section-gov {
+    padding: 40px 0;
+  }
+  
+  .hero-title-gov {
+    font-size: 1.8rem;
+  }
+  
+  .stat-value {
+    font-size: 1.6rem;
+  }
+  
+  .life-card,
+  .service-card,
+  .benefit-card,
+  .feature-card {
+    margin-bottom: 20px;
+  }
+  
+  .section-title-gov::after {
+    width: 60px;
+  }
+  
+  .final-cta-gov h2 {
+    font-size: 1.6rem;
+  }
+  
+  .final-cta-gov .btn {
+    width: 100%;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+}
+
+@media (max-width: 576px) {
+  .gov-header-bar {
+    font-size: 0.8rem;
+  }
+  
+  .gov-emblem-placeholder {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .hero-title-gov {
+    font-size: 1.5rem;
+  }
+  
+  .btn-gov-primary,
+  .btn-gov-outline {
+    padding: 12px 24px;
+    font-size: 0.95rem;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .hero-buttons-gov {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .stat-card {
+    padding: 15px 10px;
+  }
+  
+  .stat-value {
+    font-size: 1.4rem;
+  }
+  
+  .stat-label {
+    font-size: 0.75rem;
+  }
+  
+  .icon-wrapper {
+    width: 50px;
+    height: 50px;
+    font-size: 1.3rem;
+  }
+}
+
+/* ==========================================
+   ACCESSIBILITY & PRINT
+   ========================================== */
+
+@media print {
+  .gov-header-bar,
+  .hero-buttons-gov,
+  .btn-gov-primary,
+  .btn-gov-outline,
+  .final-cta-gov,
+  .quick-links-section {
+    display: none;
+  }
+  
+  .hero-section-gov {
+    padding: 20px 0;
+  }
+  
+  .section-title-gov::after {
+    display: none;
+  }
+}
+
+/* Focus styles for accessibility */
+/* a:focus,
+button:focus {
+  outline: 3px solid var(--gov-saffron);
+  outline-offset: 2px;
+} */
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .hero-title-gov {
+    color: var(--gov-text-dark);
+  }
+  
+  .stat-card,
+  .life-card,
+  .service-card,
+  .benefit-card,
+  .feature-card {
+    border: 2px solid var(--gov-text-dark);
+  }
+}

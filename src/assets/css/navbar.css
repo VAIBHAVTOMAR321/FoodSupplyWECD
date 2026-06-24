@@ -1,0 +1,518 @@
+/* ==========================================
+    Navbar Theme - White & Yellow
+    ========================================== */
+
+:root {
+  --gd-gold: #FFC107;
+  --gd-gold-light: #FFECB3;
+  --gd-gold-dark: #FF8F00;
+  --gd-bronze: #FFA000;
+  --gd-warm-white: #FFFDE7;
+  --gd-dark: #3E2723;
+  --gd-text: #5D4037;
+  --gd-text-light: #6D4C41;
+  --gd-shadow: rgba(255, 160, 0, 0.2);
+}
+
+/* ---- Main Navbar ---- */
+.custom-navbar {
+  background: #fff !important;
+  padding: 0 !important;
+  box-shadow: 0 2px 20px rgba(255, 160, 0, 0.1);
+  border-bottom: 2px solid #FFE082;
+  transition: all 0.3s ease;
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+}
+
+.custom-navbar.scrolled {
+  box-shadow: 0 4px 30px rgba(255, 160, 0, 0.2);
+}
+
+/* ---- Brand / Logo ---- */
+.brand-logo-wrapper {
+  display: flex;
+  align-items: center;
+  text-decoration: none !important;
+  gap: 12px;
+}
+
+.navbar-logo {
+  height: 60px;
+  width: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  transition: transform 0.3s ease;
+}
+
+.brand-logo-wrapper:hover .navbar-logo {
+  transform: scale(1.05);
+}
+
+.brand-text {
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--gd-dark) !important;
+  letter-spacing: 0.5px;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.brand-text-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 0px;
+  gap: 2px;
+}
+
+.uttarakhand-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.women-logo {
+  height: 37px;
+  width: auto;
+  object-fit: contain;
+}
+
+.uttarakhand-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #5D4037;
+  letter-spacing: 0.3px;
+}
+
+.department-subtitle {
+  font-weight: 600;
+  font-size: 11px;
+  color: #FF8F00;
+  letter-spacing: 0.3px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.brand-highlight {
+  color: var(--gd-gold-dark);
+  position: relative;
+}
+
+.brand-highlight::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(to right, #FFC107, #FFA000);
+  border-radius: 2px;
+}
+
+/* ---- Nav Links ---- */
+.nav-links {
+  gap: 4px;
+}
+
+.nav-link-item {
+  color: var(--gd-text) !important;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 18px !important;
+  border-radius: 8px;
+  position: relative;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.3px;
+}
+
+.nav-link-dot {
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: #FFC107;
+  transition: all 0.3s ease;
+}
+
+.nav-link-item:hover {
+  color: #FF8F00 !important;
+  background: rgba(255, 193, 7, 0.15);
+}
+
+.nav-link-item:hover .nav-link-dot {
+  width: 6px;
+  height: 6px;
+}
+
+/* Active link styling */
+.nav-link-item.active {
+  color: #FF8F00 !important;
+  background: rgba(255, 193, 7, 0.2);
+}
+
+.nav-link-item.active .nav-link-dot {
+  width: 6px;
+  height: 6px;
+}
+
+/* ---- Register/Login Button ---- */
+.register-btn {
+  background: linear-gradient(135deg, #FFC107 0%, #FFA000 100%) !important;
+  color: #3E2723 !important;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 24px !important;
+  border-radius: 50px !important;
+  margin-left: 12px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(255, 160, 0, 0.4);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  text-transform: uppercase;
+}
+
+.register-btn:hover {
+  background: linear-gradient(135deg, #FF8F00 0%, #FFC107 100%) !important;
+  color: #3E2723 !important;
+  box-shadow: 0 6px 25px rgba(255, 143, 0, 0.5);
+  transform: translateY(-2px);
+}
+
+.register-btn-arrow {
+  font-size: 16px;
+  transition: transform 0.3s ease;
+}
+
+.register-btn:hover .register-btn-arrow {
+  transform: translateX(3px);
+}
+
+/* ---- Mobile Language Toggle ---- */
+.mobile-language-toggle {
+  display: none;
+  background: #fff !important;
+  border: 2px solid #FFC107 !important;
+  color: #FF8F00 !important;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 14px !important;
+  border-radius: 20px !important;
+  gap: 4px;
+  transition: all 0.3s ease;
+}
+
+.mobile-language-toggle:hover {
+  background: #FFC107 !important;
+  color: #3E2723 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 160, 0, 0.3);
+}
+
+.mobile-language-toggle i {
+  font-size: 14px;
+}
+
+/* Desktop Language Toggle - hidden by default on mobile */
+.desktop-language-toggle {
+  display: none;
+  background: transparent !important;
+  border: 2px solid #FFC107 !important;
+  color: #FF8F00 !important;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px 14px !important;
+  border-radius: 20px !important;
+  gap: 4px;
+  transition: all 0.3s ease;
+}
+
+.desktop-language-toggle:hover {
+  background: #FFC107 !important;
+  color: #3E2723 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 160, 0, 0.3);
+}
+
+.desktop-language-toggle i {
+  font-size: 14px;
+}
+
+/* ---- Custom Toggler (Hamburger) ---- */
+.navbar-toggler-custom {
+  border: none !important;
+  padding: 8px !important;
+  box-shadow: none !important;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: transparent !important;
+  transition: all 0.3s ease;
+}
+
+.navbar-toggler-custom:hover {
+  background: rgba(255, 193, 7, 0.15) !important;
+  border-radius: 8px;
+}
+
+.navbar-toggler-custom:focus {
+  box-shadow: none !important;
+}
+
+.toggler-line {
+  width: 24px;
+  height: 3px;
+  background: #FFC107;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-toggler-custom[aria-expanded="true"] .toggler-line:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.navbar-toggler-custom[aria-expanded="true"] .toggler-line:nth-child(2) {
+  opacity: 0;
+}
+
+.navbar-toggler-custom[aria-expanded="true"] .toggler-line:nth-child(3) {
+  transform: rotate(-45deg) translate(5px, -5px);
+}
+
+/* ---- Bootstrap Overrides ---- */
+.custom-navbar .navbar-toggler {
+  border: none;
+  padding: 6px;
+  box-shadow: none;
+}
+
+.custom-navbar .navbar-toggler-icon {
+  display: none;
+}
+
+.custom-navbar .navbar-collapse {
+  transition: all 0.3s ease;
+}
+
+/* ==========================================
+    RESPONSIVE
+    ========================================== */
+
+/* Tablet & below */
+@media (max-width: 991px) {
+  .custom-navbar {
+    min-height: auto;
+    padding: 10px 0 !important;
+  }
+  .uttarakhand-title {
+    font-size: 12px !important;
+  }
+  .brand-logo-wrapper {
+    padding: 4px 0;
+    margin-right: 8px;
+  }
+
+  .navbar-logo {
+    height: 44px;
+  }
+
+  .brand-text {
+    font-size: 16px;
+  }
+
+  .brand-text-container {
+    gap: 1px;
+  }
+
+  .uttarakhand-title {
+    font-size: 12px;
+  }
+
+  .department-subtitle {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+
+  .women-logo {
+    height: 16px;
+  }
+
+  /* Mobile language toggle - visible on mobile */
+  .mobile-language-toggle {
+    display: inline-flex;
+    margin-left: 8px;
+    margin-right: 8px;
+    padding: 5px 10px !important;
+    font-size: 12px;
+  }
+
+  .mobile-language-toggle i {
+    font-size: 12px;
+  }
+
+    /* Push hamburger to far right */
+    .navbar-toggler-custom {
+      margin-left: auto;
+      background: rgba(255, 193, 7, 0.15) !important;
+      border-radius: 8px;
+      padding: 10px !important;
+    }
+
+    .navbar-toggler-custom:hover {
+      background: rgba(255, 193, 7, 0.25) !important;
+    }
+
+    /* Hide desktop toggle on mobile */
+    .desktop-language-toggle {
+      display: none !important;
+    }
+
+    .nav-links {
+      text-align: center;
+      margin-top: 15px;
+      padding: 15px 0;
+      gap: 6px;
+    }
+
+    .nav-link-item {
+      font-size: 15px;
+      padding: 12px 20px !important;
+      justify-content: center;
+    }
+
+    .nav-link-item:hover {
+      background: rgba(255, 193, 7, 0.15);
+    }
+
+    .register-btn {
+      margin-left: 252px !important;
+      margin-top: 10px;
+      display: inline-flex;
+      justify-content: center;
+      width: fit-content;
+      padding: 12px 32px !important;
+    }
+}
+
+/* Mobile */
+@media (max-width: 576px) {
+  .navbar-logo {
+    height: 38px;
+  }
+  .department-subtitle {
+    margin-top: 4px !important;
+  }
+  .uttarakhand-title {
+    font-size: 8px !important;
+  }
+  .brand-text {
+    font-size: 14px;
+  }
+
+  .brand-text-container {
+    gap: 0;
+  }
+
+  .uttarakhand-title {
+    font-size: 11px;
+  }
+
+  .department-subtitle {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+
+  .women-logo {
+    height: 14px;
+  }
+
+  .brand-highlight::after {
+    height: 2px;
+  }
+
+  .nav-link-item {
+    font-size: 14px;
+    padding: 10px 16px !important;
+  }
+
+  .register-btn {
+    font-size: 13px;
+    padding: 10px 28px !important;
+    margin-left: 100px !important;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 400px) {
+  .navbar-logo {
+    height: 34px;
+  }
+
+  .brand-text {
+    font-size: 14px;
+  }
+
+  .nav-link-item {
+    font-size: 13px;
+    padding: 10px 14px !important;
+  }
+}
+
+/* Desktop hover refinement */
+@media (min-width: 992px) {
+  .nav-link-item::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%) scaleX(0);
+    width: 60%;
+    height: 2px;
+    background: linear-gradient(to right, #FFC107, #FFA000);
+    border-radius: 1px;
+    transition: transform 0.3s ease;
+  }
+
+  .nav-link-item:hover::after,
+  .nav-link-item.active::after {
+    transform: translateX(-50%) scaleX(1);
+  }
+
+  /* Desktop language toggle - visible only on desktop */
+  .desktop-language-toggle {
+    display: inline-flex;
+    margin-left: 12px;
+  }
+
+  .mobile-language-toggle {
+    display: none !important;
+  }
+}
+
+/* ---- Subtle animations ---- */
+@keyframes navFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nav-link-item {
+  animation: navFadeIn 0.4s ease forwards;
+}
+
+.nav-link-item:nth-child(1) { animation-delay: 0.05s; }
+.nav-link-item:nth-child(2) { animation-delay: 0.1s; }
+.nav-link-item:nth-child(3) { animation-delay: 0.15s; }
+.nav-link-item:nth-child(4) { animation-delay: 0.2s; }
