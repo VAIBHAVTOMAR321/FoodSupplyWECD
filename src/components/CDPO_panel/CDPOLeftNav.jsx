@@ -84,22 +84,13 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
     label: "test",
     submenu: [
       {
-        label: "Registered Student",
+        label: "Test",
         path: "#",
         icon: <FaPlusSquare />,
       },
     ],
   },
-       {
-   icon: <FaClock />,
-   label: "Time Schedule",
-   path: "/SupervisorDashBoard",
- },
-      {
-        icon: <FaComments />,
-        label: "Send Query",
-        path: "/SupervisorDashBoard",
-      },
+
       
        
       
