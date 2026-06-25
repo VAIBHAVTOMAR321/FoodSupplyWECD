@@ -132,13 +132,13 @@ const Login = () => {
   const fetchDistricts = async () => {
     let url = '';
     if (formData.role === 'anganwadi') {
-      url = 'https://mahadevaaya.com/golden100days/golden100days_backend/api/anganwadi-dropdown/';
+      url = 'https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/anganwadi-dropdown/';
     } else if (formData.role === 'supervisor') {
-      url = 'https://mahadevaaya.com/golden100days/golden100days_backend/api/sector-dropdown/';
+      url = 'https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/sector-dropdown/';
     } else if (formData.role === 'cdpo') {
-      url = 'https://mahadevaaya.com/golden100days/golden100days_backend/api/cdpo-dropdown/';
+      url = 'https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/cdpo-dropdown/';
     } else if (formData.role === 'dpo') {
-      url = 'https://mahadevaaya.com/golden100days/golden100days_backend/api/district-list/';
+      url = 'https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/district-list/';
     }
     try {
       const res = await axios.get(url || '');
@@ -166,11 +166,11 @@ const Login = () => {
 
       let url = '';
       if (formData.role === 'anganwadi') {
-        url = `https://mahadevaaya.com/golden100days/golden100days_backend/api/anganwadi-dropdown/?district=${district}`;
+        url = `https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/anganwadi-dropdown/?district=${district}`;
       } else if (formData.role === 'supervisor') {
-        url = `https://mahadevaaya.com/golden100days/golden100days_backend/api/sector-dropdown/?district=${district}`;
+        url = `https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/sector-dropdown/?district=${district}`;
       } else if (formData.role === 'cdpo') {
-        url = `https://mahadevaaya.com/golden100days/golden100days_backend/api/cdpo-dropdown/?district=${district}`;
+        url = `https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/cdpo-dropdown/?district=${district}`;
       }
 
       try {
@@ -205,7 +205,7 @@ const Login = () => {
       } else {
         setFormData(prev => ({ ...prev, email_or_phone: '' }));
         try {
-          const res = await axios.get(`https://mahadevaaya.com/golden100days/golden100days_backend/api/anganwadi-dropdown/?district=${selectedDistrict}&project=${project}`);
+          const res = await axios.get(`https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/anganwadi-dropdown/?district=${selectedDistrict}&project=${project}`);
           if (res.data.success) setSectors(res.data.data);
         } catch (err) { console.error("Error fetching sectors", err); }
       }
@@ -226,7 +226,7 @@ const Login = () => {
       setFormData(prev => ({ ...prev, email_or_phone: '' }));
       if (sector) {
         try {
-          const res = await axios.get(`https://mahadevaaya.com/golden100days/golden100days_backend/api/anganwadi-dropdown/?district=${selectedDistrict}&project=${selectedProject}&sector=${sector}`);
+          const res = await axios.get(`https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/anganwadi-dropdown/?district=${selectedDistrict}&project=${selectedProject}&sector=${sector}`);
           if (res.data.success) setAnganwadis(res.data.data);
         } catch (err) { console.error("Error fetching anganwadis", err); }
       }
@@ -292,7 +292,7 @@ const Login = () => {
       };
 
       const response = await axios.post(
-        'https://mahadevaaya.com/golden100days/golden100days_backend/api/login/',
+        'https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/login/',
         payload
       );
 
@@ -323,7 +323,7 @@ const Login = () => {
     setLoading(true);
     try {
       const payload = { username: resetPasswordUsername, password: newPassword, role: resetPasswordRole };
-      const response = await axios.post('https://mahadevaaya.com/golden100days/golden100days_backend/api/login/', payload);
+      const response = await axios.post('https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/login/', payload);
       if (response.data.access) {
         handleLoginSuccess(response.data);
       }

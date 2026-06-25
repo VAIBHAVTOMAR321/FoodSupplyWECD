@@ -36,7 +36,7 @@ const ResetPasswordModal = ({ isOpen, onClose, username, role, onPasswordResetSu
       };
 
       const response = await axios.post(
-        'https://mahadevaaya.com/golden100days/golden100days_backend/api/reset-password/',
+        'https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/reset-password/',
         payload
       );
 

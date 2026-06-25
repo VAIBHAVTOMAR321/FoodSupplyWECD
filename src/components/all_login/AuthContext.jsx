@@ -4,7 +4,7 @@ import axios from 'axios';
 const AuthContext = createContext(null);
 
 const STORAGE_KEY = 'gyandhara_auth';
-const API_URL = 'https://mahadevaaya.com/golden100days/golden100days_backend/api';
+const API_URL = 'https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api';
 
 let isRefreshing = false;
 let failedQueue = [];
