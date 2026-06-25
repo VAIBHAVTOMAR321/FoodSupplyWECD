@@ -256,8 +256,7 @@ font-size: 8px !important;
 /* Sidebar Styles */
 .anganwadi-left-nav {
     width: 260px;
-    background: linear-gradient(135deg, #e83855, #383be8, hsl(309, 91%, 54%)) !important;
-    color: white;
+   background: linear-gradient(135deg, #d68996, #8587de, hsl(309deg 41.92% 73.7%)) !important;
     transition: all 0.3s ease;
     position: fixed;
     height: 100vh;
