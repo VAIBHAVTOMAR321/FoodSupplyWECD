@@ -119,10 +119,10 @@ const SectorProfile = () => {
       setPasswordError("Passwords do not match.");
       return;
     }
-    if (password.length < 3) {
-      setPasswordError("Password should be at least 3 characters long.");
-      return;
-    }
+    // if (password.length < 3) {
+    //   setPasswordError("Password should be at least 3 characters long.");
+    //   return;
+    // }
 
     setPasswordLoading(true);
     try {
@@ -225,7 +225,7 @@ const SectorProfile = () => {
                       <Form.Group className="mb-3">
                         <Form.Label>New Password</Form.Label>
                         <InputGroup>
-                          <Form.Control type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter new password" required />
+                          <Form.Control type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter new password" />
                           <Button variant="outline-secondary" onClick={() => setShowPassword(!showPassword)}>
                             {showPassword ? <FaEyeSlash /> : <FaEye />}
                           </Button>
@@ -234,7 +234,7 @@ const SectorProfile = () => {
                       <Form.Group className="mb-3">
                         <Form.Label>Confirm Password</Form.Label>
                         <InputGroup>
-                          <Form.Control type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" required />
+                          <Form.Control type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password"  />
                           <Button variant="outline-secondary" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                             {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
                           </Button>
