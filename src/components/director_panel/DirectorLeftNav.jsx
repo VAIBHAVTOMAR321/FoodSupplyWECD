@@ -102,7 +102,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
     <>
       {/* Desktop Sidebar */}
       <div
-        className={`user-left-nav ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
+        className={`director-left-nav ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
       >
         <div className="sidebar-header">
           {sidebarOpen ? (

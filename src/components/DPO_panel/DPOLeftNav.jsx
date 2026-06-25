@@ -111,7 +111,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
     <>
       {/* Desktop Sidebar */}
       <div
-        className={`user-left-nav ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
+        className={`dpo-left-nav ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
       >
         <div className="sidebar-header">
           {sidebarOpen ? (

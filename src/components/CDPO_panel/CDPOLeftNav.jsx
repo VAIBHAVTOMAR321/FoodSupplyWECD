@@ -102,7 +102,7 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
     <>
       {/* Desktop Sidebar */}
       <div
-        className={`user-left-nav ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
+        className={`cdpo-left-nav ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
       >
         <div className="sidebar-header">
           {sidebarOpen ? (
