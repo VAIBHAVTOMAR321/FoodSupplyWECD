@@ -77,6 +77,13 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
         path: "/SupervisorDashBoard",
         active: true,
       },
+
+      {
+        icon: <FaTachometerAlt />,
+        label: "Sector Profile",
+        path: "/SectorProfile",
+        active: true,
+      },
     
      
   {
