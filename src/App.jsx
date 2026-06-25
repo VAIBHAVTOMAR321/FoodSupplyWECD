@@ -18,9 +18,11 @@ import NavBar from './components/nav_bar/NavBar';
 import Login from "./components/all_login/Login";
 import DPODashboard from "./components/DPO_panel/DPODashboard";
 import AnganwadiDashboard from "./components/anganwadi_panel/AnganwadiDashboard";
+import AnganwadiProfile from "./components/anganwadi_panel/AnganwadiProfile";
 import CDPODashboard from "./components/CDPO_panel/CDPODashboard";
 import DirectorDashboard from "./components/director_panel/DirectorDashboard";
 import Footer from "./components/footer/Footer";
+
 
 
 //  Protected Route component
@@ -44,8 +46,8 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const location = useLocation();
 
-  const hideNavbarRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard"];
-  const hideFooterRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard"];
+  const hideNavbarRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile"];
+  const hideFooterRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile"];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
 
@@ -67,6 +69,16 @@ function AppContent() {
           <Route path="/AnganwadiDashboard" element={
             <ProtectedRoute>
               <AnganwadiDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/AnganwadiProfile" element={
+            <ProtectedRoute>
+              <AnganwadiProfile />
+            </ProtectedRoute>
+          } />
+          <Route path="/AnganwadiProfile" element={
+            <ProtectedRoute>
+              <AnganwadiProfile />
             </ProtectedRoute>
           } />
           <Route path="/CDPODashboard" element={

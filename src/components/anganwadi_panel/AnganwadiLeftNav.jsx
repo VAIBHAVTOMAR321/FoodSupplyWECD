@@ -74,21 +74,14 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
       {
         icon: <FaTachometerAlt />,
         label: "DashBoard",
-        path: "/AnganwadiDashboard",
-        active: true,
+        path: "/AnganwadiDashboard"
       },
     
      
   {
     icon: <FaUsers />,
-    label: "test",
-    submenu: [
-      {
-        label: "Test",
-        path: "#",
-        icon: <FaPlusSquare />,
-      },
-    ],
+    label: "Anganwadi Profile",
+    path: "/AnganwadiProfile"
   },
        {
    icon: <FaClock />,  
@@ -131,7 +124,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
   .map((item, index) => (
     <div key={index}>
       {/* If submenu exists */}
-      {item.submenu ? (
+      {item.submenu ? ( 
         <Nav.Link
           className={`nav-item ${item.active ? "active" : ""}`}
           onClick={() => toggleSubmenu(index)}
@@ -145,7 +138,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
       ) : (
          <Link
            to={item.path}
-           className={`nav-item nav-link ${item.active ? "active" : ""}`}
+           className={`nav-item nav-link ${location.pathname === item.path ? "active" : ""}`}
            onClick={(e) => handleItemClick(e, item.path, item.active)}
          >
            <span className="nav-icon">{item.icon}</span>
@@ -212,7 +205,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
     <Nav className="flex-column">
       {menuItems.map((item, index) => (
         <div key={index}>
-          {item.submenu ? (
+          {item.submenu ? ( 
             <Nav.Link
               className={`nav-item ${item.active ? "active" : ""}`}
               onClick={() => toggleSubmenu(index)}
@@ -226,7 +219,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
           ) : (
              <Link
                to={item.path}
-               className={`nav-item nav-link ${item.active ? "active" : ""}`}
+               className={`nav-item nav-link ${location.pathname === item.path ? "active" : ""}`}
                onClick={(e) => handleItemClick(e, item.path, item.active)}
              >
                <span className="nav-icon">{item.icon}</span>
