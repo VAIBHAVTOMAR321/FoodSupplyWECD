@@ -66,15 +66,15 @@ function NavBar() {
 
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="ms-auto nav-links">
-            <Nav.Link as={Link} to="/" className="nav-link-item" onClick={() => setExpanded(false)}>
+            {/* <Nav.Link as={Link} to="/" className="nav-link-item" onClick={() => setExpanded(false)}>
               <span className="nav-link-dot"></span>
               {language === 'hi' ? 'होम' : 'Home'}
-            </Nav.Link>
+            </Nav.Link> */}
 
-            <Nav.Link as={Link} to="/Login" className="register-btn" onClick={() => setExpanded(false)}>
+            {/* <Nav.Link as={Link} to="/Login" className="register-btn" onClick={() => setExpanded(false)}>
               {language === 'hi' ? 'लॉगिन' : 'Login'}
               <span className="register-btn-arrow">→</span>
-            </Nav.Link>
+            </Nav.Link> */}
 
             {/* Desktop Language Toggle
             <Button 
