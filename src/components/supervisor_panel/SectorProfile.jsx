@@ -206,12 +206,7 @@ const SectorProfile = () => {
                             <Form.Control type="text" value={inchargeMob} onChange={(e) => setInchargeMob(e.target.value)} />
                           </Form.Group>
                         </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Updated On</Form.Label>
-                            <Form.Control type="text" value={profileData.updated_on || ""} disabled />
-                          </Form.Group>
-                        </Col>
+                        
                       </Row>
                     
                     </Form>
