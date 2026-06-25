@@ -107,7 +107,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
     <>
       {/* Desktop Sidebar */}
       <div
-        className={`user-left-nav ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
+        className={`anganwadi-left-nav ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
       >
         <div className="sidebar-header">
           {sidebarOpen ? (
