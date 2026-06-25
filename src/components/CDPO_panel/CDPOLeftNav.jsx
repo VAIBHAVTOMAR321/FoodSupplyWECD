@@ -151,7 +151,7 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
       {/* Submenu */}
       {item.submenu && (
         <Collapse in={openSubmenu === index}>
-          <div className="submenu-container-user">
+          <div className="submenu-container-cdpo">
             {item.submenu.map((subItem, subIndex) => (
                  <Link
                    key={subIndex}
@@ -231,7 +231,7 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
 
           {item.submenu && (
             <Collapse in={openSubmenu === index}>
-              <div className="submenu-container-user">
+              <div className="submenu-container-cdpo">
                 {item.submenu.map((subItem, subIndex) => (
                    <Link
                      key={subIndex}

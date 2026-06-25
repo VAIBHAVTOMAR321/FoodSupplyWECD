@@ -418,13 +418,13 @@
     font-size: 0.8rem;
 }
 
-.submenu-container-user {
+.submenu-container-cdpo{
     background: hsl(240, 28%, 43%) !important;
     padding-left: 2rem;
     line-height: 16px;
 }
 
-.submenu-container-user .nav-item {
+.submenu-container-cdpo.nav-item {
     background: hsl(240, 85%, 30%) !important;
     padding-left: 2rem;
     line-height: 16px;
@@ -448,7 +448,7 @@
     transition: all 0.3s ease;
 }
 
-.submenu-container-user .submenu-item-user:hover {
+.submenu-container-cdpo.submenu-item-user:hover {
     background: rgba(255, 255, 255, 0.2);
     color: #fff;
    
@@ -940,7 +940,7 @@ border: none !important;
      background: rgba(255, 255, 255, 0.2);
  }
  
- .user-mobile-offcanvas .submenu-container-user {
+ .user-mobile-offcanvas .submenu-container-cdpo{
     background: hsl(240, 28%, 43%) !important;
     padding-left: 2rem;
  }
