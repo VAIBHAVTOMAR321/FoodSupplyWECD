@@ -1,0 +1,108 @@
+.dashboard-box .card-hcm,
+.dashboard-box .card-thr {
+  border: none;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+}
+
+.dashboard-box .card-hcm {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.dashboard-box .card-thr {
+  background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+}
+
+.dashboard-box .card-hcm:hover,
+.dashboard-box .card-thr:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-box .card-hcm.active,
+.dashboard-box .card-thr.active {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  border: 2px solid #0d6efd;
+}
+
+.dashboard-box .card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  color: #333;
+}
+
+.dashboard-box .card-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.dashboard-box .card-hcm .card-icon {
+  color: #5a78a7;
+}
+
+.dashboard-box .card-thr .card-icon {
+  color: #6a82fb;
+}
+
+.dashboard-box .card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* View Distribution Modal Styles */
+.view-modal-header {
+  padding: 0.8rem 1.2rem;
+}
+
+.view-modal-header .modal-title {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-bottom: none;
+}
+
+.view-modal-header .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.view-modal-body {
+  background-color: #f8f9fa;
+  padding: 1rem 1.5rem;
+}
+
+.view-modal-row {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.view-modal-row:last-of-type {
+  border-bottom: none;
+}
+
+.view-modal-icon {
+  color: #6c757d;
+  margin-right: 0.75rem;
+  vertical-align: text-bottom;
+}
+
+.view-modal-label {
+  font-weight: 600;
+}
+
+.view-modal-value {
+  color: #495057;
+  font-size: 0.95rem;
+}
+
+.view-modal-body strong {
+  color: #343a40;
+}
+
+.view-modal-footer {
+  border-top: none;
+}

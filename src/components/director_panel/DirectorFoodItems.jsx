@@ -118,16 +118,15 @@ const DirectorFoodItems = () => {
   };
 
   const renderTable = (scheme, items) => (
-    <Card className="food-items-table shadow-sm">
-      <Card.Header className="d-flex justify-content-between align-items-center">
+    <div className="food-items-table-container">
+      <div className="d-flex justify-content-between align-items-center mb-3">
         <h5 className="mb-0">{scheme.toUpperCase()} Food Items</h5>
         <Button variant="primary" size="sm" onClick={() => handleShowModal(scheme)}>
           <FaPlus className="me-2" /> Add New Item
         </Button>
-      </Card.Header>
-      <Card.Body>
-        {loading[scheme] ? (
-          <div className="loading-state"><Spinner animation="border" /></div>
+      </div>
+      {loading[scheme] ? (
+        <div className="text-center p-5"><Spinner animation="border" /></div>
         ) : error[scheme] ? (
           <Alert variant="danger">{error[scheme]}</Alert>
         ) : items.length === 0 ? (
@@ -163,8 +162,7 @@ const DirectorFoodItems = () => {
             </tbody>
           </Table>
         )}
-      </Card.Body>
-    </Card>
+    </div>
   );
 
   return (
