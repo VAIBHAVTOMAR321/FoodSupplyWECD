@@ -166,7 +166,7 @@ const ThrSupervisorDistributions = () => {
               ) : (
                 <div className="table-responsive">
                   <Table striped bordered hover responsive className="mb-0">
-                    <thead>
+                     <thead>
                       <tr>
                         <th>#</th>
                         <th>AWC Name</th>
@@ -185,8 +185,7 @@ const ThrSupervisorDistributions = () => {
                         <th>DPO Status</th>
                         <th>Sector Status</th>
                         <th>Sector Remark</th>
-                        <th>Actions</th>
-                        <th>View Remarks</th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -223,16 +222,15 @@ const ThrSupervisorDistributions = () => {
                               <Button
                                 variant="outline-danger"
                                 size="sm"
+                                className="me-2"
                                 disabled={item.sector_status === "approved" || item.sector_status === "rejected" || loadingAction[item.id]}
                                 onClick={() => handleToggleRemark(item, "rejected")}
                               >
                                 Reject
                               </Button>
-                            </td>
-                            <td>
                               <Button
                                 variant="outline-primary"
-                                size="sm"
+                                size="sm" className="mt-2"
                                 onClick={() => handleViewRemark(item)}
                               >
                                 View
@@ -241,7 +239,7 @@ const ThrSupervisorDistributions = () => {
                           </tr>
                           {openRemarkId === item.id && (
                             <tr>
-                              <td colSpan="19">
+                              <td colSpan="18">
                                 <div className="d-flex align-items-start gap-2">
                                   <Form.Control
                                     type="text"
