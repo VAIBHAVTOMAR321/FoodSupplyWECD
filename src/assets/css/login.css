@@ -11,7 +11,7 @@
   overflow: hidden;
   margin-top: 60px;
   min-height: calc(100vh - 120px);
-  background: #FFFDE7;
+ 
 }
 
 .login-bg-pattern {
@@ -20,23 +20,19 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-image:
-    radial-gradient(circle at 20% 80%, rgba(255, 193, 7, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(245, 158, 11, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(255, 249, 196, 0.3) 0%, transparent 60%);
-  pointer-events: none;
+ 
 }
 
 .login-container {
   display: flex;
   max-width: 1000px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.98);
+  margin-top: 12px;
   border-radius: 24px;
   overflow: hidden;
   box-shadow:
-    0 25px 60px -12px rgba(245, 158, 11, 0.2),
-    0 0 0 1px rgba(255, 193, 7, 0.3);
+    0 25px 60px -12px rgba(127, 148, 254, 0.2),
+    0 0 0 1px rgba(127, 148, 254, 0.2);
   position: relative;
   z-index: 1;
 }
@@ -44,12 +40,13 @@
 .login-left {
   flex: 1;
   min-width: 0;
-  background: #FFFFFF;
+  background-color: #fff;
+ 
 }
 
 .login-right {
   width: 320px;
-  background: linear-gradient(135deg, #FFFDE7 0%, #FFF8E1 50%, #FFECB3 100%);
+  background-color:#007aff;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -58,6 +55,7 @@
 
 .login-content {
   padding: 30px 36px;
+ 
 }
 
 /* ---- Header ---- */
@@ -74,7 +72,7 @@
   left: 10%;
   right: 10%;
   height: 2px;
-  background: linear-gradient(to right, transparent, #FFC107, transparent);
+  background: linear-gradient(to right, transparent, hsl(229, 100%, 51%), transparent);
 }
 
 .brand-logo {
@@ -176,26 +174,25 @@
   padding: 10px 12px;
   border-radius: 8px;
   transition: all 0.2s ease;
-  border: 1px solid #FFE082;
-  background: #FFFDE7;
+  border: 1px solid #8882ff;
+
 }
 
 .radio-option:hover {
-  background: #FFF8E1;
-  border-color: #FFA000;
+ 
+  border-color: hsl(237, 100%, 50%);
 }
-
 .radio-option input[type="radio"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: #FFA000;
+  accent-color: #007aff;
 }
 
 .radio-option:has(input[type="radio"]:checked) {
-  background: #FFF8E1;
-  border-color: #FFA000;
-  box-shadow: 0 0 0 2px rgba(255, 160, 0, 0.2);
+  background: #fffdf8;
+  border-color: #007aff;
+  box-shadow: 0 0 0 2px rgba(255, 160, 0, 0.2); 
 }
 
 .radio-label {
@@ -334,37 +331,37 @@
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #FFA000;
+  color: #0015ff;
   font-size: 15px;
   transition: color 0.2s ease;
   z-index: 2;
   pointer-events: none;
 }
 
-.input-wrapper input:focus ~ i:first-of-type {
-  color: #F57F17;
-}
+/* .input-wrapper input:focus ~ i:first-of-type {
+  color: #8882ff;
+} */
 
 .input-wrapper input {
   width: 100%;
   padding: 11px 42px 11px 38px;
-  border: 2px solid #FFE082;
+  border: 2px solid #007aff;
   border-radius: 10px;
   font-size: 13px;
   transition: all 0.25s ease;
-  background: #FFFDE7;
+ 
   color: #3E2723;
 }
 
 .input-wrapper input:focus {
   outline: none;
-  border-color: #FFA000;
-  background: #FFFFFF;
+  border-color: #007aff;
+
   box-shadow: 0 0 0 4px rgba(255, 160, 0, 0.15);
 }
 
 .input-wrapper input::placeholder {
-  color: #FFB300;
+  color: #007aff;
 }
 
 .password-toggle {
@@ -375,7 +372,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #FFA000;
+  color: #007aff;
   padding: 0;
   width: 24px;
   height: 24px;
@@ -396,7 +393,7 @@
 }
 
 .password-toggle:hover {
-  color: #F57F17;
+  color: #007aff;
 }
 
 /* ---- Options ---- */
@@ -419,34 +416,34 @@
 .remember-me input {
   width: 15px;
   height: 15px;
-  accent-color: #FFA000;
+  accent-color: #007aff;
   cursor: pointer;
 }
 
 .forgot-link {
   font-size: 12px;
-  color: #F57F17;
+  color: #007aff;
   text-decoration: none;
   font-weight: 600;
   transition: color 0.2s ease;
 }
 
 .forgot-link:hover {
-  color: #FF6F00;
+  color: #007aff;
 }
 
 /* ---- Login Button ---- */
 .login-btn {
   width: 100%;
   padding: 13px;
-  background: linear-gradient(135deg, #FFC107 0%, #FFA000 50%, #FF8F00 100%);
+  background-color: #007aff;
   background-size: 200% 100%;
   background-position: 0% 50%;
   border: none;
   border-radius: 12px;
   font-size: 15px;
   font-weight: 700;
-  color: #3E2723;
+  color: #fff;
   cursor: pointer;
   transition: all 0.4s ease;
   display: flex;
@@ -509,7 +506,7 @@
   text-align: center;
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #FFE082;
+  border-top: 1px solid #007aff;
 }
 
 .login-footer p {
@@ -519,14 +516,14 @@
 }
 
 .login-footer a {
-  color: #F57F17;
+  color: #007aff;
   text-decoration: none;
   font-weight: 700;
   transition: color 0.2s ease;
 }
 
 .login-footer a:hover {
-  color: #FF6F00;
+  color: #007aff;
 }
 
 /* ---- Right Panel (Uttarakhand Logo) ---- */
@@ -583,11 +580,18 @@
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-10px); }
 }
-
 .uttarakhand-title {
   font-size: 20px;
   font-weight: 800;
-  color: #3E2723;
+  color: #fff;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.uttarakhand-title-s {
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
   margin: 0;
   letter-spacing: 0.5px;
 }

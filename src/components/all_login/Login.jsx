@@ -37,7 +37,7 @@ const Login = () => {
 
   // Content in Hindi - Government Portal Style (consistent with Home.jsx)
   const content = {
-    brandSubtitle: "आज का कौशल, कल का सशक्तिकरण",
+   
    
     roleLabel: "अपनी भूमिका चुनें",
     userIdLabel: "लॉगिन टाइप",
@@ -340,7 +340,7 @@ const Login = () => {
           <div className="login-right">
           <div className="uttarakhand-section">
             <img src={UkLogo} alt="Uttarakhand Logo" className="uttarakhand-logo" />
-            <h2 className="uttarakhand-title">महिला सशक्तिकरण एवं बाल विकास विभाग<br/>Women Empowerment & Child Development Department</h2>
+            <h2 className="uttarakhand-title-s">महिला सशक्तिकरण एवं बाल विकास विभाग<br/>Women Empowerment & Child Development Department</h2>
             
           </div>
 

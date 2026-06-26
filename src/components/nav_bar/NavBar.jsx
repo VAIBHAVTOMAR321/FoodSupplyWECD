@@ -31,7 +31,7 @@ function NavBar() {
   ''
 ) : (
   <>
- <div style={{ lineHeight: "1.2" }}>
+ <div style={{ lineHeight: "1.2" }} className="women-style">
   
 
 
@@ -49,12 +49,7 @@ function NavBar() {
                 className="women-logo"
               />
             </div>
-            <span className="department-subtitle">
-              {language === 'hi' 
-                ? 'महिला सशक्तिकरण एवं बाल विकास विभाग' 
-                : 'Uttarakhand'} 
-              
-            </span>
+           
           </div>
         </Navbar.Brand>
 

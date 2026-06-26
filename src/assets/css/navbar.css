@@ -19,7 +19,7 @@
   background: #fff !important;
   padding: 0 !important;
   box-shadow: 0 2px 20px rgba(255, 160, 0, 0.1);
-  border-bottom: 2px solid #FFE082;
+  /* border-bottom: 2px solid hsl(235, 100%, 75%); */
   transition: all 0.3s ease;
   min-height: 70px;
   display: flex;
@@ -29,7 +29,9 @@
 .custom-navbar.scrolled {
   box-shadow: 0 4px 30px rgba(255, 160, 0, 0.2);
 }
-
+.women-style{
+  text-align: justify;
+}
 /* ---- Brand / Logo ---- */
 .brand-logo-wrapper {
   display: flex;
