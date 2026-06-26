@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal } from "react-bootstrap";
+import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/supervisorleftnav.css";
 import SupervisorHeader from "./SupervisorHeader";
@@ -21,6 +21,8 @@ const ThrSupervisorDistributions = () => {
   const [openRemarkAction, setOpenRemarkAction] = useState("");
   const [remarkValue, setRemarkValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
 
   const [showRemarkModal, setShowRemarkModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState(null);
@@ -133,6 +135,46 @@ const ThrSupervisorDistributions = () => {
     }
   };
 
+  const indexOfLast = currentPage * itemsPerPage;
+  const indexOfFirst = indexOfLast - itemsPerPage;
+  const currentItems = distributions.slice(indexOfFirst, indexOfLast);
+  const totalPages = Math.ceil(distributions.length / itemsPerPage);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+    const items = [];
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    if (endPage - startPage + 1 < maxVisible) {
+      startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+    items.push(
+      <Pagination.First key="first" onClick={() => handlePageChange(1)} disabled={currentPage === 1} />,
+      <Pagination.Prev key="prev" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
+    );
+    for (let i = startPage; i <= endPage; i++) {
+      items.push(
+        <Pagination.Item key={i} active={i === currentPage} onClick={() => handlePageChange(i)}>
+          {i}
+        </Pagination.Item>
+      );
+    }
+    items.push(
+      <Pagination.Next key="next" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />,
+      <Pagination.Last key="last" onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
+    );
+    return (
+      <div className="d-flex justify-content-center mt-3">
+        <Pagination size="sm">{items}</Pagination>
+      </div>
+    );
+  };
+
   return (
     <div className="dashboard-container">
       <SupervisorLeftNav
@@ -189,7 +231,7 @@ const ThrSupervisorDistributions = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {distributions.map((item, index) => (
+                      {currentItems.map((item, index) => (
                         <React.Fragment key={item.id}>
                           <tr>
                             <td>{index + 1}</td>
@@ -233,7 +275,7 @@ const ThrSupervisorDistributions = () => {
                                 size="sm" className="mt-2"
                                 onClick={() => handleViewRemark(item)}
                               >
-                                View
+                                View Remark
                               </Button>
                             </td>
                           </tr>
@@ -279,6 +321,7 @@ const ThrSupervisorDistributions = () => {
                       ))}
                     </tbody>
                   </Table>
+                  {renderPagination()}
                 </div>
               )}
             </Card.Body>
