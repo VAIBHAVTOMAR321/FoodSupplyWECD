@@ -14,6 +14,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import Home from './components/pages/Home';
 import { AuthProvider, useAuth } from './components/all_login/AuthContext';
 import SupervisorDashBoard from "./components/supervisor_panel/SupervisorDashBoard";
+import ThrSupervisorDistributions from "./components/supervisor_panel/ThrSupervisorDistributions";
 import NavBar from './components/nav_bar/NavBar';
 import Login from "./components/all_login/Login";
 import DPODashboard from "./components/DPO_panel/DPODashboard";
@@ -49,8 +50,8 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const location = useLocation();
 
-  const hideNavbarRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard"];
-  const hideFooterRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard"];
+  const hideNavbarRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions"];
+  const hideFooterRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions"];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
 
@@ -99,12 +100,17 @@ function AppContent() {
               <DirectorFoodItems />
             </ProtectedRoute>
           } />
-           <Route path="/SectorProfile" element={
-            <ProtectedRoute>
-              <SectorProfile /> 
-            </ProtectedRoute>
-          } />
-           <Route path="/ITCellDashBoard" element={
+<Route path="/SectorProfile" element={
+             <ProtectedRoute>
+               <SectorProfile /> 
+             </ProtectedRoute>
+           } />
+            <Route path="/thr-supervisor-distributions" element={
+             <ProtectedRoute>
+               <ThrSupervisorDistributions />
+             </ProtectedRoute>
+           } />
+            <Route path="/ITCellDashBoard" element={
             <ProtectedRoute>
               <ITCellDashBoard />
             </ProtectedRoute>
