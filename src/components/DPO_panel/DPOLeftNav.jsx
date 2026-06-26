@@ -77,6 +77,13 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
         path: "/DPODashboard",
         active: true,
       },
+
+        {
+        icon: <FaTachometerAlt />,
+        label: "THR Distributions",
+        path: "/ThrDpoDistributions",
+        active: true,
+      },
     
      
   {

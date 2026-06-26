@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination } from "react-bootstrap";
-import { useAuth } from "../all_login/AuthContext";
-import "../../assets/css/supervisorleftnav.css";
-import SupervisorHeader from "./SupervisorHeader";
-import SupervisorLeftNav from "./SupervisorLeftNav";
 
-const ThrSupervisorDistributions = () => {
+import "../../assets/css/supervisorleftnav.css";
+import CDPOLeftNav from "./CDPOLeftNav";
+import CDPOHeader from "./CDPOHeader";
+import { useAuth } from "../all_login/AuthContext";
+
+
+
+const ThrCdpoDistributions = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -43,7 +46,7 @@ const ThrSupervisorDistributions = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await api.get("/thr-supervisor-distributions/");
+      const response = await api.get("/thr-cdpo-distributions/");
       const raw = response.data?.data || response.data || [];
       const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
       setDistributions(items);
@@ -90,16 +93,16 @@ const ThrSupervisorDistributions = () => {
     setSubmitting(true);
     setLoadingAction(prev => ({ ...prev, [item.id]: true }));
     try {
-      const response = await api.put("/thr-supervisor-distributions/", {
+      const response = await api.put("/thr-cdpo-distributions/", {
         id: item.id,
-        sector_status: action,
-        sector_remark: remark || null,
+        cdpo_status: action,
+        cdpo_remark: remark || null,
       });
 
       if (response.data?.success !== false) {
         setSuccessMsg(`Status updated to ${action} successfully.`);
         setDistributions(prev => prev.map(d =>
-          d.id === item.id ? { ...d, sector_status: action, sector_remark: remark || null } : d
+          d.id === item.id ? { ...d, cdpo_status: action, cdpo_remark: remark || null } : d
         ));
         setOpenRemarkId(null);
         setOpenRemarkAction("");
@@ -177,19 +180,19 @@ const ThrSupervisorDistributions = () => {
 
   return (
     <div className="dashboard-container">
-      <SupervisorLeftNav
+      <CDPOLeftNav
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
         isMobile={isMobile}
         isTablet={isTablet}
       />
       <div className="main-content-dash">
-        <SupervisorHeader toggleSidebar={toggleSidebar} />
+        <CDPOHeader toggleSidebar={toggleSidebar} />
 
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading">
             <h3 className="mb-4 fw-bold">
-              THR Supervisor Distributions
+              THR cdpo Distributions
             </h3>
           </div>
 
@@ -226,7 +229,7 @@ const ThrSupervisorDistributions = () => {
                         <th>CDPO Status</th>
                         <th>DPO Status</th>
                         <th>Sector Status</th>
-                        <th>Sector Remark</th>
+                        <th>CDPO Remark</th>
                         <th>Action</th>
                       </tr>
                     </thead>
@@ -250,13 +253,13 @@ const ThrSupervisorDistributions = () => {
                             <td><Badge bg={getStatusVariant(item.cdpo_status)}>{item.cdpo_status || "pending"}</Badge></td>
                             <td><Badge bg={getStatusVariant(item.dpo_status)}>{item.dpo_status || "pending"}</Badge></td>
                             <td><Badge bg={getStatusVariant(item.sector_status)}>{item.sector_status}</Badge></td>
-                            <td>{item.sector_remark || "-"}</td>
+                            <td>{item.cdpo_remark || "-"}</td>
                             <td>
                               <Button
                                 variant="outline-success"
                                 size="sm"
                                 className="me-2"
-                                disabled={item.sector_status === "approved" || item.sector_status === "rejected" || loadingAction[item.id]}
+                                disabled={item.sector_status === "pending" || item.sector_status === "pendings" || item.cdpo_status === "approved" || item.cdpo_status === "rejected" || loadingAction[item.id]}
                                 onClick={() => handleToggleRemark(item, "approved")}
                               >
                                 Approve
@@ -265,7 +268,7 @@ const ThrSupervisorDistributions = () => {
                                 variant="outline-danger"
                                 size="sm"
                                 className="me-2"
-                                disabled={item.sector_status === "approved" || item.sector_status === "rejected" || loadingAction[item.id]}
+                                disabled={item.sector_status === "pending" || item.sector_status === "pendings" || item.cdpo_status === "approved" || item.cdpo_status === "rejected" || loadingAction[item.id]}
                                 onClick={() => handleToggleRemark(item, "rejected")}
                               >
                                 Reject
@@ -367,4 +370,4 @@ const ThrSupervisorDistributions = () => {
   );
 };
 
-export default ThrSupervisorDistributions;
+export default ThrCdpoDistributions;

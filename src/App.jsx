@@ -28,6 +28,8 @@ import DirectorFoodItems from "./components/director_panel/DirectorFoodItems";
 import HCMDirectorReport from "./components/director_panel/HCMDirectorReport";
 import THRDirectorReport from "./components/director_panel/THRDirectorReport";
 import ITCellDashBoard from "./components/it_cell_panel/ITCellDashBoard";
+import ThrCdpoDistributions from "./components/CDPO_panel/ThrCdpoDistributions";
+import ThrDpoDistributions from "./components/DPO_panel/ThrDpoDistributions";
 
 
 
@@ -52,8 +54,8 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const location = useLocation();
 
-  const hideNavbarRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport"];
-  const hideFooterRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport"];
+  const hideNavbarRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions"];
+  const hideFooterRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions"];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
 
@@ -82,9 +84,9 @@ function AppContent() {
               <AnganwadiProfile />
             </ProtectedRoute>
           } />
-          <Route path="/AnganwadiProfile" element={
+          <Route path="/ThrDpoDistributions" element={
             <ProtectedRoute>
-              <AnganwadiProfile />
+              <ThrDpoDistributions />               
             </ProtectedRoute>
           } />
           <Route path="/CDPODashboard" element={
@@ -92,6 +94,7 @@ function AppContent() {
               <CDPODashboard />
             </ProtectedRoute>
           } />
+
           <Route path="/DirectorDashboard" element={
             <ProtectedRoute>
               <DirectorDashboard />
@@ -110,6 +113,11 @@ function AppContent() {
           <Route path="/THRDirectorReport" element={
             <ProtectedRoute>
               <THRDirectorReport />
+            </ProtectedRoute>
+          } />
+           <Route path="/ThrCdpoDistributions" element={
+            <ProtectedRoute>
+              <ThrCdpoDistributions />
             </ProtectedRoute>
           } />
             <Route path="/SectorProfile" element={
