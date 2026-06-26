@@ -221,13 +221,6 @@ const THRDirectorReport = () => {
     );
   }
 
-  const totals = useMemo(() => {
-    return filteredData.reduce((acc, item) => {
-        acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-        acc.quantity += parseFloat(item.quantity) || 0;
-        return acc;
-    }, { beneficiaries: 0, quantity: 0 });
-  }, [filteredData]);
   return (
     <div className="dashboard-container">
       <DirectorLeftNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} />
