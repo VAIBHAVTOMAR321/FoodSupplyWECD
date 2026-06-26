@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Card, Spinner, Table, Button, Modal, Form, Alert, Badge } from "react-bootstrap";
+import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/supervisorleftnav.css";
 import SupervisorHeader from "./SupervisorHeader";
@@ -14,14 +14,16 @@ const ThrSupervisorDistributions = () => {
   const [distributions, setDistributions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const [showModal, setShowModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [pendingAction, setPendingAction] = useState("");
-  const [remark, setRemark] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [actionError, setActionError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [loadingAction, setLoadingAction] = useState({});
+  const [openRemarkId, setOpenRemarkId] = useState(null);
+  const [openRemarkAction, setOpenRemarkAction] = useState("");
+  const [remarkValue, setRemarkValue] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const [showRemarkModal, setShowRemarkModal] = useState(false);
+  const [selectedRemarks, setSelectedRemarks] = useState(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -61,49 +63,45 @@ const ThrSupervisorDistributions = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const handleOpenModal = (item, action) => {
-    setSelectedItem(item);
-    setPendingAction(action);
-    setRemark("");
-    setActionError("");
-    setShowModal(true);
+  const handleToggleRemark = (item, action) => {
+    if (openRemarkId === item.id) {
+      setOpenRemarkId(null);
+      setOpenRemarkAction("");
+    } else {
+      setOpenRemarkId(item.id);
+      setOpenRemarkAction(action);
+      setRemarkValue("");
+      setActionError("");
+    }
   };
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setSelectedItem(null);
-    setPendingAction("");
-    setRemark("");
-    setActionError("");
-  };
-
-  const handleStatusUpdate = async (e) => {
-    e.preventDefault();
-    if (!selectedItem) return;
-
+  const handleStatusUpdate = async (item) => {
+    const action = openRemarkAction;
+    const remark = remarkValue.trim();
     setActionError("");
 
-    if (pendingAction === "rejected" && !remark.trim()) {
-      setActionError("Please provide a remark for rejection.");
+    if (action === "rejected" && !remark) {
+      setActionError("Please enter a remark for rejection.");
       return;
     }
 
     setSubmitting(true);
+    setLoadingAction(prev => ({ ...prev, [item.id]: true }));
     try {
       const response = await api.put("/thr-supervisor-distributions/", {
-        id: selectedItem.id,
-        sector_status: pendingAction,
-        sector_remark: remark.trim() || null,
+        id: item.id,
+        sector_status: action,
+        sector_remark: remark || null,
       });
 
       if (response.data?.success !== false) {
-        setSuccessMsg(`Status updated to ${pendingAction} successfully.`);
-        setDistributions(prev => prev.map(item =>
-          item.id === selectedItem.id
-            ? { ...item, sector_status: pendingAction, sector_remark: remark.trim() || null }
-            : item
+        setSuccessMsg(`Status updated to ${action} successfully.`);
+        setDistributions(prev => prev.map(d =>
+          d.id === item.id ? { ...d, sector_status: action, sector_remark: remark || null } : d
         ));
-        handleCloseModal();
+        setOpenRemarkId(null);
+        setOpenRemarkAction("");
+        setRemarkValue("");
         setTimeout(() => setSuccessMsg(""), 3000);
       } else {
         setActionError(response.data?.message || "Failed to update status.");
@@ -113,7 +111,18 @@ const ThrSupervisorDistributions = () => {
       console.error(err);
     } finally {
       setSubmitting(false);
+      setLoadingAction(prev => ({ ...prev, [item.id]: false }));
     }
+  };
+
+  const handleViewRemark = (item) => {
+    setSelectedRemarks(item);
+    setShowRemarkModal(true);
+  };
+
+  const handleCloseRemarkModal = () => {
+    setShowRemarkModal(false);
+    setSelectedRemarks(null);
   };
 
   const getStatusVariant = (status) => {
@@ -144,6 +153,7 @@ const ThrSupervisorDistributions = () => {
 
           {successMsg && <Alert variant="success" className="mb-3">{successMsg}</Alert>}
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
+          {actionError && <Alert variant="danger" className="mb-3">{actionError}</Alert>}
 
           <Card className="shadow-sm">
             <Card.Body>
@@ -176,48 +186,98 @@ const ThrSupervisorDistributions = () => {
                         <th>Sector Status</th>
                         <th>Sector Remark</th>
                         <th>Actions</th>
+                        <th>View Remarks</th>
                       </tr>
                     </thead>
                     <tbody>
                       {distributions.map((item, index) => (
-                        <tr key={item.id}>
-                          <td>{index + 1}</td>
-                          <td>{item.awc_name}</td>
-                          <td>{item.awc_code}</td>
-                          <td>{item.awc_type}</td>
-                          <td>{item.sector}</td>
-                          <td>{item.project}</td>
-                          <td>{item.district}</td>
-                          <td>{item.food_item}</td>
-                          <td>{item.quantity}</td>
-                          <td>{item.unit}</td>
-                          <td>{item.total_beneficiaries}</td>
-                          <td>{item.fin_year}</td>
-                          <td>{item.quarter}</td>
-                          <td><Badge bg={item.cdpo_status === "approved" ? "success" : item.cdpo_status === "rejected" ? "danger" : "warning"}>{item.cdpo_status || "pending"}</Badge></td>
-                          <td><Badge bg={item.dpo_status === "approved" ? "success" : item.dpo_status === "rejected" ? "danger" : "warning"}>{item.dpo_status || "pending"}</Badge></td>
-                          <td><Badge bg={getStatusVariant(item.sector_status)}>{item.sector_status}</Badge></td>
-                          <td>{item.sector_remark || "-"}</td>
-                          <td>
-                            <Button
-                              variant="outline-success"
-                              size="sm"
-                              className="me-2"
-                              disabled={item.sector_status === "approved" || item.sector_status === "rejected"}
-                              onClick={() => handleOpenModal(item, "approved")}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              variant="outline-danger"
-                              size="sm"
-                              disabled={item.sector_status === "approved" || item.sector_status === "rejected"}
-                              onClick={() => handleOpenModal(item, "rejected")}
-                            >
-                              Reject
-                            </Button>
-                          </td>
-                        </tr>
+                        <React.Fragment key={item.id}>
+                          <tr>
+                            <td>{index + 1}</td>
+                            <td>{item.awc_name}</td>
+                            <td>{item.awc_code}</td>
+                            <td>{item.awc_type}</td>
+                            <td>{item.sector}</td>
+                            <td>{item.project}</td>
+                            <td>{item.district}</td>
+                            <td>{item.food_item}</td>
+                            <td>{item.quantity}</td>
+                            <td>{item.unit}</td>
+                            <td>{item.total_beneficiaries}</td>
+                            <td>{item.fin_year}</td>
+                            <td>{item.quarter}</td>
+                            <td><Badge bg={getStatusVariant(item.cdpo_status)}>{item.cdpo_status || "pending"}</Badge></td>
+                            <td><Badge bg={getStatusVariant(item.dpo_status)}>{item.dpo_status || "pending"}</Badge></td>
+                            <td><Badge bg={getStatusVariant(item.sector_status)}>{item.sector_status}</Badge></td>
+                            <td>{item.sector_remark || "-"}</td>
+                            <td>
+                              <Button
+                                variant="outline-success"
+                                size="sm"
+                                className="me-2"
+                                disabled={item.sector_status === "approved" || item.sector_status === "rejected" || loadingAction[item.id]}
+                                onClick={() => handleToggleRemark(item, "approved")}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                variant="outline-danger"
+                                size="sm"
+                                disabled={item.sector_status === "approved" || item.sector_status === "rejected" || loadingAction[item.id]}
+                                onClick={() => handleToggleRemark(item, "rejected")}
+                              >
+                                Reject
+                              </Button>
+                            </td>
+                            <td>
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={() => handleViewRemark(item)}
+                              >
+                                View
+                              </Button>
+                            </td>
+                          </tr>
+                          {openRemarkId === item.id && (
+                            <tr>
+                              <td colSpan="19">
+                                <div className="d-flex align-items-start gap-2">
+                                  <Form.Control
+                                    type="text"
+                                    size="sm"
+                                    placeholder="Enter remark"
+                                    value={remarkValue}
+                                    onChange={(e) => setRemarkValue(e.target.value)}
+                                    className="me-2"
+                                    style={{ maxWidth: "300px" }}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant={openRemarkAction === "approved" ? "success" : "danger"}
+                                    disabled={submitting || loadingAction[item.id]}
+                                    onClick={() => handleStatusUpdate(item)}
+                                  >
+                                    {loadingAction[item.id] ? "Saving..." : "Save"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={submitting || loadingAction[item.id]}
+                                    onClick={() => {
+                                      setOpenRemarkId(null);
+                                      setOpenRemarkAction("");
+                                      setRemarkValue("");
+                                      setActionError("");
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </Table>
@@ -227,33 +287,38 @@ const ThrSupervisorDistributions = () => {
           </Card>
         </Container>
 
-        <Modal show={showModal} onHide={handleCloseModal} centered>
+        <Modal show={showRemarkModal} onHide={handleCloseRemarkModal} centered size="lg">
           <Modal.Header closeButton>
-            <Modal.Title>
-              {pendingAction === "approved" ? "Approve" : "Reject"} Distribution
-            </Modal.Title>
+            <Modal.Title>All Remarks - {selectedRemarks?.awc_name}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            {actionError && <Alert variant="danger">{actionError}</Alert>}
-            <Form onSubmit={handleStatusUpdate}>
-              <Form.Group className="mb-3">
-                <Form.Label>Remark</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  placeholder="Enter remark (optional for approve, required for reject)"
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                />
-              </Form.Group>
-              <Button variant="secondary" onClick={handleCloseModal} className="me-2" disabled={submitting}>
-                Cancel
-              </Button>
-              <Button variant={pendingAction === "approved" ? "success" : "danger"} type="submit" disabled={submitting}>
-                {submitting ? <Spinner as="span" animation="border" size="sm" /> : pendingAction === "approved" ? "Approve" : "Reject"}
-              </Button>
-            </Form>
+            {selectedRemarks && (
+              <div>
+                <div className="mb-3">
+                  <h6>CDPO Remark</h6>
+                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.cdpo_status)}>{selectedRemarks.cdpo_status || "pending"}</Badge></p>
+                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.cdpo_remark || "No remark"}</p>
+                </div>
+                <hr />
+                <div className="mb-3">
+                  <h6>DPO Remark</h6>
+                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.dpo_status)}>{selectedRemarks.dpo_status || "pending"}</Badge></p>
+                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.dpo_remark || "No remark"}</p>
+                </div>
+                <hr />
+                <div className="mb-3">
+                  <h6>Sector Remark</h6>
+                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>{selectedRemarks.sector_status}</Badge></p>
+                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.sector_remark || "No remark"}</p>
+                </div>
+              </div>
+            )}
           </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseRemarkModal}>
+              Close
+            </Button>
+          </Modal.Footer>
         </Modal>
 
       </div>
