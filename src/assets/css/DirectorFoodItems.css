@@ -1,0 +1,126 @@
+.food-items-container {
+  background-color: #f4f7f9;
+  min-height: calc(100vh - 60px); /* Adjust based on header height */
+}
+
+.food-items-content {
+  padding: 1.5rem;
+}
+
+/* Page Title */
+.page-title {
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 1.5rem !important;
+  padding-bottom: 0.5rem;
+  border-bottom: 3px solid #e0e0e0;
+}
+
+/* Tab Styling */
+.food-items-tabs .nav-link {
+  font-weight: 600;
+  color: #5a6e82;
+  border: none;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s ease;
+  padding: 0.75rem 1.25rem;
+  margin-right: 0.5rem;
+}
+
+.food-items-tabs .nav-link.active {
+  color: #0d6efd;
+  background-color: transparent;
+  border-bottom-color: #0d6efd;
+}
+
+.food-items-tabs .nav-link:hover {
+  color: #0d6efd;
+  background-color: #e9ecef;
+  border-radius: 5px 5px 0 0;
+}
+
+/* Table Card Styling */
+.food-items-table {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #dee2e6;
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+.food-items-table:hover {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
+}
+
+.food-items-table .card-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  padding: 0.75rem 1.25rem;
+}
+
+.food-items-table .table {
+  margin-bottom: 0;
+  vertical-align: middle;
+}
+
+.food-items-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #495057;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+.food-items-table tbody tr:hover {
+  background-color: #f0f5ff;
+}
+
+.food-items-table .btn-action {
+  margin-right: 5px;
+  transition: all 0.2s ease-in-out;
+}
+
+.food-items-table .btn-action:hover {
+  transform: scale(1.1);
+}
+
+.modal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.modal-header .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.form-label {
+  font-weight: 600;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+}
+
+@media (max-width: 767.98px) {
+  .food-items-content {
+    padding: 1rem;
+  }
+
+  .food-items-table {
+    font-size: 0.9rem;
+  }
+
+  .btn-action {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+  }
+}

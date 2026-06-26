@@ -27,7 +27,8 @@ import {
   FaBriefcase,
   FaGraduationCap,
   FaTasks,
-  FaClock
+  FaClock,
+  FaAppleAlt,
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -76,6 +77,11 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
         label: "DashBoard",
         path: "/DirectorDashboard",
         active: true,
+      },
+      {
+        icon: <FaAppleAlt />,
+        label: "Food Items",
+        path: "/director/food-items",
       },
     
      
