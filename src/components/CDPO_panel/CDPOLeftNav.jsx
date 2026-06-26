@@ -77,6 +77,13 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
         path: "/CDPODashboard",
         active: true,
       },
+
+      {
+        icon: <FaTachometerAlt />,
+        label: "THR Distributions",
+        path: "/ThrCdpoDistributions",
+        active: true,
+      },
     
      
   {
