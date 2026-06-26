@@ -78,17 +78,23 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
         active: true,
       },
 
-      {
-        icon: <FaTachometerAlt />,
-        label: "Sector Profile",
-        path: "/SectorProfile",
-        active: true,
-      },
-    
+{
+         icon: <FaTachometerAlt />,
+         label: "Sector Profile",
+         path: "/SectorProfile",
+         active: true,
+       },
+       {
+         icon: <FaCube />,
+         label: "THR Distributions",
+         path: "/thr-supervisor-distributions",
+         active: true,
+       },
      
-  {
-    icon: <FaUsers />,
-    label: "test",
+      
+   {
+     icon: <FaUsers />,
+     label: "test",
     submenu: [
       {
         label: "Test",
