@@ -51,7 +51,6 @@ const Login = () => {
     rememberMe: "मुझे याद रखें",
     signIn: "साइन इन करें",
     signingIn: "साइन इन हो रहा है...",
-    
     learnTitle: "सीखें",
     learnDesc: "गुणवत्तापूर्ण शिक्षा और नए पाठ्यक्रमों तक पहुंच प्राप्त करें",
     growTitle: "बढ़ें",

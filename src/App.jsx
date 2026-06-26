@@ -109,7 +109,7 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router basename="/angfoodproject">
         <AppContent />
       </Router>
     </AuthProvider>
