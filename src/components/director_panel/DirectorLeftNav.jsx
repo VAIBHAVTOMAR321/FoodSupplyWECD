@@ -76,7 +76,6 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
         icon: <FaTachometerAlt />,
         label: "DashBoard",
         path: "/DirectorDashboard",
-        active: true,
       },
       {
         icon: <FaAppleAlt />,
@@ -139,7 +138,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
       {/* If submenu exists */}
       {item.submenu ? (
         <Nav.Link
-          className={`nav-item ${item.active ? "active" : ""}`}
+          className={`nav-item ${item.submenu.some(sub => sub.path === location.pathname) ? "active" : ""}`}
           onClick={() => toggleSubmenu(index)}
         >
           <span className="nav-icon">{item.icon}</span>
@@ -151,7 +150,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
       ) : (
          <Link
            to={item.path}
-           className={`nav-item nav-link ${item.active ? "active" : ""}`}
+           className={`nav-item nav-link ${location.pathname === item.path ? "active" : ""}`}
            onClick={(e) => handleItemClick(e, item.path, item.active)}
          >
            <span className="nav-icon">{item.icon}</span>
@@ -220,7 +219,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
         <div key={index}>
           {item.submenu ? (
             <Nav.Link
-              className={`nav-item ${item.active ? "active" : ""}`}
+              className={`nav-item ${item.submenu.some(sub => sub.path === location.pathname) ? "active" : ""}`}
               onClick={() => toggleSubmenu(index)}
             >
               <span className="nav-icon">{item.icon}</span>
@@ -232,7 +231,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
           ) : (
              <Link
                to={item.path}
-               className={`nav-item nav-link ${item.active ? "active" : ""}`}
+               className={`nav-item nav-link ${location.pathname === item.path ? "active" : ""}`}
                onClick={(e) => handleItemClick(e, item.path, item.active)}
              >
                <span className="nav-icon">{item.icon}</span>
