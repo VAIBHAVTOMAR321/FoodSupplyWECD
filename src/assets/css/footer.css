@@ -3,18 +3,18 @@
     ========================================== */
 
 .gov-footer {
-  background: linear-gradient(135deg, #FFFDE7 0%, #FFF8E1 50%, #FFECB3 100%);
+
   color: #5D4037;
   font-size: 0.9rem;
-  padding: 50px 0 20px;
-  border-top: 3px solid #FFC107;
+ 
+  border-top: 1px solid hsl(236, 100%, 51%);
 }
 
 .gov-footer h6 {
   font-size: 1rem;
   font-weight: 700;
   color: #3E2723;
-  margin-bottom: 18px;
+
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
