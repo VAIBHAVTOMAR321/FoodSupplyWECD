@@ -24,6 +24,7 @@ import DirectorDashboard from "./components/director_panel/DirectorDashboard";
 import Footer from "./components/footer/Footer";
 import SectorProfile from "./components/supervisor_panel/SectorProfile";
 import DirectorFoodItems from "./components/director_panel/DirectorFoodItems";
+import ITCellDashBoard from "./components/it_cell_panel/ITCellDashBoard";
 
 
 
@@ -48,8 +49,8 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const location = useLocation();
 
-  const hideNavbarRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items"];
-  const hideFooterRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items"];
+  const hideNavbarRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard"];
+  const hideFooterRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard"];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
 
@@ -100,7 +101,12 @@ function AppContent() {
           } />
            <Route path="/SectorProfile" element={
             <ProtectedRoute>
-              <SectorProfile />
+              <SectorProfile /> 
+            </ProtectedRoute>
+          } />
+           <Route path="/ITCellDashBoard" element={
+            <ProtectedRoute>
+              <ITCellDashBoard />
             </ProtectedRoute>
           } />
             
