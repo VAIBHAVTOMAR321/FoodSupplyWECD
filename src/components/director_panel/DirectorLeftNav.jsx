@@ -87,11 +87,16 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
      
   {
     icon: <FaUsers />,
-    label: "test",
+    label: "Reports",
     submenu: [
       {
-        label: "Test",
-        path: "#",
+        label: "HCM Report",
+        path: "/HCMDirectorReport",
+        icon: <FaPlusSquare />,
+      },
+      {
+        label: "THR Report",
+        path: "/THRDirectorReport",
         icon: <FaPlusSquare />,
       },
     ],

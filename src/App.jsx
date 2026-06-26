@@ -25,6 +25,8 @@ import DirectorDashboard from "./components/director_panel/DirectorDashboard";
 import Footer from "./components/footer/Footer";
 import SectorProfile from "./components/supervisor_panel/SectorProfile";
 import DirectorFoodItems from "./components/director_panel/DirectorFoodItems";
+import HCMDirectorReport from "./components/director_panel/HCMDirectorReport";
+import THRDirectorReport from "./components/director_panel/THRDirectorReport";
 import ITCellDashBoard from "./components/it_cell_panel/ITCellDashBoard";
 
 
@@ -50,8 +52,8 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const location = useLocation();
 
-  const hideNavbarRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions"];
-  const hideFooterRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions"];
+  const hideNavbarRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport"];
+  const hideFooterRoutes = ["/SupervisorDashBoard", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport"];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
 
@@ -100,7 +102,17 @@ function AppContent() {
               <DirectorFoodItems />
             </ProtectedRoute>
           } />
-<Route path="/SectorProfile" element={
+          <Route path="/HCMDirectorReport" element={
+            <ProtectedRoute>
+              <HCMDirectorReport />
+            </ProtectedRoute>
+          } />
+          <Route path="/THRDirectorReport" element={
+            <ProtectedRoute>
+              <THRDirectorReport />
+            </ProtectedRoute>
+          } />
+            <Route path="/SectorProfile" element={
              <ProtectedRoute>
                <SectorProfile /> 
              </ProtectedRoute>
