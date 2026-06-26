@@ -61,8 +61,8 @@ const Login = () => {
       userIdRequired: "यूजर आईडी / फोन आवश्यक है",
       passwordRequired: "पासवर्ड आवश्यक है",
       loginFailed: "लॉगिन विफल रहा। कृपया पुनः प्रयास करें।",
-      loginSuccess: "लॉगिन सफल!",
-      invalidCredentials: "गलत क्रेडेंशियल। कृपया पुनः प्रयास करें।",
+      loginSuccess: "Login Successfully!",
+      invalidCredentials: "Invalid credentials. Please try again.",
       userNotFound: "उपयोगकर्ता नहीं मिला।",
       defaultPasswordNotAllowed: "डिफ़ॉल्ट पासवर्ड की अनुमति नहीं है। कृपया अपना पासवर्ड रीसेट करें।"
     },
@@ -261,7 +261,7 @@ const Login = () => {
         navigate('/AnganwadiDashboard');
         break;
       case 'it-cell':
-        navigate('/ITCellDashboard');
+        navigate('/ITCellDashBoard');
         break;
       default:
         navigate('/UserDashboard');
