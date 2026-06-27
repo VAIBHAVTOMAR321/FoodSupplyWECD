@@ -141,11 +141,10 @@ const HCMDirectorReport = () => {
       })
     );
 
-    const beneficiaryIndex = visibleColumns.findIndex(c => c.dataField === 'total_beneficiaries');
     const totalRow = visibleColumns.map((col, idx) => {
-      if (idx < beneficiaryIndex) return '';
-      if (col.dataField === 'total_beneficiaries') return String(totals.beneficiaries);
-      if (col.dataField === 'quantity') return totals.quantity.toFixed(2);
+      if (idx === 0) return 'Total';
+      if (col.dataField === 'total_beneficiaries') return totals.beneficiaries.toString();
+      if (col.dataField === 'quantity') return totals.quantity.toFixed(2).toString();
       return '';
     });
     body.push(totalRow);
@@ -156,9 +155,23 @@ const HCMDirectorReport = () => {
       startY: 20,
       head: head,
       body: body,
-      theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [34, 139, 34] },
+      theme: 'striped',
+      styles: {
+        fontSize: 7,
+        cellPadding: 2,
+        textColor: [0, 0, 0],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+      },
+      bodyStyles: {
+        fillColor: [255, 255, 255],
+      },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
     });
     doc.save('hcm_director_report.pdf');
   };
@@ -175,12 +188,11 @@ const HCMDirectorReport = () => {
       return newRow;
     });
 
-    const beneficiaryIndex = visibleColumns.findIndex(c => c.dataField === 'total_beneficiaries');
-    const totalRow = { '#': '' };
+    const totalRow = { '#': 'Total' };
     visibleColumns.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
       else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
-      else totalRow[col.text] = '';
+      else if (col.text !== '#') totalRow[col.text] = '';
     });
     dataToExport.push(totalRow);
 
