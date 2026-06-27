@@ -53,8 +53,8 @@ font-size: 8px !important;
 }
 
 .dashboard-card-icon {
-    width: 20px !important;
-    height: 20px !important;
+    width: 60px !important;
+    height: 60px !important;
     margin-bottom: 2px !important;
     display: flex;
     align-items: center;
