@@ -78,35 +78,24 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
         active: true,
       },
 
-        {
-        icon: <FaTachometerAlt />,
-        label: "THR Distributions",
-        path: "/ThrDpoDistributions",
-        active: true,
-      },
-    
+      
      
   {
     icon: <FaUsers />,
-    label: "test",
+    label: "Distributions",
     submenu: [
       {
-        label: "Registered Student",
-        path: "#",
+        label: "THR Distributions",
+        path: "/ThrDpoDistributions",
+        icon: <FaPlusSquare />,
+      },
+        {
+        label: "HCM Distributions",
+        path: "/HcmDpoDistributions",
         icon: <FaPlusSquare />,
       },
     ],
   },
-       {
-   icon: <FaClock />,
-   label: "Time Schedule",
-   path: "/SupervisorDashBoard",
- },
-      {
-        icon: <FaComments />,
-        label: "Send Query",
-        path: "/SupervisorDashBoard",
-      },
       
        
       
