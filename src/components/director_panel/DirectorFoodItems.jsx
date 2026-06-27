@@ -348,7 +348,7 @@ const DirectorFoodItems = () => {
         <DirectorHeader toggleSidebar={toggleSidebar} />
         <div className="food-items-container">
           <Container fluid className="dashboard-box food-items-content">
-            <h3 className="page-title">Food Items Management</h3>
+            <h3 className="page-title-heading">Food Items Management</h3>
             <Tabs defaultActiveKey="hcm" id="food-items-tabs" className="mb-4 food-items-tabs">
               <Tab eventKey="hcm" title="HCM Food Items">
                 {renderTable('hcm', hcmItems)}
