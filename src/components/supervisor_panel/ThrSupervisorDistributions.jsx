@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination } from "react-bootstrap";
+import React, { useState, useEffect, useMemo } from "react";
+import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/supervisorleftnav.css";
 import SupervisorHeader from "./SupervisorHeader";
 import SupervisorLeftNav from "./SupervisorLeftNav";
+import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 const ThrSupervisorDistributions = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -27,13 +31,102 @@ const ThrSupervisorDistributions = () => {
   const [showRemarkModal, setShowRemarkModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState(null);
 
+  const [columns, setColumns] = useState([
+    { dataField: '#', text: '#', visible: true },
+    { dataField: 'awc_name', text: 'AWC Name', visible: true },
+    { dataField: 'awc_code', text: 'AWC Code', visible: true },
+    { dataField: 'awc_type', text: 'AWC Type', visible: true },
+    { dataField: 'sector', text: 'Sector', visible: true },
+    { dataField: 'project', text: 'Project', visible: true },
+    { dataField: 'district', text: 'District', visible: true },
+    { dataField: 'food_item', text: 'Food Item', visible: true },
+    { dataField: 'fin_year', text: 'Fin Year', visible: true },
+    { dataField: 'quarter', text: 'Quarter', visible: true },
+    { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
+    { dataField: 'quantity', text: 'Qty', visible: true },
+    { dataField: 'unit', text: 'Unit', visible: true },
+    { dataField: 'sector_status', text: 'Sector Status', visible: true },
+    { dataField: 'cdpo_status', text: 'CDPO Status', visible: true },
+    { dataField: 'dpo_status', text: 'DPO Status', visible: true },
+    { dataField: 'sector_remark', text: 'Sector Remark', visible: true },
+    { dataField: 'action', text: 'Action', visible: true },
+  ]);
+  const [showColumnModal, setShowColumnModal] = useState(false);
+  const visibleColumns = columns.filter(c => c.visible);
+
+  const [filters, setFilters] = useState({
+    finYear: [],
+    quarter: [],
+    district: [],
+    project: [],
+    sector: [],
+    food_item: [],
+    sector_status: [],
+    cdpo_status: [],
+    dpo_status: [],
+  });
+  const [uniqueFinYears, setUniqueFinYears] = useState([]);
+  const [uniqueQuarters, setUniqueQuarters] = useState([]);
+  const [uniqueDistricts, setUniqueDistricts] = useState([]);
+  const [uniqueProjects, setUniqueProjects] = useState([]);
+  const [uniqueSectors, setUniqueSectors] = useState([]);
+  const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
+  const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
+  const [uniqueCdpoStatuses, setUniqueCdpoStatuses] = useState([]);
+  const [uniqueDpoStatuses, setUniqueDpoStatuses] = useState([]);
+
+  useEffect(() => {
+    if (distributions.length > 0) {
+      setUniqueFinYears([...new Set(distributions.map(item => item.fin_year))]);
+      setUniqueQuarters([...new Set(distributions.map(item => item.quarter))]);
+      setUniqueDistricts([...new Set(distributions.map(item => item.district))]);
+      setUniqueProjects([...new Set(distributions.map(item => item.project))]);
+      setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
+      setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
+      setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status))]);
+      setUniqueCdpoStatuses([...new Set(distributions.map(item => item.cdpo_status))]);
+      setUniqueDpoStatuses([...new Set(distributions.map(item => item.dpo_status))]);
+    }
+  }, [distributions]);
+
+  const handleMultiSelectChange = (filterName, value) => {
+    setFilters(prevFilters => {
+      const currentValues = prevFilters[filterName];
+      if (currentValues.includes(value)) {
+        return { ...prevFilters, [filterName]: currentValues.filter(v => v !== value) };
+      } else {
+        return { ...prevFilters, [filterName]: [...currentValues, value] };
+      }
+    });
+  };
+
+  const filteredData = useMemo(() => {
+    return distributions.filter(item => {
+      const { finYear, quarter, district, project, sector, food_item, sector_status, cdpo_status, dpo_status } = filters;
+      return (finYear.length === 0 || finYear.includes(item.fin_year)) &&
+             (quarter.length === 0 || quarter.includes(item.quarter)) &&
+             (district.length === 0 || district.includes(item.district)) &&
+             (project.length === 0 || project.includes(item.project)) &&
+             (sector.length === 0 || sector.includes(item.sector)) &&
+             (food_item.length === 0 || food_item.includes(item.food_item)) &&
+             (sector_status.length === 0 || sector_status.includes(item.sector_status)) &&
+             (cdpo_status.length === 0 || cdpo_status.includes(item.cdpo_status)) &&
+             (dpo_status.length === 0 || dpo_status.includes(item.dpo_status));
+    });
+  }, [distributions, filters]);
+
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
+
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
       setIsMobile(width < 768);
       setIsTablet(width >= 768 && width < 1024);
     };
-    
+
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -127,6 +220,95 @@ const ThrSupervisorDistributions = () => {
     setSelectedRemarks(null);
   };
 
+  const handleColumnToggle = (index) => {
+    const newColumns = [...columns];
+    newColumns[index].visible = !newColumns[index].visible;
+    setColumns(newColumns);
+  };
+
+  const totals = useMemo(() => {
+    return filteredData.reduce((acc, item) => {
+        acc.beneficiaries += Number(item.total_beneficiaries) || 0;
+        acc.quantity += parseFloat(item.quantity) || 0;
+        return acc;
+    }, { beneficiaries: 0, quantity: 0 });
+  }, [filteredData]);
+
+  const exportToPDF = () => {
+    const visibleColumns = columns.filter(c => c.visible);
+    const head = [visibleColumns.map(c => c.text)];
+    const body = filteredData.map((row, index) =>
+      visibleColumns.map(col => {
+        if (col.dataField === '#') return index + 1;
+        const value = row[col.dataField];
+        return value !== null && value !== undefined ? String(value) : '';
+      })
+    );
+
+    const beneficiaryIndex = visibleColumns.findIndex(c => c.dataField === 'total_beneficiaries');
+    const totalRow = visibleColumns.map((col, idx) => {
+      if (idx < beneficiaryIndex) return '';
+      if (col.dataField === 'total_beneficiaries') return String(totals.beneficiaries);
+      if (col.dataField === 'quantity') return totals.quantity.toFixed(2);
+      return '';
+    });
+    body.push(totalRow);
+
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.text("THR Supervisor Distributions Report", 14, 16);
+    autoTable(doc, {
+      startY: 20,
+      head: head,
+      body: body,
+      theme: 'grid',
+      styles: {
+        fontSize: 7,
+        cellPadding: 2,
+      },
+      headStyles: {
+        textColor: [0, 0, 0],
+        fillColor: [255, 255, 255],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.5
+      },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+    doc.save('thr_supervisor_distributions.pdf');
+  };
+
+  const exportToExcel = () => {
+    const visibleColumns = columns.filter(c => c.visible && c.dataField !== '#');
+    const dataToExport = filteredData.map((row, index) => {
+      const newRow = { '#': index + 1 };
+      visibleColumns.forEach(col => {
+        if (col.dataField !== '#') {
+          newRow[col.text] = row[col.dataField];
+        }
+      });
+      if (columns.find(c => c.dataField === 'sector_status')?.visible) newRow['Sector Remark'] = row.sector_remark;
+      if (columns.find(c => c.dataField === 'cdpo_status')?.visible) newRow['CDPO Remark'] = row.cdpo_remark;
+      if (columns.find(c => c.dataField === 'dpo_status')?.visible) newRow['DPO Remark'] = row.dpo_remark;
+      return newRow;
+    });
+
+    const beneficiaryIndex = visibleColumns.findIndex(c => c.dataField === 'total_beneficiaries');
+    const totalRow = { '#': '' };
+    visibleColumns.forEach(col => {
+      if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
+      else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
+      else totalRow[col.text] = '';
+    });
+    if (columns.find(c => c.dataField === 'sector_status')?.visible) totalRow['Sector Remark'] = '';
+    if (columns.find(c => c.dataField === 'cdpo_status')?.visible) totalRow['CDPO Remark'] = '';
+    if (columns.find(c => c.dataField === 'dpo_status')?.visible) totalRow['DPO Remark'] = '';
+    dataToExport.push(totalRow);
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "THR Supervisor Distributions");
+    XLSX.writeFile(workbook, "thr_supervisor_distributions.xlsx");
+  };
+
   const getStatusVariant = (status) => {
     switch (status) {
       case "approved": return "success";
@@ -137,8 +319,8 @@ const ThrSupervisorDistributions = () => {
 
   const indexOfLast = currentPage * itemsPerPage;
   const indexOfFirst = indexOfLast - itemsPerPage;
-  const currentItems = distributions.slice(indexOfFirst, indexOfLast);
-  const totalPages = Math.ceil(distributions.length / itemsPerPage);
+  const currentItems = filteredData.slice(indexOfFirst, indexOfLast);
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -187,11 +369,152 @@ const ThrSupervisorDistributions = () => {
         <SupervisorHeader toggleSidebar={toggleSidebar} />
 
         <Container fluid className="dashboard-box mt-3">
-          <div className="main-heading">
-            <h3 className="mb-4 fw-bold">
-              THR Supervisor Distributions
-            </h3>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h3 className="mb-0">THR Supervisor Distributions</h3>
+            <div>
+              <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
+                <FaFilePdf className="me-1" /> Export PDF
+              </Button>
+              <Button variant="outline-success" size="sm" onClick={exportToExcel} className="me-2">
+                <FaFileExcel className="me-1" /> Export Excel
+              </Button>
+              <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)}>
+                <FaEye className="me-1" /> Column Visibility
+              </Button>
+            </div>
           </div>
+
+          <Row className="mb-3">
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-finyear" className="w-100">
+                  {filters.finYear.length ? `${filters.finYear.length} years selected` : 'All Fin. Years'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueFinYears.map(year => (
+                    <Dropdown.Item key={year} as="div">
+                      <Form.Check type="checkbox" label={year} checked={filters.finYear.includes(year)} onChange={() => handleMultiSelectChange('finYear', year)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-quarter" className="w-100">
+                  {filters.quarter.length ? `${filters.quarter.length} quarters selected` : 'All Quarters'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueQuarters.map(q => (
+                    <Dropdown.Item key={q} as="div">
+                      <Form.Check type="checkbox" label={q} checked={filters.quarter.includes(q)} onChange={() => handleMultiSelectChange('quarter', q)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-district" className="w-100">
+                  {filters.district.length ? `${filters.district.length} districts selected` : 'All Districts'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueDistricts.map(d => (
+                    <Dropdown.Item key={d} as="div">
+                      <Form.Check type="checkbox" label={d} checked={filters.district.includes(d)} onChange={() => handleMultiSelectChange('district', d)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-project" className="w-100">
+                  {filters.project.length ? `${filters.project.length} projects selected` : 'All Projects'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueProjects.map(p => (
+                    <Dropdown.Item key={p} as="div">
+                      <Form.Check type="checkbox" label={p} checked={filters.project.includes(p)} onChange={() => handleMultiSelectChange('project', p)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector" className="w-100">
+                  {filters.sector.length ? `${filters.sector.length} sectors selected` : 'All Sectors'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueSectors.map(s => (
+                    <Dropdown.Item key={s} as="div">
+                      <Form.Check type="checkbox" label={s} checked={filters.sector.includes(s)} onChange={() => handleMultiSelectChange('sector', s)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-food-item" className="w-100">
+                  {filters.food_item.length ? `${filters.food_item.length} items selected` : 'All Food Items'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueFoodItems.map(item => (
+                    <Dropdown.Item key={item} as="div">
+                      <Form.Check type="checkbox" label={item} checked={filters.food_item.includes(item)} onChange={() => handleMultiSelectChange('food_item', item)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+          </Row>
+
+          <Row className="mb-3">
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status" className="w-100">
+                  {filters.sector_status.length ? `${filters.sector_status.length} selected` : 'All Sector Status'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueSectorStatuses.map(s => (
+                    <Dropdown.Item key={s} as="div">
+                      <Form.Check type="checkbox" label={s} checked={filters.sector_status.includes(s)} onChange={() => handleMultiSelectChange('sector_status', s)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-cdpo-status" className="w-100">
+                  {filters.cdpo_status.length ? `${filters.cdpo_status.length} selected` : 'All CDPO Status'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueCdpoStatuses.map(s => (
+                    <Dropdown.Item key={s} as="div">
+                      <Form.Check type="checkbox" label={s} checked={filters.cdpo_status.includes(s)} onChange={() => handleMultiSelectChange('cdpo_status', s)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-dpo-status" className="w-100">
+                  {filters.dpo_status.length ? `${filters.dpo_status.length} selected` : 'All DPO Status'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueDpoStatuses.map(s => (
+                    <Dropdown.Item key={s} as="div">
+                      <Form.Check type="checkbox" label={s} checked={filters.dpo_status.includes(s)} onChange={() => handleMultiSelectChange('dpo_status', s)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+          </Row>
 
           {successMsg && <Alert variant="success" className="mb-3">{successMsg}</Alert>}
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
@@ -203,124 +526,129 @@ const ThrSupervisorDistributions = () => {
                 <div className="text-center py-4">
                   <Spinner animation="border" />
                 </div>
-              ) : distributions.length === 0 ? (
+              ) : filteredData.length === 0 ? (
                 <div className="text-center py-4 text-muted">No THR distributions found.</div>
               ) : (
                 <div className="table-responsive">
                   <Table striped bordered hover responsive className="mb-0">
-                     <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>AWC Name</th>
-                        <th>AWC Code</th>
-                        <th>AWC Type</th>
-                        <th>Sector</th>
-                        <th>Project</th>
-                        <th>District</th>
-                        <th>Food Item</th>
-                        <th>Qty</th>
-                        <th>Unit</th>
-                        <th>Beneficiaries</th>
-                        <th>Fin Year</th>
-                        <th>Quarter</th>
-                        <th>CDPO Status</th>
-                        <th>DPO Status</th>
-                        <th>Sector Status</th>
-                        <th>Sector Remark</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {currentItems.map((item, index) => (
-                        <React.Fragment key={item.id}>
-                          <tr>
-                            <td>{index + 1}</td>
-                            <td>{item.awc_name}</td>
-                            <td>{item.awc_code}</td>
-                            <td>{item.awc_type}</td>
-                            <td>{item.sector}</td>
-                            <td>{item.project}</td>
-                            <td>{item.district}</td>
-                            <td>{item.food_item}</td>
-                            <td>{item.quantity}</td>
-                            <td>{item.unit}</td>
-                            <td>{item.total_beneficiaries}</td>
-                            <td>{item.fin_year}</td>
-                            <td>{item.quarter}</td>
-                            <td><Badge bg={getStatusVariant(item.cdpo_status)}>{item.cdpo_status || "pending"}</Badge></td>
-                            <td><Badge bg={getStatusVariant(item.dpo_status)}>{item.dpo_status || "pending"}</Badge></td>
-                            <td><Badge bg={getStatusVariant(item.sector_status)}>{item.sector_status}</Badge></td>
-                            <td>{item.sector_remark || "-"}</td>
-                            <td>
-                              <Button
-                                variant="outline-success"
-                                size="sm"
-                                className="me-2"
-                                disabled={item.sector_status === "approved" || item.sector_status === "rejected" || loadingAction[item.id]}
-                                onClick={() => handleToggleRemark(item, "approved")}
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                variant="outline-danger"
-                                size="sm"
-                                className="me-2"
-                                disabled={item.sector_status === "approved" || item.sector_status === "rejected" || loadingAction[item.id]}
-                                onClick={() => handleToggleRemark(item, "rejected")}
-                              >
-                                Reject
-                              </Button>
-                              <Button
-                                variant="outline-primary"
-                                size="sm" className="mt-2"
-                                onClick={() => handleViewRemark(item)}
-                              >
-                                View Remark
-                              </Button>
-                            </td>
-                          </tr>
-                          {openRemarkId === item.id && (
+                      <thead>
+                        <tr>
+                          {visibleColumns.map((col, index) => <th key={col.dataField}>{col.text}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {currentItems.length > 0 ? currentItems.map((row, index) => (
+                          <React.Fragment key={row.id}>
                             <tr>
-                              <td colSpan="18">
-                                <div className="d-flex align-items-start gap-2">
-                                  <Form.Control
-                                    type="text"
-                                    size="sm"
-                                    placeholder="Enter remark"
-                                    value={remarkValue}
-                                    onChange={(e) => setRemarkValue(e.target.value)}
-                                    className="me-2"
-                                    style={{ maxWidth: "300px" }}
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant={openRemarkAction === "approved" ? "success" : "danger"}
-                                    disabled={submitting || loadingAction[item.id]}
-                                    onClick={() => handleStatusUpdate(item)}
-                                  >
-                                    {loadingAction[item.id] ? "Saving..." : "Save"}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    disabled={submitting || loadingAction[item.id]}
-                                    onClick={() => {
-                                      setOpenRemarkId(null);
-                                      setOpenRemarkAction("");
-                                      setRemarkValue("");
-                                      setActionError("");
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </td>
+                                {visibleColumns.map((col, i) => {
+                                  let cellContent;
+                                 switch (col.dataField) {
+                                   case '#':
+                                     cellContent = index + 1;
+                                     break;
+                                   case 'sector_status':
+                                   case 'cdpo_status':
+                                   case 'dpo_status':
+                                     cellContent = <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField]}</Badge>;
+                                     break;
+                                   case 'action':
+                                     cellContent = (
+                                       <>
+                                         <Button
+                                           variant="outline-success"
+                                           size="sm"
+                                           className="me-2"
+                                           disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
+                                           onClick={() => handleToggleRemark(row, "approved")}
+                                         >
+                                           Approve
+                                         </Button>
+                                         <Button
+                                           variant="outline-danger"
+                                           size="sm"
+                                           className="me-2"
+                                           disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
+                                           onClick={() => handleToggleRemark(row, "rejected")}
+                                         >
+                                           Reject
+                                         </Button>
+                                         <Button
+                                           variant="outline-primary"
+                                           size="sm"
+                                           onClick={() => handleViewRemark(row)}
+                                         >
+                                           View Remark
+                                         </Button>
+                                       </>
+                                     );
+                                     break;
+                                   default:
+                                     cellContent = row[col.dataField];
+                                 }
+                                  return <td key={col.dataField}>{cellContent}</td>;
+                                })}
                             </tr>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </Table>
+                            {openRemarkId === row.id && (
+                              <tr>
+                                <td colSpan={visibleColumns.length}>
+                                  <div className="d-flex align-items-start gap-2">
+                                    <Form.Control
+                                      type="text"
+                                      size="sm"
+                                      placeholder="Enter remark"
+                                      value={remarkValue}
+                                      onChange={(e) => setRemarkValue(e.target.value)}
+                                      className="me-2"
+                                      style={{ maxWidth: "300px" }}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant={openRemarkAction === "approved" ? "success" : "danger"}
+                                      disabled={submitting || loadingAction[row.id]}
+                                      onClick={() => handleStatusUpdate(row)}
+                                    >
+                                      {loadingAction[row.id] ? "Saving..." : "Save"}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      disabled={submitting || loadingAction[row.id]}
+                                      onClick={() => {
+                                        setOpenRemarkId(null);
+                                        setOpenRemarkAction("");
+                                        setRemarkValue("");
+                                        setActionError("");
+                                      }}
+                                    >
+                                       Cancel
+                                     </Button>
+           </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        )) : (
+                          <tr>
+                            <td colSpan={visibleColumns.length} className="text-center">No data available</td>
+                          </tr>
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          {visibleColumns.map((col, i) => {
+                            let cellContent = '';
+                            if (i === 0) {
+                              cellContent = <strong>Total</strong>;
+                            } else if (col.dataField === 'total_beneficiaries') {
+                              cellContent = <strong>{totals.beneficiaries}</strong>;
+                            } else if (col.dataField === 'quantity') {
+                              cellContent = <strong>{totals.quantity.toFixed(2)}</strong>;
+                            }
+                            return <td key={`total-${col.dataField}`}>{cellContent}</td>;
+                          })}
+                        </tr>
+                      </tfoot>
+                   </Table>
                   {renderPagination()}
                 </div>
               )}
@@ -357,6 +685,28 @@ const ThrSupervisorDistributions = () => {
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={handleCloseRemarkModal}>
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
+          <Modal.Header closeButton>
+            <Modal.Title>Show/Hide Columns</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {columns.map((col, index) => (
+              <Form.Check
+                key={index}
+                type="checkbox"
+                label={col.text}
+                checked={col.visible}
+                onChange={() => handleColumnToggle(index)}
+              />
+            ))}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowColumnModal(false)}>
               Close
             </Button>
           </Modal.Footer>
