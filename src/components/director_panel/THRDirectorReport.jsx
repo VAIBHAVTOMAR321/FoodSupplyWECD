@@ -145,27 +145,36 @@ const THRDirectorReport = () => {
       })
     );
 
-    const beneficiaryIndex = visibleColumns.findIndex(c => c.dataField === 'total_beneficiaries');
     const totalRow = visibleColumns.map((col, idx) => {
-      if (idx < beneficiaryIndex) return '';
-      if (col.dataField === 'total_beneficiaries') return String(totals.beneficiaries);
-      if (col.dataField === 'quantity') return totals.quantity.toFixed(2);
+      if (idx === 0) return 'Total';
+      if (col.dataField === 'total_beneficiaries') return totals.beneficiaries.toString();
+      if (col.dataField === 'quantity') return totals.quantity.toFixed(2).toString();
       return '';
     });
     body.push(totalRow);
-
+  
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.text("THR Distribution Report", 14, 16);
     autoTable(doc, {
       startY: 20,
       head: head,
       body: body,
-      theme: 'grid',
+      theme: 'striped', // Using striped theme to have more control over colors
       styles: {
         fontSize: 7,
         cellPadding: 2,
+        textColor: [0, 0, 0], // Black text color for all cells
+        lineColor: [0, 0, 0], // Black border color
+        lineWidth: 0.1,
       },
-      headStyles: { fillColor: [34, 139, 34] },
+      headStyles: { 
+        fillColor: [255, 255, 255], // White background for header
+        textColor: [0, 0, 0], // Black text for header
+        fontStyle: 'bold',
+      },
+      bodyStyles: {
+        fillColor: [255, 255, 255], // White background for body rows
+      },
       alternateRowStyles: { fillColor: [245, 245, 245] },
     });
     doc.save('thr_director_report.pdf');
@@ -186,16 +195,16 @@ const THRDirectorReport = () => {
       return newRow;
     });
 
-    const beneficiaryIndex = visibleColumns.findIndex(c => c.dataField === 'total_beneficiaries');
-    const totalRow = { '#': '' };
+    const totalRow = { '#': 'Total' };
     visibleColumns.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
       else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
       else totalRow[col.text] = '';
     });
-    if (columns.find(c => c.dataField === 'sector_status')?.visible) totalRow['Sector Remark'] = '';
-    if (columns.find(c => c.dataField === 'cdpo_status')?.visible) totalRow['CDPO Remark'] = '';
-    if (columns.find(c => c.dataField === 'dpo_status')?.visible) totalRow['DPO Remark'] = '';
+    // Clear remark columns for the total row
+    if (columns.some(c => c.dataField === 'sector_status' && c.visible)) totalRow['Sector Remark'] = '';
+    if (columns.some(c => c.dataField === 'cdpo_status' && c.visible)) totalRow['CDPO Remark'] = '';
+    if (columns.some(c => c.dataField === 'dpo_status' && c.visible)) totalRow['DPO Remark'] = '';
     dataToExport.push(totalRow);
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
