@@ -31,6 +31,7 @@ import ITCellDashBoard from "./components/it_cell_panel/ITCellDashBoard";
 import ThrCdpoDistributions from "./components/CDPO_panel/ThrCdpoDistributions";
 import ThrDpoDistributions from "./components/DPO_panel/ThrDpoDistributions";
 import HcmSupervisorDistributions from "./components/supervisor_panel/HcmSupervisorDistributions";
+import HcmCdpoDistributions from "./components/CDPO_panel/HcmCdpoDistributions";
 
 
 
@@ -55,8 +56,8 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const location = useLocation();
 
-  const hideNavbarRoutes = ["/SupervisorDashBoard", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions"];
-  const hideFooterRoutes = ["/SupervisorDashBoard", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions"];
+  const hideNavbarRoutes = ["/SupervisorDashBoard", "/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions"];
+  const hideFooterRoutes = ["/SupervisorDashBoard", "/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions"];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
 
@@ -139,6 +140,12 @@ function AppContent() {
              <Route path="/HcmSupervisorDistributions" element={
             <ProtectedRoute>
               <HcmSupervisorDistributions />
+            </ProtectedRoute>
+          } />
+
+            <Route path="/HcmCdpoDistributions" element={
+            <ProtectedRoute>
+              <HcmCdpoDistributions />
             </ProtectedRoute>
           } />
             
