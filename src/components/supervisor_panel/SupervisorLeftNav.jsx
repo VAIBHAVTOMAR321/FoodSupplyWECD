@@ -90,6 +90,12 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
          path: "/thr-supervisor-distributions",
          active: true,
        },
+        {
+         icon: <FaCube />,
+         label: "HCM Distributions",
+         path: "/HcmSupervisorDistributions",
+         active: true,
+       },
      
       
    {
