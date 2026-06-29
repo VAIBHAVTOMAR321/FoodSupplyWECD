@@ -143,17 +143,17 @@ const AnganwadiDashboard = () => {
 
     setSelectedItem(modalItem);
 
-    if (isNew) {
-      setDistributionData({ total_beneficiaries: '', date: new Date().toISOString().split('T')[0], fin_year: scheme === 'thr' ? getCurrentFinancialYear() : '', quarter: '' });
-    } else if (existingRecord) {
+    if (existingRecord) {
       if (scheme === 'hcm') {
         setDistributionData({
           total_beneficiaries: existingRecord.total_beneficiaries,
+          bene_in_ang: existingRecord.bene_in_ang || '',
           date: existingRecord.date,
         });
       } else { // thr
         setDistributionData({
           total_beneficiaries: existingRecord.total_beneficiaries,
+          bene_in_ang: existingRecord.bene_in_ang || '',
           fin_year: existingRecord.fin_year,
           quarter: existingRecord.quarter,
         });
@@ -161,11 +161,13 @@ const AnganwadiDashboard = () => {
     } else {
       setDistributionData({ 
         total_beneficiaries: '', 
+        bene_in_ang: '',
         date: new Date().toISOString().split('T')[0], 
         fin_year: scheme === 'thr' ? getCurrentFinancialYear() : '', 
         quarter: '' 
       });
     }
+
     setDistributionError('');
     setShowDistributionModal(true);
   };
