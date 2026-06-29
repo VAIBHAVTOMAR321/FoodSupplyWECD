@@ -398,8 +398,14 @@ const AnganwadiDashboard = () => {
                         <th>Food Item</th>
                         {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Quarter</th></>}
                         <th>Beneficiaries</th>
-                        {activeScheme === 'hcm' && <th>Beneficiaries Enrolled in AWC</th>}
-                        <th>Quantity</th>
+                        {activeScheme === 'hcm' && (
+                          <>
+                            <th>Beneficiaries Enrolled in AWC</th>
+                            <th>Quantity</th>
+                            <th>Unit</th>
+                          </>
+                        )}
+                        {activeScheme === 'thr' && <th>Quantity</th>}
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -410,8 +416,14 @@ const AnganwadiDashboard = () => {
                           <td>{record.food_item}</td>
                           {activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{record.quarter}</td></>}
                           <td>{record.total_beneficiaries}</td>
-                          {activeScheme === 'hcm' && <td>{record.bene_in_ang}</td>}
-                          <td>{record.quantity} {record.unit}</td>
+                          {activeScheme === 'hcm' && (
+                            <>
+                              <td>{record.bene_in_ang}</td>
+                              <td>{record.quantity}</td>
+                              <td>{record.unit}</td>
+                            </>
+                          )}
+                          {activeScheme === 'thr' && <td>{record.quantity} {record.unit}</td>}
                           <td>
                             <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleOpenViewModal(record)}>
                               <FaEye />
