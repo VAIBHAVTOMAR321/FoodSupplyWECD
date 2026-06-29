@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner, Alert } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Table, Collapse } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dpo.css";
 import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
-import { FaUsers, FaUserFriends, FaBox } from "react-icons/fa";
+import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 const DPODashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -20,6 +20,7 @@ const DPODashboard = () => {
   const [hcmTotalRegistrations, setHcmTotalRegistrations] = useState(0);
   const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
   const [thrFoodItemsCount, setThrFoodItemsCount] = useState(0);
+  const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -115,6 +116,66 @@ const DPODashboard = () => {
     }, { beneficiaries: 0, quantity: 0 });
   }, [hcmDistributions]);
 
+  const FoodItemTable = ({
+    scheme,
+    api
+  }) => {
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+      const fetchItems = async () => {
+        setLoading(true);
+        setError("");
+        try {
+          const response = await api.get(`/${scheme}-food-items/`);
+          const data = Array.isArray(response.data) ? response.data : response.data ?.data || [];
+          setItems(Array.isArray(data) ? data : []);
+        } catch (err) {
+          setError(`Failed to fetch ${scheme.toUpperCase()} food items.`);
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchItems();
+    }, [scheme, api]);
+
+    if (loading) return <div className="text-center p-4"><Spinner animation="border" /></div>;
+    if (error) return <Alert variant="danger">{error}</Alert>;
+    if (items.length === 0) return <div className="text-center p-4 text-muted">No food items found.</div>;
+
+    return (
+      <div className="table-responsive">
+        <Table striped bordered hover responsive className="mb-0 food-item-table">
+          <thead className="table-light sticky-top">
+            <tr>
+              <th>#</th>
+              <th>Food Item</th>
+              <th>Quantity Per Beneficiary</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => (
+              <tr key={item.id}>
+                <td>{index + 1}</td>
+                <td>{item.food_item}</td>
+                <td>{item.qty_per_ben}</td>
+                <td>{item.unit}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+    );
+  };
+
+  const handleCardClick = (scheme) => {
+    setExpanded(expanded === scheme ? null : scheme);
+  };
+
   return (
     <div className="dashboard-container">
       <DPOLeftNav
@@ -127,126 +188,129 @@ const DPODashboard = () => {
         <DPOHeader toggleSidebar={toggleSidebar} />
 
         <Container fluid className="dashboard-box mt-3">
-          <div className="main-heading">
-            <h3 className="mb-4 fw-bold">
+          {/* <div className="dashboard-header-section">
+            <h2 className="dashboard-main-title">
               DPO Dashboard
-            </h3>
-          </div>
+            </h2>
+            <p className="dashboard-subtitle">Welcome! Here's a summary of the distribution activities.</p>
+          </div> */}
 
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
 
-          <Row className="mb-4 g-3">
-            <Col xs={6} md={4} lg={6}>
-              <Card className="dashboard-card h-100">
-                <Card.Body className="d-flex flex-column align-items-center justify-content-center p-2">
-                  <div className="dashboard-card-icon bg-info bg-opacity-10">
-                    <FaBox className="text-info" size={22} />
+          <div className="dashboard-section">
+            <h4 className="section-title">Food Items Overview</h4>
+            <Row className="g-3">
+              <Col md={6}>
+                <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">HCM Food Items</h6>
+                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}</div>
+                      </div>
+                      <div className="ms-auto expand-icon">
+                        {expanded === 'hcm' ? <FaChevronUp /> : <FaChevronDown />}
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+                <Collapse in={expanded === 'hcm'}>
+                  <div className="expandable-content">
+                    <Card><Card.Body className="p-0"><FoodItemTable scheme="hcm" api={api} /></Card.Body></Card>
                   </div>
-                  <h6 className="dashboard-card-title mb-1">HCM Food Items</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}
+                </Collapse>
+              </Col>
+              <Col md={6}>
+                <Card className="dashboard-card card-thr expandable-card" onClick={() => handleCardClick('thr')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon thr-icon"><FaBox /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">THR Food Items</h6>
+                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}</div>
+                      </div>
+                      <div className="ms-auto expand-icon">
+                        {expanded === 'thr' ? <FaChevronUp /> : <FaChevronDown />}
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+                <Collapse in={expanded === 'thr'}>
+                  <div className="expandable-content">
+                    <Card><Card.Body className="p-0"><FoodItemTable scheme="thr" api={api} /></Card.Body></Card>
                   </div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col xs={6} md={4} lg={6}>
-              <Card className="dashboard-card h-100">
-                <Card.Body className="d-flex flex-column align-items-center justify-content-center p-2">
-                  <div className="dashboard-card-icon bg-secondary bg-opacity-10">
-                    <FaBox className="text-secondary" size={22} />
-                  </div>
-                  <h6 className="dashboard-card-title mb-1">THR Food Items</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
+                </Collapse>
+              </Col>
+            </Row>
+          </div>
 
-          <Row className="mb-4 g-3">
-            <Col xs={6} md={4} lg={4}>
-              <Card className="dashboard-card h-100">
-                <Card.Body className="d-flex flex-column align-items-center justify-content-center p-2">
-                  <div className="dashboard-card-icon bg-primary bg-opacity-10">
-                    <FaUsers className="text-primary" size={22} />
-                  </div>
-                  <h6 className="dashboard-card-title mb-1">THR Registrations</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : thrTotalRegistrations}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col xs={6} md={4} lg={4}>
-              <Card className="dashboard-card h-100">
-                <Card.Body className="d-flex flex-column align-items-center justify-content-center p-2">
-                  <div className="dashboard-card-icon bg-success bg-opacity-10">
-                    <FaUserFriends className="text-success" size={22} />
-                  </div>
-                  <h6 className="dashboard-card-title mb-1">THR Beneficiaries</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : thrTotals.beneficiaries.toLocaleString()}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col xs={6} md={4} lg={4}>
-              <Card className="dashboard-card h-100">
-                <Card.Body className="d-flex flex-column align-items-center justify-content-center p-2">
-                  <div className="dashboard-card-icon bg-info bg-opacity-10">
-                    <FaBox className="text-info" size={22} />
-                  </div>
-                  <h6 className="dashboard-card-title mb-1">THR Quantity</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : thrTotals.quantity.toFixed(2)}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
+          <div className="dashboard-section">
+            <h4 className="section-title">THR Distribution Summary</h4>
+            <Row className="g-3">
+              <Col md={4}>
+                <Card className="dashboard-card card-thr">
+                  <Card.Body>
+                    <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
+                    <h6 className="dashboard-card-title">THR Registrations</h6>
+                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrTotalRegistrations}</div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={4}>
+                <Card className="dashboard-card card-thr">
+                  <Card.Body>
+                    <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
+                    <h6 className="dashboard-card-title">THR Beneficiaries</h6>
+                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrTotals.beneficiaries.toLocaleString()}</div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={4}>
+                <Card className="dashboard-card card-thr">
+                  <Card.Body>
+                    <div className="dashboard-card-icon thr-icon"><FaBox /></div>
+                    <h6 className="dashboard-card-title">THR Quantity</h6>
+                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrTotals.quantity.toFixed(2)}</div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          </div>
 
-          <Row className="mb-4 g-3">
-            <Col xs={6} md={4} lg={4}>
-              <Card className="dashboard-card h-100">
-                <Card.Body className="d-flex flex-column align-items-center justify-content-center p-2">
-                  <div className="dashboard-card-icon bg-warning bg-opacity-10">
-                    <FaUsers className="text-warning" size={22} />
-                  </div>
-                  <h6 className="dashboard-card-title mb-1">HCM Registrations</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : hcmTotalRegistrations}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col xs={6} md={4} lg={4}>
-              <Card className="dashboard-card h-100">
-                <Card.Body className="d-flex flex-column align-items-center justify-content-center p-2">
-                  <div className="dashboard-card-icon bg-danger bg-opacity-10">
-                    <FaUserFriends className="text-danger" size={22} />
-                  </div>
-                  <h6 className="dashboard-card-title mb-1">HCM Beneficiaries</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : hcmTotals.beneficiaries.toLocaleString()}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col xs={6} md={4} lg={4}>
-              <Card className="dashboard-card h-100">
-                <Card.Body className="d-flex flex-column align-items-center justify-content-center p-2">
-                  <div className="dashboard-card-icon bg-secondary bg-opacity-10">
-                    <FaBox className="text-secondary" size={22} />
-                  </div>
-                  <h6 className="dashboard-card-title mb-1">HCM Quantity</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : hcmTotals.quantity.toFixed(2)}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
+          <div className="dashboard-section">
+            <h4 className="section-title">HCM Distribution Summary</h4>
+            <Row className="g-3">
+              <Col md={4}>
+                <Card className="dashboard-card card-hcm">
+                  <Card.Body>
+                    <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
+                    <h6 className="dashboard-card-title">HCM Registrations</h6>
+                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmTotalRegistrations}</div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={4}>
+                <Card className="dashboard-card card-hcm">
+                  <Card.Body>
+                    <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
+                    <h6 className="dashboard-card-title">HCM Beneficiaries</h6>
+                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmTotals.beneficiaries.toLocaleString()}</div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={4}>
+                <Card className="dashboard-card card-hcm">
+                  <Card.Body>
+                    <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
+                    <h6 className="dashboard-card-title">HCM Quantity</h6>
+                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmTotals.quantity.toFixed(2)}</div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          </div>
+
         </Container>
       </div>
     </div>
