@@ -32,6 +32,7 @@ const HcmCdpoDistributions = () => {
     { dataField: 'food_item', text: 'Food Item', visible: true },
     { dataField: 'date', text: 'Date', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
+    { dataField: 'bene_in_ang', text: 'Beneficiaries in AWC', visible: true },
     { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
   ]);
