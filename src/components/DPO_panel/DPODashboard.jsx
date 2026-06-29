@@ -147,7 +147,7 @@ const DPODashboard = () => {
     if (items.length === 0) return <div className="text-center p-4 text-muted">No food items found.</div>;
 
     return (
-      <div className="table-responsive">
+      <div className="table-responsive food-item-table-container">
         <Table striped bordered hover responsive className="mb-0 food-item-table">
           <thead className="table-light sticky-top">
             <tr>
@@ -216,9 +216,9 @@ const DPODashboard = () => {
                   </Card.Body>
                 </Card>
                 <Collapse in={expanded === 'hcm'}>
-                  <div className="expandable-content">
-                    <Card><Card.Body className="p-0"><FoodItemTable scheme="hcm" api={api} /></Card.Body></Card>
-                  </div>
+                  <div className="mt-3">
+                    <FoodItemTable scheme="hcm" api={api} />
+                   </div>
                 </Collapse>
               </Col>
               <Col md={6}>
@@ -237,9 +237,9 @@ const DPODashboard = () => {
                   </Card.Body>
                 </Card>
                 <Collapse in={expanded === 'thr'}>
-                  <div className="expandable-content">
-                    <Card><Card.Body className="p-0"><FoodItemTable scheme="thr" api={api} /></Card.Body></Card>
-                  </div>
+                  <div className="mt-3">
+                    <FoodItemTable scheme="thr" api={api} />
+                   </div>
                 </Collapse>
               </Col>
             </Row>

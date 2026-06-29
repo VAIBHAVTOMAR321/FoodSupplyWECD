@@ -1276,6 +1276,33 @@ img {
     overflow: hidden;
 }
 
+.food-item-table-container {
+    margin-top: 1rem;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.food-item-table thead {
+    background-color: #5557bb; /* Matching DPO left nav color */
+    color: white;
+}
+
+.food-item-table th,
+.food-item-table td {
+    padding: 0.75rem;
+    vertical-align: middle;
+}
+
+.dashboard-card {
+    padding: 0.75rem;
+}
+
+.dashboard-card-title {
+    font-size: 0.85rem;
+}
+
 .food-item-table {
     margin-bottom: 0;
     max-height: 300px;
