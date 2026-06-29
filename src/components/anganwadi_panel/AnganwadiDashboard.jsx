@@ -134,10 +134,14 @@ const AnganwadiDashboard = () => {
       // For brand new entries from the main button
       modalItem = { scheme, isNew: true };
     } else if (existingRecord) {
+      // Find the full food item details from the list to get qty_per_ben
+      const fullFoodItem = foodItems.find(fi => fi.food_item === existingRecord.food_item);
       // For editing an existing record
       modalItem = { ...item, ...existingRecord, scheme, isEdit: true };
+      modalItem = { ...fullFoodItem, ...existingRecord, scheme, isEdit: true };
     } else {
       // This case might be deprecated if we only add from the new modal
+      // This is for adding a distribution from the food item list (not used anymore)
       modalItem = { ...item, scheme };
     }
 
