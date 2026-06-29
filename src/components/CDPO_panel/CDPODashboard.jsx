@@ -259,7 +259,7 @@ const CDPODashboard = () => {
                   <div className="dashboard-card-icon bg-success bg-opacity-10">
                     <FaUserFriends className="text-success" size={22} />
                   </div>
-                  <h6 className="dashboard-card-title mb-1">THR Beneficiaries</h6>
+                  <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
                   <div className="dashboard-card-value">
                     {loading ? <Spinner animation="border" size="sm" /> : thrTotals.beneficiaries.toLocaleString()}
                   </div>
@@ -302,7 +302,7 @@ const CDPODashboard = () => {
                   <div className="dashboard-card-icon bg-danger bg-opacity-10">
                     <FaUserFriends className="text-danger" size={22} />
                   </div>
-                  <h6 className="dashboard-card-title mb-1">HCM Beneficiaries</h6>
+                  <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
                   <div className="dashboard-card-value">
                     {loading ? <Spinner animation="border" size="sm" /> : hcmTotals.beneficiaries.toLocaleString()}
                   </div>

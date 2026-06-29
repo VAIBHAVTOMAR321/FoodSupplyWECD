@@ -261,7 +261,7 @@ const DPODashboard = () => {
                 <Card className="dashboard-card card-thr">
                   <Card.Body>
                     <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
-                    <h6 className="dashboard-card-title">THR Beneficiaries</h6>
+                    <h6 className="dashboard-card-title">THR Distribution</h6>
                     <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrTotals.beneficiaries.toLocaleString()}</div>
                   </Card.Body>
                 </Card>
@@ -294,7 +294,7 @@ const DPODashboard = () => {
                 <Card className="dashboard-card card-hcm">
                   <Card.Body>
                     <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
-                    <h6 className="dashboard-card-title">HCM Beneficiaries</h6>
+                    <h6 className="dashboard-card-title">HCM Distribution</h6>
                     <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmTotals.beneficiaries.toLocaleString()}</div>
                   </Card.Body>
                 </Card>
