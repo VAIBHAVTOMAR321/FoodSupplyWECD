@@ -529,8 +529,8 @@ const ThrSupervisorDistributions = () => {
               ) : filteredData.length === 0 ? (
                 <div className="text-center py-4 text-muted">No THR distributions found.</div>
               ) : (
-                <div className="table-responsive">
-                  <Table striped bordered hover responsive className="mb-0">
+                <div className="table-responsive responsive-table-container">
+                  <Table striped bordered hover responsive className="mb-0 bg-white" style={{ tableLayout: 'fixed', width: '100%', minWidth: '900px' }}>
                       <thead>
                         <tr>
                           {visibleColumns.map((col, index) => <th key={col.dataField}>{col.text}</th>)}

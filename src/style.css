@@ -136,6 +136,31 @@ body {
   cursor: pointer;
   transition: all 0.3s ease;
 }
+.table-responsive.responsive-table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.25rem;
+}
+.table-responsive.responsive-table-container table {
+  min-width: 900px;
+}
+.table-responsive.responsive-table-container th,
+.table-responsive.responsive-table-container td {
+  white-space: nowrap;
+}
+@media (max-width: 991.98px) {
+  .table-responsive.responsive-table-container {
+    margin-bottom: 1rem;
+  }
+  .table-responsive.responsive-table-container table {
+    min-width: 720px;
+  }
+}
+@media (max-width: 767.98px) {
+  .table-responsive.responsive-table-container table {
+    min-width: 640px;
+  }
+}
 .registration-page h2{
   font-size: 20px;
   font-weight: 600;
