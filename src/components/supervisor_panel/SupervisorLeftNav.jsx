@@ -98,17 +98,7 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
        },
      
       
-   {
-     icon: <FaUsers />,
-     label: "test",
-    submenu: [
-      {
-        label: "Test",
-        path: "#",
-        icon: <FaPlusSquare />,
-      },
-    ],
-  },
+   
     
       
        

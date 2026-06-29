@@ -92,17 +92,7 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
       },
     
      
-  {
-    icon: <FaUsers />,
-    label: "test",
-    submenu: [
-      {
-        label: "Test",
-        path: "#",
-        icon: <FaPlusSquare />,
-      },
-    ],
-  },
+  
 
       
        

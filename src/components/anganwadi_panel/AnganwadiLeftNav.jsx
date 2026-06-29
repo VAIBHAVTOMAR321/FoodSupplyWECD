@@ -84,22 +84,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
     path: "/AnganwadiProfile"
   },
 
-   {
-      icon: <FaUsers />,
-      label: "test",
-      submenu: [
-        {
-          label: "Test",
-          path: "#",
-          icon: <FaPlusSquare />,
-        },
-      ],
-    },
-       {
-   icon: <FaClock />,  
-   label: "Time Schedule",
-   path: "#",
- },
+ 
      
       
        
