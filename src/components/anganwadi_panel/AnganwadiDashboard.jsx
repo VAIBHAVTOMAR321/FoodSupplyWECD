@@ -50,7 +50,7 @@ const AnganwadiDashboard = () => {
   // State for distribution modal
   const [showDistributionModal, setShowDistributionModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [distributionData, setDistributionData] = useState({ total_beneficiaries: '', bene_in_ang: '', date: '', fin_year: '', quarter: '' });
+  const [distributionData, setDistributionData] = useState({ total_beneficiaries: '', date: '', fin_year: '', quarter: '' });
   const [distributionError, setDistributionError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -136,7 +136,6 @@ const AnganwadiDashboard = () => {
     } else if (existingRecord) {
       // Find the full food item details from the list to get qty_per_ben
       const fullFoodItem = foodItems.find(fi => fi.food_item === existingRecord.food_item);
-      // For editing an existing record
       modalItem = { ...item, ...existingRecord, scheme, isEdit: true };
       modalItem = { ...fullFoodItem, ...existingRecord, scheme, isEdit: true };
     } else {
@@ -151,21 +150,18 @@ const AnganwadiDashboard = () => {
       if (scheme === 'hcm') {
         setDistributionData({
           total_beneficiaries: existingRecord.total_beneficiaries,
-          bene_in_ang: existingRecord.bene_in_ang || '',
           date: existingRecord.date,
         });
       } else { // thr
         setDistributionData({
           total_beneficiaries: existingRecord.total_beneficiaries,
-          bene_in_ang: existingRecord.bene_in_ang || '',
           fin_year: existingRecord.fin_year,
           quarter: existingRecord.quarter,
         });
       }
     } else {
       setDistributionData({ 
-        total_beneficiaries: '', 
-        bene_in_ang: '',
+        total_beneficiaries: '',
         date: new Date().toISOString().split('T')[0], 
         fin_year: scheme === 'thr' ? getCurrentFinancialYear() : '', 
         quarter: '' 
@@ -201,7 +197,7 @@ const AnganwadiDashboard = () => {
     }
 
     const isThr = activeScheme === 'thr';
-    const commonFieldsFilled = selectedItem && distributionData.total_beneficiaries && distributionData.bene_in_ang;
+    const commonFieldsFilled = selectedItem && distributionData.total_beneficiaries;
     const schemeFieldsFilled = isThr
       ? distributionData.fin_year && distributionData.quarter
       : distributionData.date;
@@ -242,9 +238,8 @@ const AnganwadiDashboard = () => {
     let payload = {
       food_item: selectedFoodItemDetails.food_item,
       total_beneficiaries: parseInt(distributionData.total_beneficiaries, 10),
-      bene_in_ang: parseInt(distributionData.bene_in_ang, 10),
       quantity: isNaN(calculatedQuantity) ? 0 : calculatedQuantity,
-      unit: selectedItem.unit,
+      unit: selectedFoodItemDetails.unit,
     };
 
     if (isThr) {
@@ -402,14 +397,9 @@ const AnganwadiDashboard = () => {
                         <th>Food Item</th>
                         {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Quarter</th></>}
                         <th>Beneficiaries</th>
-                        {activeScheme === 'hcm' && (
-                          <>
-                            <th>Beneficiaries Enrolled in AWC</th>
-                            <th>Quantity</th>
-                            <th>Unit</th>
-                          </>
-                        )}
-                        {activeScheme === 'thr' && <th>Quantity</th>}
+                        {activeScheme === 'hcm' && <th>Beneficiaries Enrolled in AWC</th>}
+                        <th>Quantity</th>
+                        <th>Unit</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -420,14 +410,9 @@ const AnganwadiDashboard = () => {
                           <td>{record.food_item}</td>
                           {activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{record.quarter}</td></>}
                           <td>{record.total_beneficiaries}</td>
-                          {activeScheme === 'hcm' && (
-                            <>
-                              <td>{record.bene_in_ang}</td>
-                              <td>{record.quantity}</td>
-                              <td>{record.unit}</td>
-                            </>
-                          )}
-                          {activeScheme === 'thr' && <td>{record.quantity} {record.unit}</td>}
+                          {activeScheme === 'hcm' && <td>{record.bene_in_ang}</td>}
+                          <td>{record.quantity}</td>
+                          <td>{record.unit}</td>
                           <td>
                             <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleOpenViewModal(record)}>
                               <FaEye />
@@ -518,16 +503,6 @@ const AnganwadiDashboard = () => {
                       required
                     />
                   </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Beneficiaries in Anganwadi</Form.Label>
-                    <Form.Control
-                      type="number"
-                      value={distributionData.bene_in_ang}
-                      onChange={(e) => setDistributionData({ ...distributionData, bene_in_ang: e.target.value })}
-                      placeholder="Enter number of beneficiaries in Anganwadi"
-                      required
-                    />
-                  </Form.Group>
                   {activeScheme === 'hcm' ? (
                     <Form.Group className="mb-3">
                       <Form.Label>Date</Form.Label>
@@ -565,6 +540,14 @@ const AnganwadiDashboard = () => {
                     <Form.Text>
                       ({selectedFoodItemForCalc?.qty_per_ben || 0} {selectedFoodItemForCalc?.unit} per beneficiary)
                     </Form.Text>
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Unit</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={selectedFoodItemForCalc?.unit || ''}
+                      disabled
+                    />
                   </Form.Group>
                   <div className="d-flex justify-content-end">
                     <Button variant="secondary" onClick={handleCloseDistributionModal} className="me-2">
