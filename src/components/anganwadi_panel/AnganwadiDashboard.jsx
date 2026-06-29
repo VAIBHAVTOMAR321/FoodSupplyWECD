@@ -50,7 +50,7 @@ const AnganwadiDashboard = () => {
   // State for distribution modal
   const [showDistributionModal, setShowDistributionModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [distributionData, setDistributionData] = useState({ total_beneficiaries: '', date: '', fin_year: '', quarter: '' });
+  const [distributionData, setDistributionData] = useState({ total_beneficiaries: '', bene_in_ang: '', date: '', fin_year: '', quarter: '' });
   const [distributionError, setDistributionError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -188,14 +188,14 @@ const AnganwadiDashboard = () => {
   const handleDistributionSubmit = async (e) => {
     e.preventDefault();
 
-    // If it's a new entry, a food item must be selected from the dropdown
+    // If it's a new entry, a food item must be selected from the dropdown.
     if (selectedItem.isNew && !distributionData.food_item_id) {
       setDistributionError("Please select a food item.");
       return;
     }
 
     const isThr = activeScheme === 'thr';
-    const commonFieldsFilled = selectedItem && distributionData.total_beneficiaries;
+    const commonFieldsFilled = selectedItem && distributionData.total_beneficiaries && distributionData.bene_in_ang;
     const schemeFieldsFilled = isThr
       ? distributionData.fin_year && distributionData.quarter
       : distributionData.date;
@@ -236,6 +236,7 @@ const AnganwadiDashboard = () => {
     let payload = {
       food_item: selectedFoodItemDetails.food_item,
       total_beneficiaries: parseInt(distributionData.total_beneficiaries, 10),
+      bene_in_ang: parseInt(distributionData.bene_in_ang, 10),
       quantity: isNaN(calculatedQuantity) ? 0 : calculatedQuantity,
       unit: selectedItem.unit,
     };
@@ -395,6 +396,7 @@ const AnganwadiDashboard = () => {
                         <th>Food Item</th>
                         {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Quarter</th></>}
                         <th>Beneficiaries</th>
+                        {activeScheme === 'hcm' && <th>Beneficiaries Enrolled in AWC</th>}
                         <th>Quantity</th>
                         <th>Actions</th>
                       </tr>
@@ -406,6 +408,7 @@ const AnganwadiDashboard = () => {
                           <td>{record.food_item}</td>
                           {activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{record.quarter}</td></>}
                           <td>{record.total_beneficiaries}</td>
+                          {activeScheme === 'hcm' && <td>{record.bene_in_ang}</td>}
                           <td>{record.quantity} {record.unit}</td>
                           <td>
                             <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleOpenViewModal(record)}>
@@ -497,6 +500,16 @@ const AnganwadiDashboard = () => {
                       required
                     />
                   </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Beneficiaries in Anganwadi</Form.Label>
+                    <Form.Control
+                      type="number"
+                      value={distributionData.bene_in_ang}
+                      onChange={(e) => setDistributionData({ ...distributionData, bene_in_ang: e.target.value })}
+                      placeholder="Enter number of beneficiaries in Anganwadi"
+                      required
+                    />
+                  </Form.Group>
                   {activeScheme === 'hcm' ? (
                     <Form.Group className="mb-3">
                       <Form.Label>Date</Form.Label>
@@ -557,6 +570,7 @@ const AnganwadiDashboard = () => {
                 <ListGroup variant="flush">
                   <ListGroup.Item><FaBuilding className="view-modal-icon" /> <strong>AWC Name:</strong> {viewItem.awc_name}</ListGroup.Item>
                   <ListGroup.Item><FaHashtag className="view-modal-icon" /> <strong>AWC Code:</strong> {viewItem.awc_code}</ListGroup.Item>
+                  <ListGroup.Item><FaUsers className="view-modal-icon" /> <strong>Beneficiaries in Anganwadi:</strong> {viewItem.bene_in_ang}</ListGroup.Item>
                   <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>Food Item:</strong> {viewItem.food_item}</ListGroup.Item>
                   <ListGroup.Item><FaUsers className="view-modal-icon" /> <strong>Beneficiaries:</strong> {viewItem.total_beneficiaries}</ListGroup.Item>
                   <ListGroup.Item><FaWeightHanging className="view-modal-icon" /> <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}</ListGroup.Item>
