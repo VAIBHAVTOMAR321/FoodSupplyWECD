@@ -895,6 +895,7 @@ border: none !important;
     width: 100%;
     overflow-x: hidden;
     padding: 4px;
+    text-align: justify;
 }
 
 /* ===== UNIVERSAL RESPONSIVE STYLES FOR ALL COMPONENTS ===== */

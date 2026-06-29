@@ -1913,3 +1913,52 @@ img {
 .close-btn-custom:hover {
   background-color: #c82333 !important;
 }
+
+/* Styles for expandable cards */
+.expandable-card {
+  cursor: pointer;
+}
+
+.expand-icon {
+  font-size: 1.2rem;
+  color: #6c757d;
+  transition: transform 0.2s ease-in-out;
+}
+
+.expandable-card:hover .expand-icon {
+  color: #343a40;
+}
+
+.card-hcm .hcm-icon {
+  background-color: rgba(255, 193, 7, 0.1);
+  color: #ffc107;
+  padding: 10px;
+  border-radius: 50%;
+}
+
+.card-thr .thr-icon {
+  background-color: rgba(13, 202, 240, 0.1);
+  color: #0dcaf0;
+  padding: 10px;
+  border-radius: 50%;
+}
+
+/* Styles for the food item table inside collapse */
+.food-item-table-container {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+  border-radius: .375rem;
+}
+
+.food-item-table {
+  margin-bottom: 0;
+}
+
+.food-item-table thead.sticky-top {
+  top: -1px; /* Ensure it sticks right at the top of the container */
+}
+
+.food-item-table th {
+  background-color: #f8f9fa;
+}

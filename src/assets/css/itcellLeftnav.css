@@ -248,7 +248,7 @@
 /* Sidebar Styles */
 .dpo-left-nav {
     width: 260px;
-       background: linear-gradient(135deg, #e8b938, #e8b938, #e8b938) !important;
+       background: linear-gradient(135deg, #3838e8, #3b38e8, #8438e8) !important;
     color: white;
     transition: all 0.3s ease;
     position: fixed;
