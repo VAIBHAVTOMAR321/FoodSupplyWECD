@@ -393,7 +393,7 @@ const HcmDpoDistributions = () => {
                 <div className="text-center py-4 text-muted">No HCM distributions found.</div>
               ) : (
                 <div className="table-responsive">
-                  <Table striped bordered hover responsive className="mb-0" style={{ tableLayout: 'fixed', width: '100%' }}>
+                  <Table striped bordered hover responsive className="mb-0 bg-white">
                      <thead>
                        <tr>
                          {visibleColumns.map((col) => <th key={`th-${col.dataField}`}>{col.text}</th>)}
