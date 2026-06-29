@@ -126,15 +126,26 @@ const AnganwadiDashboard = () => {
     }
   };
 
-  const handleOpenDistributionModal = (item, scheme, existingRecord = null) => {
+  const handleOpenDistributionModal = (item, scheme, existingRecord = null, isNew = false) => {
     // If editing, the `item` is the distribution record, which also has food_item details
     // If adding, the `item` is the food item from the list
-    const modalItem = existingRecord
-      ? { ...item, ...existingRecord, scheme, isEdit: true } // Merge and mark as edit
-      : { ...item, scheme };
+    let modalItem;
+    if (isNew) {
+      // For brand new entries from the main button
+      modalItem = { scheme, isNew: true };
+    } else if (existingRecord) {
+      // For editing an existing record
+      modalItem = { ...item, ...existingRecord, scheme, isEdit: true };
+    } else {
+      // This case might be deprecated if we only add from the new modal
+      modalItem = { ...item, scheme };
+    }
 
     setSelectedItem(modalItem);
-    if (existingRecord) {
+
+    if (isNew) {
+      setDistributionData({ total_beneficiaries: '', date: new Date().toISOString().split('T')[0], fin_year: scheme === 'thr' ? getCurrentFinancialYear() : '', quarter: '' });
+    } else if (existingRecord) {
       if (scheme === 'hcm') {
         setDistributionData({
           total_beneficiaries: existingRecord.total_beneficiaries,
@@ -176,11 +187,21 @@ const AnganwadiDashboard = () => {
 
   const handleDistributionSubmit = async (e) => {
     e.preventDefault();
+
+    // If it's a new entry, a food item must be selected from the dropdown
+    if (selectedItem.isNew && !distributionData.food_item_id) {
+      setDistributionError("Please select a food item.");
+      return;
+    }
+
     const isThr = activeScheme === 'thr';
     const commonFieldsFilled = selectedItem && distributionData.total_beneficiaries;
     const schemeFieldsFilled = isThr
       ? distributionData.fin_year && distributionData.quarter
       : distributionData.date;
+
+    const selectedFoodItemDetails = selectedItem.isNew ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10)) : selectedItem;
+
 
     if (!commonFieldsFilled || !schemeFieldsFilled) {
       setDistributionError("Please fill all required fields.");
@@ -194,7 +215,7 @@ const AnganwadiDashboard = () => {
           // When editing, selectedItem.id is the distribution record id.
           // When adding, selectedItem.id is the food item id, so it won't match a distribution record id.
           const isSameRecord = selectedItem.isEdit && rec.id === selectedItem.id;
-          return !isSameRecord &&
+          return !isSameRecord && // Don't compare against itself when editing
                  rec.food_item === selectedItem.food_item &&
                  rec.fin_year === distributionData.fin_year &&
                  rec.quarter === distributionData.quarter;
@@ -209,13 +230,13 @@ const AnganwadiDashboard = () => {
     setSubmitting(true);
     setDistributionError('');
 
-    const isEdit = !!selectedItem.id && selectedItem.isEdit;
-    const calculatedQuantity = parseFloat(selectedItem.qty_per_ben) * parseInt(distributionData.total_beneficiaries, 10);
+    const isEdit = selectedItem.isEdit;
+    const calculatedQuantity = parseFloat(selectedFoodItemDetails.qty_per_ben) * parseInt(distributionData.total_beneficiaries, 10);
 
     let payload = {
-      food_item: selectedItem.food_item,
+      food_item: selectedFoodItemDetails.food_item,
       total_beneficiaries: parseInt(distributionData.total_beneficiaries, 10),
-      quantity: isNaN(calculatedQuantity) ? 0 : calculatedQuantity.toFixed(2),
+      quantity: isNaN(calculatedQuantity) ? 0 : calculatedQuantity,
       unit: selectedItem.unit,
     };
 
@@ -227,7 +248,11 @@ const AnganwadiDashboard = () => {
     }
 
     if (isEdit) {
-      payload.id = selectedItem.id; // The ID of the distribution record
+      payload.id = selectedItem.id;
+    } else {
+      // For new entries, get food_item from dropdown selection
+      const selectedFoodItem = foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10));
+      payload.food_item = selectedFoodItem.food_item;
     }
 
     const url = activeScheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution;
@@ -262,9 +287,13 @@ const AnganwadiDashboard = () => {
     }
   };
 
-  const calculatedQuantity = selectedItem 
-    ? (parseFloat(selectedItem.qty_per_ben) * (parseInt(distributionData.total_beneficiaries, 10) || 0)).toFixed(2)
-    : 0;
+  const selectedFoodItemForCalc = selectedItem?.isNew
+    ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10))
+    : selectedItem;
+
+  const calculatedQuantity = selectedFoodItemForCalc
+    ? (parseFloat(selectedFoodItemForCalc.qty_per_ben) * (parseInt(distributionData.total_beneficiaries, 10) || 0)).toFixed(2)
+    : '0.00';
 
   const availableQuarters = selectedItem && activeScheme === 'thr'
     ? allQuarters.filter(q => {
@@ -346,6 +375,60 @@ const AnganwadiDashboard = () => {
           {activeScheme && (
             <Row>
               <Col xs={12}>
+                <div className="d-flex justify-content-between align-items-center mt-4 mb-3">
+                  <h5 className="mb-0">{activeScheme.toUpperCase()} Distribution Records</h5>
+                  <Button variant="success" onClick={() => handleOpenDistributionModal(null, activeScheme, null, true)}>
+                    <FaDolly className="me-2" /> New Distribution
+                  </Button>
+                </div>
+                {loading.table ? (
+                  <div className="loading-state"><Spinner animation="border" /></div>
+                ) : error.table ? (
+                  <Alert variant="danger">{error.table}</Alert>
+                ) : distributionRecords.length === 0 ? (
+                  <div className="empty-state">No distribution records found for {activeScheme.toUpperCase()}.</div>
+                ) : (
+                  <Table striped bordered hover responsive>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Food Item</th>
+                        {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Quarter</th></>}
+                        <th>Beneficiaries</th>
+                        <th>Quantity</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {distributionRecords.map((record, index) => (
+                        <tr key={record.id}>
+                          <td>{index + 1}</td>
+                          <td>{record.food_item}</td>
+                          {activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{record.quarter}</td></>}
+                          <td>{record.total_beneficiaries}</td>
+                          <td>{record.quantity} {record.unit}</td>
+                          <td>
+                            <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleOpenViewModal(record)}>
+                              <FaEye />
+                            </Button>
+                            {record.sector_status !== 'approved' && (
+                              <>
+                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenDistributionModal(record, activeScheme, record)}>
+                                  <FaEdit />
+                                </Button>
+                                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(record)}>
+                                  <FaTrash />
+                                </Button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                )}
+              </Col>
+              <Col xs={12}>
                 <div className="food-items-table-container mt-4">
                   <h5 className="mb-3">{activeScheme.toUpperCase()} Food Item List</h5>
                   {loading.table ? (
@@ -362,46 +445,17 @@ const AnganwadiDashboard = () => {
                             <th>Food Item</th>
                             <th>Qty Per Beneficiary</th>
                             <th>Unit</th>
-                            <th>Action</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {foodItems.map((item, index) => {
-                            const distributionRecord = distributionRecords.find(rec => rec.food_item === item.food_item);
-                            return (
-                              <tr key={item.id}>
-                                <td>{index + 1}</td>
-                                <td>{item.food_item}</td>
-                                <td>{item.qty_per_ben}</td>
-                                <td>{item.unit}</td>
-                                <td>
-                                  {distributionRecord ? (
-                                    <>
-                                      <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleOpenViewModal(distributionRecord)}>
-                                        <FaEye /> View
-                                      </Button>
-                                      {activeScheme === 'thr' && distributionRecord.sector_status === 'approved' ? (
-                                        <span className="badge bg-success p-2">Approved by Sector</span>
-                                      ) : (
-                                        <>
-                                          <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenDistributionModal(item, activeScheme, distributionRecord)}>
-                                            <FaEdit /> Edit
-                                          </Button>
-                                          <Button variant="outline-danger" size="sm" onClick={() => handleDelete(distributionRecord)}>
-                                            <FaTrash /> Delete
-                                          </Button>
-                                        </>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <Button variant="outline-success" size="sm" onClick={() => handleOpenDistributionModal(item, activeScheme)}>
-                                      <FaDolly /> Distribute
-                                    </Button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
+                          {foodItems.map((item, index) => (
+                            <tr key={item.id}>
+                              <td>{index + 1}</td>
+                              <td>{item.food_item}</td>
+                              <td>{item.qty_per_ben}</td>
+                              <td>{item.unit}</td>
+                            </tr>
+                          ))}
                         </tbody>
                       </Table>
                     )}
@@ -413,15 +467,26 @@ const AnganwadiDashboard = () => {
           {selectedItem && (
             <Modal show={showDistributionModal} onHide={handleCloseDistributionModal} centered>
               <Modal.Header closeButton>
-                <Modal.Title>{selectedItem.id ? 'Edit' : 'Record'} Distribution for {selectedItem.food_item}</Modal.Title>
+                <Modal.Title>{selectedItem.isEdit ? 'Edit' : 'Record'} Distribution {selectedItem.food_item ? `for ${selectedItem.food_item}` : ''}</Modal.Title>
               </Modal.Header>
               <Modal.Body>
                 {distributionError && <Alert variant="danger">{distributionError}</Alert>}
                 <Form onSubmit={handleDistributionSubmit}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Food Item</Form.Label>
-                    <Form.Control type="text" value={selectedItem.food_item} disabled />
-                  </Form.Group>
+                  {selectedItem.isNew ? (
+                    <Form.Group className="mb-3">
+                      <Form.Label>Food Item</Form.Label>
+                      <Form.Select
+                        required
+                        value={distributionData.food_item_id || ''}
+                        onChange={(e) => setDistributionData({ ...distributionData, food_item_id: e.target.value })}
+                      >
+                        <option value="">Select a food item...</option>
+                        {foodItems.map(item => <option key={item.id} value={item.id}>{item.food_item}</option>)}
+                      </Form.Select>
+                    </Form.Group>
+                  ) : (
+                    <Form.Group className="mb-3"><Form.Label>Food Item</Form.Label><Form.Control type="text" value={selectedItem.food_item} disabled /></Form.Group>
+                  )}
                   <Form.Group className="mb-3">
                     <Form.Label>Total Beneficiaries</Form.Label>
                     <Form.Control 
@@ -463,11 +528,11 @@ const AnganwadiDashboard = () => {
                     <Form.Label>Total Quantity</Form.Label>
                     <Form.Control 
                       type="text" 
-                      value={`${calculatedQuantity} ${selectedItem.unit}`} 
+                      value={selectedFoodItemForCalc ? `${calculatedQuantity} ${selectedFoodItemForCalc.unit}` : '0.00'}
                       disabled 
                     />
                     <Form.Text>
-                      ({selectedItem.qty_per_ben} {selectedItem.unit} per beneficiary)
+                      ({selectedFoodItemForCalc?.qty_per_ben || 0} {selectedFoodItemForCalc?.unit} per beneficiary)
                     </Form.Text>
                   </Form.Group>
                   <div className="d-flex justify-content-end">
@@ -475,7 +540,7 @@ const AnganwadiDashboard = () => {
                       Cancel
                     </Button>
                     <Button variant="primary" type="submit" disabled={submitting}>
-                      {submitting ? <Spinner as="span" animation="border" size="sm" /> : (selectedItem.id ? 'Update' : 'Submit')}
+                      {submitting ? <Spinner as="span" animation="border" size="sm" /> : (selectedItem.isEdit ? 'Update' : 'Submit')}
                     </Button>
                   </div>
                 </Form>
