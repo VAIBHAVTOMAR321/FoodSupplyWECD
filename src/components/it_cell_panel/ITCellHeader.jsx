@@ -36,7 +36,7 @@ function ITCellHeader({ toggleSidebar }) {
   const [imageError, setImageError] = useState(false);
 
   const getDisplayName = () => {
-    return userDetails.full_name || "DPO";
+    return userDetails.full_name || "IT Cell";
   };
 
   const getUserPhotoUrl = () => {

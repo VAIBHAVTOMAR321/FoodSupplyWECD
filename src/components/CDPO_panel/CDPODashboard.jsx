@@ -19,6 +19,8 @@ const CDPODashboard = () => {
   const [error, setError] = useState("");
   const [thrTotalRegistrations, setThrTotalRegistrations] = useState(0);
   const [hcmTotalRegistrations, setHcmTotalRegistrations] = useState(0);
+  const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
+  const [thrFoodItemsCount, setThrFoodItemsCount] = useState(0);
 
   useEffect(() => {
     const handleResize = () => {
@@ -56,11 +58,31 @@ const CDPODashboard = () => {
     }
   };
 
+  const fetchHcmFoodItems = async () => {
+    try {
+      const response = await api.get("/hcm-food-items/");
+      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      setHcmFoodItemsCount(Array.isArray(data) ? data.length : 0);
+    } catch (err) {
+      console.error("Failed to fetch HCM food items:", err);
+    }
+  };
+
+  const fetchThrFoodItems = async () => {
+    try {
+      const response = await api.get("/thr-food-items/");
+      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      setThrFoodItemsCount(Array.isArray(data) ? data.length : 0);
+    } catch (err) {
+      console.error("Failed to fetch THR food items:", err);
+    }
+  };
+
   const fetchDistributions = async () => {
     setLoading(true);
     setError("");
     try {
-      await Promise.all([fetchThrDistributions(), fetchHcmDistributions()]);
+      await Promise.all([fetchThrDistributions(), fetchHcmDistributions(), fetchHcmFoodItems(), fetchThrFoodItems()]);
     } catch (err) {
       setError("Failed to fetch CDPO distributions.");
     } finally {
@@ -113,6 +135,35 @@ const CDPODashboard = () => {
           </div>
 
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
+
+          <Row className="mb-4 g-3">
+            <Col xs={6} md={4} lg={6}>
+              <Card className="dashboard-card h-100">
+                <Card.Body className="d-flex flex-column align-items-center justify-content-center p-2">
+                  <div className="dashboard-card-icon bg-info bg-opacity-10">
+                    <FaBox className="text-info" size={22} />
+                  </div>
+                  <h6 className="dashboard-card-title mb-1">HCM Food Items</h6>
+                  <div className="dashboard-card-value">
+                    {loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6} md={4} lg={6}>
+              <Card className="dashboard-card h-100">
+                <Card.Body className="d-flex flex-column align-items-center justify-content-center p-2">
+                  <div className="dashboard-card-icon bg-secondary bg-opacity-10">
+                    <FaBox className="text-secondary" size={22} />
+                  </div>
+                  <h6 className="dashboard-card-title mb-1">THR Food Items</h6>
+                  <div className="dashboard-card-value">
+                    {loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
 
           <Row className="mb-4 g-3">
             <Col xs={6} md={4} lg={4}>
