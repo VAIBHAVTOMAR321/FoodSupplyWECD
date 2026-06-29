@@ -384,7 +384,7 @@ const HcmCdpoDistributions = () => {
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
 
           <Card className="shadow-sm">
-            <Card.Body>
+          
               {loading ? (
                 <div className="text-center py-4">
                   <Spinner animation="border" />
@@ -439,7 +439,7 @@ const HcmCdpoDistributions = () => {
                   {renderPagination()}
                 </div>
               )}
-            </Card.Body>
+           
           </Card>
         </Container>
 

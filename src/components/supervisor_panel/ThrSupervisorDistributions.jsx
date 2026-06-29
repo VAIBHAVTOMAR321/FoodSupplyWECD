@@ -521,7 +521,7 @@ const ThrSupervisorDistributions = () => {
           {actionError && <Alert variant="danger" className="mb-3">{actionError}</Alert>}
 
           <Card className="shadow-sm">
-            <Card.Body>
+           
               {loading ? (
                 <div className="text-center py-4">
                   <Spinner animation="border" />
@@ -652,7 +652,7 @@ const ThrSupervisorDistributions = () => {
                   {renderPagination()}
                 </div>
               )}
-            </Card.Body>
+          
           </Card>
         </Container>
 
