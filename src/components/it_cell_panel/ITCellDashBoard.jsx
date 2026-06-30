@@ -38,7 +38,7 @@ const ITCellDashBoard = () => {
 
   const fetchThrDistributions = async () => {
     try {
-      const response = await api.get("/thr-distributions/");
+      const response = await api.get("/thr-director-distributions/");
       const raw = response.data?.data || [];
       const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
       setThrDistributions(items);
@@ -50,7 +50,7 @@ const ITCellDashBoard = () => {
 
   const fetchHcmDistributions = async () => {
     try {
-      const response = await api.get("/hcm-distributions/");
+      const response = await api.get("/hcm-director-distributions/");
       const raw = response.data?.data || [];
       const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
       setHcmDistributions(items);
