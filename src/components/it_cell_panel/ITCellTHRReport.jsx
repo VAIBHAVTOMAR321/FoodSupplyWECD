@@ -37,6 +37,12 @@ const ITCellTHRReport = () => {
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [formErrors, setFormErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [foodItems, setFoodItems] = useState([]);
 
   const initialColumns = [
     { dataField: '#', text: '#', visible: true },
@@ -73,11 +79,22 @@ const ITCellTHRReport = () => {
       setUniqueProjects([...new Set(data.map((item) => item.project))]);
       setUniqueSectors([...new Set(data.map((item) => item.sector))]);
       setUniqueFoodItems([...new Set(data.map((item) => item.food_item))]);
+      fetchFoodItems();
     } catch (err) {
       setError("Failed to fetch THR report data.");
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  }, [api]);
+
+  const fetchFoodItems = useCallback(async () => {
+    try {
+      const response = await api.get("/thr-food-items/");
+      const data = Array.isArray(response.data) ? response.data : response.data.data || [];
+      setFoodItems(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch THR food items.", err);
     }
   }, [api]);
 
@@ -122,6 +139,66 @@ const ITCellTHRReport = () => {
     const newColumns = [...columns];
     newColumns[index].visible = !newColumns[index].visible;
     setColumns(newColumns);
+  };
+
+  const handleShowEditModal = (item) => {
+    setEditingItem(item);
+    setEditFormData({ ...item });
+    setFormErrors({});
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingItem(null);
+  };
+
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    setSubmitting(true);
+    setFormErrors({});
+
+    const foodItemDetails = foodItems.find(fi => fi.food_item === editFormData.food_item);
+    const quantity = foodItemDetails ? (parseFloat(foodItemDetails.qty_per_ben) * parseInt(editFormData.total_beneficiaries, 10)).toFixed(2) : editingItem.quantity;
+
+    const payload = {
+      ...editFormData,
+      id: editingItem.id, // Ensure id is correctly passed
+      total_beneficiaries: parseInt(editFormData.total_beneficiaries, 10),
+      quantity: quantity,
+    };
+    delete payload.created_at; // Do not send these fields on update
+    delete payload.updated_at;
+
+    try {
+      await api.put("/thr-director-distributions/", payload);
+      handleCloseEditModal();
+      fetchData(); // Refresh data
+    } catch (err) {
+      setFormErrors({ api: "Failed to update record. Please try again." });
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this record?")) {
+      try {
+        await api.delete("/thr-director-distributions/", { data: { id: [id] } });
+        fetchData(); // Refresh data
+      } catch (err) {
+        setError("Failed to delete record. Please try again.");
+        console.error(err);
+      }
+    }
   };
 
   const toggleSidebar = () => {
@@ -277,8 +354,8 @@ const ITCellTHRReport = () => {
                           case 'action':
                             cellContent = (
                               <>
-                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => console.log('Edit', row.id)}><FaEdit /></Button>
-                                <Button variant="outline-danger" size="sm" onClick={() => console.log('Delete', row.id)}><FaTrash /></Button>
+                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleShowEditModal(row)}><FaEdit /></Button>
+                                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(row.id)}><FaTrash /></Button>
                               </>
                             );
                             break;
@@ -340,6 +417,119 @@ const ITCellTHRReport = () => {
             </Button>
           </Modal.Footer>
         </Modal>
+
+        {editingItem && (
+          <Modal show={showEditModal} onHide={handleCloseEditModal} centered>
+            <Modal.Header closeButton>
+              <Modal.Title>Edit THR Distribution</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              {formErrors.api && <Alert variant="danger">{formErrors.api}</Alert>}
+              <Form onSubmit={handleUpdate}>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Food Item</Form.Label>
+                      <Form.Control as="select" name="food_item" value={editFormData.food_item} onChange={handleEditFormChange} required>
+                        <option value="">Select Food Item</option>
+                        {foodItems.map(fi => <option key={fi.id} value={fi.food_item}>{fi.food_item}</option>)}
+                      </Form.Control>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Total Beneficiaries</Form.Label>
+                      <Form.Control type="number" name="total_beneficiaries" value={editFormData.total_beneficiaries} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Financial Year</Form.Label>
+                      <Form.Control type="text" name="fin_year" value={editFormData.fin_year} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Quarter</Form.Label>
+                      <Form.Control as="select" name="quarter" value={editFormData.quarter} onChange={handleEditFormChange} required>
+                        <option value="">Select Quarter</option>
+                        <option value="apr-may-jun">April-May-June</option>
+                        <option value="jul-aug-sep">July-August-September</option>
+                        <option value="oct-nov-dec">October-November-December</option>
+                        <option value="jan-feb-mar">January-February-March</option>
+                      </Form.Control>
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>AWC Name</Form.Label>
+                      <Form.Control type="text" name="awc_name" value={editFormData.awc_name} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>AWC Code</Form.Label>
+                      <Form.Control type="text" name="awc_code" value={editFormData.awc_code} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                 <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Sector Status</Form.Label>
+                      <Form.Control as="select" name="sector_status" value={editFormData.sector_status} onChange={handleEditFormChange}>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                      </Form.Control>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>CDPO Status</Form.Label>
+                      <Form.Control as="select" name="cdpo_status" value={editFormData.cdpo_status} onChange={handleEditFormChange}>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                      </Form.Control>
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>DPO Status</Form.Label>
+                      <Form.Control as="select" name="dpo_status" value={editFormData.dpo_status} onChange={handleEditFormChange}>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                      </Form.Control>
+                    </Form.Group>
+                  </Col>
+                   <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Quantity</Form.Label>
+                      <Form.Control type="text" name="quantity" value={editFormData.quantity} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                <div className="d-flex justify-content-end">
+                  <Button variant="secondary" onClick={handleCloseEditModal} className="me-2">
+                    Cancel
+                  </Button>
+                  <Button variant="primary" type="submit" disabled={submitting}>
+                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : 'Update'}
+                  </Button>
+                </div>
+              </Form>
+            </Modal.Body>
+          </Modal>
+        )}
       </div>
     </div>
   );

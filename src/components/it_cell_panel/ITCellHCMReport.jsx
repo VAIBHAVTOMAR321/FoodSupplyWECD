@@ -35,6 +35,12 @@ const ITCellHCMReport = () => {
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [formErrors, setFormErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [foodItems, setFoodItems] = useState([]);
 
   const initialColumns = [
     { dataField: '#', text: '#', visible: true },
@@ -66,11 +72,22 @@ const ITCellHCMReport = () => {
       setUniqueProjects([...new Set(data.map((item) => item.project))]);
       setUniqueSectors([...new Set(data.map((item) => item.sector))]);
       setUniqueFoodItems([...new Set(data.map((item) => item.food_item))]);
+      fetchFoodItems();
     } catch (err) {
       setError("Failed to fetch HCM report data.");
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  }, [api]);
+
+  const fetchFoodItems = useCallback(async () => {
+    try {
+      const response = await api.get("/hcm-food-items/");
+      const data = Array.isArray(response.data) ? response.data : response.data.data || [];
+      setFoodItems(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch HCM food items.", err);
     }
   }, [api]);
 
@@ -123,6 +140,73 @@ const ITCellHCMReport = () => {
     const newColumns = [...columns];
     newColumns[index].visible = !newColumns[index].visible;
     setColumns(newColumns);
+  };
+
+  const handleShowEditModal = (item) => {
+    setEditingItem(item);
+    // Ensure date is in YYYY-MM-DD format for the input[type="date"]
+    setEditFormData({
+      ...item,
+      date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
+    });
+    setFormErrors({});
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingItem(null);
+  };
+
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    setSubmitting(true);
+    setFormErrors({});
+
+    const foodItemDetails = foodItems.find(fi => fi.food_item === editFormData.food_item);
+    const quantity = foodItemDetails ? (parseFloat(foodItemDetails.qty_per_ben) * parseInt(editFormData.total_beneficiaries, 10)).toFixed(2) : editingItem.quantity;
+    const unit = foodItemDetails ? foodItemDetails.unit : editingItem.unit;
+
+    const payload = {
+      ...editFormData,
+      id: editingItem.id,
+      total_beneficiaries: parseInt(editFormData.total_beneficiaries, 10),
+      bene_in_ang: editFormData.bene_in_ang ? parseInt(editFormData.bene_in_ang, 10) : null,
+      quantity: quantity,
+      unit: unit,
+    };
+    delete payload.created_at;
+    delete payload.updated_at;
+
+    try {
+      await api.put("/hcm-director-distributions/", payload);
+      handleCloseEditModal();
+      fetchData(); // Refresh data
+    } catch (err) {
+      setFormErrors({ api: "Failed to update record. Please try again." });
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this record?")) {
+      try {
+        await api.delete("/hcm-director-distributions/", { data: { id: [id] } });
+        fetchData(); // Refresh data
+      } catch (err) {
+        setError("Failed to delete record. Please try again.");
+        console.error(err);
+      }
+    }
   };
 
   const toggleSidebar = () => {
@@ -261,8 +345,8 @@ const ITCellHCMReport = () => {
                           case 'action':
                             cellContent = (
                               <>
-                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => console.log('Edit', row.id)}><FaEdit /></Button>
-                                <Button variant="outline-danger" size="sm" onClick={() => console.log('Delete', row.id)}><FaTrash /></Button>
+                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleShowEditModal(row)}><FaEdit /></Button>
+                                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(row.id)}><FaTrash /></Button>
                               </>
                             );
                             break;
@@ -304,6 +388,112 @@ const ITCellHCMReport = () => {
           </Modal.Body>
           <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button></Modal.Footer>
         </Modal>
+
+        {editingItem && (
+          <Modal show={showEditModal} onHide={handleCloseEditModal} centered size="lg">
+            <Modal.Header closeButton>
+              <Modal.Title>Edit HCM Distribution</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              {formErrors.api && <Alert variant="danger">{formErrors.api}</Alert>}
+              <Form onSubmit={handleUpdate}>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Food Item</Form.Label>
+                      <Form.Control as="select" name="food_item" value={editFormData.food_item} onChange={handleEditFormChange} required>
+                        <option value="">Select Food Item</option>
+                        {foodItems.map(fi => <option key={fi.id} value={fi.food_item}>{fi.food_item}</option>)}
+                      </Form.Control>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Date</Form.Label>
+                      <Form.Control type="date" name="date" value={editFormData.date} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>District</Form.Label>
+                      <Form.Control type="text" name="district" value={editFormData.district} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Project</Form.Label>
+                      <Form.Control type="text" name="project" value={editFormData.project} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Sector</Form.Label>
+                      <Form.Control type="text" name="sector" value={editFormData.sector} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>AWC Type</Form.Label>
+                      <Form.Control as="select" name="awc_type" value={editFormData.awc_type} onChange={handleEditFormChange} required>
+                        <option value="">Select AWC Type</option>
+                        <option value="AWC">AWC</option>
+                        <option value="Mini-AWC">Mini-AWC</option>
+                      </Form.Control>
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Total Beneficiaries</Form.Label>
+                      <Form.Control type="number" name="total_beneficiaries" value={editFormData.total_beneficiaries} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Beneficiaries in AWC</Form.Label>
+                      <Form.Control type="number" name="bene_in_ang" value={editFormData.bene_in_ang || ''} onChange={handleEditFormChange} />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>AWC Name</Form.Label>
+                      <Form.Control type="text" name="awc_name" value={editFormData.awc_name} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>AWC Code</Form.Label>
+                      <Form.Control type="text" name="awc_code" value={editFormData.awc_code} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Quantity</Form.Label>
+                      <Form.Control type="text" name="quantity" value={editFormData.quantity} onChange={handleEditFormChange} required />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <div className="d-flex justify-content-end">
+                  <Button variant="secondary" onClick={handleCloseEditModal} className="me-2">
+                    Cancel
+                  </Button>
+                  <Button variant="primary" type="submit" disabled={submitting}>
+                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : 'Update'}
+                  </Button>
+                </div>
+              </Form>
+            </Modal.Body>
+          </Modal>
+        )}
       </div>
     </div>
   );
