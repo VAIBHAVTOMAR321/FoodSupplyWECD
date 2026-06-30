@@ -27,7 +27,8 @@ import {
   FaBriefcase,
   FaGraduationCap,
   FaTasks,
-  FaClock
+  FaClock,
+  FaFileAlt
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -79,32 +80,27 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
       },
 
        {
-        icon: <FaTachometerAlt />,
+        icon: <FaCube />,
         label: "Food Item",
         path: "/ITCellFoodItem",
         active: true,
       },
     
-     
- 
-
-  
-     
       {
-    icon: <FaUsers />,
-    label: "Reports",
+    icon: <FaBook />,
+    label: "Reports & Distribution",
     path: "#",
     submenu: [
       {
-        label: "THR Report",
+        label: "THR Distribution ",
         path: "/ITCellTHRReport",
-        icon: <FaPlusSquare />,
+        icon: <FaFileAlt />,
       },
 
        {
-        label: "HCM Report",
+        label: "HCM Distribution",
         path: "/ITCellHCMReport",
-        icon: <FaPlusSquare />,
+        icon: <FaFileAlt />,
       },
     ],
   },   
