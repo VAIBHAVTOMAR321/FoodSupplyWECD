@@ -80,7 +80,7 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
 
        {
         icon: <FaTachometerAlt />,
-        label: "FoodItem",
+        label: "Food Item",
         path: "/ITCellFoodItem",
         active: true,
       },
