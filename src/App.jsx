@@ -37,6 +37,7 @@ import ITCellHCMDistributions from "./components/it_cell_panel/ITCellHCMDistribu
 import ITCellHCMReport from "./components/it_cell_panel/ITCellHCMReport";
 import ITCellTHRDistributions from "./components/it_cell_panel/ITCellTHRDistributions";
 import ITCellTHRReport from "./components/it_cell_panel/ITCellTHRReport";
+import ITCellFoodItem from "./components/it_cell_panel/ITCellFoodItem";
 
 
 
@@ -61,8 +62,8 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const location = useLocation();
 
-  const hideNavbarRoutes = ["/SupervisorDashBoard", "/HcmDpoDistributions","/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport"];
-  const hideFooterRoutes = ["/SupervisorDashBoard", "/HcmDpoDistributions", "/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport"];
+  const hideNavbarRoutes = ["/SupervisorDashBoard", "/HcmDpoDistributions","/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem"];
+  const hideFooterRoutes = ["/SupervisorDashBoard", "/HcmDpoDistributions", "/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem"];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
 
@@ -105,6 +106,12 @@ function AppContent() {
           <Route path="/CDPODashboard" element={
             <ProtectedRoute>
               <CDPODashboard />
+            </ProtectedRoute>
+          } />
+
+            <Route path="/ITCellFoodItem" element={
+            <ProtectedRoute>
+              <ITCellFoodItem />
             </ProtectedRoute>
           } />
 

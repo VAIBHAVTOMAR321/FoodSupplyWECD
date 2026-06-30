@@ -77,6 +77,13 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
         path: "/ITCellDashBoard",
         active: true,
       },
+
+       {
+        icon: <FaTachometerAlt />,
+        label: "FoodItem",
+        path: "/ITCellFoodItem",
+        active: true,
+      },
     
      
   {
