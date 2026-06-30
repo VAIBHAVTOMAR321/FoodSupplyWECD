@@ -85,13 +85,13 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
     path: "#",
     submenu: [
       {
-        label: "THR Distributions",
+        label: "THR Distribution",
         path: "/ITCellTHRDistributions",
         icon: <FaPlusSquare />,
       },
 
        {
-        label: "HCM Distributions",
+        label: "HCM Distribution",
         path: "/ITCellHCMDistributions",
         icon: <FaPlusSquare />,
       },
