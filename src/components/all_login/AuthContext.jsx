@@ -59,15 +59,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     console.log('🔴 Logging out...');
 
-    // 1. Determine redirect path based on role (Logic from Login.jsx)
-    let redirectPath = '/login';
-    if (role === 'director') {
-      redirectPath = '/login?director';
-    } else if (role === 'dpo' || role === 'cdpo') {
-      redirectPath = '/login?district';
-    }
-    // For supervisor/anganwadi, it remains '/login'
-
+    const redirectPath = '/angfoodproject';
 
     isRefreshing = false;
     failedQueue = [];

@@ -186,8 +186,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
             className="nav-item logout-btn"
             onClick={() => {
               if (typeof logout === "function") {
-                logout();
-                navigate("/login");
+                logout(); // This will clear the auth state and redirect
               }
             }}
           >

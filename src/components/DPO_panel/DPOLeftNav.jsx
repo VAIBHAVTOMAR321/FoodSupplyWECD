@@ -181,8 +181,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
             className="nav-item logout-btn"
             onClick={() => {
               if (typeof logout === "function") {
-                logout();
-                navigate("/login");
+                logout(); // This will clear the auth state and redirect
               }
             }}
           >
