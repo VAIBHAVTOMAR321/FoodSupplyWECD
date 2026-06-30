@@ -165,14 +165,11 @@ const ITCellTHRReport = () => {
     setSubmitting(true);
     setFormErrors({});
 
-    const foodItemDetails = foodItems.find(fi => fi.food_item === editFormData.food_item);
-    const quantity = foodItemDetails ? (parseFloat(foodItemDetails.qty_per_ben) * parseInt(editFormData.total_beneficiaries, 10)).toFixed(2) : editingItem.quantity;
-
     const payload = {
       ...editFormData,
       id: editingItem.id, // Ensure id is correctly passed
       total_beneficiaries: parseInt(editFormData.total_beneficiaries, 10),
-      quantity: quantity,
+      quantity: parseFloat(editFormData.quantity).toFixed(2),
     };
     delete payload.created_at; // Do not send these fields on update
     delete payload.updated_at;
@@ -513,7 +510,7 @@ const ITCellTHRReport = () => {
                    <Col md={6}>
                     <Form.Group className="mb-3">
                       <Form.Label>Quantity</Form.Label>
-                      <Form.Control type="text" name="quantity" value={editFormData.quantity} onChange={handleEditFormChange} required />
+                      <Form.Control type="number" step="0.01" name="quantity" value={editFormData.quantity} onChange={handleEditFormChange} required />
                     </Form.Group>
                   </Col>
                 </Row>

@@ -170,17 +170,12 @@ const ITCellHCMReport = () => {
     setSubmitting(true);
     setFormErrors({});
 
-    const foodItemDetails = foodItems.find(fi => fi.food_item === editFormData.food_item);
-    const quantity = foodItemDetails ? (parseFloat(foodItemDetails.qty_per_ben) * parseInt(editFormData.total_beneficiaries, 10)).toFixed(2) : editingItem.quantity;
-    const unit = foodItemDetails ? foodItemDetails.unit : editingItem.unit;
-
     const payload = {
       ...editFormData,
       id: editingItem.id,
       total_beneficiaries: parseInt(editFormData.total_beneficiaries, 10),
       bene_in_ang: editFormData.bene_in_ang ? parseInt(editFormData.bene_in_ang, 10) : null,
-      quantity: quantity,
-      unit: unit,
+      quantity: parseFloat(editFormData.quantity).toFixed(2),
     };
     delete payload.created_at;
     delete payload.updated_at;
@@ -478,7 +473,7 @@ const ITCellHCMReport = () => {
                   <Col md={6}>
                     <Form.Group className="mb-3">
                       <Form.Label>Quantity</Form.Label>
-                      <Form.Control type="text" name="quantity" value={editFormData.quantity} onChange={handleEditFormChange} required />
+                      <Form.Control type="number" step="0.01" name="quantity" value={editFormData.quantity} onChange={handleEditFormChange} required />
                     </Form.Group>
                   </Col>
                 </Row>
