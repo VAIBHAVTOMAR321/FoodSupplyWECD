@@ -29,7 +29,8 @@ import {
   FaTasks,
   FaClock,
   FaFileAlt,
-  FaTruck
+  FaTruck,
+  FaKey
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -77,6 +78,13 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
         icon: <FaTachometerAlt />,
         label: "DashBoard",
         path: "/ITCellDashBoard",
+        active: true,
+      },
+
+      {
+        icon: <FaKey />,
+        label: "Password Reset",
+        path: "/AllRoleResetpassword",
         active: true,
       },
 

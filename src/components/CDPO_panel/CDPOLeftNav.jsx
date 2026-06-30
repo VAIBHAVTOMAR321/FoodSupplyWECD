@@ -27,7 +27,8 @@ import {
   FaBriefcase,
   FaGraduationCap,
   FaTasks,
-  FaClock
+  FaClock,
+  FaTruck
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -79,13 +80,13 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
       },
 
       {
-        icon: <FaTachometerAlt />,
+        icon: <FaTruck />,
         label: "THR Distributions",
         path: "/ThrCdpoDistributions",
         active: true,
       },
       {
-        icon: <FaTachometerAlt />,
+        icon: <FaTruck />,
         label: "HCM Distributions",
         path: "/HcmCdpoDistributions",
         active: true,

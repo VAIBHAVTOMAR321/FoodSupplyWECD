@@ -27,7 +27,9 @@ import {
   FaBriefcase,
   FaGraduationCap,
   FaTasks,
-  FaClock
+  FaClock,
+  FaTruck,
+  FaFileAlt
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -81,18 +83,18 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
       
      
   {
-    icon: <FaUsers />,
+    icon: <FaTruck />,
     label: "Distributions",
     submenu: [
       {
         label: "THR Distributions",
         path: "/ThrDpoDistributions",
-        icon: <FaPlusSquare />,
+        icon: <FaFileAlt />,
       },
         {
         label: "HCM Distributions",
         path: "/HcmDpoDistributions",
-        icon: <FaPlusSquare />,
+        icon: <FaFileAlt />,
       },
     ],
   },

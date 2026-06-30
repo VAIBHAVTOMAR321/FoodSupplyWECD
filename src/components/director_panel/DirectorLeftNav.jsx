@@ -28,6 +28,7 @@ import {
   FaGraduationCap,
   FaTasks,
   FaClock,
+  FaFileAlt,
   FaAppleAlt,
 } from "react-icons/fa";
 import axios from "axios";

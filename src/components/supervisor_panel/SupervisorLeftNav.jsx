@@ -27,7 +27,8 @@ import {
   FaBriefcase,
   FaGraduationCap,
   FaTasks,
-  FaClock
+  FaClock,
+  FaTruck
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -79,19 +80,19 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
       },
 
 {
-         icon: <FaTachometerAlt />,
+         icon: <FaBuilding />,
          label: "Sector Profile",
          path: "/SectorProfile",
          active: true,
        },
        {
-         icon: <FaCube />,
+         icon: <FaTruck />,
          label: "THR Distributions",
          path: "/thr-supervisor-distributions",
          active: true,
        },
         {
-         icon: <FaCube />,
+         icon: <FaTruck />,
          label: "HCM Distributions",
          path: "/HcmSupervisorDistributions",
          active: true,
