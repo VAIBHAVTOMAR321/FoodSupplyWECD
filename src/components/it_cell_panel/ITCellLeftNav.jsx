@@ -103,7 +103,7 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
 
        {
         label: "HCM Report",
-        path: "/ITCellTHRReport",
+        path: "/ITCellHCMReport",
         icon: <FaPlusSquare />,
       },
     ],
