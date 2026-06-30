@@ -74,34 +74,50 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
       {
         icon: <FaTachometerAlt />,
         label: "DashBoard",
-        path: "/DPODashboard",
+        path: "/ITCellDashBoard",
         active: true,
       },
     
      
   {
     icon: <FaUsers />,
-    label: "test",
+    label: "Distributions",
+    path: "#",
     submenu: [
       {
-        label: "Registered Student",
-        path: "#",
+        label: "THR Distributions",
+        path: "/ITCellTHRDistributions",
+        icon: <FaPlusSquare />,
+      },
+
+       {
+        label: "HCM Distributions",
+        path: "/ITCellHCMDistributions",
         icon: <FaPlusSquare />,
       },
     ],
   },
-       {
-   icon: <FaClock />,
-   label: "Time Schedule",
-   path: "/SupervisorDashBoard",
- },
+
+  
+     
       {
-        icon: <FaComments />,
-        label: "Send Query",
-        path: "/SupervisorDashBoard",
+    icon: <FaUsers />,
+    label: "Reports",
+    path: "#",
+    submenu: [
+      {
+        label: "THR Report",
+        path: "/ITCellTHRReport",
+        icon: <FaPlusSquare />,
       },
-      
-       
+
+       {
+        label: "HCM Report",
+        path: "/ITCellTHRReport",
+        icon: <FaPlusSquare />,
+      },
+    ],
+  },   
       
      ];
 
