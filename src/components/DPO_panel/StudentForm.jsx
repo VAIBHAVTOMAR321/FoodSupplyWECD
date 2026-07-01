@@ -309,12 +309,20 @@ const StudentForm = () => {
                     <thead>
                       <tr>
                         <th>#</th>
+                        <th>District</th>
+                        <th>Project</th>
+                        <th>Sector</th>
                         <th>AWC Name</th>
                         <th>Fin. Year</th>
                         <th>Quarter</th>
-                        <th>PW & LM</th>
-                        <th>Child (6m-3y)</th>
-                        <th>Child (3-6y)</th>
+                        <th title="Pregnant Women & Lactating Mothers">PW & LM</th>
+                        <th title="Children 6 months to 3 years">Child (6m-3y)</th>
+                        <th title="Children 3 to 6 years">Child (3-6y)</th>
+                        <th title="Adolescent Girls">Adol. Girls</th>
+                        <th title="SAM 6 months to 3 years">SAM (6m-3y)</th>
+                        <th title="SAM 3 to 5 years">SAM (3-5y)</th>
+                        <th title="SUW 6 months to 3 years">SUW (6m-3y)</th>
+                        <th title="SUW 3 to 6 years">SUW (3-6y)</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -322,12 +330,20 @@ const StudentForm = () => {
                       {reports.length > 0 ? reports.map((report, index) => (
                         <tr key={report.id}>
                           <td>{(currentPage - 1) * 20 + index + 1}</td>
+                          <td>{report.district}</td>
+                          <td>{report.project}</td>
+                          <td>{report.sector}</td>
                           <td>{report.awc_name}</td>
                           <td>{report.fin_year}</td>
                           <td>{report.quarter}</td>
                           <td>{report.pw_lm}</td>
                           <td>{report.children_6m_3y}</td>
                           <td>{report.children_3_6y}</td>
+                          <td>{report.adolescent_girls}</td>
+                          <td>{report.sam_6m_3y}</td>
+                          <td>{report.sam_3_5y}</td>
+                          <td>{report.suw_6m_3y}</td>
+                          <td>{report.suw_3_6y}</td>
                           <td>
                             <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleShowViewModal(report)}><FaEye /></Button>
                             <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(report)}><FaEdit /></Button>
@@ -335,7 +351,7 @@ const StudentForm = () => {
                           </td>
                         </tr>
                       )) : (
-                        <tr><td colSpan="8" className="text-center">No reports found.</td></tr>
+                        <tr><td colSpan="16" className="text-center">No reports found.</td></tr>
                       )}
                     </tbody>
                   </Table>
