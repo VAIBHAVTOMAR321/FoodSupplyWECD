@@ -26,7 +26,7 @@ const DirectorFoodItems = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({ scheme: "", item: null });
-  const [formData, setFormData] = useState({ food_item: "", qty_per_ben: "", unit: "" });
+  const [formData, setFormData] = useState({ food_item: "", qty_per_ben: "", unit: "", bene_category: "", days_allotted: "" });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -76,16 +76,30 @@ const DirectorFoodItems = () => {
 
   const handleShowModal = (scheme, item = null) => {
     setModalConfig({ scheme, item });
-    setFormData(item ? { food_item: item.food_item, qty_per_ben: item.qty_per_ben, unit: item.unit } : { food_item: "", qty_per_ben: "", unit: "" });
+    if (item) {
+      setFormData({
+        food_item: item.food_item,
+        qty_per_ben: item.qty_per_ben,
+        unit: item.unit,
+        bene_category: item.bene_category || "",
+        days_allotted: item.days_allotted || ""
+      });
+    } else {
+      setFormData({ food_item: "", qty_per_ben: "", unit: "", bene_category: "", days_allotted: "" });
+    }
     setFormErrors({});
     setShowModal(true);
   };
 
   const handleCloseModal = () => setShowModal(false);
 
-  const validateForm = () => {
+  const validateForm = (scheme) => {
     const errors = {};
     if (!formData.food_item.trim()) errors.food_item = "Food item is required.";
+    if (scheme === 'thr') {
+      if (!formData.bene_category.trim()) errors.bene_category = "Beneficiary category is required.";
+      if (!formData.days_allotted) errors.days_allotted = "Days allotted is required.";
+    }
     if (!formData.qty_per_ben) errors.qty_per_ben = "Quantity is required.";
     else if (isNaN(formData.qty_per_ben)) errors.qty_per_ben = "Quantity must be a number.";
     if (!formData.unit.trim()) errors.unit = "Unit is required.";
@@ -95,13 +109,17 @@ const DirectorFoodItems = () => {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    const { scheme, item } = modalConfig;
+    if (!validateForm(scheme)) return;
 
     setSubmitting(true);
-    const { scheme, item } = modalConfig;
     const url = API_URLS[scheme];
     const method = item ? 'put' : 'post';
     let payload = { ...formData };
+    if (scheme !== 'thr') {
+      delete payload.bene_category;
+      delete payload.days_allotted;
+    }
     if (item) {
       payload.id = item.id;
     }
@@ -218,7 +236,11 @@ const DirectorFoodItems = () => {
 
         const firstRow = json[0] || {};
         const fileHeaders = Object.keys(firstRow).map(h => h.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/_+/g, '_'));
-        const requiredHeaders = ["food_item", "qty_per_ben", "unit"];
+        let requiredHeaders = ["food_item", "qty_per_ben", "unit"];
+        if (bulkUploadScheme === 'thr') {
+          requiredHeaders.push("bene_category", "days_allotted");
+        }
+
         const missingHeaders = requiredHeaders.filter(h => !fileHeaders.some(fh => headerMapping[fh] === h || fh === h));
 
         if (missingHeaders.length > 0) {
@@ -251,6 +273,14 @@ const DirectorFoodItems = () => {
           } else if (isNaN(Number(newRow.qty_per_ben))) {
             rowErrors.push("'qty_per_ben' must be a number.");
           }
+          if (bulkUploadScheme === 'thr') {
+            if (!newRow.bene_category || String(newRow.bene_category).trim() === "") rowErrors.push("'bene_category' is missing.");
+            if (newRow.days_allotted === undefined || newRow.days_allotted === null || String(newRow.days_allotted).trim() === "") {
+              rowErrors.push("'days_allotted' is missing.");
+            } else if (isNaN(Number(newRow.days_allotted))) {
+              rowErrors.push("'days_allotted' must be a number.");
+            }
+          }
           if (!newRow.unit || String(newRow.unit).trim() === "") rowErrors.push("'unit' is missing.");
 
           if (rowErrors.length > 0) {
@@ -278,10 +308,15 @@ const DirectorFoodItems = () => {
   }
 
   const downloadSampleFile = () => {
-    const sampleData = [
+    const hcmSampleData = [
       { food_item: "Sample Rice", qty_per_ben: 150, unit: "gram" },
       { food_item: "Sample Dal", qty_per_ben: 50, unit: "gram" },
     ];
+    const thrSampleData = [
+      { food_item: "Sample Rice", qty_per_ben: 5, unit: "Kg", bene_category: "6month-3yr", days_allotted: 25 },
+      { food_item: "Sample Dal", qty_per_ben: 2, unit: "Kg", bene_category: "3yr-6yr", days_allotted: 25 },
+    ];
+    const sampleData = bulkUploadScheme === 'thr' ? thrSampleData : hcmSampleData;
     const worksheet = XLSX.utils.json_to_sheet(sampleData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "FoodItems");
@@ -314,16 +349,20 @@ const DirectorFoodItems = () => {
                 <th>#</th>
                 <th>Food Item</th>
                 <th>Qty Per Beneficiary</th>
+                {scheme === 'thr' && <th>Beneficiary Category</th>}
+                {scheme === 'thr' && <th>Days Allotted</th>}
                 <th>Unit</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, index) => (
-                <tr key={item.id}>
+                <tr key={item.id || index}>
                   <td>{index + 1}</td>
                   <td>{item.food_item}</td>
                   <td>{item.qty_per_ben}</td>
+                  {scheme === 'thr' && <td>{item.bene_category}</td>}
+                  {scheme === 'thr' && <td>{item.days_allotted}</td>}
                   <td>{item.unit}</td>
                   <td>
                     <Button variant="outline-primary" size="sm" className="btn-action" onClick={() => handleShowModal(scheme, item)}>
@@ -381,6 +420,38 @@ const DirectorFoodItems = () => {
                 </Form.Control.Feedback>
               </Form.Group>
 
+              {modalConfig.scheme === 'thr' && (
+                <>
+                  <Form.Group className="mb-3" controlId="bene_category">
+                    <Form.Label>Beneficiary Category</Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder="e.g., 6month-3yr"
+                      value={formData.bene_category}
+                      onChange={(e) => setFormData({ ...formData, bene_category: e.target.value })}
+                      isInvalid={!!formErrors.bene_category}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      {formErrors.bene_category}
+                    </Form.Control.Feedback>
+                  </Form.Group>
+
+                  <Form.Group className="mb-3" controlId="days_allotted">
+                    <Form.Label>Days Allotted</Form.Label>
+                    <Form.Control
+                      type="number"
+                      placeholder="Enter days allotted"
+                      value={formData.days_allotted}
+                      onChange={(e) => setFormData({ ...formData, days_allotted: e.target.value })}
+                      isInvalid={!!formErrors.days_allotted}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      {formErrors.days_allotted}
+                    </Form.Control.Feedback>
+                  </Form.Group>
+                </>
+              )}
+
               <Form.Group className="mb-3" controlId="qty_per_ben">
                 <Form.Label>Quantity Per Beneficiary</Form.Label>
                 <Form.Control
@@ -426,7 +497,11 @@ const DirectorFoodItems = () => {
         </Modal.Header>
         <Modal.Body>
           {bulkUploadError && <Alert variant="danger">{bulkUploadError}</Alert>}
-          <p>Upload an Excel file with the following columns: <strong>food_item</strong>, <strong>qty_per_ben</strong>, <strong>unit</strong>.</p>
+          {bulkUploadScheme === 'thr' ? (
+            <p>Upload an Excel file with columns: <strong>food_item</strong>, <strong>qty_per_ben</strong>, <strong>unit</strong>, <strong>bene_category</strong>, <strong>days_allotted</strong>.</p>
+          ) : (
+            <p>Upload an Excel file with columns: <strong>food_item</strong>, <strong>qty_per_ben</strong>, <strong>unit</strong>.</p>
+          )}
           <Button variant="link" onClick={downloadSampleFile} className="p-0 mb-3">
             <FaFileExcel className="me-1" /> Download Sample File
           </Button>
@@ -448,6 +523,8 @@ const DirectorFoodItems = () => {
                     <th>#</th>
                     <th>Food Item</th>
                     <th>Qty Per Ben</th>
+                    {bulkUploadScheme === 'thr' && <th>Bene. Category</th>}
+                    {bulkUploadScheme === 'thr' && <th>Days Allotted</th>}
                     <th>Unit</th>
                     <th>Status</th>
                   </tr>
@@ -458,6 +535,8 @@ const DirectorFoodItems = () => {
                       <td>{index + 1}</td>
                       <td>{item.data.food_item}</td>
                       <td>{item.data.qty_per_ben}</td>
+                      {bulkUploadScheme === 'thr' && <td>{item.data.bene_category}</td>}
+                      {bulkUploadScheme === 'thr' && <td>{item.data.days_allotted}</td>}
                       <td>{item.data.unit}</td>
                       <td>{item.errors.length > 0 ? <span className="text-danger">Error</span> : <span className="text-success">OK</span>}</td>
                     </tr>
