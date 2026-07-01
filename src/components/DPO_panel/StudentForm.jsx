@@ -125,12 +125,16 @@ const StudentForm = () => {
 
   const fetchReports = useCallback(async (page, currentFilters) => {
     setLoading(true);
-    setError("");
+    setError('');
     try {
-      const params = new URLSearchParams({
-        page,
-        ...currentFilters,
+      const params = new URLSearchParams({ page });
+      // Append filters to params if they have a value, to keep the URL clean
+      Object.entries(currentFilters).forEach(([key, value]) => {
+        if (value) {
+          params.append(key, value);
+        }
       });
+
       const response = await api.get(`/ang-beneficiary-report/?${params.toString()}`);
       setReports(response.data.results || []);
       setTotalPages(response.data.total_pages || 1);
@@ -144,14 +148,22 @@ const StudentForm = () => {
 
   useEffect(() => {
     fetchReports(currentPage, filters);
-  }, [fetchReports, currentPage, filters]);
+  }, [fetchReports, currentPage]);
 
   const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
+    const { name, value } = e.target;    
+    setFilters((prev) => ({ ...prev, [name]: value }));
     setCurrentPage(1);
   };
 
+  const handleResetFilters = () => {
+    setFilters({ fin_year: "", quarter: "", district: "", project: "", sector: "", awc_name: "" });
+    setUniqueProjects([]);
+    setUniqueSectors([]);
+    setUniqueAwcs([]);
+    setCurrentPage(1);
+    fetchReports(1, { fin_year: "", quarter: "", district: "", project: "", sector: "", awc_name: "" });
+  };
   const handleDistrictChange = (e) => {
     const district = e.target.value;
     setFilters(prev => ({ ...prev, district, project: "", sector: "", awc_name: "" }));
@@ -164,6 +176,7 @@ const StudentForm = () => {
     setUniqueSectors([]);
     setUniqueAwcs([]);
     setCurrentPage(1);
+    fetchReports(1, { ...filters, district, project: "", sector: "", awc_name: "" });
   };
 
   const handleProjectChange = (e) => {
@@ -177,6 +190,7 @@ const StudentForm = () => {
     }
     setUniqueAwcs([]);
     setCurrentPage(1);
+    fetchReports(1, { ...filters, project, sector: "", awc_name: "" });
   };
 
   const handleSectorChange = (e) => {
@@ -189,6 +203,7 @@ const StudentForm = () => {
       setUniqueAwcs([]);
     }
     setCurrentPage(1);
+    fetchReports(1, { ...filters, sector, awc_name: "" });
   };
 
   const toggleSidebar = () => {
@@ -262,14 +277,19 @@ const StudentForm = () => {
   const handleCloseBulkUploadModal = () => setShowBulkUploadModal(false);
 
   const downloadSampleFile = () => {
+    const headers = [
+      "fin_year", "quarter", "awc_name", "pw_lm", "children_3_6y",
+      "children_6m_3y", "adolescent_girls", "sam_6m_3y", "sam_3_5y",
+      "suw_6m_3y", "suw_3_6y"
+    ];
     const sampleData = [
       {
         fin_year: "2025-26",
         quarter: "jan-feb-mar",
         awc_name: "THAPLA",
         pw_lm: 24,
-        children_3_6y: 38,
         children_6m_3y: 21,
+        children_3_6y: 38,
         adolescent_girls: 17,
         sam_6m_3y: 2,
         sam_3_5y: 1,
@@ -277,7 +297,7 @@ const StudentForm = () => {
         suw_3_6y: 4,
       },
     ];
-    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const worksheet = XLSX.utils.json_to_sheet(sampleData, { header: headers });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "BeneficiaryReports");
     XLSX.writeFile(workbook, "SampleBeneficiaryReports.xlsx");
@@ -305,7 +325,11 @@ const StudentForm = () => {
           return;
         }
 
-        const requiredHeaders = Object.keys(initialFormData).filter(k => !['district', 'project', 'sector'].includes(k));
+        const requiredHeaders = [
+          "fin_year", "quarter", "awc_name", "pw_lm", "children_3_6y",
+          "children_6m_3y", "adolescent_girls", "sam_6m_3y", "sam_3_5y",
+          "suw_6m_3y", "suw_3_6y"
+        ];
         const fileHeaders = Object.keys(json[0] || {});
         const missingHeaders = requiredHeaders.filter(h => !fileHeaders.includes(h));
 
@@ -338,6 +362,19 @@ const StudentForm = () => {
     reader.readAsArrayBuffer(file);
   };
 
+  const previewHeaders = {
+    fin_year: "Fin. Year",
+    quarter: "Quarter",
+    awc_name: "AWC Name",
+    pw_lm: "PW & LM",
+    children_3_6y: "Child (3-6y)",
+    children_6m_3y: "Child (6m-3y)",
+    adolescent_girls: "Adol. Girls",
+    sam_6m_3y: "SAM (6m-3y)",
+    sam_3_5y: "SAM (3-5y)",
+    suw_6m_3y: "SUW (6m-3y)",
+    suw_3_6y: "SUW (3-6y)",
+  };
   const handleBulkUpload = async () => {
     if (!bulkFile || bulkPreviewData.some(item => item.errors.length > 0)) {
       setBulkUploadError("Cannot upload. Please select a valid file and fix any errors.");
@@ -417,7 +454,7 @@ const StudentForm = () => {
     
       <Card.Header as="h5">{editingId ? "Edit" : "Add"} Beneficiary Report</Card.Header>
      
-        <Form onSubmit={handleSubmit} className="p-3">
+        <Form onSubmit={handleSubmit}>
           {error && <Alert variant="danger">{error}</Alert>}
           <Row>
             <Col md={3}><Form.Group className="mb-3"><Form.Label>Financial Year</Form.Label><Form.Control type="text" name="fin_year" value={formData.fin_year} onChange={handleFormChange} required /></Form.Group></Col>
@@ -465,7 +502,7 @@ const StudentForm = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <h3 className="fw-bold">Student Form</h3>
+            <h3 className="fw-bold">Beneficiary Reports</h3>
             <div>
               <Button onClick={handleShowBulkUploadModal} variant="success" className="me-2"><FaUpload className="me-2" /> Bulk Upload</Button>
               <Button onClick={handleAddNew} variant="primary"><FaPlus className="me-2" /> Add New Report</Button>
@@ -483,7 +520,7 @@ const StudentForm = () => {
               <Row className="align-items-center">
                 <Col md={3}><Card.Title as="h5" className="mb-0">Existing Reports</Card.Title></Col>
                 <Col md={9}>
-                  <Button variant="secondary" onClick={() => setFilters({ fin_year: "", quarter: "", district: "", project: "", sector: "", awc_name: "" })}>Reset Filters</Button>
+                  <Button variant="secondary" onClick={handleResetFilters}>Reset Filters</Button>
                 </Col>
               </Row>
               <Row className="mt-3">
@@ -611,11 +648,9 @@ const StudentForm = () => {
                     <thead>
                       <tr>
                         <th>#</th>
-                        <th>AWC Name</th>
-                        <th>Fin. Year</th>
-                        <th>Quarter</th>
-                        <th>PW & LM</th>
-                        <th>Child (6m-3y)</th>
+                        {Object.keys(previewHeaders).map(key => (
+                          <th key={key}>{previewHeaders[key]}</th>
+                        ))}
                         <th>Status</th>
                       </tr>
                     </thead>
@@ -623,11 +658,9 @@ const StudentForm = () => {
                       {bulkPreviewData.map((item, index) => (
                         <tr key={index} className={item.errors.length > 0 ? 'table-danger' : ''}>
                           <td>{index + 1}</td>
-                          <td>{item.data.awc_name}</td>
-                          <td>{item.data.fin_year}</td>
-                          <td>{item.data.quarter}</td>
-                          <td>{item.data.pw_lm}</td>
-                          <td>{item.data.children_6m_3y}</td>
+                          {Object.keys(previewHeaders).map(key => (
+                            <td key={key}>{item.data[key]}</td>
+                          ))}
                           <td>
                             {item.errors.length > 0 ? (
                               <span className="text-danger" title={item.errors.join('\n')}>Error</span>
