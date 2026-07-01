@@ -322,7 +322,7 @@ const DirectorFoodItems = () => {
   const renderTable = (scheme, items) => (
     <div className="food-items-table-container">
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h5 className="mb-0">{scheme.toUpperCase()} Food Items</h5>
+        <h5 className="mb-0">{scheme.toUpperCase()} खाद्य सामग्री विवरण</h5>
         <div>
           <Button variant="success" size="sm" onClick={() => handleShowBulkUploadModal(scheme)} className="me-2">
             <FaUpload className="me-2" /> Bulk Upload
@@ -383,7 +383,7 @@ const DirectorFoodItems = () => {
         <DirectorHeader toggleSidebar={toggleSidebar} />
         <div className="food-items-container">
           <Container fluid className="dashboard-box food-items-content">
-            <h3 className="page-title-heading">Food Items Management</h3>
+            <h3 className="page-title-heading">THR एवं HCM खाद्य सामग्री</h3>
             <Tabs defaultActiveKey="hcm" id="food-items-tabs" className="mb-4 food-items-tabs">
               <Tab eventKey="hcm" title="HCM Food Items">
                 {renderTable('hcm', hcmItems)}
