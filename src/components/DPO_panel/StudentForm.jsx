@@ -232,7 +232,7 @@ const StudentForm = () => {
 
   const renderForm = () => (
     <Card className="mb-4">
-      <Card.Body>
+    
       <Card.Header as="h5">{editingId ? "Edit" : "Add"} Beneficiary Report</Card.Header>
      
         <Form onSubmit={handleSubmit}>
@@ -265,7 +265,7 @@ const StudentForm = () => {
             {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingId ? "Update Report" : "Save Report")}
           </Button>
         </Form>
-      </Card.Body>
+      
     </Card>
   );
 
@@ -302,7 +302,7 @@ const StudentForm = () => {
                 <Col md={3}><Button variant="secondary" onClick={() => setFilters({ fin_year: "", quarter: "" })}>Reset Filters</Button></Col>
               </Row>
             </Card.Header>
-            <Card.Body>
+          
               {loading ? <div className="text-center"><Spinner animation="border" /></div> : error && !loading ? <Alert variant="danger">{error}</Alert> : (
                 <>
                   <Table striped bordered hover responsive>
@@ -342,7 +342,7 @@ const StudentForm = () => {
                   {totalPages > 1 && <Pagination className="justify-content-center"><Pagination.Prev onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1} /><Pagination.Item>{currentPage} / {totalPages}</Pagination.Item><Pagination.Next onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages} /></Pagination>}
                 </>
               )}
-            </Card.Body>
+           
           </Card>
 
           {viewingReport && (
