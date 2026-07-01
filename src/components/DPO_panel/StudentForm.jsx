@@ -417,7 +417,7 @@ const StudentForm = () => {
     
       <Card.Header as="h5">{editingId ? "Edit" : "Add"} Beneficiary Report</Card.Header>
      
-        <Form onSubmit={handleSubmit}>
+        <Form onSubmit={handleSubmit} className="p-3">
           {error && <Alert variant="danger">{error}</Alert>}
           <Row>
             <Col md={3}><Form.Group className="mb-3"><Form.Label>Financial Year</Form.Label><Form.Control type="text" name="fin_year" value={formData.fin_year} onChange={handleFormChange} required /></Form.Group></Col>
@@ -465,7 +465,7 @@ const StudentForm = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <h3 className="fw-bold">Beneficiary Reports</h3>
+            <h3 className="fw-bold">Student Form</h3>
             <div>
               <Button onClick={handleShowBulkUploadModal} variant="success" className="me-2"><FaUpload className="me-2" /> Bulk Upload</Button>
               <Button onClick={handleAddNew} variant="primary"><FaPlus className="me-2" /> Add New Report</Button>
