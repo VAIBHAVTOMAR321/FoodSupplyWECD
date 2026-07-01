@@ -19,7 +19,8 @@ import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
 import "../../assets/css/dpo.css";
 import { useAuth } from "../all_login/AuthContext";
-import { FaPlus, FaEdit, FaTrash, FaEye, FaUsers, FaChild, FaFemale, FaExclamationTriangle } from "react-icons/fa";
+import { FaPlus, FaEdit, FaTrash, FaEye, FaUsers, FaChild, FaFemale, FaExclamationTriangle, FaUpload, FaFileExcel } from "react-icons/fa";
+import * as XLSX from "xlsx";
 
 const getCurrentFinancialYear = () => {
   const today = new Date();
@@ -73,6 +74,12 @@ const StudentForm = () => {
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingReport, setViewingReport] = useState(null);
+
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkUploadError, setBulkUploadError] = useState("");
+  const [bulkPreviewData, setBulkPreviewData] = useState([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -188,6 +195,124 @@ const StudentForm = () => {
     }
   };
 
+  const handleShowBulkUploadModal = () => {
+    setBulkFile(null);
+    setBulkPreviewData([]);
+    setBulkUploadError("");
+    setShowBulkUploadModal(true);
+  };
+
+  const handleCloseBulkUploadModal = () => setShowBulkUploadModal(false);
+
+  const downloadSampleFile = () => {
+    const sampleData = [
+      {
+        fin_year: "2025-26",
+        quarter: "jan-feb-mar",
+        awc_name: "THAPLA",
+        pw_lm: 24,
+        children_3_6y: 38,
+        children_6m_3y: 21,
+        adolescent_girls: 17,
+        sam_6m_3y: 2,
+        sam_3_5y: 1,
+        suw_6m_3y: 3,
+        suw_3_6y: 4,
+      },
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "BeneficiaryReports");
+    XLSX.writeFile(workbook, "SampleBeneficiaryReports.xlsx");
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBulkFile(file);
+    setBulkPreviewData([]);
+    setBulkUploadError('');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+        if (json.length === 0) {
+          setBulkUploadError("The Excel file is empty.");
+          return;
+        }
+
+        const requiredHeaders = Object.keys(initialFormData).filter(k => !['district', 'project', 'sector'].includes(k));
+        const fileHeaders = Object.keys(json[0] || {});
+        const missingHeaders = requiredHeaders.filter(h => !fileHeaders.includes(h));
+
+        if (missingHeaders.length > 0) {
+          setBulkUploadError(`Missing required columns: ${missingHeaders.join(", ")}`);
+          return;
+        }
+
+        const previewData = json.map((row) => {
+          const rowErrors = [];
+          requiredHeaders.forEach(header => {
+            if (row[header] === undefined || row[header] === null || String(row[header]).trim() === "") {
+              rowErrors.push(`'${header}' is missing.`);
+            } else if (header !== 'fin_year' && header !== 'quarter' && header !== 'awc_name' && isNaN(Number(row[header]))) {
+              rowErrors.push(`'${header}' must be a number.`);
+            }
+          });
+          return { data: row, errors: rowErrors };
+        });
+
+        setBulkPreviewData(previewData);
+        if (previewData.some(item => item.errors.length > 0)) {
+          setBulkUploadError("Your file contains errors. Please fix them before uploading.");
+        }
+      } catch (err) {
+        setBulkUploadError("Failed to parse the Excel file. Please ensure it's a valid .xlsx or .xls file.");
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleBulkUpload = async () => {
+    if (!bulkFile || bulkPreviewData.some(item => item.errors.length > 0)) {
+      setBulkUploadError("Cannot upload. Please select a valid file and fix any errors.");
+      return;
+    }
+    setBulkUploading(true);
+    setBulkUploadError("");
+
+    try {
+      const uploadPromises = bulkPreviewData.map(item => {
+        const selectedAwc = awcList.find(awc => awc.awc_name === item.data.awc_name);
+        const payload = {
+          ...item.data,
+          district: selectedAwc?.district_name || '',
+          project: selectedAwc?.project || '',
+          sector: selectedAwc?.sector || '',
+        };
+        return api.post("/ang-beneficiary-report/", payload);
+      });
+
+      await Promise.all(uploadPromises);
+      setSuccess("Bulk upload successful!");
+      handleCloseBulkUploadModal();
+      fetchReports(1, { fin_year: "", quarter: "" });
+    } catch (err) {
+      setBulkUploadError("An error occurred during bulk upload. Some records may have failed.");
+      console.error("Bulk upload failed:", err.response || err);
+    } finally {
+      setBulkUploading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -284,7 +409,10 @@ const StudentForm = () => {
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h3 className="fw-bold">Beneficiary Reports</h3>
-            <Button onClick={handleAddNew} variant="primary"><FaPlus className="me-2" /> Add New Report</Button>
+            <div>
+              <Button onClick={handleShowBulkUploadModal} variant="success" className="me-2"><FaUpload className="me-2" /> Bulk Upload</Button>
+              <Button onClick={handleAddNew} variant="primary"><FaPlus className="me-2" /> Add New Report</Button>
+            </div>
           </div>
 
           {success && <Alert variant="success">{success}</Alert>}
@@ -375,6 +503,69 @@ const StudentForm = () => {
               <Modal.Footer><Button variant="secondary" onClick={handleCloseViewModal}>Close</Button></Modal.Footer>
             </Modal>
           )}
+
+          <Modal show={showBulkUploadModal} onHide={handleCloseBulkUploadModal} centered size="xl">
+            <Modal.Header closeButton>
+              <Modal.Title>Bulk Upload Beneficiary Reports</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              {bulkUploadError && <Alert variant="danger">{bulkUploadError}</Alert>}
+              <p>Upload an Excel file with the required columns. The 'awc_name' must match an existing AWC in the system.</p>
+              <Button variant="link" onClick={downloadSampleFile} className="p-0 mb-3">
+                <FaFileExcel className="me-1" /> Download Sample File
+              </Button>
+              <Form.Group controlId="formFile" className="mb-3">
+                <Form.Label>Select Excel File</Form.Label>
+                <Form.Control
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={handleFileSelect}
+                />
+              </Form.Group>
+
+              {bulkPreviewData.length > 0 && (
+                <div className="mt-4" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  <h6>File Preview</h6>
+                  <Table striped bordered hover responsive size="sm">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>AWC Name</th>
+                        <th>Fin. Year</th>
+                        <th>Quarter</th>
+                        <th>PW & LM</th>
+                        <th>Child (6m-3y)</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkPreviewData.map((item, index) => (
+                        <tr key={index} className={item.errors.length > 0 ? 'table-danger' : ''}>
+                          <td>{index + 1}</td>
+                          <td>{item.data.awc_name}</td>
+                          <td>{item.data.fin_year}</td>
+                          <td>{item.data.quarter}</td>
+                          <td>{item.data.pw_lm}</td>
+                          <td>{item.data.children_6m_3y}</td>
+                          <td>
+                            {item.errors.length > 0 ? (
+                              <span className="text-danger" title={item.errors.join('\n')}>Error</span>
+                            ) : (
+                              <span className="text-success">OK</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </div>
+              )}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={handleCloseBulkUploadModal} disabled={bulkUploading}>Cancel</Button>
+              <Button variant="primary" onClick={handleBulkUpload} disabled={bulkUploading || !bulkFile || bulkPreviewData.some(item => item.errors.length > 0)}>{bulkUploading ? <><Spinner as="span" animation="border" size="sm" /> Uploading...</> : "Upload"}</Button>
+            </Modal.Footer>
+          </Modal>
         </Container>
       </div>
     </div>
