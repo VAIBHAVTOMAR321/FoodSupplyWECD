@@ -159,15 +159,19 @@ const DirectorDashboard = () => {
               <th>#</th>
               <th>Food Item</th>
               <th>Quantity Per Beneficiary</th>
+              <th>Beneficiary Category</th>
+              <th>Days Allotted</th>
               <th>Unit</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item, index) => (
-              <tr key={item.id}>
+              <tr key={item.id || index}>
                 <td>{index + 1}</td>
                 <td>{item.food_item}</td>
                 <td>{item.qty_per_ben}</td>
+                <td>{item.bene_category}</td>
+                <td>{item.days_allotted}</td>
                 <td>{item.unit}</td>
               </tr>
             ))}
