@@ -36,6 +36,7 @@ const DirectorFoodItems = () => {
   const [bulkUploadError, setBulkUploadError] = useState("");
   const [bulkPreviewData, setBulkPreviewData] = useState([]);
   const [bulkValidationErrors, setBulkValidationErrors] = useState([]);
+  const [beneficiaryCategories, setBeneficiaryCategories] = useState([]);
   const [bulkUploading, setBulkUploading] = useState(false);
 
   const fetchData = useCallback(async (scheme) => {
@@ -58,9 +59,20 @@ const DirectorFoodItems = () => {
     }
   }, [api]);
 
+  const fetchBeneficiaryCategories = useCallback(async () => {
+    try {
+        const response = await api.get("/beneficiary-categories/");
+        setBeneficiaryCategories(response.data || []);
+    } catch (err) {
+        console.error("Failed to fetch beneficiary categories:", err);
+        setError(prev => ({ ...prev, thr: "Failed to load beneficiary categories." }));
+    }
+  }, [api]);
+
   useEffect(() => {
     fetchData('hcm');
     fetchData('thr');
+    fetchBeneficiaryCategories();
 
     const handleResize = () => {
       const width = window.innerWidth;
@@ -70,7 +82,7 @@ const DirectorFoodItems = () => {
     
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [fetchData]);
+  }, [fetchData, fetchBeneficiaryCategories]);
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
@@ -423,14 +435,17 @@ const DirectorFoodItems = () => {
               {modalConfig.scheme === 'thr' && (
                 <>
                   <Form.Group className="mb-3" controlId="bene_category">
-                    <Form.Label>Beneficiary Category</Form.Label>
-                    <Form.Control
-                      type="text"
-                      placeholder="e.g., 6month-3yr"
+                    <Form.Label>Beneficiary Category</Form.Label>                    
+                    <Form.Select
                       value={formData.bene_category}
                       onChange={(e) => setFormData({ ...formData, bene_category: e.target.value })}
                       isInvalid={!!formErrors.bene_category}
-                    />
+                    >
+                      <option value="">Select a category</option>
+                      {beneficiaryCategories.map(cat => (
+                        <option key={cat.id} value={cat.category_name}>{cat.category_name}</option>
+                      ))}
+                    </Form.Select>
                     <Form.Control.Feedback type="invalid">
                       {formErrors.bene_category}
                     </Form.Control.Feedback>
