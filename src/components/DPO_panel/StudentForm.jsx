@@ -68,10 +68,21 @@ const StudentForm = () => {
   const [formErrors, setFormErrors] = useState({});
   const [showForm, setShowForm] = useState(false);
 
-  const [filters, setFilters] = useState({ fin_year: "", quarter: "" });
+  const [filters, setFilters] = useState({
+    fin_year: "",
+    quarter: "",
+    district: "",
+    project: "",
+    sector: "",
+    awc_name: "",
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  const [uniqueDistricts, setUniqueDistricts] = useState([]);
+  const [uniqueProjects, setUniqueProjects] = useState([]);
+  const [uniqueSectors, setUniqueSectors] = useState([]);
+  const [uniqueAwcs, setUniqueAwcs] = useState([]);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingReport, setViewingReport] = useState(null);
 
@@ -105,6 +116,13 @@ const StudentForm = () => {
     fetchAwcList();
   }, [api]);
 
+  useEffect(() => {
+    if (awcList.length > 0) {
+      const districts = [...new Set(awcList.map(item => item.district_name))];
+      setUniqueDistricts(districts);
+    }
+  }, [awcList]);
+
   const fetchReports = useCallback(async (page, currentFilters) => {
     setLoading(true);
     setError("");
@@ -131,6 +149,45 @@ const StudentForm = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
+    setCurrentPage(1);
+  };
+
+  const handleDistrictChange = (e) => {
+    const district = e.target.value;
+    setFilters(prev => ({ ...prev, district, project: "", sector: "", awc_name: "" }));
+    if (district) {
+      const projects = [...new Set(awcList.filter(item => item.district_name === district).map(item => item.project))];
+      setUniqueProjects(projects);
+    } else {
+      setUniqueProjects([]);
+    }
+    setUniqueSectors([]);
+    setUniqueAwcs([]);
+    setCurrentPage(1);
+  };
+
+  const handleProjectChange = (e) => {
+    const project = e.target.value;
+    setFilters(prev => ({ ...prev, project, sector: "", awc_name: "" }));
+    if (project) {
+      const sectors = [...new Set(awcList.filter(item => item.district_name === filters.district && item.project === project).map(item => item.sector))];
+      setUniqueSectors(sectors);
+    } else {
+      setUniqueSectors([]);
+    }
+    setUniqueAwcs([]);
+    setCurrentPage(1);
+  };
+
+  const handleSectorChange = (e) => {
+    const sector = e.target.value;
+    setFilters(prev => ({ ...prev, sector, awc_name: "" }));
+    if (sector) {
+      const awcs = [...new Set(awcList.filter(item => item.district_name === filters.district && item.project === filters.project && item.sector === sector).map(item => item.awc_name))];
+      setUniqueAwcs(awcs);
+    } else {
+      setUniqueAwcs([]);
+    }
     setCurrentPage(1);
   };
 
@@ -425,9 +482,17 @@ const StudentForm = () => {
             <Card.Header>
               <Row className="align-items-center">
                 <Col md={3}><Card.Title as="h5" className="mb-0">Existing Reports</Card.Title></Col>
-                <Col md={3}><Form.Control type="text" name="fin_year" placeholder="Filter by Fin. Year (e.g., 2025-26)" value={filters.fin_year} onChange={handleFilterChange} /></Col>
-                <Col md={3}><Form.Select name="quarter" value={filters.quarter} onChange={handleFilterChange}><option value="">All Quarters</option><option value="apr-may-jun">April-May-June</option><option value="jul-aug-sep">July-August-September</option><option value="oct-nov-dec">October-November-December</option><option value="jan-feb-mar">January-February-March</option></Form.Select></Col>
-                <Col md={3}><Button variant="secondary" onClick={() => setFilters({ fin_year: "", quarter: "" })}>Reset Filters</Button></Col>
+                <Col md={9}>
+                  <Button variant="secondary" onClick={() => setFilters({ fin_year: "", quarter: "", district: "", project: "", sector: "", awc_name: "" })}>Reset Filters</Button>
+                </Col>
+              </Row>
+              <Row className="mt-3">
+                <Col md={2}><Form.Control type="text" name="fin_year" placeholder="Fin. Year (e.g., 2025-26)" value={filters.fin_year} onChange={handleFilterChange} /></Col>
+                <Col md={2}><Form.Select name="quarter" value={filters.quarter} onChange={handleFilterChange}><option value="">All Quarters</option><option value="apr-may-jun">Apr-Jun</option><option value="jul-aug-sep">Jul-Sep</option><option value="oct-nov-dec">Oct-Dec</option><option value="jan-feb-mar">Jan-Mar</option></Form.Select></Col>
+                <Col md={2}><Form.Select name="district" value={filters.district} onChange={handleDistrictChange}><option value="">All Districts</option>{uniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}</Form.Select></Col>
+                <Col md={2}><Form.Select name="project" value={filters.project} onChange={handleProjectChange} disabled={!filters.district}><option value="">All Projects</option>{uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}</Form.Select></Col>
+                <Col md={2}><Form.Select name="sector" value={filters.sector} onChange={handleSectorChange} disabled={!filters.project}><option value="">All Sectors</option>{uniqueSectors.map(s => <option key={s} value={s}>{s}</option>)}</Form.Select></Col>
+                <Col md={2}><Form.Select name="awc_name" value={filters.awc_name} onChange={handleFilterChange} disabled={!filters.sector}><option value="">All AWCs</option>{uniqueAwcs.map(a => <option key={a} value={a}>{a}</option>)}</Form.Select></Col>
               </Row>
             </Card.Header>
           
@@ -455,30 +520,46 @@ const StudentForm = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {reports.length > 0 ? reports.map((report, index) => (
-                        <tr key={report.id}>
-                          <td>{(currentPage - 1) * 20 + index + 1}</td>
-                          <td>{report.district}</td>
-                          <td>{report.project}</td>
-                          <td>{report.sector}</td>
-                          <td>{report.awc_name}</td>
-                          <td>{report.fin_year}</td>
-                          <td>{report.quarter}</td>
-                          <td>{report.pw_lm}</td>
-                          <td>{report.children_6m_3y}</td>
-                          <td>{report.children_3_6y}</td>
-                          <td>{report.adolescent_girls}</td>
-                          <td>{report.sam_6m_3y}</td>
-                          <td>{report.sam_3_5y}</td>
-                          <td>{report.suw_6m_3y}</td>
-                          <td>{report.suw_3_6y}</td>
-                          <td>
-                            <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleShowViewModal(report)}><FaEye /></Button>
-                            <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(report)}><FaEdit /></Button>
-                            <Button variant="outline-danger" size="sm" onClick={() => handleDelete(report.id)}><FaTrash /></Button>
-                          </td>
-                        </tr>
-                      )) : (
+                      {reports.length > 0 ? (
+                        <>
+                          {reports.map((report, index) => (
+                            <tr key={report.id}>
+                              <td>{(currentPage - 1) * 20 + index + 1}</td>
+                              <td>{report.district}</td>
+                              <td>{report.project}</td>
+                              <td>{report.sector}</td>
+                              <td>{report.awc_name}</td>
+                              <td>{report.fin_year}</td>
+                              <td>{report.quarter}</td>
+                              <td>{report.pw_lm}</td>
+                              <td>{report.children_6m_3y}</td>
+                              <td>{report.children_3_6y}</td>
+                              <td>{report.adolescent_girls}</td>
+                              <td>{report.sam_6m_3y}</td>
+                              <td>{report.sam_3_5y}</td>
+                              <td>{report.suw_6m_3y}</td>
+                              <td>{report.suw_3_6y}</td>
+                              <td>
+                                <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleShowViewModal(report)}><FaEye /></Button>
+                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(report)}><FaEdit /></Button>
+                                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(report.id)}><FaTrash /></Button>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="table-active fw-bold">
+                            <td colSpan="7">Total</td>
+                            <td>{reports.reduce((sum, r) => sum + (Number(r.pw_lm) || 0), 0)}</td>
+                            <td>{reports.reduce((sum, r) => sum + (Number(r.children_6m_3y) || 0), 0)}</td>
+                            <td>{reports.reduce((sum, r) => sum + (Number(r.children_3_6y) || 0), 0)}</td>
+                            <td>{reports.reduce((sum, r) => sum + (Number(r.adolescent_girls) || 0), 0)}</td>
+                            <td>{reports.reduce((sum, r) => sum + (Number(r.sam_6m_3y) || 0), 0)}</td>
+                            <td>{reports.reduce((sum, r) => sum + (Number(r.sam_3_5y) || 0), 0)}</td>
+                            <td>{reports.reduce((sum, r) => sum + (Number(r.suw_6m_3y) || 0), 0)}</td>
+                            <td>{reports.reduce((sum, r) => sum + (Number(r.suw_3_6y) || 0), 0)}</td>
+                            <td></td>
+                          </tr>
+                        </>
+                      ) : (
                         <tr><td colSpan="16" className="text-center">No reports found.</td></tr>
                       )}
                     </tbody>
