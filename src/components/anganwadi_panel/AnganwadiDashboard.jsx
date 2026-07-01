@@ -451,6 +451,9 @@ const AnganwadiDashboard = () => {
                             <th>Food Item</th>
                             <th>Qty Per Beneficiary</th>
                             <th>Unit</th>
+                            <th>Beneficiary Category</th>
+                            <th>Days Allotted</th>
+                            <th>Total Quantity</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -460,6 +463,9 @@ const AnganwadiDashboard = () => {
                               <td>{item.food_item}</td>
                               <td>{item.qty_per_ben}</td>
                               <td>{item.unit}</td>
+                              <td>{item.bene_category}</td>
+                              <td>{item.days_allotted}</td>
+                              <td>{item.total_quantity}</td>
                             </tr>
                           ))}
                         </tbody>
