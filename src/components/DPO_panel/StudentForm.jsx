@@ -303,6 +303,23 @@ const StudentForm = () => {
     XLSX.writeFile(workbook, "SampleBeneficiaryReports.xlsx");
   };
 
+  // Levenshtein distance function to find closest match for misspelled names
+  const levenshteinDistance = (a, b) => {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+    for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+    for (let j = 1; j <= b.length; j++) {
+      for (let i = 1; i <= a.length; i++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + cost);
+      }
+    }
+    return matrix[b.length][a.length];
+  };
+
+
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -338,6 +355,10 @@ const StudentForm = () => {
           return;
         }
 
+        // Create a map for quick, case-insensitive AWC name lookup
+        const awcNameMap = new Map();
+        awcList.forEach(awc => awcNameMap.set(awc.awc_name.toUpperCase(), awc.awc_name));
+
         const previewData = json.map((row) => {
           const rowErrors = [];
           requiredHeaders.forEach(header => {
@@ -347,6 +368,42 @@ const StudentForm = () => {
               rowErrors.push(`'${header}' must be a number.`);
             }
           });
+
+          // Validate awc_name against the fetched list
+          const excelAwcName = row.awc_name ? String(row.awc_name).trim().toUpperCase() : "";
+          const excelAwcNameBase = excelAwcName.split(/[-\s(]/)[0].trim();
+
+          if (!excelAwcName) {
+            rowErrors.push("'awc_name' is missing.");
+          } else if (awcNameMap.has(excelAwcName)) {
+            row.awc_name = awcNameMap.get(excelAwcName); // Correct casing
+          } else if (excelAwcNameBase && awcNameMap.has(excelAwcNameBase)) {
+            // Attempt to correct by matching the base name (e.g., "Sunoli" from "Sunoli-03")
+            row.awc_name = awcNameMap.get(excelAwcNameBase);
+          } else {
+            let bestMatch = null;
+            let minDistance = Infinity;
+
+            // Levenshtein distance check on both full and base names
+            awcList.forEach(awc => {
+              const fullDistance = levenshteinDistance(excelAwcName, awc.awc_name.toUpperCase());
+              const baseDistance = levenshteinDistance(excelAwcNameBase, awc.awc_name.toUpperCase().split(/[-\s(]/)[0].trim());
+              const distance = Math.min(fullDistance, baseDistance);
+
+              if (distance < minDistance) {
+                minDistance = distance;
+                bestMatch = awc.awc_name;
+              }
+            });
+
+            // Automatically correct if the spelling is very close
+            if (bestMatch && minDistance <= 3) {
+              row.awc_name = bestMatch;
+            } else {
+              const errorMessage = bestMatch ? `'${row.awc_name}' is not a valid AWC name. Did you mean '${bestMatch}'?` : `'${row.awc_name}' is not a valid AWC name.`;
+              rowErrors.push(errorMessage);
+            }
+          }
           return { data: row, errors: rowErrors };
         });
 
