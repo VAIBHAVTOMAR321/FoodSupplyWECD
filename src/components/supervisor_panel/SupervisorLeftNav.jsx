@@ -86,19 +86,32 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
          path: "/SectorProfile",
          active: true,
        },
-       {
-         icon: <FaTruck />,
-         label: "THR Distributions",
-         path: "/thr-supervisor-distributions",
-         active: true,
-       },
+       
+
         {
          icon: <FaTruck />,
-         label: "HCM Distributions",
-         path: "/HcmSupervisorDistributions",
+         label: "Beneficiarie Entry",
+         path: "/SupervisorBeneficiarieEntry",
          active: true,
        },
+       
      
+         {
+          icon: <FaTruck />,
+          label: "Distributions",
+          submenu: [
+            {
+              label: "HCM Distributions",
+              path: "/HcmSupervisorDistributions",
+              icon: <FaFileAlt />,
+            },
+              {
+              label: "THR Distributions",
+              path: "/thr-supervisor-distributions",
+              icon: <FaFileAlt />,
+            },
+          ],
+        },
         {
           icon: <FaTruck />,
           label: "Receiving",

@@ -56,7 +56,7 @@ const HcmSupervisorDistributions = () => {
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueAwcTypes, setUniqueAwcTypes] = useState([]);
-  const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
+  const [beneficiaryCategories, setBeneficiaryCategories] = useState([]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -77,7 +77,6 @@ const HcmSupervisorDistributions = () => {
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
       setUniqueAwcTypes([...new Set(distributions.map(item => item.awc_type))]);
-      setUniqueBeneCategories([...new Set(distributions.map(item => item.bene_category))]);
     }
   }, [distributions]);
 
@@ -130,9 +129,21 @@ const HcmSupervisorDistributions = () => {
     }
   };
 
+  const fetchBeneficiaryCategories = async () => {
+    try {
+      const response = await api.get("/beneficiary-categories/");
+      const data = response.data || [];
+      setBeneficiaryCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch beneficiary categories.", err);
+      setError("Failed to fetch beneficiary categories.");
+    }
+  };
+
   useEffect(() => {
     if (api) {
       fetchDistributions();
+      fetchBeneficiaryCategories();
     }
   }, [api]);
 
@@ -363,9 +374,9 @@ const HcmSupervisorDistributions = () => {
                   {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueBeneCategories.map(t => (
-                    <Dropdown.Item key={t} as="div">
-                      <Form.Check type="checkbox" label={t} checked={filters.bene_category.includes(t)} onChange={() => handleMultiSelectChange('bene_category', t)} />
+                  {beneficiaryCategories.map(cat => (
+                    <Dropdown.Item key={cat.id} as="div">
+                      <Form.Check type="checkbox" label={cat.category_name} checked={filters.bene_category.includes(cat.category_name)} onChange={() => handleMultiSelectChange('bene_category', cat.category_name)} />
                     </Dropdown.Item>
                   ))}
                 </Dropdown.Menu>

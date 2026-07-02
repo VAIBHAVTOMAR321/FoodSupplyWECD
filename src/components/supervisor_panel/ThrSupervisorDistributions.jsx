@@ -75,7 +75,7 @@ const ThrSupervisorDistributions = () => {
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
-  const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
+  const [beneficiaryCategories, setBeneficiaryCategories] = useState([]);
   const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
   const [uniqueCdpoStatuses, setUniqueCdpoStatuses] = useState([]);
   const [uniqueDpoStatuses, setUniqueDpoStatuses] = useState([]);
@@ -88,7 +88,6 @@ const ThrSupervisorDistributions = () => {
       setUniqueProjects([...new Set(distributions.map(item => item.project))]);
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
-      setUniqueBeneCategories([...new Set(distributions.map(item => item.bene_category))]);
       setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status))]);
       setUniqueCdpoStatuses([...new Set(distributions.map(item => item.cdpo_status))]);
       setUniqueDpoStatuses([...new Set(distributions.map(item => item.dpo_status))]);
@@ -155,9 +154,21 @@ const ThrSupervisorDistributions = () => {
     }
   };
 
+  const fetchBeneficiaryCategories = async () => {
+    try {
+      const response = await api.get("/beneficiary-categories/");
+      const data = response.data || [];
+      setBeneficiaryCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch beneficiary categories.", err);
+      setError("Failed to fetch beneficiary categories.");
+    }
+  };
+
   useEffect(() => {
     if (api) {
       fetchDistributions();
+      fetchBeneficiaryCategories();
     }
   }, [api]);
 
@@ -471,9 +482,9 @@ const ThrSupervisorDistributions = () => {
                   {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueBeneCategories.map(cat => (
-                    <Dropdown.Item key={cat} as="div">
-                      <Form.Check type="checkbox" label={cat} checked={filters.bene_category.includes(cat)} onChange={() => handleMultiSelectChange('bene_category', cat)} />
+                  {beneficiaryCategories.map(cat => (
+                    <Dropdown.Item key={cat.id} as="div">
+                      <Form.Check type="checkbox" label={cat.category_name} checked={filters.bene_category.includes(cat.category_name)} onChange={() => handleMultiSelectChange('bene_category', cat.category_name)} />
                     </Dropdown.Item>
                   ))}
                 </Dropdown.Menu>

@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from "react";
-import { Container, Card, Spinner, Table, Button, Alert, Pagination } from "react-bootstrap";
+import {
+  Container,
+  Card,
+  Form,
+  Row,
+  Col,
+  Button,
+  Spinner,
+  Alert,
+  InputGroup,
+} from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+
 import "../../assets/css/dashboard.css";
-import { FaUserCircle } from "react-icons/fa";
+import "../../assets/css/AnganwadiProfile.css";
+import { FaEye, FaEyeSlash, FaUserCircle, FaLock } from "react-icons/fa";
 import SupervisorLeftNav from "./SupervisorLeftNav";
 import SupervisorHeader from "./SupervisorHeader";
 
-const HcmSupervisorReceiving = () => {
+const SupervisorBeneficiarieEntry = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -151,4 +163,4 @@ const HcmSupervisorReceiving = () => {
   );
 };
 
-export default HcmSupervisorReceiving;
+export default SupervisorBeneficiarieEntry;
