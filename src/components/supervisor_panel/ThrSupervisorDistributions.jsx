@@ -565,7 +565,7 @@ const ThrSupervisorDistributions = () => {
                   >
                       <thead>
                         <tr>
-                          {visibleColumns.map((col, index) => <th key={col.dataField}>{col.text}</th>)}
+                          {visibleColumns.map((col, index) => <th key={col.dataField} style={(col.dataField === 'bene_category' || col.dataField === 'food_item') ? { width: '200px' } : {}}>{col.text}</th>)}
                         </tr>
                       </thead>
                       <tbody>
@@ -577,6 +577,20 @@ const ThrSupervisorDistributions = () => {
                                  switch (col.dataField) {
                                    case '#':
                                      cellContent = index + 1;
+                                      break;
+                                    case 'food_item':
+                                      cellContent = (
+                                        <div className="bene-category-cell" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                                          {row[col.dataField]}
+                                        </div>
+                                      );
+                                      break;
+                                    case 'bene_category':
+                                      cellContent = (
+                                        <div className="bene-category-cell" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                                          {row[col.dataField]}
+                                        </div>
+                                      );
                                      break;
                                    case 'sector_status':
                                    case 'cdpo_status':
@@ -585,11 +599,10 @@ const ThrSupervisorDistributions = () => {
                                      break;
                                    case 'action':
                                      cellContent = (
-                                       <>
+                                       <div className="d-flex align-items-center gap-2">
                                          <Button
                                            variant="outline-success"
                                            size="sm"
-                                           className="me-2"
                                            disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
                                            onClick={() => handleToggleRemark(row, "approved")}
                                          >
@@ -598,7 +611,6 @@ const ThrSupervisorDistributions = () => {
                                          <Button
                                            variant="outline-danger"
                                            size="sm"
-                                           className="me-2"
                                            disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
                                            onClick={() => handleToggleRemark(row, "rejected")}
                                          >
@@ -611,7 +623,7 @@ const ThrSupervisorDistributions = () => {
                                          >
                                            View Remark
                                          </Button>
-                                       </>
+                                       </div>
                                      );
                                      break;
                                    default:

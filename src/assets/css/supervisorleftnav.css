@@ -148,6 +148,9 @@
     font-weight: 600;
     margin-bottom: 4px;
 }
+.bene-category-cell{
+  width: 200px !important;
+}
 /* Dashboard Cards Row */
 .dashboard-cards-row {
     display: flex;
