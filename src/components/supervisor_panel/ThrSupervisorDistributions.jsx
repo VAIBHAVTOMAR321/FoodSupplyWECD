@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/supervisorleftnav.css";
@@ -6,7 +6,7 @@ import SupervisorHeader from "./SupervisorHeader";
 import SupervisorLeftNav from "./SupervisorLeftNav";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
 const ThrSupervisorDistributions = () => {
@@ -30,6 +30,7 @@ const ThrSupervisorDistributions = () => {
 
   const [showRemarkModal, setShowRemarkModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState(null);
+  const tableRef = useRef(null);
 
   const [columns, setColumns] = useState([
     { dataField: '#', text: '#', visible: true },
@@ -241,45 +242,34 @@ const ThrSupervisorDistributions = () => {
   }, [filteredData]);
 
   const exportToPDF = () => {
-    const visibleColumns = columns.filter(c => c.visible);
-    const head = [visibleColumns.map(c => c.text)];
-    const body = filteredData.map((row, index) =>
-      visibleColumns.map(col => {
-        if (col.dataField === '#') return index + 1;
-        const value = row[col.dataField];
-        return value !== null && value !== undefined ? String(value) : '';
-      })
-    );
+    const input = tableRef.current;
+    if (!input) {
+      console.error("Table element not found for PDF export.");
+      return;
+    }
+    html2canvas(input, {
+      scale: 2, // Higher scale for better quality
+      useCORS: true
+    }).then(canvas => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'pt',
+        format: 'a4'
+      });
 
-    const beneficiaryIndex = visibleColumns.findIndex(c => c.dataField === 'total_beneficiaries');
-    const totalRow = visibleColumns.map((col, idx) => {
-      if (idx < beneficiaryIndex) return '';
-      if (col.dataField === 'total_beneficiaries') return String(totals.beneficiaries);
-      if (col.dataField === 'quantity') return totals.quantity.toFixed(2);
-      return '';
-    });
-    body.push(totalRow);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasWidth / canvasHeight;
+      
+      const width = pdfWidth - 40; // with some margin
+      const height = width / ratio;
 
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.text("THR Supervisor Distributions Report", 14, 16);
-    autoTable(doc, {
-      startY: 20,
-      head: head,
-      body: body,
-      theme: 'grid',
-      styles: {
-        fontSize: 7,
-        cellPadding: 2,
-      },
-      headStyles: {
-        textColor: [0, 0, 0],
-        fillColor: [255, 255, 255],
-        lineColor: [0, 0, 0],
-        lineWidth: 0.5
-      },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
+      pdf.text("THR Supervisor Distributions Report", 20, 30);
+      pdf.addImage(imgData, 'PNG', 20, 40, width, height);
+      pdf.save('thr_supervisor_distributions.pdf');
     });
-    doc.save('thr_supervisor_distributions.pdf');
   };
 
   const exportToExcel = () => {
@@ -553,7 +543,15 @@ const ThrSupervisorDistributions = () => {
                 <div className="text-center py-4 text-muted">No THR distributions found.</div>
               ) : (
                 <div className="table-responsive">
-                  <Table striped bordered hover responsive className="mb-0">
+                  <Table 
+                    striped 
+                    bordered 
+                    hover 
+                    responsive 
+                    className="mb-0" 
+                    ref={tableRef}
+                    style={{ border: '1px solid #dee2e6' }}
+                  >
                       <thead>
                         <tr>
                           {visibleColumns.map((col, index) => <th key={col.dataField}>{col.text}</th>)}

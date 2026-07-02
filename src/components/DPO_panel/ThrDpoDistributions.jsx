@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dpo.css";
@@ -6,7 +6,7 @@ import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
 const ThrDpoDistributions = () => {
@@ -30,6 +30,7 @@ const ThrDpoDistributions = () => {
 
   const [showRemarkModal, setShowRemarkModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState(null);
+  const tableRef = useRef(null);
 
   const [columns, setColumns] = useState([
     { dataField: '#', text: '#', visible: true },
@@ -40,6 +41,8 @@ const ThrDpoDistributions = () => {
     { dataField: 'project', text: 'Project', visible: true },
     { dataField: 'district', text: 'District', visible: true },
     { dataField: 'food_item', text: 'Food Item', visible: true },
+    { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
+    { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin Year', visible: true },
     { dataField: 'quarter', text: 'Quarter', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
@@ -61,6 +64,7 @@ const ThrDpoDistributions = () => {
     project: [],
     sector: [],
     food_item: [],
+    bene_category: [],
     cdpo_status: [],
     dpo_status: [],
     sector_status: [],
@@ -71,6 +75,7 @@ const ThrDpoDistributions = () => {
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
+  const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
   const [uniqueCdpoStatuses, setUniqueCdpoStatuses] = useState([]);
   const [uniqueDpoStatuses, setUniqueDpoStatuses] = useState([]);
   const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
@@ -95,6 +100,7 @@ const ThrDpoDistributions = () => {
       setUniqueProjects([...new Set(distributions.map(item => item.project))]);
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
+      setUniqueBeneCategories([...new Set(distributions.map(item => item.bene_category))]);
       setUniqueCdpoStatuses([...new Set(distributions.map(item => item.cdpo_status))]);
       setUniqueDpoStatuses([...new Set(distributions.map(item => item.dpo_status))]);
       setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status))]);
@@ -114,13 +120,14 @@ const ThrDpoDistributions = () => {
 
   const filteredData = useMemo(() => {
     return distributions.filter(item => {
-      const { finYear, quarter, district, project, sector, food_item, cdpo_status, dpo_status, sector_status } = filters;
+      const { finYear, quarter, district, project, sector, food_item, bene_category, cdpo_status, dpo_status, sector_status } = filters;
       return (finYear.length === 0 || finYear.includes(item.fin_year)) &&
              (quarter.length === 0 || quarter.includes(item.quarter)) &&
              (district.length === 0 || district.includes(item.district)) &&
              (project.length === 0 || project.includes(item.project)) &&
              (sector.length === 0 || sector.includes(item.sector)) &&
              (food_item.length === 0 || food_item.includes(item.food_item)) &&
+             (bene_category.length === 0 || bene_category.includes(item.bene_category)) &&
              (cdpo_status.length === 0 || cdpo_status.includes(item.cdpo_status)) &&
              (dpo_status.length === 0 || dpo_status.includes(item.dpo_status)) &&
              (sector_status.length === 0 || sector_status.includes(item.sector_status));
@@ -234,45 +241,34 @@ const ThrDpoDistributions = () => {
   }, [filteredData]);
 
   const exportToPDF = () => {
-    const visCols = columns.filter(c => c.visible);
-    const head = [visCols.map(c => c.text)];
-    const body = filteredData.map((row, index) =>
-      visCols.map(col => {
-        if (col.dataField === '#') return index + 1;
-        const value = row[col.dataField];
-        return value !== null && value !== undefined ? String(value) : '';
-      })
-    );
+    const input = tableRef.current;
+    if (!input) {
+      console.error("Table element not found for PDF export.");
+      return;
+    }
+    html2canvas(input, {
+      scale: 2, // Higher scale for better quality
+      useCORS: true
+    }).then(canvas => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'pt',
+        format: 'a4'
+      });
 
-    const beneficiaryIndex = visCols.findIndex(c => c.dataField === 'total_beneficiaries');
-    const totalRow = visCols.map((col, idx) => {
-      if (idx < beneficiaryIndex) return '';
-      if (col.dataField === 'total_beneficiaries') return String(totals.beneficiaries);
-      if (col.dataField === 'quantity') return totals.quantity.toFixed(2);
-      return '';
-    });
-    body.push(totalRow);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasWidth / canvasHeight;
+      
+      const width = pdfWidth - 40; // with some margin
+      const height = width / ratio;
 
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.text("THR DPO Distributions Report", 14, 16);
-    autoTable(doc, {
-      startY: 20,
-      head: head,
-      body: body,
-      theme: 'grid',
-      styles: {
-        fontSize: 7,
-        cellPadding: 2,
-      },
-      headStyles: {
-        textColor: [0, 0, 0],
-        fillColor: [255, 255, 255],
-        lineColor: [0, 0, 0],
-        lineWidth: 0.5
-      },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
+      pdf.text("THR DPO Distributions Report", 20, 30);
+      pdf.addImage(imgData, 'PNG', 20, 40, width, height);
+      pdf.save('thr_dpo_distributions.pdf');
     });
-    doc.save('thr_dpo_distributions.pdf');
   };
 
   const exportToExcel = () => {
@@ -466,6 +462,20 @@ const ThrDpoDistributions = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category" className="w-100">
+                  {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueBeneCategories.map(cat => (
+                    <Dropdown.Item key={cat} as="div">
+                      <Form.Check type="checkbox" label={cat} checked={filters.bene_category.includes(cat)} onChange={() => handleMultiSelectChange('bene_category', cat)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
           </Row>
 
           <Row className="mb-3">
@@ -527,7 +537,15 @@ const ThrDpoDistributions = () => {
                 <div className="text-center py-4 text-muted">No THR distributions found.</div>
               ) : (
                 <div className="table-responsive">
-                  <Table striped bordered hover responsive className="mb-0">
+                  <Table 
+                    striped 
+                    bordered 
+                    hover 
+                    responsive 
+                    className="mb-0" 
+                    ref={tableRef}
+                    style={{ border: '1px solid #dee2e6' }}
+                  >
                      <thead>
                        <tr>
                          {visibleColumns.map((col) => <th key={`th-${col.dataField}`}>{col.text}</th>)}

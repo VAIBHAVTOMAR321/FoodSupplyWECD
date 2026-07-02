@@ -6,7 +6,7 @@ import "../../assets/css/itcellLeftnav.css";
 import ITCellLeftNav from "./ITCellLeftNav";
 import ITCellHeader from "./ITCellHeader";
 import { FaFilePdf, FaFileExcel, FaEye, FaEdit, FaTrash } from "react-icons/fa";
-import jsPDF from "jspdf";
+import jsPDF from "jspdf"; 
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
@@ -28,6 +28,7 @@ const ITCellTHRReport = () => {
     project: [],
     sector: [],
     food_item: [],
+    bene_category: [],
   });
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
   const [uniqueQuarters, setUniqueQuarters] = useState([]);
@@ -35,6 +36,7 @@ const ITCellTHRReport = () => {
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
+  const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -53,6 +55,8 @@ const ITCellTHRReport = () => {
     { dataField: 'awc_code', text: 'AWC Code', visible: true },
     { dataField: 'awc_type', text: 'AWC Type', visible: true },
     { dataField: 'food_item', text: 'Food Item', visible: true },
+    { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
+    { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin. Year', visible: true },
     { dataField: 'quarter', text: 'Quarter', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
@@ -79,6 +83,7 @@ const ITCellTHRReport = () => {
       setUniqueProjects([...new Set(data.map((item) => item.project))]);
       setUniqueSectors([...new Set(data.map((item) => item.sector))]);
       setUniqueFoodItems([...new Set(data.map((item) => item.food_item))]);
+      setUniqueBeneCategories([...new Set(data.map((item) => item.bene_category))]);
       fetchFoodItems();
     } catch (err) {
       setError("Failed to fetch THR report data.");
@@ -120,6 +125,7 @@ const ITCellTHRReport = () => {
     if (filters.project.length) data = data.filter((item) => filters.project.includes(item.project));
     if (filters.sector.length) data = data.filter((item) => filters.sector.includes(item.sector));
     if (filters.food_item.length) data = data.filter((item) => filters.food_item.includes(item.food_item));
+    if (filters.bene_category.length) data = data.filter((item) => filters.bene_category.includes(item.bene_category));
     setFilteredData(data);
     setCurrentPage(1);
   }, [filters, reportData]);
@@ -321,6 +327,18 @@ const ITCellTHRReport = () => {
             <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.project.length ? `${filters.project.length} projects selected` : 'All Projects'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueProjects.map(p => (<Dropdown.Item key={p} as="div"><Form.Check type="checkbox" label={p} checked={filters.project.includes(p)} onChange={() => handleMultiSelectChange('project', p)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
             <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.sector.length ? `${filters.sector.length} sectors selected` : 'All Sectors'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueSectors.map(s => (<Dropdown.Item key={s} as="div"><Form.Check type="checkbox" label={s} checked={filters.sector.includes(s)} onChange={() => handleMultiSelectChange('sector', s)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
             <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.food_item.length ? `${filters.food_item.length} items selected` : 'All Food Items'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueFoodItems.map(item => (<Dropdown.Item key={item} as="div"><Form.Check type="checkbox" label={item} checked={filters.food_item.includes(item)} onChange={() => handleMultiSelectChange('food_item', item)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
+          </Row>
+          <Row className="mb-3">
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category" className="w-100">
+                  {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueBeneCategories.map(cat => (<Dropdown.Item key={cat} as="div"><Form.Check type="checkbox" label={cat} checked={filters.bene_category.includes(cat)} onChange={() => handleMultiSelectChange('bene_category', cat)} /></Dropdown.Item>))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
           </Row>
 
           {loading ? (

@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Container, Row, Col, Form, Spinner, Table, Button, Alert, Pagination, Modal, Dropdown } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
 const THRDirectorReport = () => {
@@ -26,6 +26,7 @@ const THRDirectorReport = () => {
     project: [],
     sector: [],
     food_item: [],
+    bene_category: [],
   });
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
   const [uniqueQuarters, setUniqueQuarters] = useState([]);
@@ -33,6 +34,7 @@ const THRDirectorReport = () => {
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
+  const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
@@ -45,6 +47,8 @@ const THRDirectorReport = () => {
     { dataField: 'awc_code', text: 'AWC Code', visible: true },
     { dataField: 'awc_type', text: 'AWC Type', visible: true },
     { dataField: 'food_item', text: 'Food Item', visible: true },
+    { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
+    { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin. Year', visible: true },
     { dataField: 'quarter', text: 'Quarter', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
@@ -56,6 +60,7 @@ const THRDirectorReport = () => {
   ];
 
   const [columns, setColumns] = useState(initialColumns);
+  const tableRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -70,6 +75,7 @@ const THRDirectorReport = () => {
       setUniqueProjects([...new Set(data.map((item) => item.project))]);
       setUniqueSectors([...new Set(data.map((item) => item.sector))]);
       setUniqueFoodItems([...new Set(data.map((item) => item.food_item))]);
+      setUniqueBeneCategories([...new Set(data.map((item) => item.bene_category))]);
     } catch (err) {
       setError("Failed to fetch THR report data.");
       console.error(err);
@@ -99,6 +105,7 @@ const THRDirectorReport = () => {
     if (filters.project.length) data = data.filter((item) => filters.project.includes(item.project));
     if (filters.sector.length) data = data.filter((item) => filters.sector.includes(item.sector));
     if (filters.food_item.length) data = data.filter((item) => filters.food_item.includes(item.food_item));
+    if (filters.bene_category.length) data = data.filter((item) => filters.bene_category.includes(item.bene_category));
     setFilteredData(data);
     setCurrentPage(1);
   }, [filters, reportData]);
@@ -135,49 +142,34 @@ const THRDirectorReport = () => {
   }, [filteredData]);
 
   const exportToPDF = () => {
-    const visibleColumns = columns.filter(c => c.visible);
-    const head = [visibleColumns.map(c => c.text)];
-    const body = filteredData.map((row, index) =>
-      visibleColumns.map(col => {
-        if (col.dataField === '#') return index + 1;
-        const value = row[col.dataField];
-        return value !== null && value !== undefined ? String(value) : '';
-      })
-    );
+    const input = tableRef.current;
+    if (!input) {
+      console.error("Table element not found for PDF export.");
+      return;
+    }
+    html2canvas(input, {
+      scale: 2, // Higher scale for better quality
+      useCORS: true
+    }).then(canvas => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'pt',
+        format: 'a4'
+      });
 
-    const totalRow = visibleColumns.map((col, idx) => {
-      if (idx === 0) return 'Total';
-      if (col.dataField === 'total_beneficiaries') return totals.beneficiaries.toString();
-      if (col.dataField === 'quantity') return totals.quantity.toFixed(2).toString();
-      return '';
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasWidth / canvasHeight;
+      
+      const width = pdfWidth - 40; // with some margin
+      const height = width / ratio;
+
+      pdf.text("THR Distribution Report", 20, 30);
+      pdf.addImage(imgData, 'PNG', 20, 40, width, height);
+      pdf.save('thr_director_report.pdf');
     });
-    body.push(totalRow);
-  
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.text("THR Distribution Report", 14, 16);
-    autoTable(doc, {
-      startY: 20,
-      head: head,
-      body: body,
-      theme: 'striped', // Using striped theme to have more control over colors
-      styles: {
-        fontSize: 7,
-        cellPadding: 2,
-        textColor: [0, 0, 0], // Black text color for all cells
-        lineColor: [0, 0, 0], // Black border color
-        lineWidth: 0.1,
-      },
-      headStyles: { 
-        fillColor: [255, 255, 255], // White background for header
-        textColor: [0, 0, 0], // Black text for header
-        fontStyle: 'bold',
-      },
-      bodyStyles: {
-        fillColor: [255, 255, 255], // White background for body rows
-      },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-    });
-    doc.save('thr_director_report.pdf');
   };
 
   const exportToExcel = () => {
@@ -336,6 +328,20 @@ const THRDirectorReport = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category" className="w-100">
+                  {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueBeneCategories.map(cat => (
+                    <Dropdown.Item key={cat} as="div">
+                      <Form.Check type="checkbox" label={cat} checked={filters.bene_category.includes(cat)} onChange={() => handleMultiSelectChange('bene_category', cat)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
           </Row>
 
           {loading ? (
@@ -344,7 +350,7 @@ const THRDirectorReport = () => {
             <Alert variant="danger">{error}</Alert>
           ) : (
             <>
-              <Table striped bordered hover responsive className="bg-white">
+              <Table striped bordered hover responsive className="bg-white" ref={tableRef} style={{ border: '1px solid #dee2e6' }}>
                 <thead>
                   <tr>{columns.map((col, index) => col.visible && <th key={index}>{col.text}</th>)}</tr>
                 </thead>
