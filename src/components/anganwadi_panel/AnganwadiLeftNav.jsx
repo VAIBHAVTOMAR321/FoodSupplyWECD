@@ -89,6 +89,12 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
     path: "/FoodItemReceiving"
   },
 
+  {
+    icon: <FaUsers />,
+    label: "Beneficiaries Entry",
+    path: "/BeneficiarieEntry"
+  },
+
  
      
       

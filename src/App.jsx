@@ -41,6 +41,7 @@ import ITCellFoodItem from "./components/it_cell_panel/ITCellFoodItem";
 import AllRoleResetpassword from "./components/it_cell_panel/AllRoleResetpassword";
 import FoodItemReceiving from "./components/anganwadi_panel/FoodItemReceiving";
 import StudentForm from "./components/DPO_panel/StudentForm";
+import BeneficiarieEntry from "./components/anganwadi_panel/BeneficiarieEntry";
 
 
 
@@ -65,8 +66,8 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const location = useLocation();
 
-  const hideNavbarRoutes = ["/StudentForm","/SupervisorDashBoard", "/FoodItemReceiving", "/AllRoleResetpassword", "/HcmDpoDistributions","/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem"];
-  const hideFooterRoutes = ["/StudentForm","/SupervisorDashBoard", "/FoodItemReceiving", "/AllRoleResetpassword","/HcmDpoDistributions", "/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem"];
+  const hideNavbarRoutes = ["/BeneficiarieEntry", "/StudentForm","/SupervisorDashBoard", "/FoodItemReceiving", "/AllRoleResetpassword", "/HcmDpoDistributions","/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem"];
+  const hideFooterRoutes = ["/BeneficiarieEntry", "/StudentForm","/SupervisorDashBoard", "/FoodItemReceiving", "/AllRoleResetpassword","/HcmDpoDistributions", "/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem"];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
 
@@ -84,6 +85,12 @@ function AppContent() {
            <Route path="/StudentForm" element={
             <ProtectedRoute>
               <StudentForm />
+            </ProtectedRoute>
+          } />
+
+           <Route path="/BeneficiarieEntry" element={
+            <ProtectedRoute>
+              <BeneficiarieEntry />
             </ProtectedRoute>
           } />
 
