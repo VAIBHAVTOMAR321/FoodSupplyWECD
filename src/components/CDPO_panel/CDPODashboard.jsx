@@ -59,9 +59,6 @@ const CDPODashboard = () => {
       const [hcmRes, thrRes] = await Promise.all([ 
         api.get("/cdpo/dashboard/hcm/"),
         api.get("/cdpo/dashboard/thr/")
-      const [hcmRes, thrRes] = await Promise.all([
-        api.get("/cdpo/dashboard-hcm/"),
-        api.get("/cdpo/dashboard-thr/")
       ]);
       setHcmSummary(hcmRes.data);
       setThrSummary(thrRes.data);
@@ -78,7 +75,6 @@ const CDPODashboard = () => {
       await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems()]);
     } catch (err) {
       setError("Failed to fetch supervisor distributions.");
-      setError("Failed to fetch CDPO distributions.");
     } finally {
       setLoading(false);
     }
@@ -309,7 +305,7 @@ const CDPODashboard = () => {
             <h4 className="section-title">THR Distribution & Received Summary</h4>
             <Row className="g-3"> 
               <Col md={4}>
-                <Card className="dashboard-card card-thr" onClick={() => navigate('/thr-supervisor-distributions')}>
+                <Card className="dashboard-card card-thr" onClick={() => navigate('/ThrCdpoDistributions')}>
                   <Card.Body>
                     <div className="d-flex align-items-center w-100">
                       <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
@@ -377,7 +373,7 @@ const CDPODashboard = () => {
             <h4 className="section-title">HCM Distribution & Received Summary</h4>
             <Row className="g-3"> 
               <Col md={4}>
-                <Card className="dashboard-card card-hcm" onClick={() => navigate('/HcmSupervisorDistributions')}>
+                <Card className="dashboard-card card-hcm" onClick={() => navigate('/HcmCdpoDistributions')}>
                   <Card.Body>
                     <div className="d-flex align-items-center w-100">
                       <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
