@@ -28,7 +28,8 @@ import {
   FaGraduationCap,
   FaTasks,
   FaClock,
-  FaTruck
+  FaTruck,
+  FaFileAlt
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -98,7 +99,23 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
          active: true,
        },
      
-      
+        {
+          icon: <FaTruck />,
+          label: "Receiving",
+          submenu: [
+            {
+              label: "THR Receiving",
+              path: "/ThrSupervisorReceiving",
+              icon: <FaFileAlt />,
+            },
+              {
+              label: "HCM Receiving",
+              path: "/HcmSupervisorReceiving",
+              icon: <FaFileAlt />,
+            },
+          ],
+        },
+            
    
     
       
