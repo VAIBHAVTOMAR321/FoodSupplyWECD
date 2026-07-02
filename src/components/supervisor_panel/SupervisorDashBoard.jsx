@@ -1,23 +1,22 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/supervisorleftnav.css";
 import SupervisorHeader from "./SupervisorHeader";
 import SupervisorLeftNav from "./SupervisorLeftNav";
-import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
 
 const SupervisorDashBoard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   
+  const navigate = useNavigate();
   const { api } = useAuth();
-  const [thrDistributions, setThrDistributions] = useState([]);
-  const [hcmDistributions, setHcmDistributions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [thrTotalRegistrations, setThrTotalRegistrations] = useState(0);
-  const [hcmTotalRegistrations, setHcmTotalRegistrations] = useState(0);
+  const [hcmSummary, setHcmSummary] = useState(null);
   const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
   const [thrFoodItemsCount, setThrFoodItemsCount] = useState(0);
   const [expanded, setExpanded] = useState(null);
@@ -33,30 +32,6 @@ const SupervisorDashBoard = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  const fetchThrDistributions = async () => {
-    try {
-      const response = await api.get("/thr-supervisor-distributions/");
-      const raw = response.data?.data || [];
-      const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
-      setThrDistributions(items);
-      setThrTotalRegistrations(response.data?.count || items.length);
-    } catch (err) {
-      console.error("Failed to fetch THR Supervisor distributions:", err);
-    }
-  };
-
-  const fetchHcmDistributions = async () => {
-    try {
-      const response = await api.get("/hcm-supervisor-distributions/");
-      const raw = response.data?.data || [];
-      const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
-      setHcmDistributions(items);
-      setHcmTotalRegistrations(response.data?.count || items.length);
-    } catch (err) {
-      console.error("Failed to fetch HCM Supervisor distributions:", err);
-    }
-  };
 
   const fetchHcmFoodItems = async () => {
     try {
@@ -78,11 +53,22 @@ const SupervisorDashBoard = () => {
     }
   };
 
+  const fetchDashboardSummaries = async () => {
+    try {
+      // Only fetch HCM summary as THR summary is no longer displayed
+      const hcmRes = await api.get("/supervisor/dashboard-hcm/");
+      setHcmSummary(hcmRes.data);
+    } catch (err) {
+      setError("Failed to fetch dashboard summaries.");
+      console.error("Dashboard summary fetch error:", err);
+    }
+  };
+
   const fetchAllData = async () => {
     setLoading(true);
     setError("");
     try {
-      await Promise.all([fetchThrDistributions(), fetchHcmDistributions(), fetchHcmFoodItems(), fetchThrFoodItems()]);
+      await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems()]);
     } catch (err) {
       setError("Failed to fetch supervisor distributions.");
     } finally {
@@ -99,22 +85,6 @@ const SupervisorDashBoard = () => {
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
-
-  const thrTotals = useMemo(() => {
-    return thrDistributions.reduce((acc, item) => {
-      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-      acc.quantity += parseFloat(item.quantity) || 0;
-      return acc;
-    }, { beneficiaries: 0, quantity: 0 });
-  }, [thrDistributions]);
-
-  const hcmTotals = useMemo(() => {
-    return hcmDistributions.reduce((acc, item) => {
-      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-      acc.quantity += parseFloat(item.quantity) || 0;
-      return acc;
-    }, { beneficiaries: 0, quantity: 0 });
-  }, [hcmDistributions]);
 
   const FoodItemTable = ({
     scheme,
@@ -170,6 +140,33 @@ const SupervisorDashBoard = () => {
                 <td>{item.bene_category}</td>
                 <td>{item.days_allotted}</td>
                 <td>{item.total_quantity}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+    );
+  };
+
+  const ReceivingTable = ({ items }) => {
+    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No receiving records found.</div>;
+
+    return (
+      <div className="table-responsive food-item-table-container">
+        <Table striped bordered hover responsive className="mb-0 food-item-table">
+          <thead className="table-light sticky-top">
+            <tr>
+              <th>#</th>
+              <th>Quantity</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => (
+              <tr key={index}>
+                <td>{index + 1}</td>
+                <td>{item.total_quantity}</td>
+                <td>{item.unit}</td>
               </tr>
             ))}
           </tbody>
@@ -251,76 +248,87 @@ const SupervisorDashBoard = () => {
           </div>
 
           <div className="dashboard-section">
-            <h4 className="section-title">THR Distribution Summary</h4>
+            <h4 className="section-title">Receiving Summary</h4>
             <Row className="g-3">
-              <Col md={4}>
-                <Card className="dashboard-card card-thr">
+              <Col md={6}>
+                <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm-receiving')}>
                   <Card.Body>
-                    <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
-                  <h6 className="dashboard-card-title mb-1">THR Registrations</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : thrTotalRegistrations}
-                  </div>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon hcm-icon"><FaTruckLoading /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">HCM Received</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : 
+                            hcmSummary?.receiving_summary?.map(s => 
+                              `${s.total_quantity || 0} ${s.unit}`
+                            ).join(', ') || '0'
+                          }
+                        </div>
+                      </div>
+                      <div className="ms-auto expand-icon">
+                        {expanded === 'hcm-receiving' ? <FaChevronUp /> : <FaChevronDown />}
+                      </div>
+                    </div>
                   </Card.Body>
                 </Card>
+                <Collapse in={expanded === 'hcm-receiving'}>
+                  <div className="mt-3">
+                    <ReceivingTable items={hcmSummary?.receiving_summary} />
+                  </div>
+                </Collapse>
               </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-thr">
+              <Col md={6}>
+                <Card className="dashboard-card card-thr expandable-card" onClick={() => handleCardClick('thr-receiving')}>
                   <Card.Body>
-                    <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
-                  <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : thrTotals.beneficiaries.toLocaleString()}
-                  </div>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon thr-icon"><FaTruckLoading /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">THR Received</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> :
+                            hcmSummary?.receiving_summary?.map(s => // Placeholder, as thrSummary is removed. You might want to fetch this separately if needed.
+                              `${s.total_quantity || 0} ${s.unit}`
+                            ).join(', ') || '0'
+                          }
+                        </div>
+                      </div>
+                      <div className="ms-auto expand-icon">
+                        {expanded === 'thr-receiving' ? <FaChevronUp /> : <FaChevronDown />}
+                      </div>
+                    </div>
                   </Card.Body>
                 </Card>
-              </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-thr">
-                  <Card.Body>
-                    <div className="dashboard-card-icon thr-icon"><FaBox /></div>
-                  <h6 className="dashboard-card-title mb-1">THR Quantity</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : thrTotals.quantity.toFixed(2)}
+                <Collapse in={expanded === 'thr-receiving'}>
+                  <div className="mt-3">
+                    <ReceivingTable items={hcmSummary?.receiving_summary} />
                   </div>
-                  </Card.Body>
-                </Card>
+                </Collapse>
               </Col>
             </Row>
           </div>
-
           <div className="dashboard-section">
             <h4 className="section-title">HCM Distribution Summary</h4>
             <Row className="g-3">
-              <Col md={4}>
-                <Card className="dashboard-card card-hcm">
-                  <Card.Body>
-                    <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
-                  <h6 className="dashboard-card-title mb-1">HCM Registrations</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : hcmTotalRegistrations}
-                  </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-hcm">
+              <Col md={6}>
+                <Card className="dashboard-card card-hcm" onClick={() => navigate('/HcmSupervisorDistributions')}>
                   <Card.Body>
                     <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
                   <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
                   <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : hcmTotals.beneficiaries.toLocaleString()}
+                    {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
                   </div>
                   </Card.Body>
                 </Card>
               </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-hcm">
+              <Col md={6}>
+                <Card className="dashboard-card card-hcm" onClick={() => navigate('/HcmSupervisorDistributions')}>
                   <Card.Body>
                     <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
                   <h6 className="dashboard-card-title mb-1">HCM Quantity</h6>
                   <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : hcmTotals.quantity.toFixed(2)}
+                    {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.map(s => 
+                      `${s.total_quantity || 0} ${s.unit}`
+                    ).join(', ') || '0'}
                   </div>
                   </Card.Body>
                 </Card>
