@@ -251,11 +251,11 @@ const SupervisorDashBoard = () => {
         <SupervisorHeader toggleSidebar={toggleSidebar} />
 
         <Container fluid className="dashboard-box mt-3">
-          <div className="main-heading">
+          {/* <div className="main-heading">
             <h3 className="mb-4 fw-bold">
               Supervisor Dashboard
             </h3>
-          </div>
+          </div> */}
 
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
 
@@ -308,16 +308,20 @@ const SupervisorDashBoard = () => {
           </div>
 
           <div className="dashboard-section">
-            <h4 className="section-title">THR Distribution Summary</h4>
+            <h4 className="section-title">THR Distribution & Received Summary</h4>
             <Row className="g-3">
               <Col md={4}>
                 <Card className="dashboard-card card-thr" onClick={() => navigate('/thr-supervisor-distributions')}>
                   <Card.Body>
-                    <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
-                  <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
-                  </div>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
+                        </div>
+                      </div>
+                    </div>
                   </Card.Body>
                 </Card>
               </Col>
@@ -372,16 +376,20 @@ const SupervisorDashBoard = () => {
             </Row>
           </div>
           <div className="dashboard-section">
-            <h4 className="section-title">HCM Distribution Summary</h4>
+            <h4 className="section-title">HCM Distribution & Received Summary</h4>
             <Row className="g-3">
               <Col md={4}>
                 <Card className="dashboard-card card-hcm" onClick={() => navigate('/HcmSupervisorDistributions')}>
                   <Card.Body>
-                    <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
-                  <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
-                  </div>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
+                        </div>
+                      </div>
+                    </div>
                   </Card.Body>
                 </Card>
               </Col>
