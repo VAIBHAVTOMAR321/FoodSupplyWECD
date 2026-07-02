@@ -311,6 +311,17 @@ const SupervisorDashBoard = () => {
             <h4 className="section-title">THR Distribution Summary</h4>
             <Row className="g-3">
               <Col md={4}>
+                <Card className="dashboard-card card-thr" onClick={() => navigate('/thr-supervisor-distributions')}>
+                  <Card.Body>
+                    <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
+                  <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
+                  <div className="dashboard-card-value">
+                    {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
+                  </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={4}>
                 <Card className="dashboard-card card-thr expandable-card" onClick={() => handleCardClick('thr-receiving')}>
                   <Card.Body>
                     <div className="d-flex align-items-center">
@@ -334,17 +345,6 @@ const SupervisorDashBoard = () => {
                     <ReceivingTable items={thrSummary?.receiving_summary} />
                   </div>
                 </Collapse>
-              </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-thr" onClick={() => navigate('/thr-supervisor-distributions')}>
-                  <Card.Body>
-                    <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
-                  <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
-                  </div>
-                  </Card.Body>
-                </Card>
               </Col>
               <Col md={4}>
                 <Card className="dashboard-card card-thr expandable-card" onClick={() => handleCardClick('thr-quantity')}>
@@ -375,6 +375,17 @@ const SupervisorDashBoard = () => {
             <h4 className="section-title">HCM Distribution Summary</h4>
             <Row className="g-3">
               <Col md={4}>
+                <Card className="dashboard-card card-hcm" onClick={() => navigate('/HcmSupervisorDistributions')}>
+                  <Card.Body>
+                    <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
+                  <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
+                  <div className="dashboard-card-value">
+                    {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
+                  </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={4}>
                 <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm-receiving')}>
                   <Card.Body>
                     <div className="d-flex align-items-center">
@@ -398,17 +409,6 @@ const SupervisorDashBoard = () => {
                     <ReceivingTable items={hcmSummary?.receiving_summary} />
                   </div>
                 </Collapse>
-              </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-hcm" onClick={() => navigate('/HcmSupervisorDistributions')}>
-                  <Card.Body>
-                    <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
-                  <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
-                  <div className="dashboard-card-value">
-                    {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
-                  </div>
-                  </Card.Body>
-                </Card>
               </Col>
               <Col md={4}>
                 <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm-quantity')}>
