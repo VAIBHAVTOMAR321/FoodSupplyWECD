@@ -11,6 +11,7 @@ import {
   Form,
   Collapse,
   Pagination,
+  Modal,
 } from "react-bootstrap";
 
 import { useAuth } from "../all_login/AuthContext";
@@ -22,6 +23,7 @@ import {
   FaPlus,
   FaEdit,
   FaTrash,
+  FaEye,
 } from "react-icons/fa";
 import "../../assets/css/AnganwadiDashboard.css";
 
@@ -57,6 +59,8 @@ const BeneficiarieEntry = () => {
     fin_year: "",
     month: "",
   });
+  const [showRemarkModal, setShowRemarkModal] = useState(false);
+  const [viewingRemark, setViewingRemark] = useState("");
 
 
   const initialFormData = {
@@ -118,6 +122,17 @@ const BeneficiarieEntry = () => {
     setFilters((prev) => ({ ...prev, [name]: value }));
     setCurrentPage(1); // Reset to first page on filter change
   };
+
+  const handleShowRemarkModal = (remark) => {
+    setViewingRemark(remark);
+    setShowRemarkModal(true);
+  };
+
+  const handleCloseRemarkModal = () => {
+    setShowRemarkModal(false);
+    setViewingRemark("");
+  };
+
   const handleAddNew = () => {
     setEditingId(null);
     setFormData(initialFormData);
@@ -361,6 +376,9 @@ const BeneficiarieEntry = () => {
                                 <Button variant="outline-danger" size="sm" onClick={() => handleDelete(report.id)}><FaTrash /></Button>
                               </>
                             )}
+                            {report.sector_remark && (
+                              <Button variant="outline-info" size="sm" onClick={() => handleShowRemarkModal(report.sector_remark)}><FaEye /></Button>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -372,6 +390,18 @@ const BeneficiarieEntry = () => {
               )}
               {renderPagination()}
           </div>
+
+          <Modal show={showRemarkModal} onHide={handleCloseRemarkModal} centered>
+            <Modal.Header closeButton>
+              <Modal.Title>सेक्टर टिप्पणी</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <p>{viewingRemark}</p>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={handleCloseRemarkModal}>बंद करें</Button>
+            </Modal.Footer>
+          </Modal>
           </Container>
 
          
