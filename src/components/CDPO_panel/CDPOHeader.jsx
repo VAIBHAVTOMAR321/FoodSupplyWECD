@@ -20,7 +20,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 
-function CDPOHeader({ toggleSidebar }) {
+function CDPOHeader({ user, toggleSidebar }) {
   const navigate = useNavigate();
 
   // State to track if the API itself failed (404/500)
@@ -36,7 +36,7 @@ function CDPOHeader({ toggleSidebar }) {
   const [imageError, setImageError] = useState(false);
 
   const getDisplayName = () => {
-    return userDetails.full_name || "CDPO User";
+    return user?.full_name || "CDPO User";
   };
 
   const getUserPhotoUrl = () => {

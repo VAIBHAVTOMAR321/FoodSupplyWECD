@@ -78,13 +78,20 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
         path: "/CDPODashboard",
         active: true,
       },
-
+ {
+        icon: <FaTruck />,
+        label: "Beneficiary Entry",
+        path: "/CDPOBeneEntry",
+        active: true,
+      },
       {
         icon: <FaTruck />,
         label: "THR Distributions",
         path: "/ThrCdpoDistributions",
         active: true,
       },
+
+     
       {
         icon: <FaTruck />,
         label: "HCM Distributions",

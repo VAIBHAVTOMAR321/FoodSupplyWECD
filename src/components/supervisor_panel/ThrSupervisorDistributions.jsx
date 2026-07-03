@@ -27,6 +27,7 @@ const ThrSupervisorDistributions = () => {
   const [submitting, setSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const [showRemarkModal, setShowRemarkModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState(null);
@@ -157,7 +158,8 @@ const ThrSupervisorDistributions = () => {
   const fetchBeneficiaryCategories = async () => {
     try {
       const response = await api.get("/beneficiary-categories/");
-      const data = response.data || [];
+      // Ensure we handle both direct array responses and object-wrapped arrays
+      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
       setBeneficiaryCategories(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch beneficiary categories.", err);
@@ -258,6 +260,7 @@ const ThrSupervisorDistributions = () => {
       console.error("Table element not found for PDF export.");
       return;
     }
+    setIsPrinting(true);
     html2canvas(input, {
       scale: 2, // Higher scale for better quality
       useCORS: true
@@ -280,6 +283,8 @@ const ThrSupervisorDistributions = () => {
       pdf.text("THR Supervisor Distributions Report", 20, 30);
       pdf.addImage(imgData, 'PNG', 20, 40, width, height);
       pdf.save('thr_supervisor_distributions.pdf');
+    }).finally(() => {
+      setIsPrinting(false);
     });
   };
 
@@ -540,7 +545,7 @@ const ThrSupervisorDistributions = () => {
             </Col>
           </Row>
 
-          {successMsg && <Alert variant="success" className="mb-3">{successMsg}</Alert>}
+          {!isPrinting && successMsg && <Alert variant="success" className="mb-3">{successMsg}</Alert>}
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
           {actionError && <Alert variant="danger" className="mb-3">{actionError}</Alert>}
 
@@ -601,7 +606,7 @@ const ThrSupervisorDistributions = () => {
                                      cellContent = (
                                        <div className="d-flex align-items-center gap-2">
                                          <Button
-                                           variant="outline-success"
+                                            variant={isPrinting ? "link" : "outline-success"}
                                            size="sm"
                                            disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
                                            onClick={() => handleToggleRemark(row, "approved")}
@@ -609,7 +614,7 @@ const ThrSupervisorDistributions = () => {
                                            Approve
                                          </Button>
                                          <Button
-                                           variant="outline-danger"
+                                            variant={isPrinting ? "link" : "outline-danger"}
                                            size="sm"
                                            disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
                                            onClick={() => handleToggleRemark(row, "rejected")}
@@ -617,7 +622,7 @@ const ThrSupervisorDistributions = () => {
                                            Reject
                                          </Button>
                                          <Button
-                                           variant="outline-primary"
+                                            variant={isPrinting ? "link" : "outline-primary"}
                                            size="sm"
                                            onClick={() => handleViewRemark(row)}
                                          >
