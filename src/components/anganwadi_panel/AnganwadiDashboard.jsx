@@ -14,6 +14,7 @@ const API_URLS = {
   thr: "/thr-food-items/",
   hcm_distribution: "/hcm-anganwadi-distribution/",
   thr_distribution: "/thr-anganwadi-distribution/",
+  beneficiary_registration: "/beneficiary-registration/",
 };
 
 const getCurrentFinancialYear = () => {
@@ -55,6 +56,9 @@ const AnganwadiDashboard = () => {
   const [submitting, setSubmitting] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewItem, setViewItem] = useState(null);
+  const [beneficiaryCount, setBeneficiaryCount] = useState(null);
+  const [beneficiaryCountLoading, setBeneficiaryCountLoading] = useState(false);
+  const [isRegistrationAvailable, setIsRegistrationAvailable] = useState(true); // New state for submit button
 
   const { user, api, uniqueId } = useAuth();
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
@@ -126,6 +130,78 @@ const AnganwadiDashboard = () => {
     }
   };
 
+  const beneCategoryMap = {
+    "6 माह से 3 वर्ष के सामान्य बच्चे": "children_6m_3y",
+    "6 माह से 3 वर्ष के अतिकुपोषित (SAM) बच्चे": "sam_6m_3y",
+    "6 माह से 3 वर्ष के गंभीर कम वजन (SUW) वाले बच्चे": "suw_6m_3y",
+    "3 वर्ष से 6 वर्ष तक के बच्चे (सामान्य, अतिकुपोषित एवं गंभीर कम वजन वाले)": "children_3_6y",
+    "3 वर्ष से 5 वर्ष के अतिकुपोषित बच्चे (अतिरिक्त THR हेतु)": "sam_3_5y",
+    "3 वर्ष से 6 वर्ष के गंभीर कम वजन वाले बच्चे (अतिरिक्त THR हेतु)": "suw_3_6y",
+    "गर्भवती एवं धात्री महिलायें": "pw_lm",
+    "किशोरी बालिकाएँ": "adolescent_girls",
+  };
+
+  const handleDateChange = async (date, foodItemId) => {
+    // 1. Immediately update the date and clear all validation and beneficiary-related state.
+    setDistributionData(prev => ({ ...prev, date, total_beneficiaries: '' }));
+    setBeneficiaryCount(null);
+    setDistributionError('');
+    setIsRegistrationAvailable(false);
+    setBeneficiaryCountLoading(true);
+
+    // Use the passed foodItemId to ensure we have the latest selection
+
+    if (!date || !selectedFoodItem) {
+      setBeneficiaryCountLoading(false); // Stop loading if there's no date or food item
+      return;
+    }
+    setDistributionError(''); // Clear previous errors
+
+    const selectedFoodItem = foodItems.find(fi => fi.id === parseInt(foodItemId, 10));
+
+    const d = new Date(date);
+    const month = d.toLocaleString('default', { month: 'short' }).toLowerCase();
+    const year = d.getFullYear();
+    const fin_year = d.getMonth() >= 3 ? `${year}-${(year + 1).toString().slice(-2)}` : `${year - 1}-${year.toString().slice(-2)}`;
+
+    try {
+      const response = await api.get(`${API_URLS.beneficiary_registration}?fin_year=${fin_year}&month=${month}`);
+      const registrationData = response.data;
+      if (registrationData && registrationData.length > 0) {
+        const registration = registrationData[0]; // Assuming one record per AWC per month
+        setIsRegistrationAvailable(true); // Registration exists
+        const categoryKey = beneCategoryMap[selectedFoodItem.bene_category];
+        
+        if (categoryKey && registration.hasOwnProperty(categoryKey)) {
+          const count = registration[categoryKey];
+          if (count > 0) {
+            setBeneficiaryCount(count);
+          } else {
+            setDistributionError(`No beneficiaries registered for "${selectedFoodItem.bene_category}" in ${month}, ${fin_year}.`);
+            setBeneficiaryCount(0);
+            setIsRegistrationAvailable(false);
+          }
+        } else {
+          setDistributionError(`Beneficiary category "${selectedFoodItem.bene_category}" not found in registration data.`);
+          setBeneficiaryCount(0); // Or handle as an error state
+          setIsRegistrationAvailable(false);
+        }
+      } else {
+        setDistributionError(`No beneficiary registration found for ${month}, ${fin_year}. Please add beneficiary data first.`);
+        setBeneficiaryCount(0);
+        setIsRegistrationAvailable(false); // No registration found
+      }
+    } catch (err) {
+      setDistributionError("Failed to fetch beneficiary registration data.");
+      console.error("Error fetching beneficiary data:", err);
+      setBeneficiaryCount(null);
+      setIsRegistrationAvailable(false);
+    } finally {
+      setBeneficiaryCountLoading(false);
+    }
+  };
+
+
   const handleOpenDistributionModal = (item, scheme, existingRecord = null, isNew = false) => {
     // If editing, the `item` is the distribution record, which also has food_item details
     // If adding, the `item` is the food item from the list
@@ -147,17 +223,25 @@ const AnganwadiDashboard = () => {
     setSelectedItem(modalItem);
 
     if (existingRecord) {
+      const foodItemDetails = foodItems.find(fi => fi.food_item === existingRecord.food_item);
       if (scheme === 'hcm') {
         setDistributionData({
           total_beneficiaries: existingRecord.total_beneficiaries,
           date: existingRecord.date,
+          food_item_id: foodItemDetails?.id,
         });
       } else { // thr
         setDistributionData({
           total_beneficiaries: existingRecord.total_beneficiaries,
           fin_year: existingRecord.fin_year,
           quarter: existingRecord.quarter,
+          food_item_id: foodItemDetails?.id,
         });
+      }
+      // If editing, immediately trigger a validation check for the existing date
+      if (scheme === 'hcm' && existingRecord.date) {
+        // Pass the date and the correct food item ID to ensure validation runs with the right context
+        handleDateChange(existingRecord.date, foodItemDetails?.id);
       }
     } else {
       setDistributionData({ 
@@ -168,13 +252,18 @@ const AnganwadiDashboard = () => {
       });
     }
 
+    // Reset validation state when opening the modal
     setDistributionError('');
+    setBeneficiaryCount(null); // Explicitly clear beneficiary count on modal open
+    setIsRegistrationAvailable(true);
     setShowDistributionModal(true);
   };
 
   const handleCloseDistributionModal = () => {
     setShowDistributionModal(false);
     setSelectedItem(null);
+    setBeneficiaryCount(null);
+    setIsRegistrationAvailable(true); // Reset on close
   };
 
   const handleOpenViewModal = (record) => {
@@ -191,7 +280,7 @@ const AnganwadiDashboard = () => {
     e.preventDefault();
 
     // If it's a new entry, a food item must be selected from the dropdown.
-    if (selectedItem.isNew && !distributionData.food_item_id) {
+    if ((selectedItem.isNew || selectedItem.isEdit) && !distributionData.food_item_id) {
       setDistributionError("Please select a food item.");
       return;
     }
@@ -202,7 +291,9 @@ const AnganwadiDashboard = () => {
       ? distributionData.fin_year && distributionData.quarter
       : distributionData.date;
 
-    const selectedFoodItemDetails = selectedItem.isNew ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10)) : selectedItem;
+    const selectedFoodItemDetails = (selectedItem.isNew || selectedItem.isEdit)
+      ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10))
+      : selectedItem;
 
 
     if (!commonFieldsFilled || !schemeFieldsFilled) {
@@ -211,20 +302,36 @@ const AnganwadiDashboard = () => {
     }
 
     // Prevent duplicate entries for THR
-    if (isThr) {
+    if (isThr && !selectedItem.isEdit) { // Only check for duplicates on new entries
       const duplicate = distributionRecords.find(
         (rec) => {
           // When editing, selectedItem.id is the distribution record id.
           // When adding, selectedItem.id is the food item id, so it won't match a distribution record id.
           const isSameRecord = selectedItem.isEdit && rec.id === selectedItem.id;
           return !isSameRecord && // Don't compare against itself when editing
-                 rec.food_item === selectedItem.food_item &&
+                 rec.food_item === selectedFoodItemDetails.food_item &&
                  rec.fin_year === distributionData.fin_year &&
                  rec.quarter === distributionData.quarter;
         }
       );
       if (duplicate) {
         setDistributionError(`A distribution for ${distributionData.fin_year} - ${distributionData.quarter} already exists.`);
+        return;
+      }
+    }
+
+    // Final validation check before submitting
+    if (activeScheme === 'hcm' && beneficiaryCount !== null) {
+      const enteredBeneficiaries = parseInt(distributionData.total_beneficiaries, 10);
+      if (enteredBeneficiaries > beneficiaryCount) {
+        setDistributionError(`Beneficiaries cannot exceed the registered count of ${beneficiaryCount}.`);
+        setSubmitting(false);
+        return;
+      }
+      // Also check if registration is missing for the selected date
+      if (!isRegistrationAvailable) {
+        setDistributionError(`Cannot submit because no beneficiary registration was found for the selected month.`);
+        setSubmitting(false);
         return;
       }
     }
@@ -240,6 +347,8 @@ const AnganwadiDashboard = () => {
       total_beneficiaries: parseInt(distributionData.total_beneficiaries, 10),
       quantity: isNaN(calculatedQuantity) ? 0 : calculatedQuantity,
       unit: selectedFoodItemDetails.unit,
+      bene_category: selectedFoodItemDetails.bene_category,
+      days_allotted: selectedFoodItemDetails.days_allotted,
     };
 
     if (isThr) {
@@ -255,6 +364,8 @@ const AnganwadiDashboard = () => {
       // For new entries, get food_item from dropdown selection
       const selectedFoodItem = foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10));
       payload.food_item = selectedFoodItem.food_item;
+      payload.bene_category = selectedFoodItem.bene_category;
+      payload.days_allotted = selectedFoodItem.days_allotted;
     }
 
     const url = activeScheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution;
@@ -289,9 +400,9 @@ const AnganwadiDashboard = () => {
     }
   };
 
-  const selectedFoodItemForCalc = selectedItem?.isNew
-    ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10))
-    : selectedItem;
+  const selectedFoodItemForCalc = (selectedItem?.isNew || selectedItem?.isEdit)
+  ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10))
+  : selectedItem;
 
   const calculatedQuantity = selectedFoodItemForCalc
     ? (parseFloat(selectedFoodItemForCalc.qty_per_ben) * (parseInt(distributionData.total_beneficiaries, 10) || 0)).toFixed(2)
@@ -396,8 +507,8 @@ const AnganwadiDashboard = () => {
                         <th>#</th>
                         <th>Food Item</th>
                         {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Quarter</th></>}
-                        <th>Beneficiaries</th>
-                        {activeScheme === 'hcm' && <th>Beneficiaries Enrolled in AWC</th>}
+                        {activeScheme === 'hcm' && <th>Beneficiary Category</th>}
+                        {activeScheme === 'hcm' && <th>Days Allotted</th>}
                         <th>Quantity</th>
                         <th>Unit</th>
                         <th>Actions</th>
@@ -409,8 +520,8 @@ const AnganwadiDashboard = () => {
                           <td>{index + 1}</td>
                           <td>{record.food_item}</td>
                           {activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{record.quarter}</td></>}
-                          <td>{record.total_beneficiaries}</td>
-                          {activeScheme === 'hcm' && <td>{record.bene_in_ang}</td>}
+                          {activeScheme === 'hcm' && <td>{record.bene_category}</td>}
+                          {activeScheme === 'hcm' && <td>{record.days_allotted}</td>}
                           <td>{record.quantity}</td>
                           <td>{record.unit}</td>
                           <td>
@@ -483,41 +594,53 @@ const AnganwadiDashboard = () => {
               </Modal.Header>
               <Modal.Body>
                 {distributionError && <Alert variant="danger">{distributionError}</Alert>}
-                <Form onSubmit={handleDistributionSubmit}>
-                  {selectedItem.isNew ? (
-                    <Form.Group className="mb-3">
-                      <Form.Label>Food Item</Form.Label>
-                      <Form.Select
-                        required
-                        value={distributionData.food_item_id || ''}
-                        onChange={(e) => setDistributionData({ ...distributionData, food_item_id: e.target.value })}
-                      >
-                        <option value="">Select a food item...</option>
-                        {foodItems.map(item => <option key={item.id} value={item.id}>{item.food_item}</option>)}
-                      </Form.Select>
-                    </Form.Group>
-                  ) : (
-                    <Form.Group className="mb-3"><Form.Label>Food Item</Form.Label><Form.Control type="text" value={selectedItem.food_item} disabled /></Form.Group>
-                  )}
+                <Form onSubmit={handleDistributionSubmit}>                  
+                  <Form.Group className="mb-3">
+                    <Form.Label>Food Item</Form.Label>
+                    <Form.Select
+                      required
+                      value={distributionData.food_item_id || ''}
+                      onChange={(e) => setDistributionData({ ...distributionData, food_item_id: e.target.value, total_beneficiaries: '' })}
+                    >
+                      <option value="">Select a food item...</option>
+                      {foodItems.map(item => <option key={item.id} value={item.id}>{item.food_item}</option>)}
+                    </Form.Select>
+                  </Form.Group>
                   <Form.Group className="mb-3">
                     <Form.Label>Total Beneficiaries</Form.Label>
                     <Form.Control 
-                      type="number" 
+                      type="number"
                       value={distributionData.total_beneficiaries}
-                      onChange={(e) => setDistributionData({ ...distributionData, total_beneficiaries: e.target.value })}
+                      onChange={(e) => {
+                        const newCount = e.target.value;
+                        setDistributionData({ ...distributionData, total_beneficiaries: newCount });
+                        if (activeScheme === 'hcm' && beneficiaryCount !== null && parseInt(newCount, 10) > beneficiaryCount) {
+                          setDistributionError(`Beneficiaries cannot exceed the registered count of ${beneficiaryCount}.`);
+                        } else {
+                          setDistributionError('');
+                        }
+                      }}
                       placeholder="Enter number of beneficiaries"
                       required
+                      disabled={activeScheme === 'hcm' && beneficiaryCount === 0}
                     />
+                    {activeScheme === 'hcm' && beneficiaryCount === 0 && <Form.Text className="text-danger">Cannot enter beneficiaries as none are registered for this period and category.</Form.Text>}
                   </Form.Group>
                   {activeScheme === 'hcm' ? (
                     <Form.Group className="mb-3">
                       <Form.Label>Date</Form.Label>
                       <Form.Control 
                         type="date" 
-                        value={distributionData.date}
-                        onChange={(e) => setDistributionData({ ...distributionData, date: e.target.value })}
+                        value={distributionData.date || ''}
+                        onChange={(e) => {
+                          const newDate = e.target.value;
+                          // Pass both the new date and the current food item ID to the handler
+                          handleDateChange(newDate, distributionData.food_item_id);
+                        }}
                         required
                       />
+                      {beneficiaryCountLoading && <Spinner animation="border" size="sm" className="mt-2" />}
+                      {beneficiaryCount !== null && !beneficiaryCountLoading && <Form.Text>Registered Beneficiaries: {beneficiaryCount}</Form.Text>}
                     </Form.Group>
                   ) : (
                     <>
@@ -536,6 +659,22 @@ const AnganwadiDashboard = () => {
                       </Form.Group>
                     </>
                   )}
+                  <Form.Group className="mb-3">
+                    <Form.Label>Beneficiary Category</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={selectedFoodItemForCalc?.bene_category || ''}
+                      disabled
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Days Allotted</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={selectedFoodItemForCalc?.days_allotted || ''}
+                      disabled
+                    />
+                  </Form.Group>
                   <Form.Group className="mb-3">
                     <Form.Label>Total Quantity</Form.Label>
                     <Form.Control 
@@ -559,7 +698,11 @@ const AnganwadiDashboard = () => {
                     <Button variant="secondary" onClick={handleCloseDistributionModal} className="me-2">
                       Cancel
                     </Button>
-                    <Button variant="primary" type="submit" disabled={submitting}>
+                    <Button 
+                      variant="primary" 
+                      type="submit" 
+                      disabled={submitting || (activeScheme === 'hcm' && !isRegistrationAvailable) || (activeScheme === 'hcm' && beneficiaryCount === 0) || (activeScheme === 'hcm' && beneficiaryCount !== null && parseInt(distributionData.total_beneficiaries, 10) > beneficiaryCount)}
+                    >
                       {submitting ? <Spinner as="span" animation="border" size="sm" /> : (selectedItem.isEdit ? 'Update' : 'Submit')}
                     </Button>
                   </div>
@@ -577,7 +720,6 @@ const AnganwadiDashboard = () => {
                 <ListGroup variant="flush">
                   <ListGroup.Item><FaBuilding className="view-modal-icon" /> <strong>AWC Name:</strong> {viewItem.awc_name}</ListGroup.Item>
                   <ListGroup.Item><FaHashtag className="view-modal-icon" /> <strong>AWC Code:</strong> {viewItem.awc_code}</ListGroup.Item>
-                  <ListGroup.Item><FaUsers className="view-modal-icon" /> <strong>Beneficiaries in Anganwadi:</strong> {viewItem.bene_in_ang}</ListGroup.Item>
                   <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>Food Item:</strong> {viewItem.food_item}</ListGroup.Item>
                   <ListGroup.Item><FaUsers className="view-modal-icon" /> <strong>Beneficiaries:</strong> {viewItem.total_beneficiaries}</ListGroup.Item>
                   <ListGroup.Item><FaWeightHanging className="view-modal-icon" /> <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}</ListGroup.Item>
