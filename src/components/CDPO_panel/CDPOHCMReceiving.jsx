@@ -7,7 +7,9 @@ import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
 import { useAuth } from "../all_login/AuthContext";
-import { FaFileExcel, FaEye } from "react-icons/fa";
+import { FaFileExcel, FaEye, FaFilePdf } from "react-icons/fa";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
 const CDPOHCMReceiving = () => {
@@ -121,6 +123,32 @@ const CDPOHCMReceiving = () => {
     XLSX.writeFile(wb, "hcm_receiving.xlsx");
   };
 
+  const exportToPDF = () => {
+    const input = tableRef.current;
+    if (!input) return;
+    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "pt",
+        format: "a2",
+      });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasWidth / canvasHeight;
+      const width = pdfWidth - 40;
+      const height = width / ratio;
+      pdf.text("HCM Receiving Report", 20, 30);
+      pdf.addImage(
+        imgData, "PNG", 20, 40, width,
+        height > pdfHeight - 60 ? pdfHeight - 60 : height
+      );
+      pdf.save("hcm_receiving_report.pdf");
+    });
+  };
+
   const renderPagination = () => {
     if (totalPages <= 1) return null;
     const items = [];
@@ -218,6 +246,9 @@ const CDPOHCMReceiving = () => {
                   <div className="d-flex justify-content-between align-items-center mb-3 mt-2">
                     <h5 className="mb-0">AWC HCM Receiving Report</h5>
                     <div>
+                      <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
+                        <FaFilePdf className="me-1" /> Export PDF
+                      </Button>
                       <Button variant="outline-success" size="sm" onClick={exportToExcel} className="me-2">
                         <FaFileExcel className="me-1" /> Export Excel
                       </Button>
