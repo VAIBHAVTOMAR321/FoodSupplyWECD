@@ -29,7 +29,8 @@ import {
   FaTasks,
   FaClock,
   FaTruck,
-  FaFileAlt
+  FaFileAlt,
+  FaTruckLoading
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -89,7 +90,7 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
        
 
         {
-         icon: <FaTruck />,
+         icon: <FaUsers />,
          label: "Beneficiarie Entry",
          path: "/SupervisorBeneficiarieEntry",
          active: true,
@@ -113,7 +114,7 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
           ],
         },
         {
-          icon: <FaTruck />,
+          icon: <FaTruckLoading />,
           label: "Receiving",
           submenu: [
             {

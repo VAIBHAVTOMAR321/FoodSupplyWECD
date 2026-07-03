@@ -80,7 +80,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
         active: true,
       },
        {
-        icon: <FaTachometerAlt />,
+        icon: <FaUsers />,
         label: "Beneficiarie Entry",
         path: "/DPOBeneEntry",
         active: true,
