@@ -71,8 +71,7 @@ const CDPOBeneEntry = () => {
     { dataField: "suw_3_6y", text: "SUW (3-6y)", visible: true },
     { dataField: "sector_status", text: "Sector Status", visible: true },
     { dataField: "sector_remark", text: "Sector Remark", visible: true },
-    { dataField: "created_at", text: "Created At", visible: true },
-    { dataField: "updated_at", text: "Updated At", visible: true },
+   
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
