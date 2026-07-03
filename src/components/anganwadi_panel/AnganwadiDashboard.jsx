@@ -178,27 +178,27 @@ const AnganwadiDashboard = () => {
               setBeneficiaryCount(count);
               setIsRegistrationAvailable(true); // Registration exists and has beneficiaries
             } else {
-              setDistributionError(`No beneficiaries registered for "${currentFoodItem.bene_category}" in ${month}, ${fin_year}.`);
+              setDistributionError(`"${currentFoodItem.bene_category}" के लिए ${month}, ${fin_year} में कोई लाभार्थी पंजीकृत नहीं है।`);
               setBeneficiaryCount(0);
               setIsRegistrationAvailable(false);
             }
           } else {
-            setDistributionError(`Beneficiary category "${currentFoodItem.bene_category}" not found in registration data.`);
+            setDistributionError(`पंजीकरण डेटा में लाभार्थी श्रेणी "${currentFoodItem.bene_category}" नहीं मिली।`);
             setBeneficiaryCount(0); // Or handle as an error state
             setIsRegistrationAvailable(false);
           }
         } else {
-          setDistributionError(`No beneficiary registration found for ${month}, ${fin_year}. Please add beneficiary data first.`);
+          setDistributionError(`${month}, ${fin_year} के लिए कोई लाभार्थी पंजीकरण नहीं मिला। कृपया पहले लाभार्थी डेटा जोड़ें।`);
           setBeneficiaryCount(0);
           setIsRegistrationAvailable(false);
         }
       } else {
-        setDistributionError(`No beneficiary registration found for ${month}, ${fin_year}. Please add beneficiary data first.`);
+        setDistributionError(`${month}, ${fin_year} के लिए कोई लाभार्थी पंजीकरण नहीं मिला। कृपया पहले लाभार्थी डेटा जोड़ें।`);
         setBeneficiaryCount(0);
         setIsRegistrationAvailable(false); // No registration found
       }
     } catch (err) {
-      setDistributionError("Failed to fetch beneficiary registration data.");
+      setDistributionError("लाभार्थी पंजीकरण डेटा लाने में विफल।");
       console.error("Error fetching beneficiary data:", err);
       setBeneficiaryCount(null);
       setIsRegistrationAvailable(false);
@@ -232,7 +232,7 @@ const AnganwadiDashboard = () => {
 
     const months = quarterToMonths[quarter];
     if (!months) {
-      setDistributionError("Invalid quarter selected.");
+      setDistributionError("अमान्य तिमाही चयनित।");
       setBeneficiaryCountLoading(false);
       return;
     }
@@ -261,15 +261,15 @@ const AnganwadiDashboard = () => {
         setBeneficiaryCount(totalBeneficiaries);
         setIsRegistrationAvailable(totalBeneficiaries > 0);
         if (totalBeneficiaries === 0) {
-          setDistributionError(`No beneficiaries registered for "${currentFoodItem.bene_category}" in the selected quarter.`);
+          setDistributionError(`चयनित तिमाही में "${currentFoodItem.bene_category}" के लिए कोई लाभार्थी पंजीकृत नहीं है।`);
         }
       } else {
-        setDistributionError(`Beneficiary registration is missing for all months in the ${quarter} quarter.`);
+        setDistributionError(`${quarter} तिमाही में सभी महीनों के लिए लाभार्थी पंजीकरण गायब है।`);
         setBeneficiaryCount(0);
         setIsRegistrationAvailable(false);
       }
     } catch (err) {
-      setDistributionError("Failed to fetch beneficiary registration data for THR.");
+      setDistributionError("THR के लिए लाभार्थी पंजीकरण डेटा लाने में विफल।");
       console.error("Error fetching THR beneficiary data:", err);
       setBeneficiaryCount(null);
       setIsRegistrationAvailable(false);
@@ -366,7 +366,7 @@ const AnganwadiDashboard = () => {
 
     // If it's a new entry, a food item must be selected from the dropdown.
     if (!distributionData.food_item_id) {
-      setDistributionError("Please select a food item.");
+      setDistributionError("कृपया एक खाद्य सामग्री चुनें।");
       setSubmitting(false);
       return;
     }
@@ -379,7 +379,7 @@ const AnganwadiDashboard = () => {
 
 
     if (!distributionData.total_beneficiaries || (isThr ? (!distributionData.fin_year || !distributionData.quarter) : !distributionData.date)) {
-      setDistributionError("Please fill all required fields.");
+      setDistributionError("कृपया सभी आवश्यक फ़ील्ड भरें।");
       setSubmitting(false);
       return;
     }
@@ -398,7 +398,7 @@ const AnganwadiDashboard = () => {
         }
       );
       if (duplicate) {
-        setDistributionError(`A distribution for ${distributionData.fin_year} - ${distributionData.quarter} already exists.`);
+        setDistributionError(`${distributionData.fin_year} - ${distributionData.quarter} के लिए एक वितरण पहले से मौजूद है।`);
         setSubmitting(false);
         return;
       }
@@ -408,13 +408,13 @@ const AnganwadiDashboard = () => {
     if (beneficiaryCount !== null) {
       const enteredBeneficiaries = parseInt(distributionData.total_beneficiaries, 10);
       if (enteredBeneficiaries > beneficiaryCount) {
-        setDistributionError(`Beneficiaries cannot exceed the registered count of ${beneficiaryCount}.`);
+        setDistributionError(`लाभार्थियों की संख्या पंजीकृत संख्या ${beneficiaryCount} से अधिक नहीं हो सकती।`);
         setSubmitting(false);
         return;
       }
       // Also check if registration is missing for the selected date
       if (!isRegistrationAvailable) {
-        setDistributionError(`Cannot submit because no beneficiary registration was found for the selected period.`);
+        setDistributionError(`सबमिट नहीं किया जा सकता क्योंकि चयनित अवधि के लिए कोई लाभार्थी पंजीकरण नहीं मिला।`);
         setSubmitting(false);
         return;
       }
@@ -460,7 +460,7 @@ const AnganwadiDashboard = () => {
       // Refresh the table data
       handleCardClick(activeScheme);
     } catch (err) {
-      setDistributionError(`Failed to ${isEdit ? 'update' : 'record'} distribution. Please try again.`);
+      setDistributionError(`वितरण ${isEdit ? 'अपडेट' : 'रिकॉर्ड'} करने में विफल। कृपया पुन: प्रयास करें।`);
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -670,7 +670,7 @@ const AnganwadiDashboard = () => {
           )}
 
           {selectedItem && (
-            <Modal show={showDistributionModal} onHide={handleCloseDistributionModal} centered>
+            <Modal show={showDistributionModal} onHide={handleCloseDistributionModal} centered size="lg">
               <Modal.Header closeButton>                
                 <Modal.Title>{selectedItem.isEdit ? 'Edit' : 'Record'} Distribution</Modal.Title>
               </Modal.Header>
@@ -706,7 +706,7 @@ const AnganwadiDashboard = () => {
                         const newCount = e.target.value;
                         setDistributionData({ ...distributionData, total_beneficiaries: newCount });
                         if (beneficiaryCount !== null && parseInt(newCount, 10) > beneficiaryCount) {
-                          setDistributionError(`Beneficiaries cannot exceed the registered count of ${beneficiaryCount}.`);
+                          setDistributionError(`लाभार्थियों की संख्या पंजीकृत संख्या ${beneficiaryCount} से अधिक नहीं हो सकती।`);
                         } else {
                           setDistributionError('');
                         }
@@ -715,7 +715,7 @@ const AnganwadiDashboard = () => {
                       required
                       disabled={(beneficiaryCount === 0 || !isRegistrationAvailable)}
                     />
-                    {beneficiaryCount === 0 && <Form.Text className="text-danger">Cannot enter beneficiaries as none are registered for this period and category.</Form.Text>}
+                    {beneficiaryCount === 0 && <Form.Text className="text-danger">लाभार्थी दर्ज नहीं कर सकते क्योंकि इस अवधि और श्रेणी के लिए कोई भी पंजीकृत नहीं है।</Form.Text>}
                   </Form.Group>
                   {activeScheme === 'hcm' ? (
                     <Form.Group className="mb-3">
@@ -731,7 +731,7 @@ const AnganwadiDashboard = () => {
                         required
                       />
                       {beneficiaryCountLoading && <Spinner animation="border" size="sm" className="mt-2" />}
-                      {beneficiaryCount !== null && !beneficiaryCountLoading && <Form.Text className={beneficiaryCount > 0 ? "text-success" : "text-danger"}>Registered Beneficiaries: {beneficiaryCount}</Form.Text>}
+                      {beneficiaryCount !== null && !beneficiaryCountLoading && <Form.Text className={beneficiaryCount > 0 ? "text-success" : "text-danger"}>पंजीकृत लाभार्थी: {beneficiaryCount}</Form.Text>}
                     </Form.Group>
                   ) : (
                     <>
@@ -764,7 +764,7 @@ const AnganwadiDashboard = () => {
                           ))}
                         </Form.Select>
                         {beneficiaryCountLoading && <Spinner animation="border" size="sm" className="mt-2" />}
-                        {beneficiaryCount !== null && !beneficiaryCountLoading && <Form.Text className={beneficiaryCount > 0 ? "text-success" : "text-danger"}>Registered Beneficiaries for Quarter: {beneficiaryCount}</Form.Text>}
+                        {beneficiaryCount !== null && !beneficiaryCountLoading && <Form.Text className={beneficiaryCount > 0 ? "text-success" : "text-danger"}>तिमाही के लिए पंजीकृत लाभार्थी: {beneficiaryCount}</Form.Text>}
                       </Form.Group>
                     </>
                   )}
