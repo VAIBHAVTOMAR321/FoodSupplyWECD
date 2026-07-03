@@ -207,6 +207,77 @@ const AnganwadiDashboard = () => {
     }
   };
 
+  const handleThrPeriodChange = async (fin_year, quarter, foodItemId, isEditing = false) => {
+    if (!isEditing) {
+      setDistributionData(prev => ({ ...prev, fin_year, quarter, total_beneficiaries: '' }));
+    }
+    setBeneficiaryCount(null);
+    setDistributionError('');
+    setIsRegistrationAvailable(false);
+    setBeneficiaryCountLoading(true);
+
+    const currentFoodItem = foodItems.find(fi => fi.id === parseInt(foodItemId, 10));
+
+    if (!fin_year || !quarter || !currentFoodItem) {
+      setBeneficiaryCountLoading(false);
+      return;
+    }
+
+    const quarterToMonths = {
+      'apr-may-jun': ['apr', 'may', 'jun'],
+      'jul-aug-sep': ['jul', 'aug', 'sep'],
+      'oct-nov-dec': ['oct', 'nov', 'dec'],
+      'jan-feb-mar': ['jan', 'feb', 'mar'],
+    };
+
+    const months = quarterToMonths[quarter];
+    if (!months) {
+      setDistributionError("Invalid quarter selected.");
+      setBeneficiaryCountLoading(false);
+      return;
+    }
+
+    try {
+      // Fetch all registrations for the financial year at once to be more efficient
+      const response = await api.get(`${API_URLS.beneficiary_registration}?fin_year=${fin_year}`);
+      const allYearRegistrations = response.data || [];
+
+      let totalBeneficiaries = 0;
+      let atLeastOneMonthRegistered = false;
+      const categoryKey = beneCategoryMap[currentFoodItem.bene_category];
+
+      for (const month of months) {
+        // Find the registration for the specific month from the fetched data
+        const registration = allYearRegistrations.find(r => r.month === month);
+
+        // If a registration exists for the month and has the relevant category
+        if (registration && categoryKey && Object.prototype.hasOwnProperty.call(registration, categoryKey)) {
+          atLeastOneMonthRegistered = true;
+          totalBeneficiaries += registration[categoryKey] || 0;
+        }
+      }
+
+      if (atLeastOneMonthRegistered) {
+        setBeneficiaryCount(totalBeneficiaries);
+        setIsRegistrationAvailable(totalBeneficiaries > 0);
+        if (totalBeneficiaries === 0) {
+          setDistributionError(`No beneficiaries registered for "${currentFoodItem.bene_category}" in the selected quarter.`);
+        }
+      } else {
+        setDistributionError(`Beneficiary registration is missing for all months in the ${quarter} quarter.`);
+        setBeneficiaryCount(0);
+        setIsRegistrationAvailable(false);
+      }
+    } catch (err) {
+      setDistributionError("Failed to fetch beneficiary registration data for THR.");
+      console.error("Error fetching THR beneficiary data:", err);
+      setBeneficiaryCount(null);
+      setIsRegistrationAvailable(false);
+    } finally {
+      setBeneficiaryCountLoading(false);
+    }
+  };
+
   const handleOpenDistributionModal = (item, scheme, existingRecord = null, isNew = false) => {
     // If editing, the `item` is the distribution record, which also has food_item details
     // If adding, the `item` is the food item from the list
@@ -249,6 +320,9 @@ const AnganwadiDashboard = () => {
       if (scheme === 'hcm' && existingRecord.date) {
         // Pass the date and the correct food item ID to ensure validation runs with the right context
         handleDateChange(existingRecord.date, foodItemDetails?.id);
+      } else if (scheme === 'thr' && existingRecord.fin_year && existingRecord.quarter) {
+        // Trigger validation for existing THR records
+        handleThrPeriodChange(existingRecord.fin_year, existingRecord.quarter, foodItemDetails?.id, true);
       }
     } else {
       setDistributionData({ 
@@ -331,7 +405,7 @@ const AnganwadiDashboard = () => {
     }
 
     // Final validation check before submitting
-    if (activeScheme === 'hcm' && beneficiaryCount !== null) {
+    if (beneficiaryCount !== null) {
       const enteredBeneficiaries = parseInt(distributionData.total_beneficiaries, 10);
       if (enteredBeneficiaries > beneficiaryCount) {
         setDistributionError(`Beneficiaries cannot exceed the registered count of ${beneficiaryCount}.`);
@@ -340,7 +414,7 @@ const AnganwadiDashboard = () => {
       }
       // Also check if registration is missing for the selected date
       if (!isRegistrationAvailable) {
-        setDistributionError(`Cannot submit because no beneficiary registration was found for the selected month.`);
+        setDistributionError(`Cannot submit because no beneficiary registration was found for the selected period.`);
         setSubmitting(false);
         return;
       }
@@ -514,8 +588,7 @@ const AnganwadiDashboard = () => {
                       <tr>
                         <th>#</th>
                         <th>Food Item</th>
-                        {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Quarter</th></>}
-                        {activeScheme === 'hcm' && <th>Total Beneficiaries</th>}
+                        {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Quarter</th></>}<th>Total Beneficiaries</th>
                         {activeScheme === 'hcm' && <th>Beneficiary Category</th>}
                         {activeScheme === 'hcm' && <th>Days Allotted</th>}
                         <th>Quantity</th>
@@ -527,9 +600,8 @@ const AnganwadiDashboard = () => {
                       {distributionRecords.map((record, index) => (
                         <tr key={record.id}>
                           <td>{index + 1}</td>
-                          <td>{record.food_item}</td>
-                          {activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{record.quarter}</td></>}
-                          {activeScheme === 'hcm' && <td>{record.total_beneficiaries}</td>}
+                          <td>{record.food_item}</td>{activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{record.quarter}</td></>}
+                          <td>{record.total_beneficiaries}</td>
                           {activeScheme === 'hcm' && <td>{record.bene_category}</td>}
                           {activeScheme === 'hcm' && <td>{record.days_allotted}</td>}
                           <td>{record.quantity}</td>
@@ -612,14 +684,17 @@ const AnganwadiDashboard = () => {
                       value={distributionData.food_item_id || ''}
                       onChange={(e) => {
                         const newFoodItemId = e.target.value;
-                        setDistributionData({ ...distributionData, food_item_id: newFoodItemId, total_beneficiaries: '' });
+                        const newDistributionData = { ...distributionData, food_item_id: newFoodItemId, total_beneficiaries: '' };
+                        setDistributionData(newDistributionData);
                         if (activeScheme === 'hcm' && distributionData.date) {
-                          handleDateChange(distributionData.date, newFoodItemId);
+                          handleDateChange(newDistributionData.date, newFoodItemId);
+                        } else if (activeScheme === 'thr' && newDistributionData.fin_year && newDistributionData.quarter) {
+                          handleThrPeriodChange(newDistributionData.fin_year, newDistributionData.quarter, newFoodItemId, selectedItem.isEdit);
                         }
                       }}
                     >
                       <option value="">Select a food item...</option>
-                      {foodItems.map(item => <option key={item.id} value={item.id}>{item.food_item}</option>)}
+                      {foodItems.map(item => <option key={item.id} value={item.id}>{item.food_item} ({item.bene_category})</option>)}
                     </Form.Select>
                   </Form.Group>
                   <Form.Group className="mb-3">
@@ -630,7 +705,7 @@ const AnganwadiDashboard = () => {
                       onChange={(e) => {
                         const newCount = e.target.value;
                         setDistributionData({ ...distributionData, total_beneficiaries: newCount });
-                        if (activeScheme === 'hcm' && beneficiaryCount !== null && parseInt(newCount, 10) > beneficiaryCount) {
+                        if (beneficiaryCount !== null && parseInt(newCount, 10) > beneficiaryCount) {
                           setDistributionError(`Beneficiaries cannot exceed the registered count of ${beneficiaryCount}.`);
                         } else {
                           setDistributionError('');
@@ -638,9 +713,9 @@ const AnganwadiDashboard = () => {
                       }}
                       placeholder="Enter number of beneficiaries"
                       required
-                      disabled={activeScheme === 'hcm' && (beneficiaryCount === 0 || !isRegistrationAvailable)}
+                      disabled={(beneficiaryCount === 0 || !isRegistrationAvailable)}
                     />
-                    {activeScheme === 'hcm' && beneficiaryCount === 0 && <Form.Text className="text-danger">Cannot enter beneficiaries as none are registered for this period and category.</Form.Text>}
+                    {beneficiaryCount === 0 && <Form.Text className="text-danger">Cannot enter beneficiaries as none are registered for this period and category.</Form.Text>}
                   </Form.Group>
                   {activeScheme === 'hcm' ? (
                     <Form.Group className="mb-3">
@@ -662,16 +737,34 @@ const AnganwadiDashboard = () => {
                     <>
                       <Form.Group className="mb-3">
                         <Form.Label>Financial Year</Form.Label>
-                        <Form.Control type="text" placeholder="e.g., 2025-26" value={distributionData.fin_year} onChange={(e) => setDistributionData({...distributionData, fin_year: e.target.value})} required />
+                        <Form.Control 
+                          type="text" 
+                          placeholder="e.g., 2025-26" 
+                          value={distributionData.fin_year} 
+                          onChange={(e) => {
+                            const newFinYear = e.target.value;
+                            handleThrPeriodChange(newFinYear, distributionData.quarter, distributionData.food_item_id, selectedItem.isEdit);
+                          }} 
+                          required 
+                        />
                       </Form.Group>
                       <Form.Group className="mb-3">
                         <Form.Label>Quarter</Form.Label>
-                        <Form.Select value={distributionData.quarter} onChange={(e) => setDistributionData({ ...distributionData, quarter: e.target.value })} required>
+                        <Form.Select 
+                          value={distributionData.quarter} 
+                          onChange={(e) => {
+                            const newQuarter = e.target.value;
+                            handleThrPeriodChange(distributionData.fin_year, newQuarter, distributionData.food_item_id, selectedItem.isEdit);
+                          }} 
+                          required
+                        >
                           <option value="">Select Quarter</option>
                           {availableQuarters.map(q => (
                             <option key={q.value} value={q.value}>{q.label}</option>
                           ))}
                         </Form.Select>
+                        {beneficiaryCountLoading && <Spinner animation="border" size="sm" className="mt-2" />}
+                        {beneficiaryCount !== null && !beneficiaryCountLoading && <Form.Text className={beneficiaryCount > 0 ? "text-success" : "text-danger"}>Registered Beneficiaries for Quarter: {beneficiaryCount}</Form.Text>}
                       </Form.Group>
                     </>
                   )}
@@ -717,7 +810,7 @@ const AnganwadiDashboard = () => {
                     <Button 
                       variant="primary" 
                       type="submit" 
-                      disabled={submitting || (activeScheme === 'hcm' && !isRegistrationAvailable) || (activeScheme === 'hcm' && beneficiaryCount === 0) || (activeScheme === 'hcm' && beneficiaryCount !== null && distributionData.total_beneficiaries && parseInt(distributionData.total_beneficiaries, 10) > beneficiaryCount)}
+                      disabled={submitting || !isRegistrationAvailable || beneficiaryCount === 0 || (beneficiaryCount !== null && distributionData.total_beneficiaries && parseInt(distributionData.total_beneficiaries, 10) > beneficiaryCount)}
                     >
                       {submitting ? <Spinner as="span" animation="border" size="sm" /> : (selectedItem.isEdit ? 'Update' : 'Submit')}
                     </Button>
