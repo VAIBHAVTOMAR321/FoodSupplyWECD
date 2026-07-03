@@ -308,7 +308,7 @@ const ITCellDashBoard = () => {
             <h4 className="section-title">THR Distribution & Received Summary</h4>
             <Row className="g-3"> 
               <Col md={4} className="d-flex">
-                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/THRDirectorReport')}>
+                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/ITCellTHRReport')}>
                   <Card.Body>
                     <div className="d-flex align-items-center w-100">
                       <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
@@ -376,7 +376,7 @@ const ITCellDashBoard = () => {
             <h4 className="section-title">HCM Distribution & Received Summary</h4>
             <Row className="g-3"> 
               <Col md={4} className="d-flex">
-                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/HCMDirectorReport')}>
+                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/ITCellHCMReport')}>
                   <Card.Body>
                     <div className="d-flex align-items-center w-100">
                       <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
