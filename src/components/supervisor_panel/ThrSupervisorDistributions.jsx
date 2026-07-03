@@ -255,64 +255,57 @@ const ThrSupervisorDistributions = () => {
   }, [filteredData]);
 
   const exportToPDF = () => {
-    const input = tableRef.current;
-    if (!input) {
-      console.error("Table element not found for PDF export.");
-      return;
-    }
     setIsPrinting(true);
-    html2canvas(input, {
-      scale: 2, // Higher scale for better quality
-      useCORS: true
-    }).then(canvas => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'pt',
-        format: 'a4'
+    setTimeout(() => {
+      const input = tableRef.current;
+      if (!input) {
+        console.error("Table element not found for PDF export.");
+        setIsPrinting(false);
+        return;
+      }
+      html2canvas(input, {
+        scale: 2,
+        useCORS: true
+      }).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'pt',
+          format: 'a2'
+        });
+
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+        
+        const width = pdfWidth - 40;
+        const height = width / ratio;
+
+        pdf.text("THR Supervisor Distributions Report", 20, 30);
+        pdf.addImage(imgData, 'PNG', 20, 40, width, height);
+        pdf.save('thr_supervisor_distributions.pdf');
+        setIsPrinting(false);
       });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      
-      const width = pdfWidth - 40; // with some margin
-      const height = width / ratio;
-
-      pdf.text("THR Supervisor Distributions Report", 20, 30);
-      pdf.addImage(imgData, 'PNG', 20, 40, width, height);
-      pdf.save('thr_supervisor_distributions.pdf');
-    }).finally(() => {
-      setIsPrinting(false);
-    });
+    }, 100);
   };
 
   const exportToExcel = () => {
-    const visibleColumns = columns.filter(c => c.visible && c.dataField !== '#');
+    const visibleColumns = columns.filter(c => c.visible && c.dataField !== '#' && c.dataField !== 'action');
     const dataToExport = filteredData.map((row, index) => {
       const newRow = { '#': index + 1 };
       visibleColumns.forEach(col => {
-        if (col.dataField !== '#') {
-          newRow[col.text] = row[col.dataField];
-        }
+        newRow[col.text] = row[col.dataField];
       });
-      if (columns.find(c => c.dataField === 'sector_status')?.visible) newRow['Sector Remark'] = row.sector_remark;
-      if (columns.find(c => c.dataField === 'cdpo_status')?.visible) newRow['CDPO Remark'] = row.cdpo_remark;
-      if (columns.find(c => c.dataField === 'dpo_status')?.visible) newRow['DPO Remark'] = row.dpo_remark;
       return newRow;
     });
 
-    const beneficiaryIndex = visibleColumns.findIndex(c => c.dataField === 'total_beneficiaries');
     const totalRow = { '#': '' };
     visibleColumns.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
       else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
       else totalRow[col.text] = '';
     });
-    if (columns.find(c => c.dataField === 'sector_status')?.visible) totalRow['Sector Remark'] = '';
-    if (columns.find(c => c.dataField === 'cdpo_status')?.visible) totalRow['CDPO Remark'] = '';
-    if (columns.find(c => c.dataField === 'dpo_status')?.visible) totalRow['DPO Remark'] = '';
     dataToExport.push(totalRow);
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -570,70 +563,64 @@ const ThrSupervisorDistributions = () => {
                   >
                       <thead>
                         <tr>
-                          {visibleColumns.map((col, index) => <th key={col.dataField} style={(col.dataField === 'bene_category' || col.dataField === 'food_item') ? { width: '200px' } : {}}>{col.text}</th>)}
+                          {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col) => <th key={col.dataField} style={(col.dataField === 'bene_category' || col.dataField === 'food_item') ? { width: '200px' } : {}}>{col.text}</th>)}
                         </tr>
                       </thead>
                       <tbody>
                         {currentItems.length > 0 ? currentItems.map((row, index) => (
                           <React.Fragment key={row.id}>
                             <tr>
-                                {visibleColumns.map((col, i) => {
+                                {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col, i) => {
                                   let cellContent;
-                                 switch (col.dataField) {
-                                   case '#':
-                                     cellContent = index + 1;
+                                  switch (col.dataField) {
+                                    case '#':
+                                      cellContent = index + 1;
                                       break;
                                     case 'food_item':
-                                      cellContent = (
-                                        <div className="bene-category-cell" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
-                                          {row[col.dataField]}
-                                        </div>
-                                      );
-                                      break;
                                     case 'bene_category':
                                       cellContent = (
                                         <div className="bene-category-cell" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
                                           {row[col.dataField]}
                                         </div>
                                       );
-                                     break;
-                                   case 'sector_status':
-                                   case 'cdpo_status':
-                                   case 'dpo_status':
-                                     cellContent = <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField]}</Badge>;
-                                     break;
-                                   case 'action':
-                                     cellContent = (
-                                       <div className="d-flex align-items-center gap-2">
-                                         <Button
-                                            variant={isPrinting ? "link" : "outline-success"}
-                                           size="sm"
-                                           disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
-                                           onClick={() => handleToggleRemark(row, "approved")}
-                                         >
-                                           Approve
-                                         </Button>
-                                         <Button
-                                            variant={isPrinting ? "link" : "outline-danger"}
-                                           size="sm"
-                                           disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
-                                           onClick={() => handleToggleRemark(row, "rejected")}
-                                         >
-                                           Reject
-                                         </Button>
-                                         <Button
-                                            variant={isPrinting ? "link" : "outline-primary"}
-                                           size="sm"
-                                           onClick={() => handleViewRemark(row)}
-                                         >
-                                           View Remark
-                                         </Button>
-                                       </div>
-                                     );
-                                     break;
-                                   default:
-                                     cellContent = row[col.dataField];
-                                 }
+                                      break;
+                                    case 'sector_status':
+                                    case 'cdpo_status':
+                                    case 'dpo_status':
+                                      cellContent = isPrinting ? row[col.dataField] : <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField]}</Badge>;
+                                      break;
+                                    case 'action':
+                                      cellContent = (
+                                        <div className="d-flex align-items-center gap-2">
+                                          <Button
+                                            variant="outline-success"
+                                            size="sm"
+                                            disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
+                                            onClick={() => handleToggleRemark(row, "approved")}
+                                          >
+                                            Approve
+                                          </Button>
+                                          <Button
+                                            variant="outline-danger"
+                                            size="sm"
+                                            disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
+                                            onClick={() => handleToggleRemark(row, "rejected")}
+                                          >
+                                            Reject
+                                          </Button>
+                                          <Button
+                                            variant="outline-primary"
+                                            size="sm"
+                                            onClick={() => handleViewRemark(row)}
+                                          >
+                                            View Remark
+                                          </Button>
+                                        </div>
+                                      );
+                                      break;
+                                    default:
+                                      cellContent = row[col.dataField];
+                                  }
                                   return <td key={col.dataField}>{cellContent}</td>;
                                 })}
                             </tr>
@@ -684,7 +671,7 @@ const ThrSupervisorDistributions = () => {
                       </tbody>
                       <tfoot>
                         <tr>
-                          {visibleColumns.map((col, i) => {
+                          {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col, i) => {
                             let cellContent = '';
                             if (i === 0) {
                               cellContent = <strong>Total</strong>;

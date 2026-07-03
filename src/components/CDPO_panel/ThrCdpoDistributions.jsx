@@ -26,6 +26,7 @@ const ThrCdpoDistributions = () => {
   const [remarkValue, setRemarkValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [itemsPerPage] = useState(20);
 
   const [showRemarkModal, setShowRemarkModal] = useState(false);
@@ -241,38 +242,43 @@ const ThrCdpoDistributions = () => {
   }, [filteredData]);
 
   const exportToPDF = () => {
-    const input = tableRef.current;
-    if (!input) {
-      console.error("Table element not found for PDF export.");
-      return;
-    }
-    html2canvas(input, {
-      scale: 2, // Higher scale for better quality
-      useCORS: true
-    }).then(canvas => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'pt',
-        format: 'a4'
+    setIsPrinting(true);
+    setTimeout(() => {
+      const input = tableRef.current;
+      if (!input) {
+        console.error("Table element not found for PDF export.");
+        setIsPrinting(false);
+        return;
+      }
+      html2canvas(input, {
+        scale: 2, // Higher scale for better quality
+        useCORS: true
+      }).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'pt',
+          format: 'a2' // Using a larger format to better fit the content
+        });
+  
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+        
+        const width = pdfWidth - 40; // with some margin
+        const height = width / ratio;
+  
+        pdf.text("THR CDPO Distributions Report", 20, 30);
+        pdf.addImage(imgData, 'PNG', 20, 40, width, height);
+        pdf.save('thr_cdpo_distributions.pdf');
+        setIsPrinting(false);
       });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      
-      const width = pdfWidth - 40; // with some margin
-      const height = width / ratio;
-
-      pdf.text("THR CDPO Distributions Report", 20, 30);
-      pdf.addImage(imgData, 'PNG', 20, 40, width, height);
-      pdf.save('thr_cdpo_distributions.pdf');
-    });
+    }, 100);
   };
 
   const exportToExcel = () => {
-    const visCols = columns.filter(c => c.visible && c.dataField !== '#');
+    const visCols = columns.filter(c => c.visible && c.dataField !== '#' && c.dataField !== 'action');
     const dataToExport = filteredData.map((row, index) => {
       const newRow = { '#': index + 1 };
       visCols.forEach(col => {
@@ -280,20 +286,15 @@ const ThrCdpoDistributions = () => {
           newRow[col.text] = row[col.dataField];
         }
       });
-      if (columns.find(c => c.dataField === 'cdpo_remark')?.visible) newRow['CDPO Remark'] = row.cdpo_remark;
-      if (columns.find(c => c.dataField === 'sector_status')?.visible) newRow['Sector Remark'] = row.sector_remark;
       return newRow;
     });
 
-    const beneficiaryIndex = visCols.findIndex(c => c.dataField === 'total_beneficiaries');
     const totalRow = { '#': '' };
     visCols.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
       else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
       else totalRow[col.text] = '';
     });
-    if (columns.find(c => c.dataField === 'cdpo_remark')?.visible) totalRow['CDPO Remark'] = '';
-    if (columns.find(c => c.dataField === 'sector_status')?.visible) totalRow['Sector Remark'] = '';
     dataToExport.push(totalRow);
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -567,11 +568,11 @@ const ThrCdpoDistributions = () => {
                                     case 'cdpo_status':
                                     case 'dpo_status':
                                     case 'sector_status':
-                                      cellContent = <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField]}</Badge>;
+                                      cellContent = isPrinting ? row[col.dataField] : <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField]}</Badge>;
                                       break;
                                     case 'action':
                                       cellContent = (
-                                        <div className="d-flex align-items-center gap-2">
+                                        <div className="d-flex align-items-center gap-2 no-print">
                                           <Button
                                             variant="outline-success"
                                             size="sm"
@@ -599,7 +600,7 @@ const ThrCdpoDistributions = () => {
                                       );
                                       break;
                                     default:
-                                      cellContent = row[col.dataField];
+                                      cellContent = row[col.dataField] || '';
                                   }
                                   return <td key={`td-${row.id}-${col.dataField}`}>{cellContent}</td>;
                                 })}
