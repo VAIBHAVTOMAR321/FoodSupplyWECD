@@ -476,8 +476,8 @@ const ThrSupervisorDistributions = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
-            <Col md={2}>
-              <Dropdown>
+            <Col md={2} >
+              <Dropdown className="mt-2">
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category" className="w-100">
                   {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
                 </Dropdown.Toggle>
