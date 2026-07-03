@@ -52,6 +52,8 @@ import CDPOTHRReceiving from "./components/CDPO_panel/CDPOTHRReceiving";
 import CDPOHCMReceiving from "./components/CDPO_panel/CDPOHCMReceiving";
 import DPOTHRReceiving from "./components/DPO_panel/DPOTHRReceiving";
 import DPOHCMReceiving from "./components/DPO_panel/DPOHCMReceiving";
+import DirectorHCMReceiving from "./components/director_panel/DirectorHCMReceiving";
+import DirectorTHRReceiving from "./components/director_panel/DirectorTHRReceiving";
 
 
 
@@ -76,10 +78,10 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const location = useLocation();
 
-  const hideNavbarRoutes = ["/DirectorBeneEntry", "/CDPOBeneEntry", "/CDPOHCMReceiving",
+  const hideNavbarRoutes = ["/DirectorHCMReceiving", "/DirectorTHRReceiving", "/DirectorBeneEntry", "/CDPOBeneEntry", "/CDPOHCMReceiving",
      "/DPOBeneEntry", "/CDPOTHRReceiving", "/DPOTHRReceiving", "/DPOHCMReceiving",
       "/SupervisorBeneficiarieEntry", "/ThrSupervisorReceiving", "/HcmSupervisorReceiving", "/BeneficiarieEntry", "/StudentForm","/SupervisorDashBoard", "/FoodItemReceiving", "/AllRoleResetpassword", "/HcmDpoDistributions","/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem"];
-  const hideFooterRoutes = ["/DirectorBeneEntry", "/CDPOBeneEntry", "/DPOBeneEntry", "/CDPOTHRReceiving", "/CDPOHCMReceiving", "/DPOTHRReceiving",
+  const hideFooterRoutes = ["/DirectorHCMReceiving", "/DirectorTHRReceiving", "/DirectorBeneEntry", "/CDPOBeneEntry", "/DPOBeneEntry", "/CDPOTHRReceiving", "/CDPOHCMReceiving", "/DPOTHRReceiving",
      "/SupervisorBeneficiarieEntry", "/ThrSupervisorReceiving", "/HcmSupervisorReceiving", "/BeneficiarieEntry", "/StudentForm","/SupervisorDashBoard", "/FoodItemReceiving", "/AllRoleResetpassword","/HcmDpoDistributions", "/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem"];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
@@ -100,6 +102,7 @@ function AppContent() {
               <CDPOHCMReceiving />
             </ProtectedRoute>
           } />
+
 
           
 
@@ -126,6 +129,20 @@ function AppContent() {
               <DPOHCMReceiving />
             </ProtectedRoute>
           } />
+
+           <Route path="/DirectorHCMReceiving" element={
+            <ProtectedRoute>
+              <DirectorHCMReceiving />
+            </ProtectedRoute>
+          } />
+
+           <Route path="/DirectorTHRReceiving" element={
+            <ProtectedRoute>
+              <DirectorTHRReceiving />
+            </ProtectedRoute>
+          } />
+
+
 
             <Route path="/DirectorBeneEntry" element={
             <ProtectedRoute>

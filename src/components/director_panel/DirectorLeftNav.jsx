@@ -30,6 +30,8 @@ import {
   FaClock,
   FaFileAlt,
   FaAppleAlt,
+  FaTruckLoading,
+  FaTruck,
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -108,6 +110,22 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
     ],
   },
       
+  {
+    icon: <FaTruckLoading />,
+    label: "Food Receiving",
+    submenu: [
+      {
+        label: "THR Receiving",
+        path: "/DirectorTHRReceiving",
+        icon: <FaFileAlt />,
+      },
+      {
+        label: "HCM Receiving",
+        path: "/DirectorHCMReceiving",
+        icon: <FaFileAlt />,
+      },
+    ],
+  },
       
        
       
