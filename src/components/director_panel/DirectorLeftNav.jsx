@@ -78,6 +78,12 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
         label: "DashBoard",
         path: "/DirectorDashboard",
       },
+
+      {
+        icon: <FaTachometerAlt />,
+        label: "Beneficiary Entry",
+        path: "/DirectorBeneEntry",
+      },
       {
         icon: <FaAppleAlt />,
         label: "Food Items",

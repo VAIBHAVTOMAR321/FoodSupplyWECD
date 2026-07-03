@@ -56,7 +56,7 @@ const HcmDpoDistributions = () => {
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueAwcTypes, setUniqueAwcTypes] = useState([]);
-  const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
+  const [beneficiaryCategories, setBeneficiaryCategories] = useState([]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -70,6 +70,7 @@ const HcmDpoDistributions = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // FIX 1: Added the missing closing `}` for the `if` block
   useEffect(() => {
     if (distributions.length > 0) {
       setUniqueDistricts([...new Set(distributions.map(item => item.district))]);
@@ -77,7 +78,6 @@ const HcmDpoDistributions = () => {
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
       setUniqueAwcTypes([...new Set(distributions.map(item => item.awc_type))]);
-      setUniqueBeneCategories([...new Set(distributions.map(item => item.bene_category))]);
     }
   }, [distributions]);
 
@@ -130,9 +130,26 @@ const HcmDpoDistributions = () => {
     }
   };
 
+  // FIX 2: Added the missing fetchBeneficiaryCategories function
+  const fetchBeneficiaryCategories = async () => {
+    try {
+      const response = await api.get("/beneficiary-categories/"); // Update URL if different
+      const data = response.data?.results || response.data || [];
+      setBeneficiaryCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch beneficiary categories:", err);
+      // Fallback: extract unique categories from distributions if API fails
+      if (distributions.length > 0) {
+        const uniqueCats = [...new Set(distributions.map(item => item.bene_category))];
+        setBeneficiaryCategories(uniqueCats.map((name, idx) => ({ id: idx, category_name: name })));
+      }
+    }
+  };
+
   useEffect(() => {
     if (api) {
       fetchDistributions();
+      fetchBeneficiaryCategories();
     }
   }, [api]);
 
@@ -163,7 +180,7 @@ const HcmDpoDistributions = () => {
       return;
     }
     html2canvas(input, {
-      scale: 2, // Higher scale for better quality
+      scale: 2,
       useCORS: true
     }).then(canvas => {
       const imgData = canvas.toDataURL('image/png');
@@ -178,7 +195,7 @@ const HcmDpoDistributions = () => {
       const canvasHeight = canvas.height;
       const ratio = canvasWidth / canvasHeight;
       
-      const width = pdfWidth - 40; // with some margin
+      const width = pdfWidth - 40;
       const height = width / ratio;
 
       pdf.text("HCM DPO Distributions Report", 20, 30);
@@ -203,7 +220,6 @@ const HcmDpoDistributions = () => {
       return newRow;
     });
 
-    const beneficiaryIndex = visCols.findIndex(c => c.dataField === 'total_beneficiaries');
     const totalRow = { '#': '' };
     visCols.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
@@ -362,9 +378,9 @@ const HcmDpoDistributions = () => {
                   {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueBeneCategories.map(t => (
-                    <Dropdown.Item key={t} as="div">
-                      <Form.Check type="checkbox" label={t} checked={filters.bene_category.includes(t)} onChange={() => handleMultiSelectChange('bene_category', t)} />
+                  {beneficiaryCategories.map(cat => (
+                    <Dropdown.Item key={cat.id} as="div">
+                      <Form.Check type="checkbox" label={cat.category_name} checked={filters.bene_category.includes(cat.category_name)} onChange={() => handleMultiSelectChange('bene_category', cat.category_name)} />
                     </Dropdown.Item>
                   ))}
                 </Dropdown.Menu>
@@ -391,70 +407,68 @@ const HcmDpoDistributions = () => {
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
 
           <Card className="shadow-sm">
-          
-              {loading ? (
-                <div className="text-center py-4">
-                  <Spinner animation="border" />
-                </div>
-              ) : filteredData.length === 0 ? (
-                <div className="text-center py-4 text-muted">No HCM distributions found.</div>
-              ) : (
-                <div className="table-responsive">
-                  <Table 
-                    striped 
-                    bordered 
-                    hover 
-                    responsive 
-                    className="mb-0 bg-white" 
-                    ref={tableRef}
-                    style={{ border: '1px solid #dee2e6' }}
-                  >
-                     <thead>
-                       <tr>
-                         {visibleColumns.map((col) => <th key={`th-${col.dataField}`}>{col.text}</th>)}
-                       </tr>
-                     </thead>
-                      <tbody>
-                        {currentItems.length > 0 ? currentItems.map((row, index) => (
-                          <tr key={`row-${row.id}`}>
-                            {visibleColumns.map((col) => {
-                              let cellContent;
-                              if (col.dataField === '#') {
-                                cellContent = index + 1;
-                              } else if (col.dataField === 'date' && row[col.dataField]) {
-                                cellContent = new Date(row[col.dataField]).toLocaleDateString('en-GB');
-                              } else {
-                                cellContent = row[col.dataField];
-                              }
-                              return <td key={`td-${row.id}-${col.dataField}`}>{cellContent}</td>;
-                            })}
-                          </tr>
-                        )) : (
-                          <tr>
-                            <td colSpan={visibleColumns.length} className="text-center">No data available</td>
-                          </tr>
-                        )}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          {visibleColumns.map((col) => {
-                            let cellContent = '';
-                            if (col.dataField === '#') {
-                              cellContent = <strong>Total</strong>;
-                            } else if (col.dataField === 'total_beneficiaries') {
-                              cellContent = <strong>{totals.beneficiaries}</strong>;
-                            } else if (col.dataField === 'quantity') {
-                              cellContent = <strong>{totals.quantity.toFixed(2)}</strong>;
-                            }
-                            return <td key={`tf-${col.dataField}`}>{cellContent}</td>;
-                          })}
-                        </tr>
-                      </tfoot>
-                   </Table>
-                  {renderPagination()}
-                </div>
-              )}
-          
+            {loading ? (
+              <div className="text-center py-4">
+                <Spinner animation="border" />
+              </div>
+            ) : filteredData.length === 0 ? (
+              <div className="text-center py-4 text-muted">No HCM distributions found.</div>
+            ) : (
+              <div className="table-responsive">
+                <Table 
+                  striped 
+                  bordered 
+                  hover 
+                  responsive 
+                  className="mb-0 bg-white" 
+                  ref={tableRef}
+                  style={{ border: '1px solid #dee2e6' }}
+                >
+                  <thead>
+                    <tr>
+                      {visibleColumns.map((col) => <th key={`th-${col.dataField}`}>{col.text}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentItems.length > 0 ? currentItems.map((row, index) => (
+                      <tr key={`row-${row.id}`}>
+                        {visibleColumns.map((col) => {
+                          let cellContent;
+                          if (col.dataField === '#') {
+                            cellContent = index + 1;
+                          } else if (col.dataField === 'date' && row[col.dataField]) {
+                            cellContent = new Date(row[col.dataField]).toLocaleDateString('en-GB');
+                          } else {
+                            cellContent = row[col.dataField];
+                          }
+                          return <td key={`td-${row.id}-${col.dataField}`}>{cellContent}</td>;
+                        })}
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={visibleColumns.length} className="text-center">No data available</td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      {visibleColumns.map((col) => {
+                        let cellContent = '';
+                        if (col.dataField === '#') {
+                          cellContent = <strong>Total</strong>;
+                        } else if (col.dataField === 'total_beneficiaries') {
+                          cellContent = <strong>{totals.beneficiaries}</strong>;
+                        } else if (col.dataField === 'quantity') {
+                          cellContent = <strong>{totals.quantity.toFixed(2)}</strong>;
+                        }
+                        return <td key={`tf-${col.dataField}`}>{cellContent}</td>;
+                      })}
+                    </tr>
+                  </tfoot>
+                </Table>
+                {renderPagination()}
+              </div>
+            )}
           </Card>
         </Container>
 

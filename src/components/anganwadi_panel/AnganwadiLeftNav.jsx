@@ -27,7 +27,8 @@ import {
   FaBriefcase,
   FaGraduationCap,
   FaTasks,
-  FaClock
+  FaClock,
+  FaTruckLoading
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -80,11 +81,12 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
      
   {
     icon: <FaUsers />,
-    label: "Anganwadi Profile",
+    icon: <FaUserCircle />,
+    label: "Anganwadi Profile",    
     path: "/AnganwadiProfile"
   },
    {
-    icon: <FaUsers />,
+    icon: <FaTruckLoading />,
     label: "Food Item Receiving",
     path: "/FoodItemReceiving"
   },

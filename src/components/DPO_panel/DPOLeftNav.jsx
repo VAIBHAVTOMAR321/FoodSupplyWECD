@@ -80,7 +80,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
         active: true,
       },
        {
-        icon: <FaTachometerAlt />,
+        icon: <FaUsers />,
         label: "Beneficiarie Entry",
         path: "/DPOBeneEntry",
         active: true,
@@ -106,6 +106,23 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
         {
         label: "HCM Distributions",
         path: "/HcmDpoDistributions",
+        icon: <FaFileAlt />,
+      },
+    ],
+  },
+
+   {
+    icon: <FaTruck />,
+    label: "Food Receiving",
+    submenu: [
+      {
+        label: "THR Receiving",
+        path: "/DPOTHRReceiving",
+        icon: <FaFileAlt />,
+      },
+        {
+        label: "HCM Receiving",
+        path: "/DPOHCMReceiving",
         icon: <FaFileAlt />,
       },
     ],
