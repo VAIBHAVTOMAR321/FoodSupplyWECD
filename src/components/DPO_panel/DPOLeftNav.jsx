@@ -110,6 +110,23 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
       },
     ],
   },
+
+   {
+    icon: <FaTruck />,
+    label: "Food Receiving",
+    submenu: [
+      {
+        label: "THR Receiving",
+        path: "/DPOTHRReceiving",
+        icon: <FaFileAlt />,
+      },
+        {
+        label: "HCM Receiving",
+        path: "/DPOHCMReceiving",
+        icon: <FaFileAlt />,
+      },
+    ],
+  },
       
        
       

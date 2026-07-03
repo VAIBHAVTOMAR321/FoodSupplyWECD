@@ -29,7 +29,8 @@ import {
   FaTasks,
   FaClock,
   FaTruck,
-  FaFileAlt
+  FaFileAlt,
+  FaTruckLoading
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -103,6 +104,23 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
           ],
         },
      
+
+           {
+          icon: <FaTruckLoading />,
+          label: "Food Receiving",
+          submenu: [
+            {
+              label: "THR Receiving",
+              path: "/CDPOTHRReceiving",
+              icon: <FaFileAlt />,
+            },
+              {
+              label: "HCM Receiving",
+              path: "/CDPOHCMReceiving",
+              icon: <FaFileAlt />,
+            },
+          ],
+        },
     
      
   
