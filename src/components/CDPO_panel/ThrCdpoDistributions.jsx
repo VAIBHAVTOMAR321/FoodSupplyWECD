@@ -66,7 +66,7 @@ const ThrCdpoDistributions = () => {
     food_item: [],
     bene_category: [],
     cdpo_status: [],
-    dpo_status: [],
+    dpo_status: [], 
     sector_status: [],
   });
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
@@ -76,6 +76,7 @@ const ThrCdpoDistributions = () => {
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
+  const [beneficiaryCategories, setBeneficiaryCategories] = useState([]);
   const [uniqueCdpoStatuses, setUniqueCdpoStatuses] = useState([]);
   const [uniqueDpoStatuses, setUniqueDpoStatuses] = useState([]);
   const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
@@ -100,7 +101,6 @@ const ThrCdpoDistributions = () => {
       setUniqueProjects([...new Set(distributions.map(item => item.project))]);
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
-      setUniqueBeneCategories([...new Set(distributions.map(item => item.bene_category))]);
       setUniqueCdpoStatuses([...new Set(distributions.map(item => item.cdpo_status))]);
       setUniqueDpoStatuses([...new Set(distributions.map(item => item.dpo_status))]);
       setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status))]);
@@ -154,11 +154,25 @@ const ThrCdpoDistributions = () => {
     }
   };
 
+  const fetchBeneficiaryCategories = async () => {
+    try {
+      const response = await api.get("/beneficiary-categories/");
+      // Ensure we handle both direct array responses and object-wrapped arrays
+      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      setBeneficiaryCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch beneficiary categories.", err);
+      setError("Failed to fetch beneficiary categories.");
+    }
+  };
+
   useEffect(() => {
     if (api) {
       fetchDistributions();
+      fetchBeneficiaryCategories();
     }
   }, [api]);
+
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -463,17 +477,17 @@ const ThrCdpoDistributions = () => {
               </Dropdown>
             </Col>
             <Col md={2}>
-              <Dropdown>
+              <Dropdown className="mt-2">
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category" className="w-100">
                   {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
                 </Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueBeneCategories.map(cat => (
-                    <Dropdown.Item key={cat} as="div">
-                      <Form.Check type="checkbox" label={cat} checked={filters.bene_category.includes(cat)} onChange={() => handleMultiSelectChange('bene_category', cat)} />
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}> 
+                  {beneficiaryCategories.map(cat => (
+                    <Dropdown.Item key={cat.id} as="div">
+                      <Form.Check type="checkbox" label={cat.category_name} checked={filters.bene_category.includes(cat.category_name)} onChange={() => handleMultiSelectChange('bene_category', cat.category_name)} />
                     </Dropdown.Item>
                   ))}
-                </Dropdown.Menu>
+                </Dropdown.Menu> 
               </Dropdown>
             </Col>
           </Row>
