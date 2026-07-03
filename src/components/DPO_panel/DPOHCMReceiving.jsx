@@ -41,6 +41,8 @@ const DPOHCMReceiving = () => {
   const tableRef = useRef(null);
 
   const [filters, setFilters] = useState({
+    fin_year: [],
+    quarter: [],
     district: [],
     project: [],
     sector: [],
@@ -48,6 +50,8 @@ const DPOHCMReceiving = () => {
     bene_category: [],
   });
 
+  const [uniqueFinYears, setUniqueFinYears] = useState([]);
+  const [uniqueQuarters, setUniqueQuarters] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
@@ -58,6 +62,8 @@ const DPOHCMReceiving = () => {
     { dataField: "#", text: "#", visible: true },
     { dataField: "date", text: "Date", visible: true },
     { dataField: "awc_name", text: "AWC Name", visible: true },
+    { dataField: "awc_code", text: "AWC Code", visible: true },
+    { dataField: "awc_type", text: "AWC Type", visible: true },
     { dataField: "district", text: "District", visible: true },
     { dataField: "project", text: "Project", visible: true },
     { dataField: "sector", text: "Sector", visible: true },
@@ -86,6 +92,8 @@ const DPOHCMReceiving = () => {
 
   useEffect(() => {
     if (reports.length > 0) {
+      setUniqueFinYears([...new Set(reports.map((item) => item.fin_year))]);
+      setUniqueQuarters([...new Set(reports.map((item) => item.quarter))]);
       setUniqueDistricts([...new Set(reports.map((item) => item.district))]);
       setUniqueProjects([...new Set(reports.map((item) => item.project))]);
       setUniqueSectors([...new Set(reports.map((item) => item.sector))]);
@@ -141,8 +149,10 @@ const DPOHCMReceiving = () => {
 
   const filteredReports = useMemo(() => {
     return reports.filter((item) => {
-      const { district, project, sector, food_item, bene_category } = filters;
+      const { fin_year, quarter, district, project, sector, food_item, bene_category } = filters;
       return (
+        (fin_year.length === 0 || fin_year.includes(item.fin_year)) &&
+        (quarter.length === 0 || quarter.includes(item.quarter)) &&
         (district.length === 0 || district.includes(item.district)) &&
         (project.length === 0 || project.includes(item.project)) &&
         (sector.length === 0 || sector.includes(item.sector)) &&
@@ -439,6 +449,36 @@ const DPOHCMReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                          {filters.fin_year.length ? `${filters.fin_year.length} selected` : "All Fin. Years"}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
+                          {uniqueFinYears.map((v) => (
+                            <Dropdown.Item key={v} as="div">
+                              <Form.Check type="checkbox" label={v} checked={filters.fin_year.includes(v)} onChange={() => handleMultiSelectChange("fin_year", v)} />
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </Col>
+
+                    <Col md={2}>
+                      <Dropdown>
+                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                          {filters.quarter.length ? `${filters.quarter.length} selected` : "All Quarters"}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
+                          {uniqueQuarters.map((v) => (
+                            <Dropdown.Item key={v} as="div">
+                              <Form.Check type="checkbox" label={v} checked={filters.quarter.includes(v)} onChange={() => handleMultiSelectChange("quarter", v)} />
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </Col>
+
+                    <Col md={2}>
+                      <Dropdown>
+                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
                           {filters.district.length ? `${filters.district.length} selected` : "All Districts"}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
@@ -512,7 +552,7 @@ const DPOHCMReceiving = () => {
                     </Col>
 
                     <Col md={2} className="d-flex align-items-end">
-                      <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ district: [], project: [], sector: [], food_item: [], bene_category: [] })}>
+                      <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], quarter: [], district: [], project: [], sector: [], food_item: [], bene_category: [] })}>
                         Clear Filters
                       </Button>
                     </Col>
