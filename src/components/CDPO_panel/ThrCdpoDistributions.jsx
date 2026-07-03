@@ -41,6 +41,8 @@ const ThrCdpoDistributions = () => {
     { dataField: 'project', text: 'Project', visible: true },
     { dataField: 'district', text: 'District', visible: true },
     { dataField: 'food_item', text: 'Food Item', visible: true },
+    { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
+    { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin Year', visible: true },
     { dataField: 'quarter', text: 'Quarter', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
@@ -62,6 +64,7 @@ const ThrCdpoDistributions = () => {
     project: [],
     sector: [],
     food_item: [],
+    bene_category: [],
     cdpo_status: [],
     dpo_status: [],
     sector_status: [],
@@ -72,6 +75,7 @@ const ThrCdpoDistributions = () => {
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
+  const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
   const [uniqueCdpoStatuses, setUniqueCdpoStatuses] = useState([]);
   const [uniqueDpoStatuses, setUniqueDpoStatuses] = useState([]);
   const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
@@ -96,6 +100,7 @@ const ThrCdpoDistributions = () => {
       setUniqueProjects([...new Set(distributions.map(item => item.project))]);
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
+      setUniqueBeneCategories([...new Set(distributions.map(item => item.bene_category))]);
       setUniqueCdpoStatuses([...new Set(distributions.map(item => item.cdpo_status))]);
       setUniqueDpoStatuses([...new Set(distributions.map(item => item.dpo_status))]);
       setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status))]);
@@ -115,13 +120,14 @@ const ThrCdpoDistributions = () => {
 
   const filteredData = useMemo(() => {
     return distributions.filter(item => {
-      const { finYear, quarter, district, project, sector, food_item, cdpo_status, dpo_status, sector_status } = filters;
+      const { finYear, quarter, district, project, sector, food_item, bene_category, cdpo_status, dpo_status, sector_status } = filters;
       return (finYear.length === 0 || finYear.includes(item.fin_year)) &&
              (quarter.length === 0 || quarter.includes(item.quarter)) &&
              (district.length === 0 || district.includes(item.district)) &&
              (project.length === 0 || project.includes(item.project)) &&
              (sector.length === 0 || sector.includes(item.sector)) &&
              (food_item.length === 0 || food_item.includes(item.food_item)) &&
+             (bene_category.length === 0 || bene_category.includes(item.bene_category)) &&
              (cdpo_status.length === 0 || cdpo_status.includes(item.cdpo_status)) &&
              (dpo_status.length === 0 || dpo_status.includes(item.dpo_status)) &&
              (sector_status.length === 0 || sector_status.includes(item.sector_status));
@@ -456,6 +462,20 @@ const ThrCdpoDistributions = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category" className="w-100">
+                  {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueBeneCategories.map(cat => (
+                    <Dropdown.Item key={cat} as="div">
+                      <Form.Check type="checkbox" label={cat} checked={filters.bene_category.includes(cat)} onChange={() => handleMultiSelectChange('bene_category', cat)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
           </Row>
 
           <Row className="mb-3">
@@ -500,6 +520,9 @@ const ThrCdpoDistributions = () => {
                   ))}
                 </Dropdown.Menu>
               </Dropdown>
+            </Col>
+            <Col md={2} className="d-flex align-items-end">
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], quarter: [], district: [], project: [], sector: [], food_item: [], bene_category: [], cdpo_status: [], dpo_status: [], sector_status: [] })} className="me-2">Clear Filters</Button>
             </Col>
           </Row>
 

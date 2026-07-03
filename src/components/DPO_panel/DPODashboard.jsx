@@ -1,23 +1,24 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Table, Collapse } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dpo.css";
+
+import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
 import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
-import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 const DPODashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
-
+  
+  const navigate = useNavigate();
   const { api } = useAuth();
-  const [thrDistributions, setThrDistributions] = useState([]);
-  const [hcmDistributions, setHcmDistributions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [thrTotalRegistrations, setThrTotalRegistrations] = useState(0);
-  const [hcmTotalRegistrations, setHcmTotalRegistrations] = useState(0);
+  const [hcmSummary, setHcmSummary] = useState(null);
+  const [thrSummary, setThrSummary] = useState(null);
   const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
   const [thrFoodItemsCount, setThrFoodItemsCount] = useState(0);
   const [expanded, setExpanded] = useState(null);
@@ -28,35 +29,11 @@ const DPODashboard = () => {
       setIsMobile(width < 768);
       setIsTablet(width >= 768 && width < 1024);
     };
-
+    
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  const fetchThrDistributions = async () => {
-    try {
-      const response = await api.get("/thr-dpo-distributions/");
-      const raw = response.data?.data || [];
-      const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
-      setThrDistributions(items);
-      setThrTotalRegistrations(response.data?.count || items.length);
-    } catch (err) {
-      console.error("Failed to fetch THR DPO distributions:", err);
-    }
-  };
-
-  const fetchHcmDistributions = async () => {
-    try {
-      const response = await api.get("/hcm-dpo-distributions/");
-      const raw = response.data?.data || [];
-      const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
-      setHcmDistributions(items);
-      setHcmTotalRegistrations(response.data?.count || items.length);
-    } catch (err) {
-      console.error("Failed to fetch HCM DPO distributions:", err);
-    }
-  };
 
   const fetchHcmFoodItems = async () => {
     try {
@@ -78,11 +55,25 @@ const DPODashboard = () => {
     }
   };
 
-  const fetchDistributions = async () => {
+  const fetchDashboardSummaries = async () => {
+    try {
+      const [hcmRes, thrRes] = await Promise.all([ 
+        api.get("/dpo/dashboard/hcm/"),
+        api.get("/dpo/dashboard/thr/")
+      ]);
+      setHcmSummary(hcmRes.data);
+      setThrSummary(thrRes.data);
+    } catch (err) {
+      setError("Failed to fetch dashboard summaries.");
+      console.error("Dashboard summary fetch error:", err);
+    }
+  };
+
+  const fetchAllData = async () => {
     setLoading(true);
     setError("");
     try {
-      await Promise.all([fetchThrDistributions(), fetchHcmDistributions(), fetchHcmFoodItems(), fetchThrFoodItems()]);
+      await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems()]);
     } catch (err) {
       setError("Failed to fetch DPO distributions.");
     } finally {
@@ -92,34 +83,18 @@ const DPODashboard = () => {
 
   useEffect(() => {
     if (api) {
-      fetchDistributions();
+      fetchAllData();
     }
   }, [api]);
-
+ 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const thrTotals = useMemo(() => {
-    return thrDistributions.reduce((acc, item) => {
-      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-      acc.quantity += parseFloat(item.quantity) || 0;
-      return acc;
-    }, { beneficiaries: 0, quantity: 0 });
-  }, [thrDistributions]);
-
-  const hcmTotals = useMemo(() => {
-    return hcmDistributions.reduce((acc, item) => {
-      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-      acc.quantity += parseFloat(item.quantity) || 0;
-      return acc;
-    }, { beneficiaries: 0, quantity: 0 });
-  }, [hcmDistributions]);
-
-  const FoodItemTable = ({
+  const FoodItemTable = ({ 
     scheme,
     api
-  }) => {
+   }) => {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -130,7 +105,7 @@ const DPODashboard = () => {
         setError("");
         try {
           const response = await api.get(`/${scheme}-food-items/`);
-          const data = Array.isArray(response.data) ? response.data : response.data ?.data || [];
+          const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
           setItems(Array.isArray(data) ? data : []);
         } catch (err) {
           setError(`Failed to fetch ${scheme.toUpperCase()} food items.`);
@@ -178,6 +153,89 @@ const DPODashboard = () => {
     );
   };
 
+  const ReceivingTable = ({ items }) => { 
+    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No receiving records found.</div>;
+
+    return (
+      <div className="table-responsive food-item-table-container">
+        <Table striped bordered hover responsive className="mb-0 food-item-table">
+          <thead className="table-light sticky-top">
+            <tr>
+              <th>#</th>
+              <th>Quantity</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => (
+              <tr key={index}>
+                <td>{index + 1}</td>
+                <td>{item.total_quantity}</td>
+                <td>{item.unit}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+    );
+  };
+
+  const DistributionTable = ({ items }) => { 
+    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No distribution records found.</div>;
+
+    return (
+      <div className="table-responsive food-item-table-container">
+        <Table striped bordered hover responsive className="mb-0 food-item-table">
+          <thead className="table-light sticky-top">
+            <tr>
+              <th>#</th>
+              <th>Total Beneficiaries</th>
+              <th>Total Quantity</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => (
+              <tr key={index}>
+                <td>{index + 1}</td>
+                <td>{item.total_beneficiaries}</td>
+                <td>{item.total_quantity}</td>
+                <td>{item.unit}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+    );
+  };
+
+  const BeneficiarySummaryTable = ({ items }) => { 
+    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No beneficiary summary found.</div>;
+
+    return (
+      <div className="table-responsive food-item-table-container">
+        <Table striped bordered hover responsive className="mb-0 food-item-table">
+          <thead className="table-light sticky-top">
+            <tr>
+              <th>#</th>
+              <th>Category Name</th>
+              <th>Beneficiary Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => (
+              <tr key={item.category_id}>
+                <td>{index + 1}</td>
+                <td>{item.category_name}</td>
+                <td>{item.beneficiary_count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+    );
+  };
+
   const handleCardClick = (scheme) => {
     setExpanded(expanded === scheme ? null : scheme);
   };
@@ -193,14 +251,7 @@ const DPODashboard = () => {
       <div className="main-content-dash">
         <DPOHeader toggleSidebar={toggleSidebar} />
 
-        <Container fluid className="dashboard-box mt-3">
-          {/* <div className="dashboard-header-section">
-            <h2 className="dashboard-main-title">
-              DPO Dashboard
-            </h2>
-            <p className="dashboard-subtitle">Welcome! Here's a summary of the distribution activities.</p>
-          </div> */}
-
+        <Container fluid className="dashboard-box mt-3"> 
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
 
           <div className="dashboard-section">
@@ -209,7 +260,7 @@ const DPODashboard = () => {
               <Col md={6}>
                 <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm')}>
                   <Card.Body>
-                    <div className="d-flex align-items-center">
+                    <div className=" d-flex align-items-center">
                       <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
                       <div className="ms-3 text-start">
                         <h6 className="dashboard-card-title">HCM Food Items</h6>
@@ -224,7 +275,7 @@ const DPODashboard = () => {
                 <Collapse in={expanded === 'hcm'}>
                   <div className="mt-3">
                     <FoodItemTable scheme="hcm" api={api} />
-                   </div>
+                  </div>
                 </Collapse>
               </Col>
               <Col md={6}>
@@ -245,78 +296,148 @@ const DPODashboard = () => {
                 <Collapse in={expanded === 'thr'}>
                   <div className="mt-3">
                     <FoodItemTable scheme="thr" api={api} />
-                   </div>
+                  </div>
                 </Collapse>
               </Col>
             </Row>
           </div>
 
           <div className="dashboard-section">
-            <h4 className="section-title">THR Distribution Summary</h4>
-            <Row className="g-3">
-              <Col md={4}>
-                <Card className="dashboard-card card-thr">
+            <h4 className="section-title">THR Distribution & Received Summary</h4>
+            <Row className="g-3"> 
+              <Col md={4} className="d-flex">
+                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/ThrDpoDistributions')}>
                   <Card.Body>
-                    <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
-                    <h6 className="dashboard-card-title">THR Registrations</h6>
-                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrTotalRegistrations}</div>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
+                        </div>
+                      </div>
+                    </div>
                   </Card.Body>
                 </Card>
               </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-thr">
+              <Col md={4} className="d-flex">
+                <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-receiving')}>
                   <Card.Body>
-                    <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
-                    <h6 className="dashboard-card-title">THR Distribution</h6>
-                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrTotals.beneficiaries.toLocaleString()}</div>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon thr-icon"><FaTruckLoading /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">THR Received</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : 
+                            thrSummary?.receiving_summary?.length || 0
+                          }
+                        </div>
+                      </div>
+                      <div className="ms-auto expand-icon">
+                        {expanded === 'thr-receiving' ? <FaChevronUp /> : <FaChevronDown />}
+                      </div>
+                    </div>
                   </Card.Body>
                 </Card>
+                <Collapse in={expanded === 'thr-receiving'}>
+                  <div className="mt-3">
+                    <ReceivingTable items={thrSummary?.receiving_summary} />
+                  </div>
+                </Collapse>
               </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-thr">
+              <Col md={4} className="d-flex">
+                <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-quantity')}>
                   <Card.Body>
-                    <div className="dashboard-card-icon thr-icon"><FaBox /></div>
-                    <h6 className="dashboard-card-title">THR Quantity</h6>
-                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrTotals.quantity.toFixed(2)}</div>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon thr-icon"><FaBox /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">THR Quantity Records</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.length || 0}
+                        </div>
+                      </div>
+                      <div className="ms-auto expand-icon">
+                        {expanded === 'thr-quantity' ? <FaChevronUp /> : <FaChevronDown />}
+                      </div>
+                    </div>
                   </Card.Body>
                 </Card>
+                <Collapse in={expanded === 'thr-quantity'}>
+                  <div className="mt-3">
+                    <DistributionTable items={thrSummary?.distribution_summary} />
+                  </div>
+                </Collapse>
               </Col>
             </Row>
           </div>
-
           <div className="dashboard-section">
-            <h4 className="section-title">HCM Distribution Summary</h4>
-            <Row className="g-3">
-              <Col md={4}>
-                <Card className="dashboard-card card-hcm">
+            <h4 className="section-title">HCM Distribution & Received Summary</h4>
+            <Row className="g-3"> 
+              <Col md={4} className="d-flex">
+                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/HcmDpoDistributions')}>
                   <Card.Body>
-                    <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
-                    <h6 className="dashboard-card-title">HCM Registrations</h6>
-                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmTotalRegistrations}</div>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
+                        </div>
+                      </div>
+                    </div>
                   </Card.Body>
                 </Card>
               </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-hcm">
+              <Col md={4} className="d-flex">
+                <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-receiving')}>
                   <Card.Body>
-                    <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
-                    <h6 className="dashboard-card-title">HCM Distribution</h6>
-                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmTotals.beneficiaries.toLocaleString()}</div>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon hcm-icon"><FaTruckLoading /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">HCM Received</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : 
+                            hcmSummary?.receiving_summary?.length || 0
+                          }
+                        </div>
+                      </div>
+                      <div className="ms-auto expand-icon">
+                        {expanded === 'hcm-receiving' ? <FaChevronUp /> : <FaChevronDown />}
+                      </div>
+                    </div>
                   </Card.Body>
                 </Card>
+                <Collapse in={expanded === 'hcm-receiving'}>
+                  <div className="mt-3">
+                    <ReceivingTable items={hcmSummary?.receiving_summary} />
+                  </div>
+                </Collapse>
               </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-hcm">
+              <Col md={4} className="d-flex">
+                <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-quantity')}>
                   <Card.Body>
-                    <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
-                    <h6 className="dashboard-card-title">HCM Quantity</h6>
-                    <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmTotals.quantity.toFixed(2)}</div>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">HCM Quantity Records</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.length || 0}
+                        </div>
+                      </div>
+                      <div className="ms-auto expand-icon">
+                        {expanded === 'hcm-quantity' ? <FaChevronUp /> : <FaChevronDown />}
+                      </div>
+                    </div>
                   </Card.Body>
                 </Card>
+                <Collapse in={expanded === 'hcm-quantity'}>
+                  <div className="mt-3">
+                    <DistributionTable items={hcmSummary?.distribution_summary} />
+                  </div>
+                </Collapse>
               </Col>
             </Row>
           </div>
-
         </Container>
       </div>
     </div>
