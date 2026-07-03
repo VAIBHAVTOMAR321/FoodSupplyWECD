@@ -694,7 +694,12 @@ const AnganwadiDashboard = () => {
                       }}
                     >
                       <option value="">Select a food item...</option>
-                      {foodItems.map(item => <option key={item.id} value={item.id}>{item.food_item} ({item.bene_category})</option>)}
+                      {foodItems.map(item => [
+                        <option key={item.id} value={item.id} style={{ fontWeight: 'bold' }}>
+                          {item.food_item}
+                        </option>,
+                        <option key={`${item.id}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>&nbsp;&nbsp;↳ Category: {item.bene_category}</option>
+                      ])}
                     </Form.Select>
                   </Form.Group>
                   <Form.Group className="mb-3">
