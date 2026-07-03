@@ -307,7 +307,7 @@ const CDPODashboard = () => {
               <Col md={4}>
                 <Card className="dashboard-card card-thr" onClick={() => navigate('/ThrCdpoDistributions')}>
                   <Card.Body>
-                    <div className="d-flex align-items-center w-100">
+                    <div className=" align-items-center w-100">
                       <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
                       <div className="ms-3 text-start">
                         <h6 className="dashboard-card-title mb-1">THR Distribution</h6>

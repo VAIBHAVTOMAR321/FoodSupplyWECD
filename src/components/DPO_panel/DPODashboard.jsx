@@ -260,7 +260,7 @@ const DPODashboard = () => {
               <Col md={6}>
                 <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm')}>
                   <Card.Body>
-                    <div className="d-flex align-items-center">
+                    <div className=" align-items-center">
                       <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
                       <div className="ms-3 text-start">
                         <h6 className="dashboard-card-title">HCM Food Items</h6>
