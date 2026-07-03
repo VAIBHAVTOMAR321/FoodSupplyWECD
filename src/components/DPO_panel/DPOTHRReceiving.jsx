@@ -42,36 +42,37 @@ const DPOTHRReceiving = () => {
 
   const [filters, setFilters] = useState({
     fin_year: [],
-    month: [],
+    quarter: [],
     district: [],
     project: [],
     sector: [],
+    food_item: [],
+    bene_category: [],
   });
 
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
-  const [uniqueMonths, setUniqueMonths] = useState([]);
+  const [uniqueQuarters, setUniqueQuarters] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
+  const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
+  const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
 
   const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
+    { dataField: "date", text: "Date", visible: true },
     { dataField: "awc_name", text: "AWC Name", visible: true },
+    { dataField: "awc_code", text: "AWC Code", visible: true },
+    { dataField: "awc_type", text: "AWC Type", visible: true },
     { dataField: "district", text: "District", visible: true },
     { dataField: "project", text: "Project", visible: true },
     { dataField: "sector", text: "Sector", visible: true },
+    { dataField: "food_item", text: "Food Item", visible: true },
+    { dataField: "bene_category", text: "Beneficiary Category", visible: true },
+    { dataField: "quantity", text: "Quantity", visible: true },
+    { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
-    { dataField: "month", text: "Month", visible: true },
-    { dataField: "pw_lm", text: "PW & LM", visible: true },
-    { dataField: "children_6m_3y", text: "Child (6m-3y)", visible: true },
-    { dataField: "children_3_6y", text: "Child (3-6y)", visible: true },
-    { dataField: "adolescent_girls", text: "Adol. Girls", visible: true },
-    { dataField: "sam_6m_3y", text: "SAM (6m-3y)", visible: true },
-    { dataField: "sam_3_5y", text: "SAM (3-5y)", visible: true },
-    { dataField: "suw_6m_3y", text: "SUW (6m-3y)", visible: true },
-    { dataField: "suw_3_6y", text: "SUW (3-6y)", visible: true },
-    { dataField: "sector_status", text: "Sector Status", visible: true },
-    { dataField: "sector_remark", text: "Sector Remark", visible: true },
+    { dataField: "quarter", text: "Quarter", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
@@ -92,10 +93,12 @@ const DPOTHRReceiving = () => {
   useEffect(() => {
     if (reports.length > 0) {
       setUniqueFinYears([...new Set(reports.map((item) => item.fin_year))]);
-      setUniqueMonths([...new Set(reports.map((item) => item.month))]);
+      setUniqueQuarters([...new Set(reports.map((item) => item.quarter))]);
       setUniqueDistricts([...new Set(reports.map((item) => item.district))]);
       setUniqueProjects([...new Set(reports.map((item) => item.project))]);
       setUniqueSectors([...new Set(reports.map((item) => item.sector))]);
+      setUniqueFoodItems([...new Set(reports.map((item) => item.food_item))]);
+      setUniqueBeneCategories([...new Set(reports.map((item) => item.bene_category))]);
     }
   }, [reports]);
 
@@ -103,20 +106,20 @@ const DPOTHRReceiving = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await api.get(`/dpo/beneficiary-summary/`);
+      const response = await api.get(`/dpo/thr-receiving-summary/`);
       const results = response.data.results;
 
       if (results && results.success) {
         setSummaryData({
           district: results.district,
-          district_total: results.district_total,
+          district_summary: results.district_summary,
           project_summary: results.project_summary,
           sector_summary: results.sector_summary,
         });
         setReports(results.data || []);
       }
     } catch (err) {
-      setError("Failed to fetch beneficiary summary.");
+      setError("Failed to fetch THR receiving summary.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -146,13 +149,15 @@ const DPOTHRReceiving = () => {
 
   const filteredReports = useMemo(() => {
     return reports.filter((item) => {
-      const { fin_year, month, district, project, sector } = filters;
+      const { fin_year, quarter, district, project, sector, food_item, bene_category } = filters;
       return (
         (fin_year.length === 0 || fin_year.includes(item.fin_year)) &&
-        (month.length === 0 || month.includes(item.month)) &&
+        (quarter.length === 0 || quarter.includes(item.quarter)) &&
         (district.length === 0 || district.includes(item.district)) &&
         (project.length === 0 || project.includes(item.project)) &&
-        (sector.length === 0 || sector.includes(item.sector))
+        (sector.length === 0 || sector.includes(item.sector)) &&
+        (food_item.length === 0 || food_item.includes(item.food_item)) &&
+        (bene_category.length === 0 || bene_category.includes(item.bene_category))
       );
     });
   }, [reports, filters]);
@@ -334,7 +339,7 @@ const DPOTHRReceiving = () => {
           )}
 
           <div className="dashboard-section">
-            <h4 className="section-title">लाभार्थी सारांश</h4>
+            <h4 className="section-title">THR प्राप्ति सारांश</h4>
 
             {loading ? (
               <div className="text-center">
@@ -348,39 +353,28 @@ const DPOTHRReceiving = () => {
                 id="beneficiary-summary-tabs"
                 className="mb-3"
               >
-                <Tab eventKey="district_total" title="District Total">
-                
-                      District Total: {summaryData.district}
-                   
-                  
-                      <Table striped bordered hover responsive>
-                        <thead>
-                          <tr>
-                            <th>PW & LM</th>
-                            <th>Child (6m-3y)</th>
-                            <th>Child (3-6y)</th>
-                            <th>Adol. Girls</th>
-                            <th>SAM (6m-3y)</th>
-                            <th>SAM (3-5y)</th>
-                            <th>SUW (6m-3y)</th>
-                            <th>SUW (3-6y)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td>{summaryData.district_total.total_pw_lm}</td>
-                            <td>{summaryData.district_total.total_children_6m_3y}</td>
-                            <td>{summaryData.district_total.total_children_3_6y}</td>
-                            <td>{summaryData.district_total.total_adolescent_girls}</td>
-                            <td>{summaryData.district_total.total_sam_6m_3y}</td>
-                            <td>{summaryData.district_total.total_sam_3_5y}</td>
-                            <td>{summaryData.district_total.total_suw_6m_3y}</td>
-                            <td>{summaryData.district_total.total_suw_3_6y}</td>
-                          </tr>
-                        </tbody>
-                      </Table>
-                  
-                
+                <Tab eventKey="district_summary" title="District Summary">
+                  <h5 className="mt-4">District Summary: {summaryData.district}</h5>
+                  <Table striped bordered hover responsive>
+                    <thead>
+                      <tr>
+                        <th>Food Item</th>
+                        <th>Beneficiary Category</th>
+                        <th>Unit</th>
+                        <th>Total Quantity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summaryData.district_summary.map((item, index) => (
+                        <tr key={index}>
+                          <td>{item.food_item}</td>
+                          <td>{item.bene_category}</td>
+                          <td>{item.unit}</td>
+                          <td>{item.total_quantity}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
                 </Tab>
 
                 <Tab eventKey="project_summary" title="Project Summary">
@@ -389,62 +383,46 @@ const DPOTHRReceiving = () => {
                     <thead>
                       <tr>
                         <th>Project</th>
-                        <th>PW & LM</th>
-                        <th>Child (6m-3y)</th>
-                        <th>Child (3-6y)</th>
-                        <th>Adol. Girls</th>
-                        <th>SAM (6m-3y)</th>
-                        <th>SAM (3-5y)</th>
-                        <th>SUW (6m-3y)</th>
-                        <th>SUW (3-6y)</th>
+                        <th>Food Item</th>
+                        <th>Beneficiary Category</th>
+                        <th>Unit</th>
+                        <th>Total Quantity</th>
                       </tr>
                     </thead>
                     <tbody>
                       {summaryData.project_summary.map((project) => (
                         <tr key={project.project}>
                           <td>{project.project}</td>
-                          <td>{project.total_pw_lm}</td>
-                          <td>{project.total_children_6m_3y}</td>
-                          <td>{project.total_children_3_6y}</td>
-                          <td>{project.total_adolescent_girls}</td>
-                          <td>{project.total_sam_6m_3y}</td>
-                          <td>{project.total_sam_3_5y}</td>
-                          <td>{project.total_suw_6m_3y}</td>
-                          <td>{project.total_suw_3_6y}</td>
+                          <td>{project.food_item}</td>
+                          <td>{project.bene_category}</td>
+                          <td>{project.unit}</td>
+                          <td>{project.total_quantity}</td>
                         </tr>
                       ))}
                     </tbody>
-                  </Table>   {/* FIX: was </Card> */}
+                  </Table>
                 </Tab>
 
                 <Tab eventKey="sector_summary" title="Sector Summary">
-                  <h5 className="mt-4">सेक्टर-वार सारांश (कुल)</h5>
+                  <h5 className="mt-4">Sector-wise Summary (Total)</h5>
                   <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
                         <th>Sector</th>
-                        <th>PW & LM</th>
-                        <th>Child (6m-3y)</th>
-                        <th>Child (3-6y)</th>
-                        <th>Adol. Girls</th>
-                        <th>SAM (6m-3y)</th>
-                        <th>SAM (3-5y)</th>
-                        <th>SUW (6m-3y)</th>
-                        <th>SUW (3-6y)</th>
+                        <th>Food Item</th>
+                        <th>Beneficiary Category</th>
+                        <th>Unit</th>
+                        <th>Total Quantity</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {summaryData.sector_summary.map((sector) => (
-                        <tr key={sector.sector}>
+                      {summaryData.sector_summary.map((sector, index) => (
+                        <tr key={`${sector.sector}-${index}`}>
                           <td>{sector.sector}</td>
-                          <td>{sector.total_pw_lm}</td>
-                          <td>{sector.total_children_6m_3y}</td>
-                          <td>{sector.total_children_3_6y}</td>
-                          <td>{sector.total_adolescent_girls}</td>
-                          <td>{sector.total_sam_6m_3y}</td>
-                          <td>{sector.total_sam_3_5y}</td>
-                          <td>{sector.total_suw_6m_3y}</td>
-                          <td>{sector.total_suw_3_6y}</td>
+                          <td>{sector.food_item}</td>
+                          <td>{sector.bene_category}</td>
+                          <td>{sector.unit}</td>
+                          <td>{sector.total_quantity}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -453,7 +431,7 @@ const DPOTHRReceiving = () => {
 
                 <Tab eventKey="awc_report" title="AWC Report">
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="mb-0">AWC Beneficiary Report</h5>
+                    <h5 className="mb-0">AWC THR Receiving Report</h5>
                     <div>
                       <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
                         <FaFilePdf className="me-1" /> Export PDF
@@ -486,12 +464,12 @@ const DPOTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.month.length ? `${filters.month.length} selected` : "All Months"}
+                          {filters.quarter.length ? `${filters.quarter.length} selected` : "All Quarters"}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
-                          {uniqueMonths.map((v) => (
+                          {uniqueQuarters.map((v) => (
                             <Dropdown.Item key={v} as="div">
-                              <Form.Check type="checkbox" label={v} checked={filters.month.includes(v)} onChange={() => handleMultiSelectChange("month", v)} />
+                              <Form.Check type="checkbox" label={v} checked={filters.quarter.includes(v)} onChange={() => handleMultiSelectChange("quarter", v)} />
                             </Dropdown.Item>
                           ))}
                         </Dropdown.Menu>
@@ -543,8 +521,38 @@ const DPOTHRReceiving = () => {
                       </Dropdown>
                     </Col>
 
+                    <Col md={2}>
+                      <Dropdown>
+                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                          {filters.food_item.length ? `${filters.food_item.length} selected` : "All Food Items"}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
+                          {uniqueFoodItems.map((v) => (
+                            <Dropdown.Item key={v} as="div">
+                              <Form.Check type="checkbox" label={v} checked={filters.food_item.includes(v)} onChange={() => handleMultiSelectChange("food_item", v)} />
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </Col>
+
+                    <Col md={2}>
+                      <Dropdown>
+                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                          {filters.bene_category.length ? `${filters.bene_category.length} selected` : "All Categories"}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
+                          {uniqueBeneCategories.map((v) => (
+                            <Dropdown.Item key={v} as="div">
+                              <Form.Check type="checkbox" label={v} checked={filters.bene_category.includes(v)} onChange={() => handleMultiSelectChange("bene_category", v)} />
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </Col>
+
                     <Col md={2} className="d-flex align-items-end">
-                      <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], month: [], district: [], project: [], sector: [] })}>
+                      <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], quarter: [], district: [], project: [], sector: [], food_item: [], bene_category: [] })}>
                         Clear Filters
                       </Button>
                     </Col>
@@ -552,7 +560,7 @@ const DPOTHRReceiving = () => {
 
                   {filteredReports.length === 0 ? (
                     <div className="text-center py-4 text-muted">
-                      No beneficiary reports found for the selected filters.
+                      No THR receiving reports found for the selected filters.
                     </div>
                   ) : (
                     <Card className="shadow-sm">
@@ -571,7 +579,7 @@ const DPOTHRReceiving = () => {
                                 {visibleColumns.map((col) => (
                                   <td key={col.dataField}>
                                     {col.dataField === "#"
-                                      ? (currentPage - 1) * itemsPerPage + index + 1
+                                      ? (currentPage - 1) * itemsPerPage + index + 1 : col.dataField === "date" ? new Date(report[col.dataField]).toLocaleDateString()
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
                                       ? new Date(report[col.dataField]).toLocaleString()
                                       : report[col.dataField]}
