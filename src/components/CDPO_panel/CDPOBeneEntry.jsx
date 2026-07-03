@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Container,
   Alert,
@@ -8,13 +8,21 @@ import {
   Row,
   Col,
   Pagination,
-  Form,
+  Dropdown,
+  Tabs,
   Button,
+  Modal,
+  Form,
+  Tab, // <-- THIS WAS MISSING
 } from "react-bootstrap";
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
 import { useAuth } from "../all_login/AuthContext";
+import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import * as XLSX from "xlsx";
 
 const CDPOBeneEntry = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -28,8 +36,44 @@ const CDPOBeneEntry = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [filterDate, setFilterDate] = useState("");
+  const [itemsPerPage] = useState(20);
+  const tableRef = useRef(null);
+
+  const [filters, setFilters] = useState({
+    fin_year: [],
+    month: [],
+    district: [],
+    project: [],
+    sector: [],
+  });
+
+  const [uniqueFinYears, setUniqueFinYears] = useState([]);
+  const [uniqueMonths, setUniqueMonths] = useState([]);
+  const [uniqueDistricts, setUniqueDistricts] = useState([]);
+  const [uniqueProjects, setUniqueProjects] = useState([]);
+  const [uniqueSectors, setUniqueSectors] = useState([]);
+
+  const [columns, setColumns] = useState([
+    { dataField: "#", text: "#", visible: true },
+    { dataField: "awc_name", text: "AWC Name", visible: true },
+    { dataField: "district", text: "District", visible: true },
+    { dataField: "project", text: "Project", visible: true },
+    { dataField: "sector", text: "Sector", visible: true },
+    { dataField: "fin_year", text: "Fin. Year", visible: true },
+    { dataField: "month", text: "Month", visible: true },
+    { dataField: "pw_lm", text: "PW & LM", visible: true },
+    { dataField: "children_6m_3y", text: "Child (6m-3y)", visible: true },
+    { dataField: "children_3_6y", text: "Child (3-6y)", visible: true },
+    { dataField: "adolescent_girls", text: "Adol. Girls", visible: true },
+    { dataField: "sam_6m_3y", text: "SAM (6m-3y)", visible: true },
+    { dataField: "sam_3_5y", text: "SAM (3-5y)", visible: true },
+    { dataField: "suw_6m_3y", text: "SUW (6m-3y)", visible: true },
+    { dataField: "suw_3_6y", text: "SUW (3-6y)", visible: true },
+    { dataField: "sector_status", text: "Sector Status", visible: true },
+    { dataField: "sector_remark", text: "Sector Remark", visible: true },
+   
+  ]);
+  const [showColumnModal, setShowColumnModal] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -47,53 +91,228 @@ const CDPOBeneEntry = () => {
     };
   }, []);
 
-  const fetchBeneficiarySummary = useCallback(
-    async (page) => {
-      setLoading(true);
-      setError("");
-      try {
-        const params = new URLSearchParams({ page });
-        if (filterDate) {
-          params.append("created_at", filterDate);
-        }
-        const response = await api.get(`/cdpo/beneficiary-summary/?${params.toString()}`);
-        const results = response.data.results;
+  useEffect(() => {
+    if (reports.length > 0) {
+      setUniqueFinYears([...new Set(reports.map((item) => item.fin_year))]);
+      setUniqueMonths([...new Set(reports.map((item) => item.month))]);
+      setUniqueDistricts([...new Set(reports.map((item) => item.district))]);
+      setUniqueProjects([...new Set(reports.map((item) => item.project))]);
+      setUniqueSectors([...new Set(reports.map((item) => item.sector))]);
+    }
+  }, [reports]);
 
-        if (results && results.success) {
-          setSummaryData({
-            project: results.project,
-            project_total: results.project_total,
-            sector_summary: results.sector_summary,
-          });
-          setReports(results.data || []);
-          setTotalPages(Math.ceil(response.data.count / 10)); // Assuming 10 items per page or get from API if available
-        }
-      } catch (err) {
-        setError("Failed to fetch beneficiary summary.");
-        console.error(err);
-      } finally {
-        setLoading(false);
+  const fetchBeneficiarySummary = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await api.get(`/cdpo/beneficiary-summary/`);
+      const results = response.data.results;
+
+      if (results && results.success) {
+        setSummaryData({
+          project: results.project,
+          project_total: results.project_total,
+          sector_summary: results.sector_summary,
+        });
+        setReports(results.data || []);
       }
-    },
-    [api, filterDate]
+    } catch (err) {
+      setError("Failed to fetch beneficiary summary.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    fetchBeneficiarySummary();
+  }, [fetchBeneficiarySummary]);
+
+  const handleMultiSelectChange = (filterName, value) => {
+    setFilters((prevFilters) => {
+      const currentValues = prevFilters[filterName];
+      if (currentValues.includes(value)) {
+        return {
+          ...prevFilters,
+          [filterName]: currentValues.filter((v) => v !== value),
+        };
+      } else {
+        return {
+          ...prevFilters,
+          [filterName]: [...currentValues, value],
+        };
+      }
+    });
+  };
+
+  const filteredReports = useMemo(() => {
+    return reports.filter((item) => {
+      const { fin_year, month, district, project, sector } = filters;
+      return (
+        (fin_year.length === 0 || fin_year.includes(item.fin_year)) &&
+        (month.length === 0 || month.includes(item.month)) &&
+        (district.length === 0 || district.includes(item.district)) &&
+        (project.length === 0 || project.includes(item.project)) &&
+        (sector.length === 0 || sector.includes(item.sector))
+      );
+    });
+  }, [reports, filters]);
+
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+  const currentItems = filteredReports.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   useEffect(() => {
-    fetchBeneficiarySummary(currentPage);
-  }, [fetchBeneficiarySummary, currentPage, filterDate]);
-
-  const handleDateFilterChange = (e) => {
-    setFilterDate(e.target.value);
-    setCurrentPage(1); // Reset to the first page when the filter changes
-  };
-
-  const handleResetFilter = () => {
-    setFilterDate("");
     setCurrentPage(1);
-  };
+  }, [filters]);
 
   const toggleSidebar = () => {
     setSidebarOpen((prev) => !prev);
+  };
+
+  const handlePageChange = (page) => {
+    const newPage = Math.max(1, Math.min(page, totalPages));
+    setCurrentPage(newPage);
+  };
+
+  const handleColumnToggle = (index) => {
+    const newColumns = [...columns];
+    newColumns[index].visible = !newColumns[index].visible;
+    setColumns(newColumns);
+  };
+
+  const visibleColumns = columns.filter((c) => c.visible);
+
+  const exportToPDF = () => {
+    const input = tableRef.current;
+    if (!input) return;
+    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "pt",
+        format: "a2",
+      });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasWidth / canvasHeight;
+      const width = pdfWidth - 40;
+      const height = width / ratio;
+      pdf.text("Beneficiary Summary Report", 20, 30);
+      pdf.addImage(
+        imgData,
+        "PNG",
+        20,
+        40,
+        width,
+        height > pdfHeight - 60 ? pdfHeight - 60 : height
+      );
+      pdf.save("beneficiary_summary_report.pdf");
+    });
+  };
+
+  const exportToExcel = () => {
+    const visCols = columns.filter((c) => c.visible && c.dataField !== "#");
+    const dataToExport = filteredReports.map((row, index) => {
+      const newRow = { "#": index + 1 };
+      visCols.forEach((col) => {
+        newRow[col.text] = row[col.dataField];
+      });
+      return newRow;
+    });
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiary Summary");
+    XLSX.writeFile(workbook, "beneficiary_summary.xlsx");
+  };
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const items = [];
+    const maxPagesToShow = 3;
+    const startPage = Math.max(2, currentPage - 1);
+    const endPage = Math.min(totalPages - 1, currentPage + 1);
+
+    items.push(
+      <Pagination.First
+        key="first"
+        onClick={() => handlePageChange(1)}
+        disabled={currentPage === 1}
+      />
+    );
+    items.push(
+      <Pagination.Prev
+        key="prev"
+        onClick={() => handlePageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+      />
+    );
+
+    items.push(
+      <Pagination.Item
+        key={1}
+        active={1 === currentPage}
+        onClick={() => handlePageChange(1)}
+      >
+        {1}
+      </Pagination.Item>
+    );
+
+    if (startPage > 2) {
+      items.push(<Pagination.Ellipsis key="start-ellipsis" />);
+    }
+
+    for (let number = startPage; number <= endPage; number++) {
+      if (number > 1 && number < totalPages) {
+        items.push(
+          <Pagination.Item
+            key={number}
+            active={number === currentPage}
+            onClick={() => handlePageChange(number)}
+          >
+            {number}
+          </Pagination.Item>
+        );
+      }
+    }
+
+    if (endPage < totalPages - 1) {
+      items.push(<Pagination.Ellipsis key="end-ellipsis" />);
+    }
+
+    if (totalPages > 1) {
+      items.push(
+        <Pagination.Item
+          key={totalPages}
+          active={totalPages === currentPage}
+          onClick={() => handlePageChange(totalPages)}
+        >
+          {totalPages}
+        </Pagination.Item>
+      );
+    }
+
+    items.push(
+      <Pagination.Next
+        key="next"
+        onClick={() => handlePageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+      />
+    );
+    items.push(
+      <Pagination.Last
+        key="last"
+        onClick={() => handlePageChange(totalPages)}
+        disabled={currentPage === totalPages}
+      />
+    );
+
+    return <Pagination className="justify-content-center mt-3">{items}</Pagination>;
   };
 
   return (
@@ -118,180 +337,368 @@ const CDPOBeneEntry = () => {
           <div className="dashboard-section">
             <h4 className="section-title">लाभार्थी सारांश</h4>
 
-            <Card className="mb-4">
-              <Card.Header>फ़िल्टर</Card.Header>
-              <Card.Body>
-                <Row className="align-items-end">
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>निर्माण तिथि के अनुसार फ़िल्टर करें</Form.Label>
-                      <Form.Control type="date" value={filterDate} onChange={handleDateFilterChange} />
-                    </Form.Group>
-                  </Col>
-                  <Col md={4}>
-                    <Form.Group>
-                      <Button variant="secondary" onClick={handleResetFilter}>रीसेट</Button>
-                    </Form.Group>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
-
             {loading ? (
               <div className="text-center">
                 <Spinner animation="border" />
               </div>
+            ) : error ? (
+              <Alert variant="danger">{error}</Alert>
             ) : summaryData ? (
-              <>
-                <Row>
-                  <Col md={12}>
-                    <Card className="mb-4">
-                      <Card.Header as="h5">
-                        Project Total: {summaryData.project}
-                      </Card.Header>
-                      <Card.Body>
-                        <Table striped bordered hover responsive>
-                          <thead>
-                            <tr>
-                              <th>PW & LM</th>
-                              <th>Child (6m-3y)</th>
-                              <th>Child (3-6y)</th>
-                              <th>Adol. Girls</th>
-                              <th>SAM (6m-3y)</th>
-                              <th>SAM (3-5y)</th>
-                              <th>SUW (6m-3y)</th>
-                              <th>SUW (3-6y)</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr>
-                              <td>{summaryData.project_total.total_pw_lm}</td>
-                              <td>
-                                {summaryData.project_total.total_children_6m_3y}
-                              </td>
-                              <td>
-                                {summaryData.project_total.total_children_3_6y}
-                              </td>
-                              <td>
-                                {summaryData.project_total.total_adolescent_girls}
-                              </td>
-                              <td>
-                                {summaryData.project_total.total_sam_6m_3y}
-                              </td>
-                              <td>{summaryData.project_total.total_sam_3_5y}</td>
-                              <td>
-                                {summaryData.project_total.total_suw_6m_3y}
-                              </td>
-                              <td>{summaryData.project_total.total_suw_3_6y}</td>
-                            </tr>
-                          </tbody>
-                        </Table>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                </Row>
+              <Tabs
+                defaultActiveKey="awc_report"
+                id="beneficiary-summary-tabs"
+                className="mb-3"
+              >
+                <Tab eventKey="project_total" title="Project Total">
+                  <Card className="mb-4">
+                   
+                      Project Total: {summaryData.project}
+                   
+                  
+                      <Table striped bordered hover responsive>
+                        <thead>
+                          <tr>
+                            <th>PW & LM</th>
+                            <th>Child (6m-3y)</th>
+                            <th>Child (3-6y)</th>
+                            <th>Adol. Girls</th>
+                            <th>SAM (6m-3y)</th>
+                            <th>SAM (3-5y)</th>
+                            <th>SUW (6m-3y)</th>
+                            <th>SUW (3-6y)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>{summaryData.project_total.total_pw_lm}</td>
+                            <td>
+                              {summaryData.project_total.total_children_6m_3y}
+                            </td>
+                            <td>
+                              {summaryData.project_total.total_children_3_6y}
+                            </td>
+                            <td>
+                              {
+                                summaryData.project_total
+                                  .total_adolescent_girls
+                              }
+                            </td>
+                            <td>
+                              {summaryData.project_total.total_sam_6m_3y}
+                            </td>
+                            <td>
+                              {summaryData.project_total.total_sam_3_5y}
+                            </td>
+                            <td>
+                              {summaryData.project_total.total_suw_6m_3y}
+                            </td>
+                            <td>
+                              {summaryData.project_total.total_suw_3_6y}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </Table>
+                  
+                  </Card>
+                </Tab>
 
-                <h5 className="mt-4">सेक्टर-वार सारांश (कुल)</h5>
-                <Table striped bordered hover responsive className="mb-4">
-                  <thead>
-                    <tr>
-                      <th>Sector</th>
-                      <th>PW & LM</th>
-                      <th>Child (6m-3y)</th>
-                      <th>Child (3-6y)</th>
-                      <th>Adol. Girls</th>
-                      <th>SAM (6m-3y)</th>
-                      <th>SAM (3-5y)</th>
-                      <th>SUW (6m-3y)</th>
-                      <th>SUW (3-6y)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summaryData.sector_summary.map((sector) => (
-                      <tr key={sector.sector}>
-                        <td>{sector.sector}</td>
-                        <td>{sector.total_pw_lm}</td>
-                        <td>{sector.total_children_6m_3y}</td>
-                        <td>{sector.total_children_3_6y}</td>
-                        <td>{sector.total_adolescent_girls}</td>
-                        <td>{sector.total_sam_6m_3y}</td>
-                        <td>{sector.total_sam_3_5y}</td>
-                        <td>{sector.total_suw_6m_3y}</td>
-                        <td>{sector.total_suw_3_6y}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-
-                <h5 className="mt-4">AWC से लाभार्थी रिपोर्ट</h5>
-                {reports.length > 0 ? (
-                  <Table striped bordered hover responsive>
-                    {/* Table for reports.data can be added here if needed */}
+                <Tab eventKey="sector_summary" title="Sector Summary">
+                  <h5 className="mt-4">सेक्टर-वार सारांश (कुल)</h5>
+                  <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
-                        <th>#</th>
-                        <th>AWC का नाम</th>
-                        <th>जिला</th>
-                        <th>परियोजना</th>
-                        <th>सेक्टर</th>
-                        <th>वित्तीय वर्ष</th>
-                        <th>महीना</th>
+                        <th>Sector</th>
                         <th>PW & LM</th>
-                        <th>बच्चे (6m-3y)</th>
-                        <th>बच्चे (3-6y)</th>
-                        <th>किशोरी लड़कियां</th>
+                        <th>Child (6m-3y)</th>
+                        <th>Child (3-6y)</th>
+                        <th>Adol. Girls</th>
                         <th>SAM (6m-3y)</th>
                         <th>SAM (3-5y)</th>
                         <th>SUW (6m-3y)</th>
                         <th>SUW (3-6y)</th>
-                        <th>सेक्टर स्थिति</th>
-                        <th>सेक्टर टिप्पणी</th>
-                        <th>बनाया गया</th>
-                        <th>अद्यतन किया गया</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {reports.map((report, index) => (
-                        <tr key={report.id}>
-                          <td>{(currentPage - 1) * 10 + index + 1}</td>
-                          <td>{report.awc_name}</td>
-                          <td>{report.district}</td>
-                          <td>{report.project}</td>
-                          <td>{report.sector}</td>
-                          <td>{report.fin_year}</td>
-                          <td>{report.month}</td>
-                          <td>{report.pw_lm}</td>
-                          <td>{report.children_6m_3y}</td>
-                          <td>{report.children_3_6y}</td>
-                          <td>{report.adolescent_girls}</td>
-                          <td>{report.sam_6m_3y}</td>
-                          <td>{report.sam_3_5y}</td>
-                          <td>{report.suw_6m_3y}</td>
-                          <td>{report.suw_3_6y}</td>
-                          <td>{report.sector_status}</td>
-                          <td>{report.sector_remark}</td>
-                          <td>{new Date(report.created_at).toLocaleString()}</td>
-                          <td>{new Date(report.updated_at).toLocaleString()}</td>
+                      {summaryData.sector_summary.map((sector) => (
+                        <tr key={sector.sector}>
+                          <td>{sector.sector}</td>
+                          <td>{sector.total_pw_lm}</td>
+                          <td>{sector.total_children_6m_3y}</td>
+                          <td>{sector.total_children_3_6y}</td>
+                          <td>{sector.total_adolescent_girls}</td>
+                          <td>{sector.total_sam_6m_3y}</td>
+                          <td>{sector.total_sam_3_5y}</td>
+                          <td>{sector.total_suw_6m_3y}</td>
+                          <td>{sector.total_suw_3_6y}</td>
                         </tr>
                       ))}
                     </tbody>
                   </Table>
-                ) : (
-                  <Alert variant="info">No detailed reports found.</Alert>
-                )}
-                {totalPages > 1 && (
-                  <Pagination className="justify-content-center">
-                    {[...Array(totalPages).keys()].map(number => (
-                      <Pagination.Item key={number + 1} active={number + 1 === currentPage} onClick={() => setCurrentPage(number + 1)}>{number + 1}</Pagination.Item>
-                    ))}
-                  </Pagination>
-                )}
-              </>
-            ) : (
-              !error && <p>No summary data available.</p>
-            )}
+                </Tab>
+
+                <Tab eventKey="awc_report" title="AWC Report">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h5 className="mb-0">AWC Beneficiary Report</h5>
+                    <div>
+                      <Button
+                        variant="outline-danger"
+                        size="sm"
+                        onClick={exportToPDF}
+                        className="me-2"
+                      >
+                        <FaFilePdf className="me-1" /> Export PDF
+                      </Button>
+                      <Button
+                        variant="outline-success"
+                        size="sm"
+                        onClick={exportToExcel}
+                        className="me-2"
+                      >
+                        <FaFileExcel className="me-1" /> Export Excel
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => setShowColumnModal(true)}
+                      >
+                        <FaEye className="me-1" /> Column Visibility
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Row className="mb-3 g-3">
+                    <Col md={2}>
+                      <Dropdown>
+                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                          {filters.fin_year.length
+                            ? `${filters.fin_year.length} selected`
+                            : "All Fin. Years"}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu
+                          style={{ maxHeight: "200px", overflowY: "auto" }}
+                        >
+                          {uniqueFinYears.map((v) => (
+                            <Dropdown.Item key={v} as="div">
+                              <Form.Check
+                                type="checkbox"
+                                label={v}
+                                checked={filters.fin_year.includes(v)}
+                                onChange={() =>
+                                  handleMultiSelectChange("fin_year", v)
+                                }
+                              />
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </Col>
+
+                    <Col md={2}>
+                      <Dropdown>
+                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                          {filters.month.length
+                            ? `${filters.month.length} selected`
+                            : "All Months"}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu
+                          style={{ maxHeight: "200px", overflowY: "auto" }}
+                        >
+                          {uniqueMonths.map((v) => (
+                            <Dropdown.Item key={v} as="div">
+                              <Form.Check
+                                type="checkbox"
+                                label={v}
+                                checked={filters.month.includes(v)}
+                                onChange={() =>
+                                  handleMultiSelectChange("month", v)
+                                }
+                              />
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </Col>
+
+                    <Col md={2}>
+                      <Dropdown>
+                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                          {filters.district.length
+                            ? `${filters.district.length} selected`
+                            : "All Districts"}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu
+                          style={{ maxHeight: "200px", overflowY: "auto" }}
+                        >
+                          {uniqueDistricts.map((v) => (
+                            <Dropdown.Item key={v} as="div">
+                              <Form.Check
+                                type="checkbox"
+                                label={v}
+                                checked={filters.district.includes(v)}
+                                onChange={() =>
+                                  handleMultiSelectChange("district", v)
+                                }
+                              />
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </Col>
+
+                    <Col md={2}>
+                      <Dropdown>
+                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                          {filters.project.length
+                            ? `${filters.project.length} selected`
+                            : "All Projects"}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu
+                          style={{ maxHeight: "200px", overflowY: "auto" }}
+                        >
+                          {uniqueProjects.map((v) => (
+                            <Dropdown.Item key={v} as="div">
+                              <Form.Check
+                                type="checkbox"
+                                label={v}
+                                checked={filters.project.includes(v)}
+                                onChange={() =>
+                                  handleMultiSelectChange("project", v)
+                                }
+                              />
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </Col>
+
+                    <Col md={2}>
+                      <Dropdown>
+                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                          {filters.sector.length
+                            ? `${filters.sector.length} selected`
+                            : "All Sectors"}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu
+                          style={{ maxHeight: "200px", overflowY: "auto" }}
+                        >
+                          {uniqueSectors.map((v) => (
+                            <Dropdown.Item key={v} as="div">
+                              <Form.Check
+                                type="checkbox"
+                                label={v}
+                                checked={filters.sector.includes(v)}
+                                onChange={() =>
+                                  handleMultiSelectChange("sector", v)
+                                }
+                              />
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </Col>
+
+                    <Col
+                      md={2}
+                      className="d-flex align-items-end"
+                    >
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() =>
+                          setFilters({
+                            fin_year: [],
+                            month: [],
+                            district: [],
+                            project: [],
+                            sector: [],
+                          })
+                        }
+                      >
+                        Clear Filters
+                      </Button>
+                    </Col>
+                  </Row>
+
+                  {filteredReports.length === 0 ? (
+                    <div className="text-center py-4 text-muted">
+                      No beneficiary reports found for the selected filters.
+                    </div>
+                  ) : (
+                    <Card className="shadow-sm">
+                      <div className="table-responsive">
+                        <Table
+                          striped
+                          bordered
+                          hover
+                          responsive
+                          className="mb-0"
+                          ref={tableRef}
+                        >
+                          <thead>
+                            <tr>
+                              {visibleColumns.map((col) => (
+                                <th key={col.dataField}>{col.text}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentItems.map((report, index) => (
+                              <tr key={report.id}>
+                                {visibleColumns.map((col) => (
+                                  <td key={col.dataField}>
+                                    {col.dataField === "#"
+                                      ? (currentPage - 1) * itemsPerPage +
+                                        index +
+                                        1
+                                      : col.dataField === "created_at" ||
+                                        col.dataField === "updated_at"
+                                      ? new Date(
+                                          report[col.dataField]
+                                        ).toLocaleString()
+                                      : report[col.dataField]}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </Table>
+                        {renderPagination()}
+                      </div>
+                    </Card>
+                  )}
+                </Tab>
+              </Tabs>
+            ) : null}
           </div>
         </Container>
+
+        <Modal
+          show={showColumnModal}
+          onHide={() => setShowColumnModal(false)}
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Show/Hide Columns</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {columns.map((col, index) => (
+              <Form.Check
+                key={index}
+                type="checkbox"
+                label={col.text}
+                checked={col.visible}
+                onChange={() => handleColumnToggle(index)}
+              />
+            ))}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => setShowColumnModal(false)}
+            >
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
       </div>
     </div>
   );
