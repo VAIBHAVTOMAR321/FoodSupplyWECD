@@ -352,7 +352,15 @@ const THRDirectorReport = () => {
             <>
               <Table striped bordered hover responsive className="bg-white" ref={tableRef} style={{ border: '1px solid #dee2e6' }}>
                 <thead>
-                  <tr>{columns.map((col, index) => col.visible && <th key={index}>{col.text}</th>)}</tr>
+                  <tr>
+                    {columns.map((col, index) => col.visible && (
+                      <th key={index}>
+                        {col.dataField === 'bene_category' ? (
+                          <div className="bene-category-cell" style={{ width: '150px' }}>{col.text}</div>
+                        ) : col.text}
+                      </th>
+                    ))}
+                  </tr>
                 </thead>
                 <tbody>
                   {currentItems.length > 0 ? currentItems.map((row, index) => (
@@ -363,6 +371,13 @@ const THRDirectorReport = () => {
                         switch (col.dataField) {
                           case '#':
                             cellContent = indexOfFirstItem + index + 1;
+                            break;
+                          case 'bene_category':
+                            cellContent = (
+                              <div className="bene-category-cell" style={{ width: '150px' }}>
+                                {row[col.dataField]}
+                              </div>
+                            );
                             break;
                           case 'sector_status':
                           case 'cdpo_status':
