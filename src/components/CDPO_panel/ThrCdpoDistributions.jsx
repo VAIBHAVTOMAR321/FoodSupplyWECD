@@ -566,7 +566,13 @@ const ThrCdpoDistributions = () => {
                   >
                      <thead>
                        <tr>
-                         {visibleColumns.map((col) => <th key={`th-${col.dataField}`}>{col.text}</th>)}
+                         {visibleColumns.map((col) => (
+                           <th key={`th-${col.dataField}`}>
+                             {col.dataField === 'bene_category' ? (
+                               <div className="bene-category-cell" style={{ width: '150px' }}>{col.text}</div>
+                             ) : col.text}
+                           </th>
+                         ))}
                        </tr>
                      </thead>
                       <tbody>
@@ -579,6 +585,13 @@ const ThrCdpoDistributions = () => {
                                     case '#':
                                       cellContent = index + 1;
                                       break;
+                                   case 'bene_category':
+                                     cellContent = (
+                                       <div className="bene-category-cell" style={{ width: '150px' }}>
+                                         {row[col.dataField] || ''}
+                                       </div>
+                                     );
+                                     break;
                                     case 'cdpo_status':
                                     case 'dpo_status':
                                     case 'sector_status':

@@ -270,7 +270,7 @@ const HCMDirectorReport = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
-            <Col md={2}>
+            <Col md={2} className="mt-2">
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category-hcm" className="w-100">
                   {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
