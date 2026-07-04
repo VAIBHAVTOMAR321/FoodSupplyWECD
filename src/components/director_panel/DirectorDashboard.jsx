@@ -321,7 +321,7 @@ const DirectorDashboard = () => {
                   </Card.Body>
                 </Card>
               </Col>
-              <Col md={4} className="d-flex">
+              <Col md={4}>
                 <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-receiving')}>
                   <Card.Body>
                     <div className="d-flex align-items-center">
@@ -346,7 +346,7 @@ const DirectorDashboard = () => {
                   </div>
                 </Collapse>
               </Col>
-              <Col md={4} className="d-flex">
+              <Col md={4}>
                 <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-quantity')}>
                   <Card.Body>
                     <div className="d-flex align-items-center">
@@ -389,7 +389,7 @@ const DirectorDashboard = () => {
                   </Card.Body>
                 </Card>
               </Col>
-              <Col md={4} className="d-flex">
+              <Col md={4} >
                 <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-receiving')}>
                   <Card.Body>
                     <div className="d-flex align-items-center">
@@ -414,7 +414,7 @@ const DirectorDashboard = () => {
                   </div>
                 </Collapse>
               </Col>
-              <Col md={4} className="d-flex">
+              <Col md={4} >
                 <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-quantity')}>
                   <Card.Body>
                     <div className="d-flex align-items-center">
