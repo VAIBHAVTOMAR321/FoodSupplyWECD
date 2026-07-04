@@ -142,7 +142,6 @@ const FoodItemReceiving = () => {
 
   const handleOpenModal = (item = null) => {
     setEditingItem(item);
-    const isThr = activeTab === 'thr';
     setFormData(item ? {
       ...item,
       date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
@@ -151,7 +150,7 @@ const FoodItemReceiving = () => {
       quantity: '',
       bene_category: '',
       date: new Date().toISOString().split('T')[0],
-      fin_year: isThr ? getCurrentFinancialYear() : '',
+      fin_year: getCurrentFinancialYear(),
       quarter: '',
     });
     setFormError('');
@@ -165,7 +164,19 @@ const FoodItemReceiving = () => {
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'food_item') {
+      const foodItemsList = activeTab === 'hcm' ? hcmFoodItems : thrFoodItems;
+      const selectedFoodItem = foodItemsList.find(item => item.food_item === value);
+      if (selectedFoodItem) {
+        setFormData(prev => ({
+          ...prev,
+          food_item: value,
+          bene_category: selectedFoodItem.bene_category,
+        }));
+      }
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -222,18 +233,18 @@ const FoodItemReceiving = () => {
   };
 
   const renderTable = (records) => {
-    const isThr = activeTab === 'thr';
     return (
       <Table striped bordered hover responsive className="mt-4">
         <thead>
           <tr>
             <th>#</th>
-            <th>Food Item</th>
-            <th>Quantity</th>
-            <th>Beneficiary Category</th>
-            <th>Unit</th>
             <th>Date</th>
-            {isThr && <><th>Fin. Year</th><th>Quarter</th></>}
+            <th>Food Item</th>
+            <th>Beneficiary Category</th>
+            <th>Quantity</th>
+            <th>Unit</th>
+            <th>Fin. Year</th>
+            <th>Quarter</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -241,12 +252,13 @@ const FoodItemReceiving = () => {
           {records.length > 0 ? records.map((rec, index) => (
             <tr key={rec.id}>
               <td>{index + 1}</td>
-              <td>{rec.food_item}</td>
-              <td>{rec.quantity}</td>
-              <td>{rec.bene_category}</td>
-              <td>{rec.unit}</td>
               <td>{new Date(rec.date).toLocaleDateString()}</td>
-              {isThr && <><td>{rec.fin_year}</td><td>{rec.quarter}</td></>}
+              <td>{rec.food_item}</td>
+              <td>{rec.bene_category}</td>
+              <td>{rec.quantity}</td>
+              <td>{rec.unit}</td>
+              <td>{rec.fin_year}</td>
+              <td>{rec.quarter}</td>
               <td>
                 <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenModal(rec)}>
                   <FaEdit />
@@ -258,7 +270,7 @@ const FoodItemReceiving = () => {
             </tr>
           )) : (
             <tr>
-              <td colSpan={isThr ? "9" : "7"} className="text-center">No records found.</td>
+              <td colSpan="9" className="text-center">No records found.</td>
             </tr>
           )}
         </tbody>
@@ -393,9 +405,12 @@ const FoodItemReceiving = () => {
                       required
                     >
                       <option value="">Select Food Item</option>
-                      {(activeTab === 'hcm' ? hcmFoodItems : thrFoodItems).map(item => (
-                        <option key={item.id} value={item.food_item}>{item.food_item}</option>
-                      ))}
+                      {(activeTab === 'hcm' ? hcmFoodItems : thrFoodItems).map(item => [
+                        <option key={item.id} value={item.food_item} style={{ fontWeight: 'bold' }}>
+                          {item.food_item}
+                        </option>,
+                        <option key={`${item.id}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>&nbsp;&nbsp;↳ Category: {item.bene_category}</option>
+                      ])}
                     </Form.Select>
                   </Form.Group>
                 </Col>
@@ -417,15 +432,7 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col>
                   <Form.Group className="mb-3">
-                    <Form.Label>Beneficiary Category</Form.Label>
-                    <Form.Select name="bene_category" value={formData.bene_category || ''} onChange={handleFormChange} required>
-                      <option value="">Select Category</option>
-                      {beneficiaryCategories.map(cat => (
-                        <option key={cat.id} value={cat.category_name}>
-                          {cat.category_name}
-                        </option>
-                      ))}
-                    </Form.Select>
+                    <Form.Label>Beneficiary Category</Form.Label><Form.Control type="text" name="bene_category" value={formData.bene_category || ''} readOnly disabled />
                   </Form.Group>
                 </Col>
               </Row>
@@ -442,7 +449,7 @@ const FoodItemReceiving = () => {
                     />
                   </Form.Group>
                 </Col>
-                {activeTab === 'thr' && (
+                
                   <>
                     <Col md={6}>
                       <Form.Group className="mb-3">
@@ -474,7 +481,7 @@ const FoodItemReceiving = () => {
                       </Form.Group>
                     </Col>
                   </>
-                )}
+                
               </Row>
 
               <div className="d-flex justify-content-end">
