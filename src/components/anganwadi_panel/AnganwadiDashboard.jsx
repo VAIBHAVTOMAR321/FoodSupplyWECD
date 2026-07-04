@@ -59,6 +59,7 @@ const AnganwadiDashboard = () => {
   const [beneficiaryCount, setBeneficiaryCount] = useState(null);
   const [beneficiaryCountLoading, setBeneficiaryCountLoading] = useState(false);
   const [isRegistrationAvailable, setIsRegistrationAvailable] = useState(true); // New state for submit button
+  const [isRegistrationApproved, setIsRegistrationApproved] = useState(true);
   const [selectedFoodItem, setSelectedFoodItem] = useState(null);
 
   const { user, api, uniqueId } = useAuth();
@@ -148,6 +149,7 @@ const AnganwadiDashboard = () => {
     setBeneficiaryCount(null);
     setDistributionError('');
     setIsRegistrationAvailable(false); // Assume not available until verified
+    setIsRegistrationApproved(false);
     setBeneficiaryCountLoading(true);
 
     const currentFoodItem = foodItems.find(fi => fi.id === parseInt(foodItemId, 10));
@@ -170,6 +172,12 @@ const AnganwadiDashboard = () => {
       if (registrationData && registrationData.length > 0) {
         const registration = registrationData.find(r => r.fin_year === fin_year && r.month === month);
         if (registration) {
+          if (registration.sector_status !== 'approved') {
+            setDistributionError("लाभार्थी प्रविष्टि आपके संबंधित पर्यवेक्षक द्वारा अनुमोदित नहीं है।");
+            setIsRegistrationApproved(false);
+          } else {
+            setIsRegistrationApproved(true);
+          }
           const categoryKey = beneCategoryMap[currentFoodItem.bene_category];
           
           if (categoryKey && registration.hasOwnProperty(categoryKey)) {
@@ -214,6 +222,7 @@ const AnganwadiDashboard = () => {
     setBeneficiaryCount(null);
     setDistributionError('');
     setIsRegistrationAvailable(false);
+    setIsRegistrationApproved(false);
     setBeneficiaryCountLoading(true);
 
     const currentFoodItem = foodItems.find(fi => fi.id === parseInt(foodItemId, 10));
@@ -248,11 +257,18 @@ const AnganwadiDashboard = () => {
 
       for (const month of months) {
         // Find the registration for the specific month from the fetched data
-        const registration = allYearRegistrations.find(r => r.month === month);
+        const registration = allYearRegistrations.find(r => r.month === month && r.fin_year === fin_year);
 
         // If a registration exists for the month and has the relevant category
         if (registration && categoryKey && Object.prototype.hasOwnProperty.call(registration, categoryKey)) {
           atLeastOneMonthRegistered = true;
+          // If any month in the quarter is not approved, block the submission.
+          if (registration.sector_status !== 'approved') {
+            setDistributionError(`माह ${month} के लिए लाभार्थी प्रविष्टि आपके संबंधित पर्यवेक्षक द्वारा अनुमोदित नहीं है।`);
+            setIsRegistrationApproved(false);
+            // We can break here as one unapproved month is enough to block.
+            break;
+          }
           totalBeneficiaries += registration[categoryKey] || 0;
         }
       }
@@ -262,6 +278,9 @@ const AnganwadiDashboard = () => {
         setIsRegistrationAvailable(totalBeneficiaries > 0);
         if (totalBeneficiaries === 0) {
           setDistributionError(`चयनित तिमाही में "${currentFoodItem.bene_category}" के लिए कोई लाभार्थी पंजीकृत नहीं है।`);
+        }
+        if (isRegistrationApproved === undefined || isRegistrationApproved) {
+          setIsRegistrationApproved(atLeastOneMonthRegistered);
         }
       } else {
         setDistributionError(`${quarter} तिमाही में सभी महीनों के लिए लाभार्थी पंजीकरण गायब है।`);
@@ -338,6 +357,7 @@ const AnganwadiDashboard = () => {
     setDistributionError('');
     setBeneficiaryCount(null); // Explicitly clear beneficiary count on modal open
     setIsRegistrationAvailable(true);
+    setIsRegistrationApproved(true);
     setShowDistributionModal(true);
   };
 
@@ -346,6 +366,7 @@ const AnganwadiDashboard = () => {
     setSelectedItem(null);
     setBeneficiaryCount(null);
     setSelectedFoodItem(null);
+    setIsRegistrationApproved(true);
     setIsRegistrationAvailable(true); // Reset on close
   };
 
@@ -415,6 +436,13 @@ const AnganwadiDashboard = () => {
       // Also check if registration is missing for the selected date
       if (!isRegistrationAvailable) {
         setDistributionError(`सबमिट नहीं किया जा सकता क्योंकि चयनित अवधि के लिए कोई लाभार्थी पंजीकरण नहीं मिला।`);
+        setSubmitting(false);
+        return;
+      }
+
+      // Also check for approval
+      if (!isRegistrationApproved) {
+        setDistributionError("सबमिट नहीं किया जा सकता क्योंकि लाभार्थी प्रविष्टि आपके संबंधित पर्यवेक्षक द्वारा अनुमोदित नहीं है।");
         setSubmitting(false);
         return;
       }
@@ -815,7 +843,7 @@ const AnganwadiDashboard = () => {
                     <Button 
                       variant="primary" 
                       type="submit" 
-                      disabled={submitting || !isRegistrationAvailable || beneficiaryCount === 0 || (beneficiaryCount !== null && distributionData.total_beneficiaries && parseInt(distributionData.total_beneficiaries, 10) > beneficiaryCount)}
+                      disabled={submitting || !isRegistrationAvailable || !isRegistrationApproved || beneficiaryCount === 0 || (beneficiaryCount !== null && distributionData.total_beneficiaries && parseInt(distributionData.total_beneficiaries, 10) > beneficiaryCount)}
                     >
                       {submitting ? <Spinner as="span" animation="border" size="sm" /> : (selectedItem.isEdit ? 'Update' : 'Submit')}
                     </Button>
