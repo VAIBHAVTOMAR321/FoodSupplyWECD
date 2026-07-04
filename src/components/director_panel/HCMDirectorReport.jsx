@@ -49,7 +49,6 @@ const HCMDirectorReport = () => {
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'date', text: 'Date', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
-    { dataField: 'bene_in_ang', text: 'Beneficiaries in AWC', visible: true },
     { dataField: 'quantity', text: 'Quantity', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
   ];
@@ -133,10 +132,9 @@ const HCMDirectorReport = () => {
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
         acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-        acc.bene_in_ang += Number(item.bene_in_ang) || 0;
         acc.quantity += parseFloat(item.quantity) || 0;
         return acc;
-    }, { beneficiaries: 0, bene_in_ang: 0, quantity: 0 });
+    }, { beneficiaries: 0, quantity: 0 });
   }, [filteredData]);
 
   const exportToPDF = () => {
@@ -185,7 +183,6 @@ const HCMDirectorReport = () => {
     const totalRow = { '#': 'Total' };
     visibleColumns.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'bene_in_ang') totalRow[col.text] = totals.bene_in_ang;
       else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
       else if (col.text !== '#') totalRow[col.text] = '';
     });
@@ -285,14 +282,35 @@ const HCMDirectorReport = () => {
           {loading ? <div className="text-center"><Spinner animation="border" /></div> : error ? <Alert variant="danger">{error}</Alert> : (
             <>
               <Table striped bordered hover responsive className="bg-white" ref={tableRef} style={{ border: '1px solid #dee2e6' }}>
-                <thead><tr>{columns.map((col, index) => col.visible && <th key={index}>{col.text}</th>)}</tr></thead>
+                <thead>
+                  <tr>
+                    {columns.map((col, index) => col.visible && (
+                      <th key={index}>
+                        {col.dataField === 'food_item' ? (
+                          <div className="food-item-cell" style={{ width: '180px' }}>{col.text}</div>
+                        ) : col.dataField === 'bene_category' ? (
+                          <div className="bene-category-cell" style={{ width: '150px' }}>{col.text}</div>
+                        ) : col.text}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody>
                   {currentItems.length > 0 ? currentItems.map((row, index) => (
                     <tr key={row.id}>
                       {columns.map((col, i) => {
                         if (!col.visible) return null;
-                        let cellContent = col.dataField === '#' ? indexOfFirstItem + index + 1 : row[col.dataField];
-                        return <td key={i}>{cellContent}</td>;
+                        let cellContent;
+                        if (col.dataField === '#') {
+                          cellContent = indexOfFirstItem + index + 1;
+                        } else if (col.dataField === 'food_item') {
+                          cellContent = <div className="food-item-cell" style={{ width: '180px' }}>{row[col.dataField]}</div>;
+                        } else if (col.dataField === 'bene_category') {
+                          cellContent = <div className="bene-category-cell" style={{ width: '150px' }}>{row[col.dataField]}</div>;
+                        } else {
+                          cellContent = row[col.dataField];
+                        }
+                        return <td key={i}>{cellContent}</td>
                       })}
                     </tr>
                   )) : <tr><td colSpan={columns.filter(c => c.visible).length} className="text-center">No data available</td></tr>}
@@ -303,9 +321,6 @@ const HCMDirectorReport = () => {
                     {columns.filter(c => c.visible).slice(columns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')).map(col => {
                       if (col.dataField === 'total_beneficiaries') {
                         return <td key="total_beneficiaries">{totals.beneficiaries}</td>;
-                      }
-                      if (col.dataField === 'bene_in_ang') {
-                        return <td key="total_bene_in_ang">{totals.bene_in_ang}</td>;
                       }
                       if (col.dataField === 'quantity') {
                         return <td key="total_quantity">{totals.quantity.toFixed(2)}</td>;
