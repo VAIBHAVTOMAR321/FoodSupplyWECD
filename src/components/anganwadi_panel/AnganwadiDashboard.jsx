@@ -253,6 +253,7 @@ const AnganwadiDashboard = () => {
 
       let totalBeneficiaries = 0;
       let atLeastOneMonthRegistered = false;
+      let allMonthsApproved = true;
       const categoryKey = beneCategoryMap[currentFoodItem.bene_category];
 
       for (const month of months) {
@@ -264,26 +265,25 @@ const AnganwadiDashboard = () => {
           atLeastOneMonthRegistered = true;
           // If any month in the quarter is not approved, block the submission.
           if (registration.sector_status !== 'approved') {
-            setDistributionError(`माह ${month} के लिए लाभार्थी प्रविष्टि आपके संबंधित पर्यवेक्षक द्वारा अनुमोदित नहीं है।`);
-            setIsRegistrationApproved(false);
+            setDistributionError(`माह ${month} के लिए चयनित तिमाही का रिकॉर्ड पहले से मौजूद है। `);
+            allMonthsApproved = false;
             // We can break here as one unapproved month is enough to block.
             break;
           }
           totalBeneficiaries += registration[categoryKey] || 0;
         }
       }
+      setIsRegistrationApproved(allMonthsApproved);
 
+      
       if (atLeastOneMonthRegistered) {
         setBeneficiaryCount(totalBeneficiaries);
         setIsRegistrationAvailable(totalBeneficiaries > 0);
-        if (totalBeneficiaries === 0) {
+        if (totalBeneficiaries === 0 && allMonthsApproved) {
           setDistributionError(`चयनित तिमाही में "${currentFoodItem.bene_category}" के लिए कोई लाभार्थी पंजीकृत नहीं है।`);
         }
-        if (isRegistrationApproved === undefined || isRegistrationApproved) {
-          setIsRegistrationApproved(atLeastOneMonthRegistered);
-        }
-      } else {
-        setDistributionError(`${quarter} तिमाही में सभी महीनों के लिए लाभार्थी पंजीकरण गायब है।`);
+      } else if (allMonthsApproved) {
+        setDistributionError(`${quarter} तिमाही के लिए अभी तक कोई लाभार्थी पंजीकरण नहीं किया गया है।`);
         setBeneficiaryCount(0);
         setIsRegistrationAvailable(false);
       }
@@ -406,20 +406,19 @@ const AnganwadiDashboard = () => {
     }
 
     // Prevent duplicate entries for THR
-    if (isThr && !selectedItem.isEdit) { // Only check for duplicates on new entries
-      const duplicate = distributionRecords.find(
-        (rec) => {
-          // When editing, selectedItem.id is the distribution record id.
-          // When adding, selectedItem.id is the food item id, so it won't match a distribution record id.
-          const isSameRecord = selectedItem.isEdit && rec.id === selectedItem.id;
-          return !isSameRecord && // Don't compare against itself when editing
-                 rec.food_item === selectedFoodItemDetails.food_item &&
-                 rec.fin_year === distributionData.fin_year &&
-                 rec.quarter === distributionData.quarter;
+    if (isThr) {
+      const duplicate = distributionRecords.find(rec => {
+        // Don't compare the record against itself when editing
+        if (selectedItem.isEdit && rec.id === selectedItem.id) {
+          return false;
         }
-      );
+        return rec.food_item === selectedFoodItemDetails.food_item &&
+               rec.fin_year === distributionData.fin_year &&
+               rec.quarter === distributionData.quarter;
+      });
+
       if (duplicate) {
-        setDistributionError(`${distributionData.fin_year} - ${distributionData.quarter} के लिए एक वितरण पहले से मौजूद है।`);
+        setDistributionError(`"${selectedFoodItemDetails.food_item}" के लिए ${distributionData.fin_year} - ${distributionData.quarter} का वितरण रिकॉर्ड पहले से मौजूद है।`);
         setSubmitting(false);
         return;
       }
