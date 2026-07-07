@@ -20,9 +20,8 @@ const AllRoleResetpassword = () => {
     { key: "cdpo", label: "CDPO", icon: <FaUserShield /> },
     { key: "supervisor", label: "Supervisor", icon: <FaUserTie /> },
     { key: "anganwadi", label: "Anganwadi", icon: <FaHome /> },
-    { key: "it", label: "IT Cell", icon: <FaLaptopCode /> },
   ]);
-  const [selectedRole, setSelectedRole] = useState("");
+  const [selectedRole, setSelectedRole] = useState("dpo");
   const [users, setUsers] = useState([]);
   const [roleCounts, setRoleCounts] = useState({});
 
@@ -59,7 +58,7 @@ const AllRoleResetpassword = () => {
       counts.cdpo = cdpoResponse.data?.data?.length || 0;
 
       // Fetch counts for other roles individually
-      const otherRoles = ["anganwadi", "it"]; // Supervisor is now fetched from a different endpoint
+      const otherRoles = ["anganwadi"]; // Supervisor is now fetched from a different endpoint
       const otherRolePromises = otherRoles.map(async (role) => {
         const response = await api.get(`/list-users-by-role/?role=${role}`);
         counts[role] = response.data?.users?.length || 0;
@@ -244,22 +243,28 @@ const AllRoleResetpassword = () => {
             <h3 className="mb-4 fw-bold"><FaUserShield className="me-2" /> All Role Password Reset</h3>
           </div>
 
-          <p className="text-muted mb-4">Select a role to manage user passwords.</p>
+          
 
           <Row className="g-3 mb-4">
             {roles.map(role => (
-              <Col key={role.key} md={4} lg={2}>
+              <Col key={role.key} md={4} lg={3}>
                 <Card
-                  className={`text-center role-card ${selectedRole === role.key ? 'selected' : ''}`}
+                  className={`role-card-new ${selectedRole === role.key ? 'selected' : ''}`}
                   onClick={() => handleRoleSelect(role.key)}
                 >
-               
-                    <div className="role-icon">{role.icon}</div>
-                    <Card.Title as="h6" className="mt-2 mb-0">{role.label}</Card.Title>
-                    <Card.Text className="text-muted small mt-1">
-                      {loadingCounts ? <Spinner animation="grow" size="sm" variant="secondary" /> : (roleCounts[role.key] !== undefined ? roleCounts[role.key] : 0)}
-                    </Card.Text>
-                  
+                  <Card.Body className="d-flex justify-content-between align-items-center">
+                    <div className="d-flex align-items-center">
+                      <div className="role-icon-wrapper me-3 flex-shrink-0">{role.icon}</div>
+                      <div className="role-details">
+                        <Card.Title as="h6" className="mb-0">{role.label}</Card.Title>
+                      </div>
+                    </div>
+                    <div className="role-count">
+                      {loadingCounts ? <Spinner animation="border" size="sm" variant="secondary" /> : 
+                        <span className="fw-bold">{roleCounts[role.key] !== undefined ? roleCounts[role.key] : 0}</span>
+                      }
+                    </div>
+                  </Card.Body>
                 </Card>
               </Col>
             ))}
