@@ -30,7 +30,8 @@ import {
   FaClock,
   FaFileAlt,
   FaTruckLoading,
-  FaKey
+  FaKey,
+  FaBoxOpen
 } from "react-icons/fa";
 import axios from "axios";
 
