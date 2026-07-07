@@ -10,7 +10,7 @@ import {
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
-
+import "./style.css";
 import Home from './components/pages/Home';
 import { AuthProvider, useAuth } from './components/all_login/AuthContext';
 import SupervisorDashBoard from "./components/supervisor_panel/SupervisorDashBoard";
