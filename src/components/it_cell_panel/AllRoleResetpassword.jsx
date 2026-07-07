@@ -229,7 +229,7 @@ const AllRoleResetpassword = () => {
                     <div className="role-icon">{role.icon}</div>
                     <Card.Title as="h6" className="mt-2 mb-0">{role.label}</Card.Title>
                     <Card.Text className="text-muted small mt-1">
-                      {loadingCounts ? <Spinner animation="grow" size="sm" variant="secondary" /> : `Users: ${roleCounts[role.key] || 0}`}
+                      {loadingCounts ? <Spinner animation="grow" size="sm" variant="secondary" /> : (roleCounts[role.key] !== undefined ? roleCounts[role.key] : 0)}
                     </Card.Text>
                   
                 </Card>
