@@ -11,7 +11,7 @@ import {
   FaBuilding,
   FaImage,
   FaTools,
-  FaComments,
+  FaChartBar,
   FaCube,
   FaProjectDiagram,
   FaServer,
@@ -29,7 +29,7 @@ import {
   FaTasks,
   FaClock,
   FaFileAlt,
-  FaTruck,
+  FaTruckLoading,
   FaKey
 } from "react-icons/fa";
 import axios from "axios";
@@ -89,27 +89,28 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
       },
 
        {
-        icon: <FaCube />,
+        icon: <FaBoxOpen />,
         label: "Food Item",
         path: "/ITCellFoodItem",
         active: true,
       },
     
+      
       {
-    icon: <FaBook />,
+    icon: <FaChartBar />,
     label: "Reports & Distribution",
     path: "#",
     submenu: [
       {
         label: "THR Distribution ",
         path: "/ITCellTHRReport",
-         icon: <FaTruck />,
+         icon: <FaTruckLoading />,
       },
 
        {
         label: "HCM Distribution",
         path: "/ITCellHCMReport",
-         icon: <FaTruck />,
+         icon: <FaTruckLoading />,
       },
     ],
   },   
