@@ -59,7 +59,7 @@ const AllRoleResetpassword = () => {
       counts.cdpo = cdpoResponse.data?.data?.length || 0;
 
       // Fetch counts for other roles individually
-      const otherRoles = ["supervisor", "anganwadi", "it"];
+      const otherRoles = ["anganwadi", "it"]; // Supervisor is now fetched from a different endpoint
       const otherRolePromises = otherRoles.map(async (role) => {
         const response = await api.get(`/list-users-by-role/?role=${role}`);
         counts[role] = response.data?.users?.length || 0;
@@ -67,6 +67,10 @@ const AllRoleResetpassword = () => {
 
       await Promise.all(otherRolePromises);
       setRoleCounts(counts);
+
+      // Fetch count for supervisor
+      const supervisorResponse = await api.get('/director/sectors/');
+      counts.supervisor = supervisorResponse.data?.data?.length || 0;
     } catch (err) {
       console.error("Failed to fetch role counts:", err);
       setRoleCounts({});
@@ -102,6 +106,16 @@ const AllRoleResetpassword = () => {
             const baseUser = { ...user };
             baseUser.name = user.project_name || user.username;
             baseUser.unique_id = user.username; // The username is the unique identifier for reset
+            return baseUser;
+          });
+          setUsers(filteredUsers);
+      } else if (role === 'supervisor') {
+          const response = await api.get('/director/sectors/');
+          const allUsers = response.data?.data || [];
+          const filteredUsers = allUsers.map(user => {
+            const baseUser = { ...user };
+            baseUser.name = user.sector_incharge || user.username;
+            baseUser.unique_id = user.username;
             return baseUser;
           });
           setUsers(filteredUsers);
@@ -286,7 +300,7 @@ const AllRoleResetpassword = () => {
                               <th>#</th>
                               {users.length > 0 && Object.keys(users[0]).map(key => {
                                 // Don't create columns for internal/unwanted keys
-                                if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use'].includes(key)) return null;
+                                if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use', 'updated_on'].includes(key)) return null;
                                 return (
                                   <th key={key} className="text-capitalize">{key.replace(/_/g, ' ')}</th>
                                 );
@@ -306,7 +320,7 @@ const AllRoleResetpassword = () => {
                                 </td>
                                 <td>{index + 1}</td>
                                 {Object.keys(user).map(key => {
-                                  if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use'].includes(key)) return null;
+                                  if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use', 'updated_on'].includes(key)) return null;
                                   return (
                                     <td key={key}>{user[key]}</td>
                                   );
