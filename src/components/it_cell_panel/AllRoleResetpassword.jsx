@@ -56,7 +56,7 @@ const AllRoleResetpassword = () => {
       ] = await Promise.all([
         api.get('/director/districts/'),
         api.get('/director/projects/'),
-        api.get('/director/awclist/'),
+        api.get('/director/awc-list/'),
         api.get('/director/sectors/'),
       ]);
 
