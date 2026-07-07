@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Form, Button, InputGroup, Collapse, Table, Modal } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Form, Button, Collapse, Table } from "react-bootstrap";
 
 import "../../assets/css/itcellLeftnav.css";
 
@@ -26,20 +26,11 @@ const AllRoleResetpassword = () => {
   const [users, setUsers] = useState([]);
   const [roleCounts, setRoleCounts] = useState({});
 
+  const [selectedUsers, setSelectedUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingCounts, setLoadingCounts] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  // State for the reset modal
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [resettingUser, setResettingUser] = useState(null);
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmNewPassword, setConfirmNewPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [modalSubmitting, setModalSubmitting] = useState(false);
-  const [modalFormErrors, setModalFormErrors] = useState({});
 
   useEffect(() => {
     const handleResize = () => {
@@ -56,12 +47,24 @@ const AllRoleResetpassword = () => {
   const fetchRoleCounts = useCallback(async () => {
     setLoadingCounts(true);
     try {
-      // This is a hypothetical endpoint. The backend would need to implement it.
-      const response = await api.get('/user-counts-by-role/');
-      setRoleCounts(response.data?.counts || {});
+      const counts = {};
+      // Fetch counts for director and dpo from a single endpoint
+      const directorDpoResponse = await api.get('/director/districts/');
+      const directorDpoUsers = directorDpoResponse.data?.data || [];
+      counts.director = directorDpoUsers.filter(u => u.role === 'director').length;
+      counts.dpo = directorDpoUsers.filter(u => u.role === 'dpo').length;
+
+      // Fetch counts for other roles individually
+      const otherRoles = ["cdpo", "supervisor", "anganwadi", "it"];
+      const otherRolePromises = otherRoles.map(async (role) => {
+        const response = await api.get(`/list-users-by-role/?role=${role}`);
+        counts[role] = response.data?.users?.length || 0;
+      });
+
+      await Promise.all(otherRolePromises);
+      setRoleCounts(counts);
     } catch (err) {
       console.error("Failed to fetch role counts:", err);
-      // Silently fail, as this is an enhancement, not critical functionality.
       setRoleCounts({});
     } finally {
       setLoadingCounts(false);
@@ -76,13 +79,28 @@ const AllRoleResetpassword = () => {
     setLoadingUsers(true);
     setError("");
     try {
-      const response = await api.get(`/list-users-by-role/?role=${role}`);
-      setUsers(response.data?.users || []);
+      if (role === 'director' || role === 'dpo') {
+          const response = await api.get('/director/districts/');
+          const allUsers = response.data?.data || [];
+          const filteredUsers = allUsers
+            .filter(user => user.role === role)
+            .map(user => {
+              const baseUser = { ...user };
+              baseUser.name = user.district || user.username;
+              baseUser.unique_id = user.unique_id || user.username;
+              return baseUser;
+            });
+          setUsers(filteredUsers);
+      } else {
+          const response = await api.get(`/list-users-by-role/?role=${role}`);
+          setUsers(response.data?.users || []);
+      }
     } catch (err) {
       setError(`Failed to fetch users for role: ${role}.`);
       console.error(err);
       setUsers([]);
-    } finally {
+    }
+    finally {
       setLoadingUsers(false);
     }
   }, [api]);
@@ -99,67 +117,87 @@ const AllRoleResetpassword = () => {
 
   const handleRoleSelect = (roleKey) => {
     setSelectedRole(roleKey);
+    setSelectedUsers([]); // Clear selections when role changes
     setUsers([]);
-    setModalFormErrors({});
   };
 
-  const handleResetClick = (user) => {
-    setResettingUser(user);
-    setShowResetModal(true);
-    setNewPassword("");
-    setConfirmNewPassword("");
-    setModalFormErrors({});
-    setSuccess("");
-    setError("");
-  };
+  const handleDirectReset = async (userToReset) => {
+    if (!userToReset) return;
 
-  const handleCloseModal = () => {
-    setShowResetModal(false);
-    setResettingUser(null);
-  };
-
-  const validateModalForm = () => {
-    const errors = {};
-    if (!newPassword) {
-      errors.newPassword = "New password is required.";
-    } else if (newPassword.length < 4) {
-      errors.newPassword = "Password must be at least 4 characters long.";
+    if (!window.confirm(`Are you sure you want to reset the password for ${userToReset.name}? This will happen immediately.`)) {
+      return;
     }
-    if (newPassword !== confirmNewPassword) {
-      errors.confirmNewPassword = "Passwords do not match.";
-    }
-    setModalFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
 
-  const handleModalSubmit = async (e) => {
-    e.preventDefault();
+    setLoadingUsers(true);
     setError("");
     setSuccess("");
 
-    if (!validateModalForm()) return;
-
-    setModalSubmitting(true);
     try {
       const payload = {
-        role: selectedRole,
-        unique_id: resettingUser.unique_id,
-        new_password: newPassword,
+        users: [{
+          username: userToReset.username,
+          role: selectedRole,
+        }],
       };
-      await api.put("/reset-password/", payload);
-      setSuccess(`Password for ${resettingUser.name} has been reset successfully!`);
-      handleCloseModal();
+      await api.post("/bulk-password-reset/", payload);
+      setSuccess(`Password for ${userToReset.name} has been reset successfully.`);
     } catch (err) {
-      const apiError = err.response?.data?.error || "An unexpected error occurred.";
-      setError(apiError);
+      setError(err.response?.data?.error || `Failed to reset password for ${userToReset.name}.`);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleBulkReset = async () => {
+    if (selectedUsers.length === 0) return;
+
+    if (!window.confirm(`Are you sure you want to reset passwords for ${selectedUsers.length} selected users? This will happen immediately.`)) {
+      return;
+    }
+
+    setLoadingUsers(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const payload = {
+        users: selectedUsers.map(username => ({
+          username: username,
+          role: selectedRole,
+        })),
+      };
+
+      await api.post("/bulk-password-reset/", payload);
+      setSuccess(`Passwords for ${selectedUsers.length} selected users have been reset successfully.`);
+      setSelectedUsers([]); // Clear selection after successful reset
+    } catch (err) {
+      setError(err.response?.data?.error || `Failed to reset passwords for selected users.`);
       console.error(err);
     } finally {
-      setModalSubmitting(false);
+      setLoadingUsers(false);
     }
   };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleSelectUser = (uniqueId) => {
+    // Ensure uniqueId is a string before includes check
+    const idAsString = String(uniqueId);
+    setSelectedUsers(prev =>
+      prev.includes(idAsString)
+        ? prev.filter(id => id !== idAsString)
+        : [...prev, idAsString]
+    );
+  };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedUsers(users.map(user => user.unique_id));
+    } else {
+      setSelectedUsers([]);
+    }
   };
 
   return (
@@ -187,48 +225,80 @@ const AllRoleResetpassword = () => {
                   className={`text-center role-card ${selectedRole === role.key ? 'selected' : ''}`}
                   onClick={() => handleRoleSelect(role.key)}
                 >
-                  <Card.Body>
+               
                     <div className="role-icon">{role.icon}</div>
                     <Card.Title as="h6" className="mt-2 mb-0">{role.label}</Card.Title>
                     <Card.Text className="text-muted small mt-1">
                       {loadingCounts ? <Spinner animation="grow" size="sm" variant="secondary" /> : `Users: ${roleCounts[role.key] || 0}`}
                     </Card.Text>
-                  </Card.Body>
+                  
                 </Card>
               </Col>
             ))}
           </Row>
 
-          {error && <Alert variant="danger">{error}</Alert>}
-          {success && <Alert variant="success">{success}</Alert>}
+          {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
+          {success && <Alert variant="success" onClose={() => setSuccess("")} dismissible>{success}</Alert>}
 
           <Collapse in={!!selectedRole}>
             <div>
               <Row className="justify-content-center">
                 <Col md={12}>
                   <Card className="shadow-sm">
-                    <Card.Header as="h5" className="bg-primary text-white text-capitalize">Reset Password for {selectedRole}</Card.Header>
-                    <Card.Body>
+                    <Card.Header as="h5" className="bg-primary text-white text-capitalize d-flex justify-content-between align-items-center">
+                      <span>
+                        Reset Password for {selectedRole} {users.length > 0 && `(${users.length} Users)`}
+                      </span>
+                      {selectedUsers.length > 0 && (
+                        <Button variant="light" size="sm" onClick={handleBulkReset}>
+                          Reset Password for Selected ({selectedUsers.length})
+                        </Button>
+                      )}
+                    </Card.Header>
+                   
                       {loadingUsers ? (
                         <div className="text-center"><Spinner animation="border" /></div>
                       ) : users.length > 0 ? (
                         <Table striped bordered hover responsive>
                           <thead>
                             <tr>
+                              <th>
+                                <Form.Check 
+                                  type="checkbox"
+                                  onChange={handleSelectAll}
+                                  checked={users.length > 0 && selectedUsers.length === users.length}
+                                />
+                              </th>
                               <th>#</th>
-                              <th>User Name</th>
-                              <th>Unique ID</th>
+                              {users.length > 0 && Object.keys(users[0]).map(key => {
+                                // Don't create columns for internal/unwanted keys
+                                if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id'].includes(key)) return null;
+                                return (
+                                  <th key={key} className="text-capitalize">{key.replace(/_/g, ' ')}</th>
+                                );
+                              })}
                               <th>Action</th>
                             </tr>
                           </thead>
                           <tbody>
                             {users.map((user, index) => (
-                              <tr key={user.unique_id}>
-                                <td>{index + 1}</td>
-                                <td>{user.name}</td>
-                                <td>{user.unique_id}</td>
+                              <tr key={user.unique_id || user.username}>
                                 <td>
-                                  <Button variant="outline-primary" size="sm" onClick={() => handleResetClick(user)}>
+                                  <Form.Check 
+                                    type="checkbox"
+                                    checked={selectedUsers.includes(user.unique_id)}
+                                    onChange={() => handleSelectUser(user.unique_id)}
+                                  />
+                                </td>
+                                <td>{index + 1}</td>
+                                {Object.keys(user).map(key => {
+                                  if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id'].includes(key)) return null;
+                                  return (
+                                    <td key={key}>{user[key]}</td>
+                                  );
+                                })}
+                                <td>
+                                  <Button variant="outline-primary" size="sm" onClick={() => handleDirectReset(user)}>
                                     <FaKey className="me-1" /> Reset Password
                                   </Button>
                                 </td>
@@ -239,74 +309,13 @@ const AllRoleResetpassword = () => {
                       ) : (
                         <div className="text-center text-muted">No users found for this role.</div>
                       )}
-                    </Card.Body>
+                   
                   </Card>
                 </Col>
               </Row>
             </div>
           </Collapse>
 
-          <Modal show={showResetModal} onHide={handleCloseModal} centered>
-            <Modal.Header closeButton>
-              <Modal.Title>Reset Password</Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-              {resettingUser && (
-                <Form onSubmit={handleModalSubmit}>
-                  <p>Resetting password for <strong>{resettingUser.name}</strong> ({resettingUser.unique_id})</p>
-                  
-                  {error && <Alert variant="danger">{error}</Alert>}
-
-                  <Form.Group className="mb-3" controlId="newPassword">
-                    <Form.Label>New Password</Form.Label>
-                    <InputGroup>
-                      <Form.Control
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter new password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        isInvalid={!!modalFormErrors.newPassword}
-                      />
-                      <Button variant="outline-secondary" onClick={() => setShowPassword(!showPassword)}>
-                        {showPassword ? <FaEyeSlash /> : <FaEye />}
-                      </Button>
-                      <Form.Control.Feedback type="invalid">{modalFormErrors.newPassword}</Form.Control.Feedback>
-                    </InputGroup>
-                  </Form.Group>
-
-                  <Form.Group className="mb-4" controlId="confirmPassword">
-                    <Form.Label>Confirm New Password</Form.Label>
-                    <InputGroup>
-                      <Form.Control
-                        type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Confirm new password"
-                        value={confirmNewPassword}
-                        onChange={(e) => setConfirmNewPassword(e.target.value)}
-                        isInvalid={!!modalFormErrors.confirmNewPassword}
-                      />
-                      <Button variant="outline-secondary" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                        {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
-                      </Button>
-                      <Form.Control.Feedback type="invalid">{modalFormErrors.confirmNewPassword}</Form.Control.Feedback>
-                    </InputGroup>
-                  </Form.Group>
-
-                  <div className="d-flex justify-content-end">
-                    <Button variant="secondary" onClick={handleCloseModal} className="me-2">
-                      Cancel
-                    </Button>
-                    <Button variant="primary" type="submit" disabled={modalSubmitting}>
-                      {modalSubmitting ? (
-                        <><Spinner as="span" animation="border" size="sm" /><span className="ms-2">Resetting...</span></>
-                      ) : (
-                        "Reset Password"
-                      )}
-                    </Button>
-                  </div>
-                </Form>
-              )}
-            </Modal.Body>
-          </Modal>
         </Container>
       </div>
     </div>
