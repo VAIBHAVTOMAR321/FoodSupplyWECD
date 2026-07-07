@@ -30,7 +30,9 @@ import {
   FaClock,
   FaFileAlt,
   FaTruckLoading,
+  FaFileInvoice,
   FaKey,
+  FaUserPlus,
   FaBoxOpen
 } from "react-icons/fa";
 import axios from "axios";
@@ -90,20 +92,20 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
       },
 
        {
-        icon: <FaBoxOpen />,
+        icon: <FaCube />,
         label: "Food Item",
         path: "/ITCellFoodItem",
         active: true,
       },
       {
-        icon: <FaBoxOpen />,
+        icon: <FaUserPlus />,
         label: "Beneficiary Entry",
         path: "/ITBeneEntry",
         active: true,
       },
     
       {
-    icon: <FaChartBar />,
+    icon: <FaFileInvoice />,
     label: "Reports & Distribution",
     path: "#",
     submenu: [
@@ -121,7 +123,7 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
     ],
   },   
   {
-    icon: <FaChartBar />,
+    icon: <FaTruckLoading />,
     label: "Recieving",
     path: "#",
     submenu: [
