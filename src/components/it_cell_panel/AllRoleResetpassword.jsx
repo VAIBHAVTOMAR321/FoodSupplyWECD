@@ -48,30 +48,28 @@ const AllRoleResetpassword = () => {
   const fetchRoleCounts = useCallback(async () => {
     setLoadingCounts(true);
     try {
-      const counts = {};
-      // Fetch counts for director and dpo from a single endpoint
-      const directorDpoResponse = await api.get('/director/districts/');
+      const [
+        directorDpoResponse,
+        cdpoResponse,
+        anganwadiResponse,
+        supervisorResponse,
+      ] = await Promise.all([
+        api.get('/director/districts/'),
+        api.get('/director/projects/'),
+        api.get('/director/awclist/'),
+        api.get('/director/sectors/'),
+      ]);
+
       const directorDpoUsers = directorDpoResponse.data?.data || [];
-      counts.director = directorDpoUsers.filter(u => u.role === 'director').length;
-      counts.dpo = directorDpoUsers.filter(u => u.role === 'dpo').length;
 
-      // Fetch count for cdpo
-      const cdpoResponse = await api.get('/director/projects/');
-      counts.cdpo = cdpoResponse.data?.data?.length || 0;
-
-      // Fetch counts for other roles individually
-      const otherRoles = ["anganwadi"]; // Supervisor is now fetched from a different endpoint
-      const otherRolePromises = otherRoles.map(async (role) => {
-        const response = await api.get(`/list-users-by-role/?role=${role}`);
-        counts[role] = response.data?.users?.length || 0;
-      });
-
-      await Promise.all(otherRolePromises);
-      setRoleCounts(counts);
-
-      // Fetch count for supervisor
-      const supervisorResponse = await api.get('/director/sectors/');
-      counts.supervisor = supervisorResponse.data?.data?.length || 0;
+      const newCounts = {
+        director: directorDpoUsers.filter(u => u.role === 'director').length,
+        dpo: directorDpoUsers.filter(u => u.role === 'dpo').length,
+        cdpo: cdpoResponse.data?.data?.length || 0,
+        anganwadi: anganwadiResponse.data?.data?.length || 0,
+        supervisor: supervisorResponse.data?.data?.length || 0,
+      };
+      setRoleCounts(newCounts);
     } catch (err) {
       console.error("Failed to fetch role counts:", err);
       setRoleCounts({});
@@ -119,6 +117,15 @@ const AllRoleResetpassword = () => {
             baseUser.unique_id = user.username;
             return baseUser;
           });
+          setUsers(filteredUsers);
+      } else if (role === 'anganwadi') {
+          const response = await api.get('/director/awc-list/');
+          const allUsers = response.data?.data || [];
+          const filteredUsers = allUsers.map(user => ({
+            ...user,
+            name: user.awc_name,
+            unique_id: user.username,
+          }));
           setUsers(filteredUsers);
       } else {
           const response = await api.get(`/list-users-by-role/?role=${role}`);
@@ -344,7 +351,7 @@ const AllRoleResetpassword = () => {
                               <th style={{ width: '5%' }}>#</th>
                               {users.length > 0 && Object.keys(users[0]).map(key => {
                                 // Don't create columns for internal/unwanted keys
-                                if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use', 'updated_on'].includes(key)) return null;
+                                if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use', 'updated_on', 'district_code', 'code1', 'ang_pur_adhar_stat'].includes(key)) return null;
                                 return (
                                   <th key={key} className="text-capitalize">{key.replace(/_/g, ' ')}</th>
                                 );
@@ -364,7 +371,7 @@ const AllRoleResetpassword = () => {
                                 </td>
                                 <td>{indexOfFirstItem + index + 1}</td>
                                 {Object.keys(user).map(key => {
-                                  if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use', 'updated_on'].includes(key)) return null;
+                                  if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use', 'updated_on', 'district_code', 'code1', 'ang_pur_adhar_stat'].includes(key)) return null;
                                   return (
                                     <td key={key}>{user[key]}</td>
                                   );
