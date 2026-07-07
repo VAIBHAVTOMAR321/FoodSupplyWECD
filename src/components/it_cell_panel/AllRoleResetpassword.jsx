@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Form, Button, Collapse, Table } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Form, Button, Collapse, Table, Pagination } from "react-bootstrap";
 
 import "../../assets/css/itcellLeftnav.css";
 
@@ -24,6 +24,8 @@ const AllRoleResetpassword = () => {
   const [selectedRole, setSelectedRole] = useState("dpo");
   const [users, setUsers] = useState([]);
   const [roleCounts, setRoleCounts] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
 
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -145,6 +147,7 @@ const AllRoleResetpassword = () => {
   const handleRoleSelect = (roleKey) => {
     setSelectedRole(roleKey);
     setSelectedUsers([]); // Clear selections when role changes
+    setCurrentPage(1); // Reset to first page
     setUsers([]);
   };
 
@@ -227,6 +230,41 @@ const AllRoleResetpassword = () => {
     }
   };
 
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentUsers = users.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(users.length / itemsPerPage);
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const items = [];
+    const maxPagesToShow = 5;
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.floor(maxPagesToShow / 2) + 1) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) { items.push(<Pagination.Item key={i} active={i === currentPage} onClick={() => setCurrentPage(i)}>{i}</Pagination.Item>); }
+
+    return (<Pagination className="justify-content-end mt-3"> <Pagination.First onClick={() => setCurrentPage(1)} disabled={currentPage === 1} /> <Pagination.Prev onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} /> {startPage > 1 && <Pagination.Ellipsis />} {items} {endPage < totalPages && <Pagination.Ellipsis />} <Pagination.Next onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages} /> <Pagination.Last onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} /> </Pagination>);
+  };
+
+
   return (
     <div className="dashboard-container">
       <ITCellLeftNav
@@ -292,17 +330,18 @@ const AllRoleResetpassword = () => {
                       {loadingUsers ? (
                         <div className="text-center"><Spinner animation="border" /></div>
                       ) : users.length > 0 ? (
-                        <Table striped bordered hover responsive>
+                        <>
+                          <Table striped bordered hover responsive>
                           <thead>
                             <tr>
-                              <th>
+                              <th style={{ width: '5%' }}>
                                 <Form.Check 
                                   type="checkbox"
                                   onChange={handleSelectAll}
                                   checked={users.length > 0 && selectedUsers.length === users.length}
                                 />
                               </th>
-                              <th>#</th>
+                              <th style={{ width: '5%' }}>#</th>
                               {users.length > 0 && Object.keys(users[0]).map(key => {
                                 // Don't create columns for internal/unwanted keys
                                 if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use', 'updated_on'].includes(key)) return null;
@@ -314,7 +353,7 @@ const AllRoleResetpassword = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {users.map((user, index) => (
+                            {currentUsers.map((user, index) => (
                               <tr key={user.unique_id || user.username}>
                                 <td>
                                   <Form.Check 
@@ -323,7 +362,7 @@ const AllRoleResetpassword = () => {
                                     onChange={() => handleSelectUser(user.unique_id)}
                                   />
                                 </td>
-                                <td>{index + 1}</td>
+                                <td>{indexOfFirstItem + index + 1}</td>
                                 {Object.keys(user).map(key => {
                                   if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use', 'updated_on'].includes(key)) return null;
                                   return (
@@ -338,7 +377,9 @@ const AllRoleResetpassword = () => {
                               </tr>
                             ))}
                           </tbody>
-                        </Table>
+                          </Table>
+                          {renderPagination()}
+                        </>
                       ) : (
                         <div className="text-center text-muted">No users found for this role.</div>
                       )}
