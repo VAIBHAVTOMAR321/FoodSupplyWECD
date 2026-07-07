@@ -95,8 +95,13 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
         path: "/ITCellFoodItem",
         active: true,
       },
+      {
+        icon: <FaBoxOpen />,
+        label: "Beneficiary Entry",
+        path: "/ITBeneEntry",
+        active: true,
+      },
     
-      
       {
     icon: <FaChartBar />,
     label: "Reports & Distribution",
@@ -115,6 +120,24 @@ const ITCellLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavC
       },
     ],
   },   
+  {
+    icon: <FaChartBar />,
+    label: "Recieving",
+    path: "#",
+    submenu: [
+      {
+        label: "THR Receiving ",
+        path: "/ITCellTHRReceiving",
+         icon: <FaTruckLoading />,
+      },
+
+       {
+        label: "HCM Receiving",
+        path: "/ITCellHCMReceiving",
+         icon: <FaTruckLoading />,
+      },
+    ],
+  },  
       
      ];
 
