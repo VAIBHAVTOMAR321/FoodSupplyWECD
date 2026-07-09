@@ -3,7 +3,6 @@ import { Container, Tabs, Tab, Form, Button, Table, Modal, Spinner, Alert, Row, 
 
 import { useAuth } from "../all_login/AuthContext";
 
-
 import "../../assets/css/directorleftnav.css";
 import "../../assets/css/dashboard.css";
 import "../../assets/css/AnganwadiDashboard.css";
@@ -12,26 +11,12 @@ import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 
 const API_URLS = {
-  hcm_receiving: "/hcm-food-receiving-items/", // Updated endpoint for HCM receiving
-  thr_receiving: "/thr-food-receiving-items/", // Updated endpoint for THR receiving
+  hcm_receiving: "/hcm-food-receiving-items/",
+  thr_receiving: "/thr-food-receiving-items/",
   hcm_items: "/hcm-food-items/",
   thr_items: "/thr-food-items/",
   beneficiary_categories: "/beneficiary-categories/",
 };
-
-const getCurrentFinancialYear = () => {
-  const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
-  return currentMonth >= 3 ? `${currentYear}-${(currentYear + 1).toString().slice(-2)}` : `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
-};
-
-const allQuarters = [
-  { value: 'apr-may-jun', label: 'April-May-June' },
-  { value: 'jul-aug-sep', label: 'July-August-September' },
-  { value: 'oct-nov-dec', label: 'October-November-December' },
-  { value: 'jan-feb-mar', label: 'January-February-March' },
-];
 
 const DirFoodItemReceiving = () => {
   const { api, user } = useAuth();
@@ -55,12 +40,6 @@ const DirFoodItemReceiving = () => {
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const [filters, setFilters] = useState({ fin_year: '', quarter: '' });
-  const [uniqueFilterOptions, setUniqueFilterOptions] = useState({
-    hcm: { fin_year: [], quarter: [] },
-    thr: { fin_year: [], quarter: [] },
-  });
-
   const fetchData = async () => {
     setLoading(true);
     setError("");
@@ -72,26 +51,11 @@ const DirFoodItemReceiving = () => {
         api.get(API_URLS.thr_items),
         api.get(API_URLS.beneficiary_categories),
       ]);
-      const hcmData = hcmRec.data || [];
-      const thrData = thrRec.data || [];
-
-      setHcmReceivings(hcmData);
-      setThrReceivings(thrData);
+      setHcmReceivings(hcmRec.data || []);
+      setThrReceivings(thrRec.data || []);
       setHcmFoodItems(hcmItems.data || []);
       setThrFoodItems(thrItems.data || []);
       setBeneficiaryCategories(benCategories.data || []);
-
-      // Extract unique filter options for each tab
-      setUniqueFilterOptions({
-        hcm: {
-          fin_year: [...new Set(hcmData.map(item => item.fin_year).filter(Boolean))],
-          quarter: [...new Set(hcmData.map(item => item.quarter).filter(Boolean))],
-        },
-        thr: {
-          fin_year: [...new Set(thrData.map(item => item.fin_year).filter(Boolean))],
-          quarter: [...new Set(thrData.map(item => item.quarter).filter(Boolean))],
-        },
-      });
     } catch (err) {
       setError("Failed to fetch data. Please refresh the page.");
       console.error(err);
@@ -104,39 +68,6 @@ const DirFoodItemReceiving = () => {
     fetchData();
   }, [api]);
 
-  useEffect(() => {
-    // Reset filters when tab changes
-    setFilters({ fin_year: '', quarter: '' });
-  }, [activeTab]);
-
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-  };
-
-  const applyFilters = async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (filters.fin_year) params.append('fin_year', filters.fin_year);
-    if (filters.quarter) params.append('quarter', filters.quarter);
-
-    const url = activeTab === 'thr' ? API_URLS.thr_receiving : API_URLS.hcm_receiving;
-    try {
-      const response = await api.get(`${url}?${params.toString()}`);
-      if (activeTab === 'thr') {
-        setThrReceivings(response.data || []);
-      } else {
-        setHcmReceivings(response.data || []);
-      }
-    } catch (err) {
-      setError(`Failed to fetch filtered data. Please try again.`);
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Toggle Sidebar
   const toggleSidebar = () => {
     setSidebarOpen((prev) => !prev);
   };
@@ -151,7 +82,6 @@ const DirFoodItemReceiving = () => {
       qty: '',
       bene_category: '',
       date: new Date().toISOString().split('T')[0],
-     
     });
     setFormError('');
     setShowModal(true);
@@ -196,10 +126,9 @@ const DirFoodItemReceiving = () => {
 
     let payload = {
       ...formData,
-      unit: selectedFoodItem.unit,
       qty: parseFloat(formData.qty),
-      created_by: user?.role || 'director', // Use user.role, default to 'director'
-      updated_by: user?.role || 'director', // Use user.role, default to 'director'
+      created_by: user?.role || 'director',
+      updated_by: user?.role || 'director',
     };
 
     if (editingItem) {
@@ -212,7 +141,7 @@ const DirFoodItemReceiving = () => {
     try {
       await api[method](url, payload);
       handleCloseModal();
-      fetchData(); // Refresh data
+      fetchData();
     } catch (err) {
       setFormError(`Failed to ${editingItem ? 'update' : 'create'} record. Please try again.`);
       console.error(err);
@@ -226,7 +155,7 @@ const DirFoodItemReceiving = () => {
       const url = activeTab === 'thr' ? API_URLS.thr_receiving : API_URLS.hcm_receiving;
       try {
         await api.delete(url, { data: { id } });
-        fetchData(); // Refresh data
+        fetchData();
       } catch (err) {
         alert("Failed to delete record.");
         console.error(err);
@@ -245,7 +174,6 @@ const DirFoodItemReceiving = () => {
             <th>Beneficiary Category</th>
             <th>Quantity</th>
             <th>Unit</th>
-           
             <th>Actions</th>
           </tr>
         </thead>
@@ -258,7 +186,6 @@ const DirFoodItemReceiving = () => {
               <td>{rec.bene_category}</td>
               <td>{rec.qty}</td>
               <td>{rec.unit}</td>
-            
               <td>
                 <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenModal(rec)}>
                   <FaEdit />
@@ -270,7 +197,7 @@ const DirFoodItemReceiving = () => {
             </tr>
           )) : (
             <tr>
-              <td colSpan="9" className="text-center">No records found.</td>
+              <td colSpan="7" className="text-center">No records found.</td>
             </tr>
           )}
         </tbody>
@@ -279,17 +206,9 @@ const DirFoodItemReceiving = () => {
   };
 
   const renderFilters = () => {
-    const currentFilters = uniqueFilterOptions[activeTab];
-    return (
-      <Row className="mb-3 align-items-end">
-       
-       
-      
-      </Row>
-    );
+    return null;
   };
 
-  // Responsive
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
@@ -338,7 +257,6 @@ const DirFoodItemReceiving = () => {
               {!loading && !error && (
                 <>
                   <h5 className="mt-4">HCM Receiving Records</h5>
-                  {renderFilters()}
                   {renderTable(hcmReceivings)}
                 </>
               )}
@@ -347,7 +265,6 @@ const DirFoodItemReceiving = () => {
               {!loading && !error && (
                 <>
                   <h5 className="mt-4">THR Receiving Records</h5>
-                  {renderFilters()}
                   {renderTable(thrReceivings)}
                 </>
               )}
@@ -398,9 +315,21 @@ const DirFoodItemReceiving = () => {
                 </Col>
               </Row>
               <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Unit</Form.Label>
+                     <Form.Control
+                       type="text"
+                       name="unit"
+                       value={formData.unit || ''}
+                       onChange={handleFormChange}
+                     />
+                  </Form.Group>
+                </Col>
                 <Col>
                   <Form.Group className="mb-3">
-                    <Form.Label>Beneficiary Category</Form.Label><Form.Control type="text" name="bene_category" value={formData.bene_category || ''} readOnly disabled />
+                    <Form.Label>Beneficiary Category</Form.Label>
+                    <Form.Control type="text" name="bene_category" value={formData.bene_category || ''} readOnly disabled />
                   </Form.Group>
                 </Col>
               </Row>
@@ -417,12 +346,6 @@ const DirFoodItemReceiving = () => {
                     />
                   </Form.Group>
                 </Col>
-                
-                  <>
-                   
-                  
-                  </>
-                
               </Row>
 
               <div className="d-flex justify-content-end">
