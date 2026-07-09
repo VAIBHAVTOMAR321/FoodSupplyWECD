@@ -83,6 +83,12 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
 
       {
         icon: <FaTachometerAlt />,
+        label: "Received Report ",
+        path: "/DirFoodItemReceiving",
+      },
+
+      {
+        icon: <FaTachometerAlt />,
         label: "Beneficiary Entry",
         path: "/DirectorBeneEntry",
       },
@@ -95,7 +101,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
      
   {
     icon: <FaUsers />,
-    label: "Reports",
+    label: "Beneficiary  Distribution",
     submenu: [
       {
         label: "HCM Report",
@@ -104,7 +110,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
       },
       {
         label: "THR Report",
-        path: "/THRDirectorReport",
+        path: "/THRDirectorReport",  
         icon: <FaPlusSquare />,
       },
     ],
@@ -112,7 +118,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
       
   {
     icon: <FaTruckLoading />,
-    label: "Food Receiving",
+    label: "Receiving  Report",
     submenu: [
       {
         label: "THR Receiving",
