@@ -73,7 +73,7 @@ const AllRoleResetpassword = () => {
     } catch (err) {
       console.error("Failed to fetch role counts:", err);
       setRoleCounts({});
-    } finally {
+    } finally { 
       setLoadingCounts(false);
     }
   }, [api]);

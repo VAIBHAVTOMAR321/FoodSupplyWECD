@@ -1,12 +1,24 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table, Button, ButtonGroup } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/directorleftnav.css";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
 
 import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 
 const DirectorDashboard = () => {
@@ -23,6 +35,7 @@ const DirectorDashboard = () => {
   const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
   const [thrFoodItemsCount, setThrFoodItemsCount] = useState(0);
   const [expanded, setExpanded] = useState(null);
+  const [viewMode, setViewMode] = useState("card");
 
   useEffect(() => {
     const handleResize = () => {
@@ -241,6 +254,65 @@ const DirectorDashboard = () => {
     setExpanded(expanded === scheme ? null : scheme);
   };
 
+  const foodItemsChartData = useMemo(() => ({
+    labels: ["HCM", "THR"],
+    datasets: [
+      {
+        label: "Food Items",
+        data: [hcmFoodItemsCount, thrFoodItemsCount],
+        backgroundColor: ["#0d6efd", "#198754"],
+        borderRadius: 6,
+      },
+    ],
+  }), [hcmFoodItemsCount, thrFoodItemsCount]);
+
+  const thrSummaryChartData = useMemo(() => ({
+    labels: ["Beneficiaries", "Received Qty", "Distributed Qty"],
+    datasets: [
+      {
+        label: "THR Summary",
+        data: [
+          thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0) || 0,
+          thrSummary?.receiving_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0,
+          thrSummary?.distribution_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0,
+        ],
+        backgroundColor: ["#ff8c00", "#dc3545", "#6f42c1"],
+        borderRadius: 6,
+      },
+    ],
+  }), [thrSummary]);
+
+  const hcmSummaryChartData = useMemo(() => ({
+    labels: ["Beneficiaries", "Received Qty", "Distributed Qty"],
+    datasets: [
+      {
+        label: "HCM Summary",
+        data: [
+          hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0) || 0,
+          hcmSummary?.receiving_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0,
+          hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0,
+        ],
+        backgroundColor: ["#20c997", "#0dcaf0", "#fd7e14"],
+        borderRadius: 6,
+      },
+    ],
+  }), [hcmSummary]);
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      title: { display: false },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: { precision: 0 },
+      },
+    },
+  };
+
   return (
     <div className="dashboard-container">
       <DirectorLeftNav
@@ -256,188 +328,299 @@ const DirectorDashboard = () => {
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
 
           <div className="dashboard-section">
-            <h4 className="section-title">Food Items Overview</h4>
-            <Row className="g-3">
-              <Col md={6}>
-                <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center">
-                      <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">HCM Food Items</h6>
-                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}</div>
-                      </div>
-                      <div className="ms-auto expand-icon">
-                        {expanded === 'hcm' ? <FaChevronUp /> : <FaChevronDown />}
-                      </div>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="section-title mb-0">Food Items Overview</h4>
+              <ButtonGroup size="sm">
+                <Button variant={viewMode === "card" ? "primary" : "outline-primary"} onClick={() => setViewMode("card")}>Card View</Button>
+                <Button variant={viewMode === "graph" ? "primary" : "outline-primary"} onClick={() => setViewMode("graph")}>Graph View</Button>
+              </ButtonGroup>
+            </div>
+            {viewMode === "graph" ? (
+              <Row className="g-3">
+                <Col xs={12}>
+                  <div className="w-100">
+                    <div className="mb-3 text-center">
+                      <strong>HCM: {hcmFoodItemsCount}</strong> · <strong>THR: {thrFoodItemsCount}</strong>
                     </div>
-                  </Card.Body>
-                </Card>
-                <Collapse in={expanded === 'hcm'}>
-                  <div className="mt-3">
-                    <FoodItemTable scheme="hcm" api={api} />
+                    <Row className="g-4 align-items-start">
+                      <Col lg={4}>
+                        <div style={{ height: 320 }}>
+                          <Bar data={foodItemsChartData} options={chartOptions} />
+                        </div>
+                      </Col>
+                      <Col lg={8}>
+                        <Row className="g-3">
+                          <Col xs={12}>
+                            <h6 className="text-center text-muted">HCM Food Items</h6>
+                            <FoodItemTable scheme="hcm" api={api} />
+                          </Col>
+                          <Col xs={12}>
+                            <h6 className="text-center text-muted mt-3">THR Food Items</h6>
+                            <FoodItemTable scheme="thr" api={api} />
+                          </Col>
+                        </Row>
+                      </Col>
+                    </Row>
                   </div>
-                </Collapse>
-              </Col>
-              <Col md={6}>
-                <Card className="dashboard-card card-thr expandable-card" onClick={() => handleCardClick('thr')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center">
-                      <div className="dashboard-card-icon thr-icon"><FaBox /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">THR Food Items</h6>
-                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}</div>
+                </Col>
+              </Row>
+            ) : (
+              <Row className="g-3">
+                <Col md={6}>
+                  <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center">
+                        <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title">HCM Food Items</h6>
+                          <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}</div>
+                        </div>
+                        <div className="ms-auto expand-icon">
+                          {expanded === 'hcm' ? <FaChevronUp /> : <FaChevronDown />}
+                        </div>
                       </div>
-                      <div className="ms-auto expand-icon">
-                        {expanded === 'thr' ? <FaChevronUp /> : <FaChevronDown />}
-                      </div>
+                    </Card.Body>
+                  </Card>
+                  <Collapse in={expanded === 'hcm'}>
+                    <div className="mt-3">
+                      <FoodItemTable scheme="hcm" api={api} />
                     </div>
-                  </Card.Body>
-                </Card>
-                <Collapse in={expanded === 'thr'}>
-                  <div className="mt-3">
-                    <FoodItemTable scheme="thr" api={api} />
-                  </div>
-                </Collapse>
-              </Col>
-            </Row>
+                  </Collapse>
+                </Col>
+                <Col md={6}>
+                  <Card className="dashboard-card card-thr expandable-card" onClick={() => handleCardClick('thr')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center">
+                        <div className="dashboard-card-icon thr-icon"><FaBox /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title">THR Food Items</h6>
+                          <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}</div>
+                        </div>
+                        <div className="ms-auto expand-icon">
+                          {expanded === 'thr' ? <FaChevronUp /> : <FaChevronDown />}
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                  <Collapse in={expanded === 'thr'}>
+                    <div className="mt-3">
+                      <FoodItemTable scheme="thr" api={api} />
+                    </div>
+                  </Collapse>
+                </Col>
+              </Row>
+            )}
           </div>
 
           <div className="dashboard-section">
-            <h4 className="section-title">THR Distribution & Received Summary</h4>
-            <Row className="g-3"> 
-              <Col md={4} className="d-flex">
-                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/THRDirectorReport')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
-                        </div>
-                      </div>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="section-title mb-0">THR Distribution & Received Summary</h4>
+              <ButtonGroup size="sm">
+                <Button variant={viewMode === "card" ? "primary" : "outline-primary"} onClick={() => setViewMode("card")}>Card View</Button>
+                <Button variant={viewMode === "graph" ? "primary" : "outline-primary"} onClick={() => setViewMode("graph")}>Graph View</Button>
+              </ButtonGroup>
+            </div>
+            {viewMode === "graph" ? (
+              <Row className="g-3">
+                <Col xs={12}>
+                  <div className="w-100">
+                    <div className="mb-3 text-center">
+                      <strong>Distribution Beneficiaries:</strong> {thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0) || 0} · <strong>Total Received Quantity:</strong> {thrSummary?.receiving_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0} · <strong>Total Distributed Quantity:</strong> {thrSummary?.distribution_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0}
                     </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-receiving')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center">
-                      <div className="dashboard-card-icon thr-icon"><FaTruckLoading /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">THR Received</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : 
-                            thrSummary?.receiving_summary?.length || 0
-                          }
+                    <Row className="g-4 align-items-start">
+                      <Col lg={4}>
+                        <div style={{ height: 320 }}>
+                          <Bar data={thrSummaryChartData} options={chartOptions} />
                         </div>
-                      </div>
-                      <div className="ms-auto expand-icon">
-                        {expanded === 'thr-receiving' ? <FaChevronUp /> : <FaChevronDown />}
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-                <Collapse in={expanded === 'thr-receiving'}>
-                  <div className="mt-3">
-                    <ReceivingTable items={thrSummary?.receiving_summary} />
+                      </Col>
+                      <Col lg={8}>
+                        <Row className="g-3">
+                          <Col xs={12}>
+                            <h6 className="text-center text-muted">THR Receiving Summary</h6>
+                            <ReceivingTable items={thrSummary?.receiving_summary} />
+                          </Col>
+                          <Col xs={12}>
+                            <h6 className="text-center text-muted mt-3">THR Distribution Summary</h6>
+                            <DistributionTable items={thrSummary?.distribution_summary} />
+                          </Col>
+                        </Row>
+                      </Col>
+                    </Row>
                   </div>
-                </Collapse>
-              </Col>
-              <Col md={4}>
-                <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-quantity')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center">
-                      <div className="dashboard-card-icon thr-icon"><FaBox /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">THR Quantity Records</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.length || 0}
+                </Col>
+              </Row>
+            ) : (
+              <Row className="g-3"> 
+                <Col md={4} className="d-flex">
+                  <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/THRDirectorReport')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center w-100">
+                        <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
+                          <div className="dashboard-card-value">
+                            {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
+                          </div>
                         </div>
                       </div>
-                      <div className="ms-auto expand-icon">
-                        {expanded === 'thr-quantity' ? <FaChevronUp /> : <FaChevronDown />}
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={4}>
+                  <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-receiving')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center">
+                        <div className="dashboard-card-icon thr-icon"><FaTruckLoading /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title">THR Received</h6>
+                          <div className="dashboard-card-value">
+                            {loading ? <Spinner animation="border" size="sm" /> : 
+                              thrSummary?.receiving_summary?.length || 0
+                            }
+                          </div>
+                        </div>
+                        <div className="ms-auto expand-icon">
+                          {expanded === 'thr-receiving' ? <FaChevronUp /> : <FaChevronDown />}
+                        </div>
                       </div>
+                    </Card.Body>
+                  </Card>
+                  <Collapse in={expanded === 'thr-receiving'}>
+                    <div className="mt-3">
+                      <ReceivingTable items={thrSummary?.receiving_summary} />
                     </div>
-                  </Card.Body>
-                </Card>
-                <Collapse in={expanded === 'thr-quantity'}>
-                  <div className="mt-3">
-                    <DistributionTable items={thrSummary?.distribution_summary} />
-                  </div>
-                </Collapse>
-              </Col>
-            </Row>
+                  </Collapse>
+                </Col>
+                <Col md={4}>
+                  <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-quantity')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center">
+                        <div className="dashboard-card-icon thr-icon"><FaBox /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title mb-1">THR Quantity Records</h6>
+                          <div className="dashboard-card-value">
+                            {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.length || 0}
+                          </div>
+                        </div>
+                        <div className="ms-auto expand-icon">
+                          {expanded === 'thr-quantity' ? <FaChevronUp /> : <FaChevronDown />}
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                  <Collapse in={expanded === 'thr-quantity'}>
+                    <div className="mt-3">
+                      <DistributionTable items={thrSummary?.distribution_summary} />
+                    </div>
+                  </Collapse>
+                </Col>
+              </Row>
+            )}
           </div>
           <div className="dashboard-section">
-            <h4 className="section-title">HCM Distribution & Received Summary</h4>
-            <Row className="g-3"> 
-              <Col md={4} className="d-flex">
-                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/HCMDirectorReport')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
-                        </div>
-                      </div>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="section-title mb-0">HCM Distribution & Received Summary</h4>
+              <ButtonGroup size="sm">
+                <Button variant={viewMode === "card" ? "primary" : "outline-primary"} onClick={() => setViewMode("card")}>Card View</Button>
+                <Button variant={viewMode === "graph" ? "primary" : "outline-primary"} onClick={() => setViewMode("graph")}>Graph View</Button>
+              </ButtonGroup>
+            </div>
+            {viewMode === "graph" ? (
+              <Row className="g-3">
+                <Col xs={12}>
+                  <div className="w-100">
+                    <div className="mb-3 text-center">
+                      <strong>Distribution Beneficiaries:</strong> {hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0) || 0} · <strong>Total Received Quantity:</strong> {hcmSummary?.receiving_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0} · <strong>Total Distributed Quantity:</strong> {hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0}
                     </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={4} >
-                <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-receiving')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center">
-                      <div className="dashboard-card-icon hcm-icon"><FaTruckLoading /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">HCM Received</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : 
-                            hcmSummary?.receiving_summary?.length || 0
-                          }
+                    <Row className="g-4 align-items-start">
+                      <Col lg={4}>
+                        <div style={{ height: 320 }}>
+                          <Bar data={hcmSummaryChartData} options={chartOptions} />
                         </div>
-                      </div>
-                      <div className="ms-auto expand-icon">
-                        {expanded === 'hcm-receiving' ? <FaChevronUp /> : <FaChevronDown />}
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-                <Collapse in={expanded === 'hcm-receiving'}>
-                  <div className="mt-3">
-                    <ReceivingTable items={hcmSummary?.receiving_summary} />
+                      </Col>
+                      <Col lg={8}>
+                        <Row className="g-3">
+                          <Col xs={12}>
+                            <h6 className="text-center text-muted">HCM Receiving Summary</h6>
+                            <ReceivingTable items={hcmSummary?.receiving_summary} />
+                          </Col>
+                          <Col xs={12}>
+                            <h6 className="text-center text-muted mt-3">HCM Distribution Summary</h6>
+                            <DistributionTable items={hcmSummary?.distribution_summary} />
+                          </Col>
+                        </Row>
+                      </Col>
+                    </Row>
                   </div>
-                </Collapse>
-              </Col>
-              <Col md={4} >
-                <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-quantity')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center">
-                      <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">HCM Quantity Records</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.length || 0}
+                </Col>
+              </Row>
+            ) : (
+              <Row className="g-3"> 
+                <Col md={4} className="d-flex">
+                  <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/HCMDirectorReport')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center w-100">
+                        <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
+                          <div className="dashboard-card-value">
+                            {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
+                          </div>
                         </div>
                       </div>
-                      <div className="ms-auto expand-icon">
-                        {expanded === 'hcm-quantity' ? <FaChevronUp /> : <FaChevronDown />}
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={4} >
+                  <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-receiving')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center">
+                        <div className="dashboard-card-icon hcm-icon"><FaTruckLoading /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title">HCM Received</h6>
+                          <div className="dashboard-card-value">
+                            {loading ? <Spinner animation="border" size="sm" /> : 
+                              hcmSummary?.receiving_summary?.length || 0
+                            }
+                          </div>
+                        </div>
+                        <div className="ms-auto expand-icon">
+                          {expanded === 'hcm-receiving' ? <FaChevronUp /> : <FaChevronDown />}
+                        </div>
                       </div>
+                    </Card.Body>
+                  </Card>
+                  <Collapse in={expanded === 'hcm-receiving'}>
+                    <div className="mt-3">
+                      <ReceivingTable items={hcmSummary?.receiving_summary} />
                     </div>
-                  </Card.Body>
-                </Card>
-                <Collapse in={expanded === 'hcm-quantity'}>
-                  <div className="mt-3">
-                    <DistributionTable items={hcmSummary?.distribution_summary} />
-                  </div>
-                </Collapse>
-              </Col>
-            </Row>
+                  </Collapse>
+                </Col>
+                <Col md={4} >
+                  <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-quantity')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center">
+                        <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title mb-1">HCM Quantity Records</h6>
+                          <div className="dashboard-card-value">
+                            {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.length || 0}
+                          </div>
+                        </div>
+                        <div className="ms-auto expand-icon">
+                          {expanded === 'hcm-quantity' ? <FaChevronUp /> : <FaChevronDown />}
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                  <Collapse in={expanded === 'hcm-quantity'}>
+                    <div className="mt-3">
+                      <DistributionTable items={hcmSummary?.distribution_summary} />
+                    </div>
+                  </Collapse>
+                </Col>
+              </Row>
+            )}
           </div>
         </Container>
       </div>
