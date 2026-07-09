@@ -34,7 +34,7 @@ const allQuarters = [
 ];
 
 const DirFoodItemReceiving = () => {
-  const { api } = useAuth();
+  const { api, user } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
