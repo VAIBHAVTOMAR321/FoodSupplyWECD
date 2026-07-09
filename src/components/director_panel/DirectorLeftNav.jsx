@@ -83,7 +83,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
 
       {
         icon: <FaTachometerAlt />,
-        label: "Received Report ",
+        label: "Received Food (CW)",
         path: "/DirFoodItemReceiving",
       },
 
@@ -118,7 +118,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
       
   {
     icon: <FaTruckLoading />,
-    label: "Receiving  Report",
+    label: "Center Receiving  Report",
     submenu: [
       {
         label: "THR Receiving",
