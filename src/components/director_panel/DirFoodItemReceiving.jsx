@@ -151,8 +151,7 @@ const DirFoodItemReceiving = () => {
       qty: '',
       bene_category: '',
       date: new Date().toISOString().split('T')[0],
-      fin_year: getCurrentFinancialYear(),
-      quarter: '',
+     
     });
     setFormError('');
     setShowModal(true);
@@ -246,8 +245,7 @@ const DirFoodItemReceiving = () => {
             <th>Beneficiary Category</th>
             <th>Quantity</th>
             <th>Unit</th>
-            <th>Fin. Year</th>
-            <th>Quarter</th>
+           
             <th>Actions</th>
           </tr>
         </thead>
@@ -260,8 +258,7 @@ const DirFoodItemReceiving = () => {
               <td>{rec.bene_category}</td>
               <td>{rec.qty}</td>
               <td>{rec.unit}</td>
-              <td>{rec.fin_year}</td>
-              <td>{rec.quarter}</td>
+            
               <td>
                 <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenModal(rec)}>
                   <FaEdit />
@@ -285,41 +282,9 @@ const DirFoodItemReceiving = () => {
     const currentFilters = uniqueFilterOptions[activeTab];
     return (
       <Row className="mb-3 align-items-end">
-        <Col md={4}>
-          <Form.Group>
-            <Form.Label>Financial Year</Form.Label>
-            <Form.Select name="fin_year" value={filters.fin_year} onChange={handleFilterChange}>
-              <option value="">All Years</option>
-              {currentFilters.fin_year.map(year => <option key={year} value={year}>{year}</option>)}
-            </Form.Select>
-          </Form.Group>
-        </Col>
-        <Col md={4}>
-          <Form.Group>
-            <Form.Label>Quarter</Form.Label>
-            <Form.Select name="quarter" value={filters.quarter} onChange={handleFilterChange}>
-              <option value="">All Quarters</option>
-              {currentFilters.quarter.map(q => <option key={q} value={q}>{q}</option>)}
-            </Form.Select>
-          </Form.Group>
-        </Col>
-        <Col md={4} className="d-flex align-items-end">
-          <Button onClick={applyFilters} className="me-2">Apply Filters</Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setFilters({ fin_year: '', quarter: '' });
-              // Refetch all data for the current tab after resetting
-              const url = activeTab === 'thr' ? API_URLS.thr_receiving : API_URLS.hcm_receiving;
-              api.get(url).then(response => {
-                if (activeTab === 'thr') setThrReceivings(response.data || []);
-                else setHcmReceivings(response.data || []);
-              });
-            }}
-          >
-            Reset
-          </Button>
-        </Col>
+       
+       
+      
       </Row>
     );
   };
@@ -454,35 +419,8 @@ const DirFoodItemReceiving = () => {
                 </Col>
                 
                   <>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Financial Year</Form.Label>
-                        <Form.Control
-                          type="text"
-                          name="fin_year"
-                          value={formData.fin_year || ''}
-                          onChange={handleFormChange}
-                          placeholder="e.g., 2025-26"
-                          required
-                        />
-                      </Form.Group>
-                    </Col>
-                    <Col md={12}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Quarter</Form.Label>
-                        <Form.Select
-                          name="quarter"
-                          value={formData.quarter || ''}
-                          onChange={handleFormChange}
-                          required
-                        >
-                          <option value="">Select Quarter</option>
-                          {allQuarters.map(q => (
-                            <option key={q.value} value={q.value}>{q.label}</option>
-                          ))}
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
+                   
+                  
                   </>
                 
               </Row>
