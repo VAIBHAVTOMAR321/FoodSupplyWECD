@@ -254,17 +254,31 @@ const DirectorDashboard = () => {
     setExpanded(expanded === scheme ? null : scheme);
   };
 
-  const foodItemsChartData = useMemo(() => ({
-    labels: ["HCM", "THR"],
+  const hcmFoodItemsChartData = useMemo(() => ({
+    labels: ["HCM"],
     datasets: [
       {
-        label: "Food Items",
-        data: [hcmFoodItemsCount, thrFoodItemsCount],
-        backgroundColor: ["#0d6efd", "#198754"],
+        label: "HCM Food Items",
+        data: [hcmFoodItemsCount],
+        backgroundColor: ["#0d6efd"],
         borderRadius: 6,
       },
     ],
-  }), [hcmFoodItemsCount, thrFoodItemsCount]);
+  }), [hcmFoodItemsCount]);
+
+  const thrFoodItemsChartData = useMemo(() => ({
+    labels: ["THR"],
+    datasets: [
+      {
+        label: "THR Food Items",
+        data: [thrFoodItemsCount],
+        backgroundColor: ["#198754"],
+        borderRadius: 6,
+      },
+    ],
+  }), [thrFoodItemsCount]);
+
+
 
   const thrSummaryChartData = useMemo(() => ({
     labels: ["Beneficiaries", "Received Qty", "Distributed Qty"],
@@ -326,42 +340,39 @@ const DirectorDashboard = () => {
 
         <Container fluid className="dashboard-box mt-3"> 
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
+          <div className="d-flex justify-content-end mb-3">
+            <ButtonGroup size="sm">
+              <Button variant={viewMode === "card" ? "primary" : "outline-primary"} onClick={() => setViewMode("card")}>Card View</Button>
+              <Button variant={viewMode === "graph" ? "primary" : "outline-primary"} onClick={() => setViewMode("graph")}>Graph View</Button>
+            </ButtonGroup>
+          </div>
 
           <div className="dashboard-section">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="section-title mb-0">Food Items Overview</h4>
-              <ButtonGroup size="sm">
-                <Button variant={viewMode === "card" ? "primary" : "outline-primary"} onClick={() => setViewMode("card")}>Card View</Button>
-                <Button variant={viewMode === "graph" ? "primary" : "outline-primary"} onClick={() => setViewMode("graph")}>Graph View</Button>
-              </ButtonGroup>
             </div>
             {viewMode === "graph" ? (
               <Row className="g-3">
-                <Col xs={12}>
-                  <div className="w-100">
-                    <div className="mb-3 text-center">
-                      <strong>HCM: {hcmFoodItemsCount}</strong> · <strong>THR: {thrFoodItemsCount}</strong>
-                    </div>
-                    <Row className="g-4 align-items-start">
-                      <Col lg={4}>
-                        <div style={{ height: 320 }}>
-                          <Bar data={foodItemsChartData} options={chartOptions} />
-                        </div>
-                      </Col>
-                      <Col lg={8}>
-                        <Row className="g-3">
-                          <Col xs={12}>
-                            <h6 className="text-center text-muted">HCM Food Items</h6>
-                            <FoodItemTable scheme="hcm" api={api} />
-                          </Col>
-                          <Col xs={12}>
-                            <h6 className="text-center text-muted mt-3">THR Food Items</h6>
-                            <FoodItemTable scheme="thr" api={api} />
-                          </Col>
-                        </Row>
-                      </Col>
-                    </Row>
-                  </div>
+                {/* HCM Food Items Graph View */}
+                <Col lg={6} className="mb-4">
+                  <h5 className="text-center text-muted mb-3">HCM Food Items ({hcmFoodItemsCount})</h5>
+                  <Row className="g-3 align-items-start">
+                    <Col md={8}><FoodItemTable scheme="hcm" api={api} /></Col>
+                    <Col md={4}>
+                      <div style={{ height: 320 }}><Bar data={hcmFoodItemsChartData} options={chartOptions} /></div>
+                    </Col>
+                  </Row>
+                </Col>
+
+                {/* THR Food Items Graph View */}
+                <Col lg={6} className="mb-4">
+                  <h5 className="text-center text-muted mb-3">THR Food Items ({thrFoodItemsCount})</h5>
+                  <Row className="g-3 align-items-start">
+                    <Col md={8}><FoodItemTable scheme="thr" api={api} /></Col>
+                    <Col md={4}>
+                      <div style={{ height: 320 }}><Bar data={thrFoodItemsChartData} options={chartOptions} /></div>
+                    </Col>
+                  </Row>
                 </Col>
               </Row>
             ) : (
@@ -415,10 +426,6 @@ const DirectorDashboard = () => {
           <div className="dashboard-section">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="section-title mb-0">THR Distribution & Received Summary</h4>
-              <ButtonGroup size="sm">
-                <Button variant={viewMode === "card" ? "primary" : "outline-primary"} onClick={() => setViewMode("card")}>Card View</Button>
-                <Button variant={viewMode === "graph" ? "primary" : "outline-primary"} onClick={() => setViewMode("graph")}>Graph View</Button>
-              </ButtonGroup>
             </div>
             {viewMode === "graph" ? (
               <Row className="g-3">
@@ -428,11 +435,6 @@ const DirectorDashboard = () => {
                       <strong>Distribution Beneficiaries:</strong> {thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0) || 0} · <strong>Total Received Quantity:</strong> {thrSummary?.receiving_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0} · <strong>Total Distributed Quantity:</strong> {thrSummary?.distribution_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0}
                     </div>
                     <Row className="g-4 align-items-start">
-                      <Col lg={4}>
-                        <div style={{ height: 320 }}>
-                          <Bar data={thrSummaryChartData} options={chartOptions} />
-                        </div>
-                      </Col>
                       <Col lg={8}>
                         <Row className="g-3">
                           <Col xs={12}>
@@ -444,6 +446,11 @@ const DirectorDashboard = () => {
                             <DistributionTable items={thrSummary?.distribution_summary} />
                           </Col>
                         </Row>
+                      </Col>
+                      <Col lg={4}>
+                        <div style={{ height: 320 }}>
+                          <Bar data={thrSummaryChartData} options={chartOptions} />
+                        </div>
                       </Col>
                     </Row>
                   </div>
@@ -520,10 +527,6 @@ const DirectorDashboard = () => {
           <div className="dashboard-section">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="section-title mb-0">HCM Distribution & Received Summary</h4>
-              <ButtonGroup size="sm">
-                <Button variant={viewMode === "card" ? "primary" : "outline-primary"} onClick={() => setViewMode("card")}>Card View</Button>
-                <Button variant={viewMode === "graph" ? "primary" : "outline-primary"} onClick={() => setViewMode("graph")}>Graph View</Button>
-              </ButtonGroup>
             </div>
             {viewMode === "graph" ? (
               <Row className="g-3">
@@ -533,11 +536,6 @@ const DirectorDashboard = () => {
                       <strong>Distribution Beneficiaries:</strong> {hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0) || 0} · <strong>Total Received Quantity:</strong> {hcmSummary?.receiving_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0} · <strong>Total Distributed Quantity:</strong> {hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0}
                     </div>
                     <Row className="g-4 align-items-start">
-                      <Col lg={4}>
-                        <div style={{ height: 320 }}>
-                          <Bar data={hcmSummaryChartData} options={chartOptions} />
-                        </div>
-                      </Col>
                       <Col lg={8}>
                         <Row className="g-3">
                           <Col xs={12}>
@@ -549,6 +547,11 @@ const DirectorDashboard = () => {
                             <DistributionTable items={hcmSummary?.distribution_summary} />
                           </Col>
                         </Row>
+                      </Col>
+                      <Col lg={4}>
+                        <div style={{ height: 320 }}>
+                          <Bar data={hcmSummaryChartData} options={chartOptions} />
+                        </div>
                       </Col>
                     </Row>
                   </div>
