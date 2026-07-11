@@ -285,7 +285,7 @@ const FoodItemReceiving = () => {
         <Col md={4}>
           <Form.Group>
             <Form.Label>Financial Year</Form.Label>
-            <Form.Select name="fin_year" value={filters.fin_year} onChange={handleFilterChange}>
+            <Form.Select name="fin_year" value={filters.fin_year} onChange={handleFilterChange} disabled>
               <option value="">All Years</option>
               {currentFilters.fin_year.map(year => <option key={year} value={year}>{year}</option>)}
             </Form.Select>
@@ -460,7 +460,7 @@ const FoodItemReceiving = () => {
                           value={formData.fin_year || ''}
                           onChange={handleFormChange}
                           placeholder="e.g., 2025-26"
-                          required
+                          required disabled
                         />
                       </Form.Group>
                     </Col>

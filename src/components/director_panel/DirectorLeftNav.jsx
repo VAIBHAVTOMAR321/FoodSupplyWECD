@@ -81,11 +81,11 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
         path: "/DirectorDashboard",
       },
 
-      {
-        icon: <FaTachometerAlt />,
-        label: "Received Food (CW)",
-        path: "/DirFoodItemReceiving",
-      },
+      // {
+      //   icon: <FaTachometerAlt />,
+      //   label: "Received Food (CW)",
+      //   path: "/DirFoodItemReceiving",
+      // },
 
       {
         icon: <FaTachometerAlt />,

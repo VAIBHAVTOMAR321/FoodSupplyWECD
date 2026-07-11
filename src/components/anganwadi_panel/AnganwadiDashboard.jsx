@@ -772,7 +772,7 @@ const AnganwadiDashboard = () => {
                         <Form.Control 
                           type="text" 
                           placeholder="e.g., 2025-26" 
-                          value={distributionData.fin_year} 
+                          value={distributionData.fin_year} disabled
                           onChange={(e) => {
                             const newFinYear = e.target.value;
                             handleThrPeriodChange(newFinYear, distributionData.quarter, distributionData.food_item_id, selectedItem.isEdit);
