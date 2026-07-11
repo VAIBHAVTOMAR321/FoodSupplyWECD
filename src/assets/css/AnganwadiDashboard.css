@@ -106,3 +106,7 @@
 .view-modal-footer {
   border-top: none;
 }
+
+.month-checkbox-group .form-check-label {
+  font-size: 0.85rem;
+}

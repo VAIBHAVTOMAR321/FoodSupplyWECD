@@ -824,7 +824,7 @@ const AnganwadiDashboard = () => {
                       </Form.Group>
                       <Form.Group className="mb-3">
                         <Form.Label>Months</Form.Label>
-                        <div className="d-flex flex-wrap gap-2">
+                        <div className="month-checkbox-group d-flex flex-wrap gap-2">
                           {monthOptions.map((month) => {
                             const checked = distributionData.months?.includes(month.value) || false;
                             return (
