@@ -472,14 +472,18 @@ const DirectorFoodItems = () => {
               </Form.Group>
 
               <Form.Group className="mb-3" controlId="unit">
-                <Form.Label>Unit</Form.Label>
-                <Form.Control
-                  type="text"
-                  placeholder="Enter unit (e.g., grams, ml)"
+                <Form.Label>Unit (इकाई)</Form.Label>
+                <Form.Select
                   value={formData.unit}
                   onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                   isInvalid={!!formErrors.unit}
-                />
+                >
+                  <option value="">इकाई चुनें</option>
+                  <option value="किलोग्राम (kg)">किलोग्राम (kg)</option>
+                  <option value="ग्राम (gm)">ग्राम (gm)</option>
+                  <option value="लीटर (ltr)">लीटर (ltr)</option>
+                  <option value="पैकेट (packet)">पैकेट (packet)</option>
+                </Form.Select>
                 <Form.Control.Feedback type="invalid">
                   {formErrors.unit}
                 </Form.Control.Feedback>
