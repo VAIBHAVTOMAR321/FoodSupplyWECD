@@ -48,6 +48,11 @@ const ITBeneEntry = () => {
 
   const { api } = useAuth();
   const [reports, setReports] = useState([]);
+  const [awcList, setAwcList] = useState([]);
+  const [uniqueDistricts, setUniqueDistricts] = useState([]);
+  const [uniqueProjects, setUniqueProjects] = useState([]);
+  const [uniqueSectors, setUniqueSectors] = useState([]);
+  const [filteredAwcs, setFilteredAwcs] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -111,6 +116,36 @@ const ITBeneEntry = () => {
     fetchReports();
   }, [fetchReports]);
 
+  useEffect(() => {
+    const fetchAwcList = async () => {
+      try {
+        const response = await api.get("/director/awc-list/");
+        setAwcList(response.data.data || []);
+      } catch (err) {
+        console.error("Failed to fetch AWC list:", err);
+      }
+    };
+    fetchAwcList();
+  }, [api]);
+
+  useEffect(() => {
+    if (awcList.length > 0) {
+      const districts = [...new Set(awcList
+        .filter(item => item.district_code)
+        .map(item => item.district_code)
+      )];
+      setUniqueDistricts(districts);
+    }
+  }, [awcList]);
+
+  useEffect(() => {
+    if (!formData.district) {
+      setUniqueProjects([]);
+      setUniqueSectors([]);
+      setFilteredAwcs([]);
+    }
+  }, [formData.district]);
+
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
@@ -118,6 +153,63 @@ const ITBeneEntry = () => {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDistrictChange = (e) => {
+    const district = e.target.value;
+    const projects = [...new Set(awcList.filter(item => item.district_code === district).map(item => item.project))].filter(Boolean);
+    setUniqueProjects(projects);
+    setUniqueSectors([]);
+    setFilteredAwcs([]);
+    setFormData((prev) => ({
+      ...prev,
+      district,
+      project: "",
+      sector: "",
+      awc_name: "",
+    }));
+  };
+
+  const handleProjectChange = (e) => {
+    const project = e.target.value;
+    const sectors = [...new Set(awcList.filter(item => item.district_code === formData.district && item.project === project).map(item => item.sector))].filter(Boolean);
+    setUniqueSectors(sectors);
+    setFilteredAwcs([]);
+    setFormData((prev) => ({
+      ...prev,
+      project,
+      sector: "",
+      awc_name: "",
+    }));
+  };
+
+  const handleSectorChange = (e) => {
+    const sector = e.target.value;
+    const awcs = awcList.filter(item =>
+      item.district_code === formData.district &&
+      item.project === formData.project &&
+      item.sector === sector
+    );
+    setFilteredAwcs(awcs);
+    setFormData((prev) => ({
+      ...prev,
+      sector,
+      awc_name: "",
+    }));
+  };
+
+  const handleAwcChange = (e) => {
+    const { value } = e.target;
+    const selectedAwc = awcList.find(awc => awc.awc_name === value);
+    if (selectedAwc) {
+      setFormData(prev => ({
+        ...prev,
+        awc_name: selectedAwc.awc_name,
+        district: selectedAwc.district_code,
+        project: selectedAwc.project,
+        sector: selectedAwc.sector,
+      }));
+    }
   };
 
   const handleFilterChange = (e) => {
@@ -187,8 +279,7 @@ const ITBeneEntry = () => {
         await api.put(API_URL, payload);
         setSuccess("Report updated successfully.");
       } else {
-        // The API for creation is not specified, assuming it's a POST to the same URL
-        await api.post(API_URL, payload);
+        await api.post("/ang-beneficiary-report/", payload);
         setSuccess("Report created successfully.");
       }
       setShowForm(false);
@@ -262,10 +353,9 @@ const ITBeneEntry = () => {
             <h3 className="mb-4 fw-bold">
               Beneficiary Entry
             </h3>
-            {/* Add new button can be enabled if there is a creation API */}
-            {/* <Button onClick={handleAddNew} variant="primary">
+            <Button onClick={handleAddNew} variant="primary">
               <FaPlus className="me-2" /> Add Beneficiary Details
-            </Button> */}
+            </Button>
           </div>
 
           {success && <Alert variant="success">{success}</Alert>}
@@ -277,41 +367,39 @@ const ITBeneEntry = () => {
               <Card.Header as="h5">
                 {editingId ? "Edit" : "Add"} Beneficiary Report
               </Card.Header>
-              <Card.Body>
+             
                 <Form onSubmit={handleSubmit}>
-                  <Row>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>District</Form.Label><Form.Control type="text" name="district" value={formData.district} onChange={handleFormChange} required disabled /></Form.Group></Col>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Project</Form.Label><Form.Control type="text" name="project" value={formData.project} onChange={handleFormChange} required disabled /></Form.Group></Col>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Sector</Form.Label><Form.Control type="text" name="sector" value={formData.sector} onChange={handleFormChange} required disabled /></Form.Group></Col>
+                  <Row className="align-items-end">
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Financial Year</Form.Label><Form.Control type="text" name="fin_year" value={formData.fin_year} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Month</Form.Label><Form.Select name="month" value={formData.month} onChange={handleFormChange} required disabled={!!editingId}><option value="">Select Month</option>{["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].map(m => <option key={m} value={m}>{m}</option>)}</Form.Select></Form.Group></Col>
                   </Row>
                   <Row>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>AWC Name</Form.Label><Form.Control type="text" name="awc_name" value={formData.awc_name} onChange={handleFormChange} required disabled /></Form.Group></Col>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Sector Status</Form.Label><Form.Select name="sector_status" value={formData.sector_status} onChange={handleFormChange} required><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></Form.Select></Form.Group></Col>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Sector Remark</Form.Label><Form.Control as="textarea" rows={1} name="sector_remark" value={formData.sector_remark || ''} onChange={handleFormChange} /></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>District</Form.Label><Form.Select name="district" value={formData.district} onChange={handleDistrictChange} required disabled={!!editingId}><option value="">Select District</option>{uniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}</Form.Select></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Project</Form.Label><Form.Select name="project" value={formData.project} onChange={handleProjectChange} required disabled={!formData.district || !!editingId}><option value="">Select Project</option>{uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}</Form.Select></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Sector</Form.Label><Form.Select name="sector" value={formData.sector} onChange={handleSectorChange} required disabled={!formData.project || !!editingId}><option value="">Select Sector</option>{uniqueSectors.map(s => <option key={s} value={s}>{s}</option>)}</Form.Select></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>AWC Name</Form.Label><Form.Select name="awc_name" value={formData.awc_name} onChange={handleAwcChange} required disabled={!formData.sector || !!editingId}><option value="">Select AWC</option>{filteredAwcs.map(awc => <option key={awc.awc_code} value={awc.awc_name}>{awc.awc_name}</option>)}</Form.Select>{formErrors.awc_name && <Form.Text className="text-danger">{formErrors.awc_name}</Form.Text>}</Form.Group></Col>
                   </Row>
                   <hr />
                   <h6 className="mb-3">Beneficiary Numbers</h6>
                   <Row>
-                    <Col md><Form.Group className="mb-3"><Form.Label>PW & LM</Form.Label><Form.Control type="number" name="pw_lm" value={formData.pw_lm} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md><Form.Group className="mb-3"><Form.Label>Children (6m-3y)</Form.Label><Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md><Form.Group className="mb-3"><Form.Label>Children (3-6y)</Form.Label><Form.Control type="number" name="children_3_6y" value={formData.children_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>PW & LM</Form.Label><Form.Control type="number" name="pw_lm" value={formData.pw_lm} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Children (6m-3y)</Form.Label><Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Children (3-6y)</Form.Label><Form.Control type="number" name="children_3_6y" value={formData.children_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Adolescent Girls</Form.Label><Form.Control type="number" name="adolescent_girls" value={formData.adolescent_girls} onChange={handleFormChange} required /></Form.Group></Col>
                   </Row>
                   <Row>
-                    <Col md><Form.Group className="mb-3"><Form.Label>Adolescent Girls</Form.Label><Form.Control type="number" name="adolescent_girls" value={formData.adolescent_girls} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md><Form.Group className="mb-3"><Form.Label>SAM (6m-3y)</Form.Label><Form.Control type="number" name="sam_6m_3y" value={formData.sam_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md><Form.Group className="mb-3"><Form.Label>SAM (3-5y)</Form.Label><Form.Control type="number" name="sam_3_5y" value={formData.sam_3_5y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>SAM (6m-3y)</Form.Label><Form.Control type="number" name="sam_6m_3y" value={formData.sam_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>SAM (3-5y)</Form.Label><Form.Control type="number" name="sam_3_5y" value={formData.sam_3_5y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>SUW (6m-3y)</Form.Label><Form.Control type="number" name="suw_6m_3y" value={formData.suw_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>SUW (3-6y)</Form.Label><Form.Control type="number" name="suw_3_6y" value={formData.suw_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
                   </Row>
-                  <Row>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>SUW (6m-3y)</Form.Label><Form.Control type="number" name="suw_6m_3y" value={formData.suw_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>SUW (3-6y)</Form.Label><Form.Control type="number" name="suw_3_6y" value={formData.suw_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={4}></Col>
-                  </Row>
+                  
                   <Button variant="secondary" onClick={() => setShowForm(false)} className="me-2">Cancel</Button>
                   <Button variant="primary" type="submit" disabled={submitting}>
                     {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingId ? "Update Report" : "Save Report")}
                   </Button>
                 </Form>
-              </Card.Body>
+              
             </Card>
           </Collapse>
 
