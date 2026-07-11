@@ -1,3 +1,8 @@
-.form-check-input{
-  border:1px solid #1b4a8f !important;  
+.form-check-input {
+  border: 1px solid #1b4a8f !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin-top:12px !important;
+ 
+  cursor: pointer !important;
 }

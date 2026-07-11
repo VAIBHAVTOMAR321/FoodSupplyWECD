@@ -32,6 +32,38 @@ const allQuarters = [
   { value: 'jan-feb-mar', label: 'January-February-March' },
 ];
 
+const monthOptions = [
+  { value: 'apr', label: 'April' },
+  { value: 'may', label: 'May' },
+  { value: 'jun', label: 'June' },
+  { value: 'jul', label: 'July' },
+  { value: 'aug', label: 'August' },
+  { value: 'sep', label: 'September' },
+  { value: 'oct', label: 'October' },
+  { value: 'nov', label: 'November' },
+  { value: 'dec', label: 'December' },
+  { value: 'jan', label: 'January' },
+  { value: 'feb', label: 'February' },
+  { value: 'mar', label: 'March' },
+];
+
+const quarterToMonths = {
+  'apr-may-jun': ['apr', 'may', 'jun'],
+  'jul-aug-sep': ['jul', 'aug', 'sep'],
+  'oct-nov-dec': ['oct', 'nov', 'dec'],
+  'jan-feb-mar': ['jan', 'feb', 'mar'],
+};
+
+const monthLabels = monthOptions.reduce((acc, month) => {
+  acc[month.value] = month.label;
+  return acc;
+}, {});
+
+const formatMonths = (months = []) => {
+  if (!Array.isArray(months)) return '';
+  return months.map((month) => monthLabels[month] || month).join(', ');
+};
+
 const FoodItemReceiving = () => {
   const { api } = useAuth();
 
@@ -145,13 +177,14 @@ const FoodItemReceiving = () => {
     setFormData(item ? {
       ...item,
       date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
+      months: item.months || (Array.isArray(item.quarter) ? item.quarter : quarterToMonths[item.quarter] || []),
     } : {
       food_item: '',
       quantity: '',
       bene_category: '',
       date: new Date().toISOString().split('T')[0],
       fin_year: getCurrentFinancialYear(),
-      quarter: '',
+      months: [],
     });
     setFormError('');
     setShowModal(true);
@@ -198,6 +231,7 @@ const FoodItemReceiving = () => {
       ...formData,
       unit: selectedFoodItem.unit,
       quantity: parseFloat(formData.quantity),
+      months: formData.months || [],
     };
 
     if (editingItem) {
@@ -244,7 +278,7 @@ const FoodItemReceiving = () => {
             <th>Quantity</th>
             <th>Unit</th>
             <th>Fin. Year</th>
-            <th>Quarter</th>
+            <th>Months</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -258,7 +292,7 @@ const FoodItemReceiving = () => {
               <td>{rec.quantity}</td>
               <td>{rec.unit}</td>
               <td>{rec.fin_year}</td>
-              <td>{rec.quarter}</td>
+              <td>{formatMonths(rec.months || (Array.isArray(rec.quarter) ? rec.quarter : quarterToMonths[rec.quarter] || []))}</td>
               <td>
                 <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenModal(rec)}>
                   <FaEdit />
@@ -450,38 +484,44 @@ const FoodItemReceiving = () => {
                   </Form.Group>
                 </Col>
                 
-                  <>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Financial Year</Form.Label>
-                        <Form.Control
-                          type="text"
-                          name="fin_year"
-                          value={formData.fin_year || ''}
-                          onChange={handleFormChange}
-                          placeholder="e.g., 2025-26"
-                          required disabled
-                        />
-                      </Form.Group>
-                    </Col>
-                    <Col md={12}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Quarter</Form.Label>
-                        <Form.Select
-                          name="quarter"
-                          value={formData.quarter || ''}
-                          onChange={handleFormChange}
-                          required
-                        >
-                          <option value="">Select Quarter</option>
-                          {allQuarters.map(q => (
-                            <option key={q.value} value={q.value}>{q.label}</option>
-                          ))}
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                  </>
-                
+                <>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Financial Year</Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="fin_year"
+                        value={formData.fin_year || ''}
+                        onChange={handleFormChange}
+                        placeholder="e.g., 2025-26"
+                        required disabled
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={12}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Months</Form.Label>
+                      <div className="month-checkbox-group d-flex flex-wrap gap-2">
+                        {monthOptions.map((month) => (
+                          <Form.Check
+                            key={month.value}
+                            inline
+                            type="checkbox"
+                            id={`month-${month.value}`}
+                            label={month.label}
+                            checked={(formData.months || []).includes(month.value)}
+                            onChange={(e) => {
+                              const nextMonths = e.target.checked
+                                ? [...new Set([...(formData.months || []), month.value])]
+                                : (formData.months || []).filter((m) => m !== month.value);
+                              setFormData(prev => ({ ...prev, months: nextMonths }));
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </Form.Group>
+                  </Col>
+                </>
               </Row>
 
               <div className="d-flex justify-content-end">
