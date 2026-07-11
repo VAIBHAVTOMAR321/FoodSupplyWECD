@@ -26,7 +26,7 @@ const DirectorFoodItems = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({ scheme: "", item: null });
-  const [formData, setFormData] = useState({ food_item: "", qty_per_ben: "", unit: "", bene_category: "", days_allotted: "" });
+  const [formData, setFormData] = useState({ food_item: "", qty_per_ben: "", unit: "", bene_category: "", days_allotted: "", total_quantity: "", show_status: "active" });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -94,10 +94,12 @@ const DirectorFoodItems = () => {
         qty_per_ben: item.qty_per_ben,
         unit: item.unit,
         bene_category: item.bene_category || "",
-        days_allotted: item.days_allotted || ""
+        days_allotted: item.days_allotted || "",
+        total_quantity: item.total_quantity || "",
+        show_status: item.show_status || "active"
       });
     } else {
-      setFormData({ food_item: "", qty_per_ben: "", unit: "", bene_category: "", days_allotted: "" });
+      setFormData({ food_item: "", qty_per_ben: "", unit: "", bene_category: "", days_allotted: "", total_quantity: "", show_status: "active" });
     }
     setFormErrors({});
     setShowModal(true);
@@ -125,9 +127,11 @@ const DirectorFoodItems = () => {
     setSubmitting(true);
     const url = API_URLS[scheme];
     const method = item ? 'put' : 'post';
-    let payload = { ...formData };
+    let payload = { food_item: formData.food_item, qty_per_ben: formData.qty_per_ben, unit: formData.unit, bene_category: formData.bene_category, days_allotted: formData.days_allotted };
     if (item) {
       payload.id = item.id;
+      payload.total_quantity = formData.total_quantity;
+      payload.show_status = formData.show_status;
     }
 
     try {
@@ -348,6 +352,8 @@ const DirectorFoodItems = () => {
                 <th>Beneficiary Category</th>
                 <th>Days Allotted</th>
                 <th>Unit</th>
+                <th>Total Qty</th>
+                <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -360,6 +366,8 @@ const DirectorFoodItems = () => {
                   <td>{item.bene_category}</td>
                   <td>{item.days_allotted}</td>
                   <td>{item.unit}</td>
+                  <td>{item.total_quantity}</td>
+                  <td>{item.show_status}</td>
                   <td>
                     <Button variant="outline-primary" size="sm" className="btn-action" onClick={() => handleShowModal(scheme, item)}>
                       <FaEdit />
@@ -476,6 +484,31 @@ const DirectorFoodItems = () => {
                   {formErrors.unit}
                 </Form.Control.Feedback>
               </Form.Group>
+
+              {modalConfig.item && (
+                <>
+                  <Form.Group className="mb-3" controlId="total_quantity">
+                    <Form.Label>Total Quantity</Form.Label>
+                    <Form.Control
+                      type="number"
+                      placeholder="Enter total quantity"
+                      value={formData.total_quantity}
+                      onChange={(e) => setFormData({ ...formData, total_quantity: e.target.value })}
+                    />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3" controlId="show_status">
+                    <Form.Label>Show Status</Form.Label>
+                    <Form.Select
+                      value={formData.show_status}
+                      onChange={(e) => setFormData({ ...formData, show_status: e.target.value })}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </Form.Select>
+                  </Form.Group>
+                </>
+              )}
 
               <Button variant="secondary" onClick={handleCloseModal} className="me-2">
                 Cancel
