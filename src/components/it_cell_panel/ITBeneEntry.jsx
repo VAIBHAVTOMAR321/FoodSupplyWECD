@@ -24,8 +24,11 @@ import {
   FaEdit,
   FaTrash,
   FaEye,
+  FaUpload,
+  FaFileExcel,
 } from "react-icons/fa";
 import "../../assets/css/AnganwadiDashboard.css";
+import * as XLSX from "xlsx";
 
 const getCurrentFinancialYear = () => {
   const today = new Date();
@@ -48,11 +51,6 @@ const ITBeneEntry = () => {
 
   const { api } = useAuth();
   const [reports, setReports] = useState([]);
-  const [awcList, setAwcList] = useState([]);
-  const [uniqueDistricts, setUniqueDistricts] = useState([]);
-  const [uniqueProjects, setUniqueProjects] = useState([]);
-  const [uniqueSectors, setUniqueSectors] = useState([]);
-  const [filteredAwcs, setFilteredAwcs] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -66,6 +64,15 @@ const ITBeneEntry = () => {
   const [showRemarkModal, setShowRemarkModal] = useState(false);
   const [viewingRemark, setViewingRemark] = useState("");
 
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkUploadError, setBulkUploadError] = useState("");
+  const [bulkPreviewData, setBulkPreviewData] = useState([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
+
+  const [awcList, setAwcList] = useState([]);
+  const [awcListLoading, setAwcListLoading] = useState(true);
+  const [bulkFileInputKey, setBulkFileInputKey] = useState(0);
 
   const initialFormData = {
     fin_year: getCurrentFinancialYear(),
@@ -101,6 +108,25 @@ const ITBeneEntry = () => {
   }, [api]);
 
   useEffect(() => {
+    const fetchAwcList = async () => {
+      setAwcListLoading(true);
+      try {
+        const response = await api.get("/director/awc-list/");
+        const awcs = (response.data.data || []).map(awc => ({
+          ...awc,
+          district_name: awc.district, // Ensure district_name is available
+        }));
+        setAwcList(awcs);
+      } catch (err) {
+        console.error("Failed to fetch AWC list:", err);
+      } finally {
+        setAwcListLoading(false);
+      }
+    };
+    fetchAwcList();
+  }, [api]);
+
+  useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
       setIsMobile(width < 768);
@@ -116,37 +142,6 @@ const ITBeneEntry = () => {
     fetchReports();
   }, [fetchReports]);
 
-  useEffect(() => {
-    const fetchAwcList = async () => {
-      try {
-        const response = await api.get("/director/awc-list/");
-        setAwcList(response.data.data || []);
-      } catch (err) {
-        console.error("Failed to fetch AWC list:", err);
-      }
-    };
-    fetchAwcList();
-  }, [api]);
-
-  useEffect(() => {
-    if (awcList.length > 0) {
-      const districtMap = new Map(
-        awcList
-          .filter(item => item.district_code && item.district)
-          .map(item => [item.district_code, { code: item.district_code, name: item.district }])
-      );
-      setUniqueDistricts([...districtMap.values()]);
-    }
-  }, [awcList]);
-
-  useEffect(() => {
-    if (!formData.district) {
-      setUniqueProjects([]);
-      setUniqueSectors([]);
-      setFilteredAwcs([]);
-    }
-  }, [formData.district]);
-
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
@@ -154,60 +149,6 @@ const ITBeneEntry = () => {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleDistrictChange = (e) => {
-    const districtCode = e.target.value;
-    const projects = [...new Set(awcList.filter(item => item.district_code === districtCode).map(item => item.project))].filter(Boolean);
-    setUniqueProjects(projects);
-    setUniqueSectors([]);
-    setFilteredAwcs([]);
-    setFormData((prev) => ({
-      ...prev,
-      district: districtCode,
-      project: "",
-      sector: "",
-      awc_name: "",
-    }));
-  };
-
-  const handleProjectChange = (e) => {
-    const project = e.target.value;
-    const sectors = [...new Set(awcList.filter(item => item.district_code === formData.district && item.project === project).map(item => item.sector))].filter(Boolean);
-    setUniqueSectors(sectors);
-    setFilteredAwcs([]);
-    setFormData((prev) => ({
-      ...prev,
-      project,
-      sector: "",
-      awc_name: "",
-    }));
-  };
-
-  const handleSectorChange = (e) => {
-    const sector = e.target.value;
-    const awcs = awcList.filter(item =>
-      item.district_code === formData.district &&
-      item.project === formData.project &&
-      item.sector === sector
-    );
-    setFilteredAwcs(awcs);
-    setFormData((prev) => ({
-      ...prev,
-      sector,
-      awc_name: "",
-    }));
-  };
-
-  const handleAwcChange = (e) => {
-    const { value } = e.target;
-    const selectedAwc = awcList.find(awc => awc.awc_name === value);
-    if (selectedAwc) {
-      setFormData(prev => ({
-        ...prev, // This keeps existing form data
-        awc_name: selectedAwc.awc_name,
-      }));
-    }
   };
 
   const handleFilterChange = (e) => {
@@ -252,6 +193,202 @@ const ITBeneEntry = () => {
     }
   };
 
+  const handleShowBulkUploadModal = () => {
+    setBulkFile(null);
+    setBulkPreviewData([]);
+    setBulkUploadError("");
+    setBulkFileInputKey(prev => prev + 1);
+    setShowBulkUploadModal(true);
+  };
+
+  const handleCloseBulkUploadModal = () => setShowBulkUploadModal(false);
+
+  const downloadSampleFile = () => {
+    const sampleData = [
+      {
+        fin_year: getCurrentFinancialYear(),
+        month: "apr",
+        pw_lm: 10,
+        children_6m_3y: 15,
+        children_3_6y: 20,
+        adolescent_girls: 5,
+        sam_6m_3y: 1,
+        sam_3_5y: 2,
+        suw_6m_3y: 3,
+        suw_3_6y: 4,
+        district: "Sample District",
+        project: "Sample Project",
+        sector: "Sample Sector",
+        awc_name: "Sample AWC",
+      },
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiary Data");
+    XLSX.writeFile(workbook, "SampleBeneficiaryEntry.xlsx");
+  };
+
+  // Levenshtein distance function to find closest match for misspelled names
+  const levenshteinDistance = (a, b) => {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+    for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+    for (let j = 1; j <= b.length; j++) {
+      for (let i = 1; i <= a.length; i++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + cost);
+      }
+    }
+    return matrix[b.length][a.length];
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (awcList.length === 0) {
+      if (awcListLoading) {
+        setBulkUploadError("AWC list is still loading. Please wait a moment and select the file again.");
+      } else {
+        setBulkUploadError("AWC list is not available. Please refresh the page and try again.");
+      }
+      setBulkPreviewData([]);
+      setBulkFile(null);
+      return;
+    }
+
+    setBulkFile(file);
+    setBulkPreviewData([]);
+    setBulkUploadError('');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+        if (json.length === 0) {
+          setBulkUploadError("The Excel file is empty.");
+          return;
+        }
+
+        const requiredHeaders = [
+            "fin_year", "month", "awc_name", "pw_lm", "children_3_6y",
+            "children_6m_3y", "adolescent_girls", "sam_6m_3y", "sam_3_5y",
+            "suw_6m_3y", "suw_3_6y"
+        ];
+        const fileHeaders = Object.keys(json[0] || {});
+        const missingHeaders = requiredHeaders.filter(h => !fileHeaders.includes(h));
+
+        if (missingHeaders.length > 0) {
+          setBulkUploadError(`Missing required columns: ${missingHeaders.join(", ")}`);
+          return;
+        }
+
+        // Create a map for quick, case-insensitive AWC name lookup
+        const awcNameMap = new Map();
+        awcList.forEach(awc => awcNameMap.set(String(awc.awc_name).toUpperCase(), awc.awc_name));
+
+        // For duplicate checking
+        const seenEntries = new Set();
+
+        const previewData = json.map((row, index) => {
+          const rowErrors = {};
+          requiredHeaders.forEach(header => {
+            const value = row[header];
+            if (value === undefined || value === null || String(value).trim() === "") {
+              rowErrors[header] = `'${header}' is missing.`;
+            } else {
+              if (header !== 'fin_year' && header !== 'month' && header !== 'awc_name' && isNaN(Number(value))) {
+                rowErrors[header] = `'${header}' must be a valid number.`;
+              }
+            }
+          });
+
+          // Validate awc_name against the fetched list
+          const excelAwcName = row.awc_name ? String(row.awc_name).trim().toUpperCase() : "";
+          if (!excelAwcName) {
+            rowErrors['awc_name'] = "'awc_name' is missing.";
+          } else if (awcNameMap.has(excelAwcName)) {
+            row.awc_name = awcNameMap.get(excelAwcName); // Correct casing
+          }  else { let bestMatch = null; let minDistance = Infinity; awcList.forEach(awc => {
+              const distance = levenshteinDistance(excelAwcName, awc.awc_name.toUpperCase());
+              if (distance < minDistance) {
+                minDistance = distance;
+                bestMatch = awc.awc_name;
+              }
+            });
+
+            if (bestMatch && minDistance <= 2) {
+              rowErrors['awc_name_suggestion'] = `Original: '${row.awc_name}'. Corrected to '${bestMatch}'.`;
+              row.awc_name = bestMatch;
+            } else {
+              const errorMessage = bestMatch ? `'${row.awc_name}' is not a valid AWC name. Did you mean '${bestMatch}'?` : `'${row.awc_name}' is not a valid AWC name.`;
+              rowErrors['awc_name'] = errorMessage;
+            }
+          }
+
+          if (Object.keys(rowErrors).length === 0) {
+            const entryKey = `${row.fin_year}|${row.month}|${row.awc_name}`;
+            if (seenEntries.has(entryKey)) {
+              rowErrors['duplicate'] = `Duplicate entry for AWC '${row.awc_name}' in month '${row.month}'.`;
+            } else {
+              seenEntries.add(entryKey);
+            }
+          }
+          return { data: row, errors: rowErrors };
+        });
+
+        setBulkPreviewData(previewData);
+        if (previewData.some(item => Object.keys(item.errors).length > 0)) {
+          setBulkUploadError("Your file contains errors. Please fix them before uploading.");
+        }
+      } catch (err) {
+        setBulkUploadError("Failed to parse the Excel file. Please ensure it's a valid .xlsx or .xls file.");
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleBulkUpload = async () => {
+    if (!bulkFile || bulkPreviewData.some(item => Object.keys(item.errors).length > 0 && !item.errors.awc_name_suggestion)) {
+      setBulkUploadError("Cannot upload. Please select a valid file and fix any errors.");
+      return;
+    }
+    setBulkUploading(true);
+    setBulkUploadError("");
+
+    try {
+      const validRows = bulkPreviewData.filter(item => Object.keys(item.errors).length === 0 || (Object.keys(item.errors).length === 1 && item.errors.awc_name_suggestion));
+      const uploadPromises = validRows.map(item => {
+        const selectedAwc = awcList.find(awc => awc.awc_name === item.data.awc_name);
+        const payload = {
+          ...item.data,
+          district: selectedAwc?.district_name || '',
+          project: selectedAwc?.project || '',
+          sector: selectedAwc?.sector || '',
+        };
+        return api.post("/ang-beneficiary-report/", payload);
+      });
+
+      await Promise.all(uploadPromises);
+      setSuccess("Bulk upload successful!");
+      handleCloseBulkUploadModal();
+      fetchReports();
+    } catch (err) {
+      setBulkUploadError("An error occurred during bulk upload. Some records may have failed.");
+      console.error("Bulk upload failed:", err.response || err);
+    } finally {
+      setBulkUploading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -277,7 +414,8 @@ const ITBeneEntry = () => {
         await api.put(API_URL, payload);
         setSuccess("Report updated successfully.");
       } else {
-        await api.post("/ang-beneficiary-report/", payload);
+        // The API for creation is not specified, assuming it's a POST to the same URL
+        await api.post(API_URL, payload);
         setSuccess("Report created successfully.");
       }
       setShowForm(false);
@@ -351,9 +489,10 @@ const ITBeneEntry = () => {
             <h3 className="mb-4 fw-bold">
               Beneficiary Entry
             </h3>
-            <Button onClick={handleAddNew} variant="primary">
-              <FaPlus className="me-2" /> Add Beneficiary Details
-            </Button>
+            <div>
+              <Button onClick={handleShowBulkUploadModal} variant="success" className="me-2"><FaUpload className="me-2" /> Bulk Upload</Button>
+              <Button onClick={handleAddNew} variant="primary"><FaPlus className="me-2" /> Add Beneficiary Details</Button>
+            </div>
           </div>
 
           {success && <Alert variant="success">{success}</Alert>}
@@ -365,36 +504,49 @@ const ITBeneEntry = () => {
               <Card.Header as="h5">
                 {editingId ? "Edit" : "Add"} Beneficiary Report
               </Card.Header>
-             
+              <Card.Body>
                 <Form onSubmit={handleSubmit}>
-                  <Row className="align-items-end">
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Financial Year</Form.Label><Form.Control type="text" name="fin_year" value={formData.fin_year} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Month</Form.Label><Form.Select name="month" value={formData.month} onChange={handleFormChange} required disabled={!!editingId}><option value="">Select Month</option>{["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].map(m => <option key={m} value={m}>{m}</option>)}</Form.Select></Form.Group></Col>                    <Col md={3}><Form.Group className="mb-3"><Form.Label>District</Form.Label><Form.Select name="district" value={formData.district} onChange={handleDistrictChange} required disabled={!!editingId}><option value="">Select District</option>{uniqueDistricts.map(d => <option key={d.code} value={d.code}>{`${d.name} (${d.code})`}</option>)}</Form.Select></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Project</Form.Label><Form.Select name="project" value={formData.project} onChange={handleProjectChange} required disabled={!formData.district || !!editingId}><option value="">Select Project</option>{uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}</Form.Select></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Sector</Form.Label><Form.Select name="sector" value={formData.sector} onChange={handleSectorChange} required disabled={!formData.project || !!editingId}><option value="">Select Sector</option>{uniqueSectors.map(s => <option key={s} value={s}>{s}</option>)}</Form.Select></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>AWC Name</Form.Label><Form.Select name="awc_name" value={formData.awc_name} onChange={handleAwcChange} required disabled={!formData.sector || !!editingId}><option value="">Select AWC</option>{filteredAwcs.map(awc => <option key={awc.awc_code} value={awc.awc_name}>{awc.awc_name}</option>)}</Form.Select>{formErrors.awc_name && <Form.Text className="text-danger">{formErrors.awc_name}</Form.Text>}</Form.Group></Col>
-              
-                
-                  <h6 className="mb-3">Beneficiary Numbers</h6>
-                 
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>PW & LM</Form.Label><Form.Control type="number" name="pw_lm" value={formData.pw_lm} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Children (6m-3y)</Form.Label><Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Children (3-6y)</Form.Label><Form.Control type="number" name="children_3_6y" value={formData.children_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Adolescent Girls</Form.Label><Form.Control type="number" name="adolescent_girls" value={formData.adolescent_girls} onChange={handleFormChange} required /></Form.Group></Col>
+                  <Row>
+                    <Col md={4}><Form.Group className="mb-3"><Form.Label>District</Form.Label><Form.Control type="text" name="district" value={formData.district} onChange={handleFormChange} required disabled /></Form.Group></Col>
+                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Project</Form.Label><Form.Control type="text" name="project" value={formData.project} onChange={handleFormChange} required disabled /></Form.Group></Col>
+                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Sector</Form.Label><Form.Control type="text" name="sector" value={formData.sector} onChange={handleFormChange} required disabled /></Form.Group></Col>
                   </Row>
                   <Row>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>SAM (6m-3y)</Form.Label><Form.Control type="number" name="sam_6m_3y" value={formData.sam_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>SAM (3-5y)</Form.Label><Form.Control type="number" name="sam_3_5y" value={formData.sam_3_5y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>SUW (6m-3y)</Form.Label><Form.Control type="number" name="suw_6m_3y" value={formData.suw_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>SUW (3-6y)</Form.Label><Form.Control type="number" name="suw_3_6y" value={formData.suw_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={4}><Form.Group className="mb-3"><Form.Label>AWC Name</Form.Label><Form.Control type="text" name="awc_name" value={formData.awc_name} onChange={handleFormChange} required disabled /></Form.Group></Col>
+                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Sector Status</Form.Label><Form.Select name="sector_status" value={formData.sector_status} onChange={handleFormChange} required><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></Form.Select></Form.Group></Col>
+                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Month</Form.Label>
+                      <Form.Select name="month" value={formData.month} onChange={handleFormChange} required>
+                        <option value="">Select Month</option>
+                        <option value="jan">January</option><option value="feb">February</option><option value="mar">March</option>
+                        <option value="apr">April</option><option value="may">May</option><option value="jun">June</option>
+                        <option value="jul">July</option><option value="aug">August</option><option value="sep">September</option>
+                        <option value="oct">October</option><option value="nov">November</option><option value="dec">December</option>
+                      </Form.Select>
+                    </Form.Group></Col>
                   </Row>
-                  
+                  <hr />
+                  <h6 className="mb-3">Beneficiary Numbers</h6>
+                  <Row>
+                    <Col md><Form.Group className="mb-3"><Form.Label>PW & LM</Form.Label><Form.Control type="number" name="pw_lm" value={formData.pw_lm} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md><Form.Group className="mb-3"><Form.Label>Children (6m-3y)</Form.Label><Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md><Form.Group className="mb-3"><Form.Label>Children (3-6y)</Form.Label><Form.Control type="number" name="children_3_6y" value={formData.children_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
+                  </Row>
+                  <Row>
+                    <Col md><Form.Group className="mb-3"><Form.Label>Adolescent Girls</Form.Label><Form.Control type="number" name="adolescent_girls" value={formData.adolescent_girls} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md><Form.Group className="mb-3"><Form.Label>SAM (6m-3y)</Form.Label><Form.Control type="number" name="sam_6m_3y" value={formData.sam_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md><Form.Group className="mb-3"><Form.Label>SAM (3-5y)</Form.Label><Form.Control type="number" name="sam_3_5y" value={formData.sam_3_5y} onChange={handleFormChange} required /></Form.Group></Col>
+                  </Row>
+                  <Row>
+                    <Col md={4}><Form.Group className="mb-3"><Form.Label>SUW (6m-3y)</Form.Label><Form.Control type="number" name="suw_6m_3y" value={formData.suw_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={4}><Form.Group className="mb-3"><Form.Label>SUW (3-6y)</Form.Label><Form.Control type="number" name="suw_3_6y" value={formData.suw_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={4}></Col>
+                  </Row>
                   <Button variant="secondary" onClick={() => setShowForm(false)} className="me-2">Cancel</Button>
                   <Button variant="primary" type="submit" disabled={submitting}>
                     {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingId ? "Update Report" : "Save Report")}
                   </Button>
                 </Form>
-              
+              </Card.Body>
             </Card>
           </Collapse>
 
@@ -489,6 +641,77 @@ const ITBeneEntry = () => {
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onClick={handleCloseRemarkModal}>Close</Button>
+            </Modal.Footer>
+          </Modal>
+
+          <Modal show={showBulkUploadModal} onHide={handleCloseBulkUploadModal} centered size="xl">
+            <Modal.Header closeButton>
+              <Modal.Title>Bulk Upload Beneficiary Reports</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              {bulkUploadError && <Alert variant="danger">{bulkUploadError}</Alert>}
+              <p>Upload an Excel file with the required columns. The column names must match the sample file.</p>
+              <Button variant="link" onClick={downloadSampleFile} className="p-0 mb-3">
+                <FaFileExcel className="me-1" /> Download Sample File
+              </Button>
+              <Form.Group controlId="formFile" className="mb-3">
+                <Form.Label>Select Excel File</Form.Label>
+                <Form.Control
+                  key={bulkFileInputKey}
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={handleFileSelect}
+                  disabled={awcListLoading}
+                />
+                {awcListLoading && <Form.Text className="text-muted">Loading AWC list... file selection will be enabled shortly.</Form.Text>}
+              </Form.Group>
+
+              {bulkPreviewData.length > 0 && (
+                <div className="mt-4" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  <h6>File Preview</h6>
+                  <Table striped bordered hover responsive size="sm">
+                  <thead>
+                      <tr>
+                        <th>#</th>
+                        {Object.keys(initialFormData).filter(k => !['district', 'project', 'sector'].includes(k)).map(key => <th key={key}>{key.replace(/_/g, ' ')}</th>)}
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    {bulkPreviewData.some(item => item.errors.duplicate) && (
+                      <Alert variant="warning" className="mt-2">Duplicate rows were found in your file. Only the first instance of each will be uploaded.</Alert>
+                    )}
+                    <tbody>
+                      {bulkPreviewData.map((item, index) => (
+                        <tr key={index}>
+                          <td className={Object.keys(item.errors).length > 0 && !item.errors.awc_name_suggestion ? 'table-danger' : ''}>{index + 1}</td>
+                          {Object.keys(initialFormData).filter(k => !['district', 'project', 'sector'].includes(k)).map(key => (
+                            <td 
+                              key={key} 
+                              className={item.errors[key] ? 'table-danger' : (key === 'awc_name' && item.errors.awc_name_suggestion) ? 'table-warning' : ''} 
+                              title={item.errors[key] || item.errors.awc_name_suggestion}
+                            >
+                              {item.data[key]} 
+                            </td>
+                          ))}
+                          <td>
+                            {Object.keys(item.errors).length > 0 && !item.errors.awc_name_suggestion ? (
+                              <span className="text-danger" title={Object.values(item.errors).join('\n')}>Error</span>
+                            ) : item.errors.awc_name_suggestion ? (
+                              <span className="text-warning" title={item.errors.awc_name_suggestion}>Suggestion</span>
+                            ) : (<span className="text-success">OK</span>)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </div>
+              )}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={handleCloseBulkUploadModal} disabled={bulkUploading}>Cancel</Button>
+              <Button variant="primary" onClick={handleBulkUpload} disabled={bulkUploading || !bulkFile || bulkPreviewData.some(item => Object.keys(item.errors).length > 0 && !item.errors.awc_name_suggestion)}>
+                {bulkUploading ? <><Spinner as="span" animation="border" size="sm" /> Uploading...</> : "Upload"}
+              </Button>
             </Modal.Footer>
           </Modal>
           </Container>
