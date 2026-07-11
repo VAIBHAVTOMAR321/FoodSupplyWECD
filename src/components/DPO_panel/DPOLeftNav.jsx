@@ -85,12 +85,12 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
         path: "/DPOBeneEntry",
         active: true,
       },
-// {
-//         icon: <FaTachometerAlt />,
-//         label: "Student Entery Form",
-//         path: "/StudentForm",
-//         active: true,
-//       },
+{
+        icon: <FaTachometerAlt />,
+        label: "Student Entery Form",
+        path: "/StudentForm",
+        active: true,
+      },
 
       
      
