@@ -130,11 +130,12 @@ const ITBeneEntry = () => {
 
   useEffect(() => {
     if (awcList.length > 0) {
-      const districts = [...new Set(awcList
-        .filter(item => item.district_code)
-        .map(item => item.district_code)
-      )];
-      setUniqueDistricts(districts);
+      const districtMap = new Map(
+        awcList
+          .filter(item => item.district_code && item.district)
+          .map(item => [item.district_code, { code: item.district_code, name: item.district }])
+      );
+      setUniqueDistricts([...districtMap.values()]);
     }
   }, [awcList]);
 
@@ -156,14 +157,14 @@ const ITBeneEntry = () => {
   };
 
   const handleDistrictChange = (e) => {
-    const district = e.target.value;
-    const projects = [...new Set(awcList.filter(item => item.district_code === district).map(item => item.project))].filter(Boolean);
+    const districtCode = e.target.value;
+    const projects = [...new Set(awcList.filter(item => item.district_code === districtCode).map(item => item.project))].filter(Boolean);
     setUniqueProjects(projects);
     setUniqueSectors([]);
     setFilteredAwcs([]);
     setFormData((prev) => ({
       ...prev,
-      district,
+      district: districtCode,
       project: "",
       sector: "",
       awc_name: "",
@@ -203,11 +204,8 @@ const ITBeneEntry = () => {
     const selectedAwc = awcList.find(awc => awc.awc_name === value);
     if (selectedAwc) {
       setFormData(prev => ({
-        ...prev,
+        ...prev, // This keeps existing form data
         awc_name: selectedAwc.awc_name,
-        district: selectedAwc.district_code,
-        project: selectedAwc.project,
-        sector: selectedAwc.sector,
       }));
     }
   };
@@ -371,8 +369,7 @@ const ITBeneEntry = () => {
                 <Form onSubmit={handleSubmit}>
                   <Row className="align-items-end">
                     <Col md={3}><Form.Group className="mb-3"><Form.Label>Financial Year</Form.Label><Form.Control type="text" name="fin_year" value={formData.fin_year} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Month</Form.Label><Form.Select name="month" value={formData.month} onChange={handleFormChange} required disabled={!!editingId}><option value="">Select Month</option>{["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].map(m => <option key={m} value={m}>{m}</option>)}</Form.Select></Form.Group></Col>
-                    <Col md={3}><Form.Group className="mb-3"><Form.Label>District</Form.Label><Form.Select name="district" value={formData.district} onChange={handleDistrictChange} required disabled={!!editingId}><option value="">Select District</option>{uniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}</Form.Select></Form.Group></Col>
+                    <Col md={3}><Form.Group className="mb-3"><Form.Label>Month</Form.Label><Form.Select name="month" value={formData.month} onChange={handleFormChange} required disabled={!!editingId}><option value="">Select Month</option>{["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].map(m => <option key={m} value={m}>{m}</option>)}</Form.Select></Form.Group></Col>                    <Col md={3}><Form.Group className="mb-3"><Form.Label>District</Form.Label><Form.Select name="district" value={formData.district} onChange={handleDistrictChange} required disabled={!!editingId}><option value="">Select District</option>{uniqueDistricts.map(d => <option key={d.code} value={d.code}>{`${d.name} (${d.code})`}</option>)}</Form.Select></Form.Group></Col>
                     <Col md={3}><Form.Group className="mb-3"><Form.Label>Project</Form.Label><Form.Select name="project" value={formData.project} onChange={handleProjectChange} required disabled={!formData.district || !!editingId}><option value="">Select Project</option>{uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}</Form.Select></Form.Group></Col>
                     <Col md={3}><Form.Group className="mb-3"><Form.Label>Sector</Form.Label><Form.Select name="sector" value={formData.sector} onChange={handleSectorChange} required disabled={!formData.project || !!editingId}><option value="">Select Sector</option>{uniqueSectors.map(s => <option key={s} value={s}>{s}</option>)}</Form.Select></Form.Group></Col>
                     <Col md={3}><Form.Group className="mb-3"><Form.Label>AWC Name</Form.Label><Form.Select name="awc_name" value={formData.awc_name} onChange={handleAwcChange} required disabled={!formData.sector || !!editingId}><option value="">Select AWC</option>{filteredAwcs.map(awc => <option key={awc.awc_code} value={awc.awc_name}>{awc.awc_name}</option>)}</Form.Select>{formErrors.awc_name && <Form.Text className="text-danger">{formErrors.awc_name}</Form.Text>}</Form.Group></Col>
