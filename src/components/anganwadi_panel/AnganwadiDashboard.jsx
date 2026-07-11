@@ -36,6 +36,61 @@ const allQuarters = [
   { value: 'jan-feb-mar', label: 'January-February-March' },
 ];
 
+const monthOptions = [
+  { value: 'apr', label: 'April' },
+  { value: 'may', label: 'May' },
+  { value: 'jun', label: 'June' },
+  { value: 'jul', label: 'July' },
+  { value: 'aug', label: 'August' },
+  { value: 'sep', label: 'September' },
+  { value: 'oct', label: 'October' },
+  { value: 'nov', label: 'November' },
+  { value: 'dec', label: 'December' },
+  { value: 'jan', label: 'January' },
+  { value: 'feb', label: 'February' },
+  { value: 'mar', label: 'March' },
+];
+
+const quarterToMonths = {
+  'apr-may-jun': ['apr', 'may', 'jun'],
+  'jul-aug-sep': ['jul', 'aug', 'sep'],
+  'oct-nov-dec': ['oct', 'nov', 'dec'],
+  'jan-feb-mar': ['jan', 'feb', 'mar'],
+};
+
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
+const formatMonths = (monthsOrQuarter) => {
+  if (Array.isArray(monthsOrQuarter)) {
+    return monthsOrQuarter.map((m) => monthLabels[m] || m).join(', ');
+  }
+  if (typeof monthsOrQuarter === 'string') {
+    const mapped = quarterToMonths[monthsOrQuarter];
+    if (mapped) return mapped.map((m) => monthLabels[m] || m).join(', ');
+    return monthLabels[monthsOrQuarter] || monthsOrQuarter;
+  }
+  return '';
+};
+
+const areSameMonthSets = (monthsA, monthsB) => {
+  if (!monthsA || !monthsB) return false;
+  if (monthsA.length !== monthsB.length) return false;
+  return monthsA.every((month) => monthsB.includes(month));
+};
+
 const AnganwadiDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true); 
   const [isMobile, setIsMobile] = useState(false);
@@ -51,7 +106,7 @@ const AnganwadiDashboard = () => {
   // State for distribution modal
   const [showDistributionModal, setShowDistributionModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [distributionData, setDistributionData] = useState({ total_beneficiaries: '', date: '', fin_year: '', quarter: '' });
+  const [distributionData, setDistributionData] = useState({ total_beneficiaries: '', date: '', fin_year: '', months: [] });
   const [distributionError, setDistributionError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -215,9 +270,9 @@ const AnganwadiDashboard = () => {
     }
   };
 
-  const handleThrPeriodChange = async (fin_year, quarter, foodItemId, isEditing = false) => {
+  const handleThrPeriodChange = async (fin_year, months, foodItemId, isEditing = false) => {
     if (!isEditing) {
-      setDistributionData(prev => ({ ...prev, fin_year, quarter, total_beneficiaries: '' }));
+      setDistributionData(prev => ({ ...prev, fin_year, months: months || [], total_beneficiaries: '' }));
     }
     setBeneficiaryCount(null);
     setDistributionError('');
@@ -227,21 +282,15 @@ const AnganwadiDashboard = () => {
 
     const currentFoodItem = foodItems.find(fi => fi.id === parseInt(foodItemId, 10));
 
-    if (!fin_year || !quarter || !currentFoodItem) {
+    if (!fin_year || !months?.length || !currentFoodItem) {
       setBeneficiaryCountLoading(false);
       return;
     }
 
-    const quarterToMonths = {
-      'apr-may-jun': ['apr', 'may', 'jun'],
-      'jul-aug-sep': ['jul', 'aug', 'sep'],
-      'oct-nov-dec': ['oct', 'nov', 'dec'],
-      'jan-feb-mar': ['jan', 'feb', 'mar'],
-    };
-
-    const months = quarterToMonths[quarter];
-    if (!months) {
-      setDistributionError("अमान्य तिमाही चयनित।");
+    const selectedMonths = Array.isArray(months) ? months : [months];
+    const validMonths = selectedMonths.filter(m => monthOptions.some(opt => opt.value === m));
+    if (!validMonths.length) {
+      setDistributionError("अमान्य महीने चयनित।");
       setBeneficiaryCountLoading(false);
       return;
     }
@@ -256,18 +305,14 @@ const AnganwadiDashboard = () => {
       let allMonthsApproved = true;
       const categoryKey = beneCategoryMap[currentFoodItem.bene_category];
 
-      for (const month of months) {
-        // Find the registration for the specific month from the fetched data
+      for (const month of validMonths) {
         const registration = allYearRegistrations.find(r => r.month === month && r.fin_year === fin_year);
 
-        // If a registration exists for the month and has the relevant category
         if (registration && categoryKey && Object.prototype.hasOwnProperty.call(registration, categoryKey)) {
           atLeastOneMonthRegistered = true;
-          // If any month in the quarter is not approved, block the submission.
           if (registration.sector_status !== 'approved') {
-            setDistributionError(`माह ${month} के लिए चयनित तिमाही का रिकॉर्ड पहले से मौजूद है। `);
+            setDistributionError(`महीना ${monthLabels[month] || month} के लिए चयनित महीनों में से एक रिकॉर्ड अनुमोदित नहीं है।`);
             allMonthsApproved = false;
-            // We can break here as one unapproved month is enough to block.
             break;
           }
           totalBeneficiaries += registration[categoryKey] || 0;
@@ -275,15 +320,14 @@ const AnganwadiDashboard = () => {
       }
       setIsRegistrationApproved(allMonthsApproved);
 
-      
       if (atLeastOneMonthRegistered) {
         setBeneficiaryCount(totalBeneficiaries);
         setIsRegistrationAvailable(totalBeneficiaries > 0);
         if (totalBeneficiaries === 0 && allMonthsApproved) {
-          setDistributionError(`चयनित तिमाही में "${currentFoodItem.bene_category}" के लिए कोई लाभार्थी पंजीकृत नहीं है।`);
+          setDistributionError(`चयनित महीनों में "${currentFoodItem.bene_category}" के लिए कोई लाभार्थी पंजीकृत नहीं है।`);
         }
       } else if (allMonthsApproved) {
-        setDistributionError(`${quarter} तिमाही के लिए अभी तक कोई लाभार्थी पंजीकरण नहीं किया गया है।`);
+        setDistributionError(`चयनित महीनों के लिए अभी तक कोई लाभार्थी पंजीकरण नहीं किया गया है।`);
         setBeneficiaryCount(0);
         setIsRegistrationAvailable(false);
       }
@@ -327,10 +371,15 @@ const AnganwadiDashboard = () => {
           food_item_id: foodItemDetails?.id,
         });
       } else { // thr
+        const existingMonths = Array.isArray(existingRecord.months)
+          ? existingRecord.months
+          : Array.isArray(existingRecord.quarter)
+            ? existingRecord.quarter
+            : quarterToMonths[existingRecord.quarter] || [];
         setDistributionData({
           total_beneficiaries: existingRecord.total_beneficiaries,
           fin_year: existingRecord.fin_year,
-          quarter: existingRecord.quarter,
+          months: existingMonths,
           food_item_id: foodItemDetails?.id,
         });
         setSelectedFoodItem(foodItemDetails);
@@ -339,16 +388,21 @@ const AnganwadiDashboard = () => {
       if (scheme === 'hcm' && existingRecord.date) {
         // Pass the date and the correct food item ID to ensure validation runs with the right context
         handleDateChange(existingRecord.date, foodItemDetails?.id);
-      } else if (scheme === 'thr' && existingRecord.fin_year && existingRecord.quarter) {
+      } else if (scheme === 'thr' && existingRecord.fin_year && (existingRecord.months?.length || existingRecord.quarter)) {
+        const existingMonths = Array.isArray(existingRecord.months)
+          ? existingRecord.months
+          : Array.isArray(existingRecord.quarter)
+            ? existingRecord.quarter
+            : quarterToMonths[existingRecord.quarter] || [];
         // Trigger validation for existing THR records
-        handleThrPeriodChange(existingRecord.fin_year, existingRecord.quarter, foodItemDetails?.id, true);
+        handleThrPeriodChange(existingRecord.fin_year, existingMonths, foodItemDetails?.id, true);
       }
     } else {
       setDistributionData({ 
         total_beneficiaries: '',
         date: new Date().toISOString().split('T')[0], 
         fin_year: scheme === 'thr' ? getCurrentFinancialYear() : '', 
-        quarter: '',
+        months: [],
         food_item_id: '',
       });
     }
@@ -399,7 +453,7 @@ const AnganwadiDashboard = () => {
       : selectedItem;
 
 
-    if (!distributionData.total_beneficiaries || (isThr ? (!distributionData.fin_year || !distributionData.quarter) : !distributionData.date)) {
+    if (!distributionData.total_beneficiaries || (isThr ? (!distributionData.fin_year || !distributionData.months?.length) : !distributionData.date)) {
       setDistributionError("कृपया सभी आवश्यक फ़ील्ड भरें।");
       setSubmitting(false);
       return;
@@ -408,17 +462,18 @@ const AnganwadiDashboard = () => {
     // Prevent duplicate entries for THR
     if (isThr) {
       const duplicate = distributionRecords.find(rec => {
-        // Don't compare the record against itself when editing
         if (selectedItem.isEdit && rec.id === selectedItem.id) {
           return false;
         }
+        const recMonths = Array.isArray(rec.quarter) ? rec.quarter : quarterToMonths[rec.quarter] || [];
         return rec.food_item === selectedFoodItemDetails.food_item &&
                rec.fin_year === distributionData.fin_year &&
-               rec.quarter === distributionData.quarter;
+               areSameMonthSets(recMonths, distributionData.months);
       });
 
       if (duplicate) {
-        setDistributionError(`"${selectedFoodItemDetails.food_item}" के लिए ${distributionData.fin_year} - ${distributionData.quarter} का वितरण रिकॉर्ड पहले से मौजूद है।`);
+        const selectedMonthsLabel = formatMonths(distributionData.months);
+        setDistributionError(`"${selectedFoodItemDetails.food_item}" के लिए ${distributionData.fin_year} - ${selectedMonthsLabel} का वितरण रिकॉर्ड पहले से मौजूद है।`);
         setSubmitting(false);
         return;
       }
@@ -461,7 +516,8 @@ const AnganwadiDashboard = () => {
 
     if (isThr) {
       payload.fin_year = distributionData.fin_year;
-      payload.quarter = distributionData.quarter;
+      payload.quarter = distributionData.months;
+      payload.months = distributionData.months;
     } else {
       payload.date = distributionData.date;
     }
@@ -475,7 +531,6 @@ const AnganwadiDashboard = () => {
     payload.bene_category = selectedFoodItemDetails.bene_category;
     payload.days_allotted = selectedFoodItemDetails.days_allotted;
     payload.unit = selectedFoodItemDetails.unit;
-    payload.date = distributionData.date;
 
     const url = activeScheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution;
     const method = isEdit ? 'put' : 'post';
@@ -517,20 +572,7 @@ const AnganwadiDashboard = () => {
     ? (parseFloat(selectedFoodItemForCalc.qty_per_ben) * (parseInt(distributionData.total_beneficiaries, 10) || 0)).toFixed(2)
     : '0.00';
   
-  const availableQuarters = selectedItem && activeScheme === 'thr'
-    ? allQuarters.filter(q => {
-        // Check if a record exists for this quarter, food item, and financial year
-        const isUsedByAnotherRecord = distributionRecords.some(rec => {
-          // Check if the record is for the same period but is not the one currently being edited.
-          const isDifferentRecord = selectedItem.isEdit ? rec.id !== selectedItem.id : true;
-          return isDifferentRecord &&
-                 rec.food_item === selectedFoodItem.food_item &&
-                 rec.fin_year === distributionData.fin_year &&
-                 rec.quarter === q.value;
-        });
-        return !isUsedByAnotherRecord;
-      })
-    : allQuarters;
+// No quarter-only selection is required for THR; months are selected explicitly.
 
   return (
   
@@ -615,7 +657,7 @@ const AnganwadiDashboard = () => {
                       <tr>
                         <th>#</th>
                         <th>Food Item</th>
-                        {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Quarter</th></>}<th>Total Beneficiaries</th>
+                        {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Months</th></>}<th>Total Beneficiaries</th>
                         {activeScheme === 'hcm' && <th>Beneficiary Category</th>}
                         {activeScheme === 'hcm' && <th>Days Allotted</th>}
                         <th>Quantity</th>
@@ -627,7 +669,7 @@ const AnganwadiDashboard = () => {
                       {distributionRecords.map((record, index) => (
                         <tr key={record.id}>
                           <td>{index + 1}</td>
-                          <td>{record.food_item}</td>{activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{record.quarter}</td></>}
+                          <td>{record.food_item}</td>{activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{formatMonths(record.months || record.quarter)}</td></>}
                           <td>{record.total_beneficiaries}</td>
                           {activeScheme === 'hcm' && <td>{record.bene_category}</td>}
                           {activeScheme === 'hcm' && <td>{record.days_allotted}</td>}
@@ -715,8 +757,8 @@ const AnganwadiDashboard = () => {
                         setDistributionData(newDistributionData);
                         if (activeScheme === 'hcm' && distributionData.date) {
                           handleDateChange(newDistributionData.date, newFoodItemId);
-                        } else if (activeScheme === 'thr' && newDistributionData.fin_year && newDistributionData.quarter) {
-                          handleThrPeriodChange(newDistributionData.fin_year, newDistributionData.quarter, newFoodItemId, selectedItem.isEdit);
+                        } else if (activeScheme === 'thr' && newDistributionData.fin_year && newDistributionData.months?.length) {
+                          handleThrPeriodChange(newDistributionData.fin_year, newDistributionData.months, newFoodItemId, selectedItem.isEdit);
                         }
                       }}
                     >
@@ -775,28 +817,39 @@ const AnganwadiDashboard = () => {
                           value={distributionData.fin_year} disabled
                           onChange={(e) => {
                             const newFinYear = e.target.value;
-                            handleThrPeriodChange(newFinYear, distributionData.quarter, distributionData.food_item_id, selectedItem.isEdit);
+                            handleThrPeriodChange(newFinYear, distributionData.months, distributionData.food_item_id, selectedItem.isEdit);
                           }} 
                           required 
                         />
                       </Form.Group>
                       <Form.Group className="mb-3">
-                        <Form.Label>Quarter</Form.Label>
-                        <Form.Select 
-                          value={distributionData.quarter} 
-                          onChange={(e) => {
-                            const newQuarter = e.target.value;
-                            handleThrPeriodChange(distributionData.fin_year, newQuarter, distributionData.food_item_id, selectedItem.isEdit);
-                          }} 
-                          required
-                        >
-                          <option value="">Select Quarter</option>
-                          {availableQuarters.map(q => (
-                            <option key={q.value} value={q.value}>{q.label}</option>
-                          ))}
-                        </Form.Select>
+                        <Form.Label>Months</Form.Label>
+                        <div className="d-flex flex-wrap gap-2">
+                          {monthOptions.map((month) => {
+                            const checked = distributionData.months?.includes(month.value) || false;
+                            return (
+                              <Form.Check
+                                key={month.value}
+                                inline
+                                type="checkbox"
+                                id={`month-${month.value}`}
+                                label={month.label}
+                                checked={checked}
+                                onChange={(e) => {
+                                  const nextMonths = e.target.checked
+                                    ? [...new Set([...(distributionData.months || []), month.value])]
+                                    : (distributionData.months || []).filter((m) => m !== month.value);
+                                  setDistributionData({ ...distributionData, months: nextMonths });
+                                  if (distributionData.fin_year && distributionData.food_item_id) {
+                                    handleThrPeriodChange(distributionData.fin_year, nextMonths, distributionData.food_item_id, selectedItem.isEdit);
+                                  }
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
                         {beneficiaryCountLoading && <Spinner animation="border" size="sm" className="mt-2" />}
-                        {beneficiaryCount !== null && !beneficiaryCountLoading && <Form.Text className={beneficiaryCount > 0 ? "text-success" : "text-danger"}>तिमाही के लिए पंजीकृत लाभार्थी: {beneficiaryCount}</Form.Text>}
+                        {beneficiaryCount !== null && !beneficiaryCountLoading && <Form.Text className={beneficiaryCount > 0 ? "text-success" : "text-danger"}>चयनित महीनों के लिए पंजीकृत लाभार्थी: {beneficiaryCount}</Form.Text>}
                       </Form.Group>
                     </>
                   )}
@@ -869,7 +922,7 @@ const AnganwadiDashboard = () => {
                   ) : (
                     <>
                       <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Financial Year:</strong> {viewItem.fin_year}</ListGroup.Item>
-                      <ListGroup.Item><FaCubes className="view-modal-icon" /> <strong>Quarter:</strong> {viewItem.quarter}</ListGroup.Item>
+                      <ListGroup.Item><FaCubes className="view-modal-icon" /> <strong>Months:</strong> {formatMonths(viewItem.months || viewItem.quarter)}</ListGroup.Item>
                     </>
                   )}
                   <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>Sector:</strong> {viewItem.sector}</ListGroup.Item>
