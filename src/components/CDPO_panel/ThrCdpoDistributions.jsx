@@ -9,6 +9,38 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
+const quarterToMonths = {
+  'apr-may-jun': ['apr', 'may', 'jun'],
+  'jul-aug-sep': ['jul', 'aug', 'sep'],
+  'oct-nov-dec': ['oct', 'nov', 'dec'],
+  'jan-feb-mar': ['jan', 'feb', 'mar'],
+};
+
+const formatMonths = (monthsOrQuarter) => {
+  if (Array.isArray(monthsOrQuarter)) {
+    return monthsOrQuarter.map((m) => monthLabels[m] || m).join(', ');
+  }
+  if (typeof monthsOrQuarter === 'string' && quarterToMonths[monthsOrQuarter]) {
+    return quarterToMonths[monthsOrQuarter].map(m => monthLabels[m] || m).join(', ');
+  }
+  return monthsOrQuarter; // Fallback for single month strings or other formats
+};
+
 const ThrCdpoDistributions = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -31,6 +63,7 @@ const ThrCdpoDistributions = () => {
 
   const [showRemarkModal, setShowRemarkModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState(null);
+  const [showQtyModal, setShowQtyModal] = useState(false);
   const tableRef = useRef(null);
 
   const [columns, setColumns] = useState([
@@ -45,14 +78,11 @@ const ThrCdpoDistributions = () => {
     { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin Year', visible: true },
-    { dataField: 'quarter', text: 'Quarter', visible: true },
+    { dataField: 'months', text: 'Months', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
-    { dataField: 'cdpo_status', text: 'CDPO Status', visible: true },
-    { dataField: 'dpo_status', text: 'DPO Status', visible: true },
     { dataField: 'sector_status', text: 'Sector Status', visible: true },
-    { dataField: 'cdpo_remark', text: 'CDPO Remark', visible: true },
     { dataField: 'action', text: 'Action', visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
@@ -60,26 +90,22 @@ const ThrCdpoDistributions = () => {
 
   const [filters, setFilters] = useState({
     finYear: [],
-    quarter: [],
+    months: [],
     district: [],
     project: [],
     sector: [],
     food_item: [],
     bene_category: [],
     cdpo_status: [],
-    dpo_status: [], 
     sector_status: [],
   });
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
-  const [uniqueQuarters, setUniqueQuarters] = useState([]);
+  const [uniqueMonths, setUniqueMonths] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
-  const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
   const [beneficiaryCategories, setBeneficiaryCategories] = useState([]);
-  const [uniqueCdpoStatuses, setUniqueCdpoStatuses] = useState([]);
-  const [uniqueDpoStatuses, setUniqueDpoStatuses] = useState([]);
   const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
 
   useEffect(() => {
@@ -97,13 +123,21 @@ const ThrCdpoDistributions = () => {
   useEffect(() => {
     if (distributions.length > 0) {
       setUniqueFinYears([...new Set(distributions.map(item => item.fin_year))]);
-      setUniqueQuarters([...new Set(distributions.map(item => item.quarter))]);
+      const allMonths = distributions.flatMap(item => {
+        const monthData = item.months || item.quarter;
+        if (Array.isArray(monthData)) {
+          return monthData;
+        }
+        if (typeof monthData === 'string' && quarterToMonths[monthData]) {
+          return quarterToMonths[monthData];
+        }
+        return [];
+      });
+      setUniqueMonths([...new Set(allMonths)].map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)));
       setUniqueDistricts([...new Set(distributions.map(item => item.district))]);
       setUniqueProjects([...new Set(distributions.map(item => item.project))]);
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
-      setUniqueCdpoStatuses([...new Set(distributions.map(item => item.cdpo_status))]);
-      setUniqueDpoStatuses([...new Set(distributions.map(item => item.dpo_status))]);
       setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status))]);
     }
   }, [distributions]);
@@ -121,16 +155,17 @@ const ThrCdpoDistributions = () => {
 
   const filteredData = useMemo(() => {
     return distributions.filter(item => {
-      const { finYear, quarter, district, project, sector, food_item, bene_category, cdpo_status, dpo_status, sector_status } = filters;
+      const { finYear, months, district, project, sector, food_item, bene_category, sector_status } = filters;
+      const itemMonths = (Array.isArray(item.months) ? item.months : quarterToMonths[item.quarter] || []).map(m => monthLabels[m] || m);      
+      const monthMatch = months.length === 0 || months.some(filterMonth => itemMonths.includes(filterMonth));
+
       return (finYear.length === 0 || finYear.includes(item.fin_year)) &&
-             (quarter.length === 0 || quarter.includes(item.quarter)) &&
+             monthMatch &&
              (district.length === 0 || district.includes(item.district)) &&
-             (project.length === 0 || project.includes(item.project)) &&
+             (project.length === 0 || project.includes(item.project)) && 
              (sector.length === 0 || sector.includes(item.sector)) &&
              (food_item.length === 0 || food_item.includes(item.food_item)) &&
              (bene_category.length === 0 || bene_category.includes(item.bene_category)) &&
-             (cdpo_status.length === 0 || cdpo_status.includes(item.cdpo_status)) &&
-             (dpo_status.length === 0 || dpo_status.includes(item.dpo_status)) &&
              (sector_status.length === 0 || sector_status.includes(item.sector_status));
     });
   }, [distributions, filters]);
@@ -250,9 +285,16 @@ const ThrCdpoDistributions = () => {
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
         acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-        acc.quantity += parseFloat(item.quantity) || 0;
+        const quantity = parseFloat(item.quantity) || 0;
+        const unit = item.unit || 'N/A';
+        
+        acc.quantity += quantity;
+        if (!acc.quantityByUnit[unit]) {
+          acc.quantityByUnit[unit] = 0;
+        }
+        acc.quantityByUnit[unit] += quantity;
         return acc;
-    }, { beneficiaries: 0, quantity: 0 });
+    }, { beneficiaries: 0, quantity: 0, quantityByUnit: {} });
   }, [filteredData]);
 
   const exportToPDF = () => {
@@ -409,13 +451,13 @@ const ThrCdpoDistributions = () => {
             </Col>
             <Col md={2}>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" id="dropdown-quarter" className="w-100">
-                  {filters.quarter.length ? `${filters.quarter.length} quarters selected` : 'All Quarters'}
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-months" className="w-100">
+                  {filters.months.length ? `${filters.months.length} selected` : 'All Months'}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueQuarters.map(q => (
+                  {uniqueMonths.map(q => (
                     <Dropdown.Item key={q} as="div">
-                      <Form.Check type="checkbox" label={q} checked={filters.quarter.includes(q)} onChange={() => handleMultiSelectChange('quarter', q)} />
+                      <Form.Check type="checkbox" label={q} checked={filters.months.includes(q)} onChange={() => handleMultiSelectChange('months', q)} />
                     </Dropdown.Item>
                   ))}
                 </Dropdown.Menu>
@@ -491,38 +533,7 @@ const ThrCdpoDistributions = () => {
                 </Dropdown.Menu> 
               </Dropdown>
             </Col>
-          </Row>
-
-          <Row className="mb-3">
-            <Col md={2}>
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" id="dropdown-cdpo-status" className="w-100">
-                  {filters.cdpo_status.length ? `${filters.cdpo_status.length} selected` : 'All CDPO Status'}
-                </Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueCdpoStatuses.map(s => (
-                    <Dropdown.Item key={s} as="div">
-                      <Form.Check type="checkbox" label={s} checked={filters.cdpo_status.includes(s)} onChange={() => handleMultiSelectChange('cdpo_status', s)} />
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
-            </Col>
-            <Col md={2}>
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" id="dropdown-dpo-status" className="w-100">
-                  {filters.dpo_status.length ? `${filters.dpo_status.length} selected` : 'All DPO Status'}
-                </Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueDpoStatuses.map(s => (
-                    <Dropdown.Item key={s} as="div">
-                      <Form.Check type="checkbox" label={s} checked={filters.dpo_status.includes(s)} onChange={() => handleMultiSelectChange('dpo_status', s)} />
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
-            </Col>
-            <Col md={2}>
+            <Col md={2} className="mt-2">
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status" className="w-100">
                   {filters.sector_status.length ? `${filters.sector_status.length} selected` : 'All Sector Status'}
@@ -536,8 +547,8 @@ const ThrCdpoDistributions = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
-            <Col md={2} className="d-flex align-items-end">
-              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], quarter: [], district: [], project: [], sector: [], food_item: [], bene_category: [], cdpo_status: [], dpo_status: [], sector_status: [] })} className="me-2">Clear Filters</Button>
+            <Col md={2} className="d-flex align-items-end mt-2">
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [] })} className="me-2">Clear Filters</Button>
             </Col>
           </Row>
 
@@ -591,31 +602,16 @@ const ThrCdpoDistributions = () => {
                                          {row[col.dataField] || ''}
                                        </div>
                                      );
-                                     break;
-                                    case 'cdpo_status':
-                                    case 'dpo_status':
+                                      break;
+                                    case 'months':
+                                      cellContent = formatMonths(row.months || row.quarter);
+                                      break;
                                     case 'sector_status':
                                       cellContent = isPrinting ? row[col.dataField] : <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField]}</Badge>;
                                       break;
                                     case 'action':
                                       cellContent = (
                                         <div className="d-flex align-items-center gap-2 no-print">
-                                          <Button
-                                            variant="outline-success"
-                                            size="sm"
-                                            disabled={row.sector_status === "pending" || row.sector_status === "pendings" || row.cdpo_status === "approved" || row.cdpo_status === "rejected" || loadingAction[row.id]}
-                                            onClick={() => handleToggleRemark(row, "approved")}
-                                          >
-                                            Approve
-                                          </Button>
-                                          <Button
-                                            variant="outline-danger"
-                                            size="sm"
-                                            disabled={row.sector_status === "pending" || row.sector_status === "pendings" || row.cdpo_status === "approved" || row.cdpo_status === "rejected" || loadingAction[row.id]}
-                                            onClick={() => handleToggleRemark(row, "rejected")}
-                                          >
-                                            Reject
-                                          </Button>
                                           <Button
                                             variant="outline-primary"
                                             size="sm"
@@ -686,7 +682,12 @@ const ThrCdpoDistributions = () => {
                             } else if (col.dataField === 'total_beneficiaries') {
                               cellContent = <strong>{totals.beneficiaries}</strong>;
                             } else if (col.dataField === 'quantity') {
-                              cellContent = <strong>{totals.quantity.toFixed(2)}</strong>;
+                              cellContent = (
+                                <>
+                                  {/* <strong>{totals.quantity.toFixed(2)}</strong> */}
+                                  <Button variant="link" size="sm" onClick={() => setShowQtyModal(true)}>View total</Button>
+                                </>
+                              );
                             }
                             return <td key={`tf-${col.dataField}`}>{cellContent}</td>;
                           })}
@@ -707,18 +708,6 @@ const ThrCdpoDistributions = () => {
           <Modal.Body>
             {selectedRemarks && (
               <div>
-                <div className="mb-3">
-                  <h6>CDPO Remark</h6>
-                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.cdpo_status)}>{selectedRemarks.cdpo_status || "pending"}</Badge></p>
-                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.cdpo_remark || "No remark"}</p>
-                </div>
-                <hr />
-                <div className="mb-3">
-                  <h6>DPO Remark</h6>
-                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.dpo_status)}>{selectedRemarks.dpo_status || "pending"}</Badge></p>
-                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.dpo_remark || "No remark"}</p>
-                </div>
-                <hr />
                 <div className="mb-3">
                   <h6>Sector Remark</h6>
                   <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>{selectedRemarks.sector_status}</Badge></p>
@@ -754,6 +743,34 @@ const ThrCdpoDistributions = () => {
               Close
             </Button>
           </Modal.Footer>
+        </Modal>
+
+        <Modal show={showQtyModal} onHide={() => setShowQtyModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Table striped bordered hover>
+              <thead>
+                <tr>
+                  <th>Unit</th>
+                  <th>Total Quantity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(totals.quantityByUnit).map(([unit, qty]) => (
+                  <tr key={unit}>
+                    <td>{unit}</td>
+                    <td>{qty.toFixed(2)}</td>
+                  </tr>
+                ))}
+                {/* <tr className="table-active">
+                  <td><strong>Grand Total</strong></td>
+                  <td><strong>{totals.quantity.toFixed(2)}</strong></td>
+                </tr> */}
+              </tbody>
+            </Table>
+          </Modal.Body>
         </Modal>
 
       </div>

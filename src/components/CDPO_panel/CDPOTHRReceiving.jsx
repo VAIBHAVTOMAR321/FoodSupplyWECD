@@ -12,6 +12,38 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
+const quarterToMonths = {
+  'apr-may-jun': ['apr', 'may', 'jun'],
+  'jul-aug-sep': ['jul', 'aug', 'sep'],
+  'oct-nov-dec': ['oct', 'nov', 'dec'],
+  'jan-feb-mar': ['jan', 'feb', 'mar'],
+};
+
+const formatMonths = (monthsOrQuarter) => {
+  if (Array.isArray(monthsOrQuarter)) {
+    return monthsOrQuarter.map((m) => monthLabels[m] || m).join(', ');
+  }
+  if (typeof monthsOrQuarter === 'string' && quarterToMonths[monthsOrQuarter]) {
+    return quarterToMonths[monthsOrQuarter].map(m => monthLabels[m] || m).join(', ');
+  }
+  return monthsOrQuarter; // Fallback for single month strings or other formats
+};
+
 const CDPOTHRReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -26,7 +58,7 @@ const CDPOTHRReceiving = () => {
   const itemsPerPage = 20;
   const tableRef = useRef(null);
 
-  const [filters, setFilters] = useState({ fin_year: [], quarter: [], sector: [], food_item: [], bene_category: [] });
+  const [filters, setFilters] = useState({ fin_year: [], months: [], sector: [], food_item: [], bene_category: [] });
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
@@ -38,7 +70,7 @@ const CDPOTHRReceiving = () => {
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "quantity", text: "Quantity", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
-    { dataField: "quarter", text: "Quarter", visible: true },
+    { dataField: "months", text: "Months", visible: true },
     { dataField: "date", text: "Date", visible: true },
   ]);
 
@@ -77,7 +109,18 @@ const CDPOTHRReceiving = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const uniqueValues = (key) => [...new Set(reports.map((r) => r[key]))];
+  const uniqueValues = (key) => {
+    if (key === 'months') {
+      const allMonths = reports.flatMap(item => {
+        const monthData = item.months || item.quarter;
+        if (Array.isArray(monthData)) return monthData;
+        if (typeof monthData === 'string' && quarterToMonths[monthData]) return quarterToMonths[monthData];
+        return [];
+      });
+      return [...new Set(allMonths)].map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b));
+    }
+    return [...new Set(reports.map((r) => r[key]))];
+  };
 
   const handleMultiSelectChange = (filterName, value) => {
     setFilters((prev) => ({
@@ -89,11 +132,16 @@ const CDPOTHRReceiving = () => {
   };
 
   const filteredReports = useMemo(() => {
-    return reports.filter((item) =>
-      Object.entries(filters).every(
-        ([key, vals]) => vals.length === 0 || vals.includes(item[key])
-      )
-    );
+    return reports.filter((item) => {
+      return Object.entries(filters).every(([key, vals]) => {
+        if (vals.length === 0) return true;
+        if (key === 'months') {
+          const itemMonths = (Array.isArray(item.months) ? item.months : quarterToMonths[item.quarter] || []).map(m => monthLabels[m] || m);
+          return vals.some(filterMonth => itemMonths.includes(filterMonth));
+        }
+        return vals.includes(item[key]);
+      });
+    });
   }, [reports, filters]);
 
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
@@ -171,8 +219,8 @@ const CDPOTHRReceiving = () => {
     return <Pagination className="justify-content-center mt-3">{items}</Pagination>;
   };
 
-  const filterKeys = ["fin_year", "quarter", "sector", "food_item", "bene_category"];
-  const filterLabels = { fin_year: "Fin. Year", quarter: "Quarter", sector: "Sector", food_item: "Food Item", bene_category: "Category" };
+  const filterKeys = ["fin_year", "months", "sector", "food_item", "bene_category"];
+  const filterLabels = { fin_year: "Fin. Year", months: "Months", sector: "Sector", food_item: "Food Item", bene_category: "Category" };
 
   return (
     <div className="dashboard-container">
@@ -275,7 +323,7 @@ const CDPOTHRReceiving = () => {
                       </Col>
                     ))}
                     <Col md={2} className="d-flex align-items-end">
-                      <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], quarter: [], sector: [], food_item: [], bene_category: [] })}>
+                      <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], months: [], sector: [], food_item: [], bene_category: [] })}>
                         Clear Filters
                       </Button>
                     </Col>
@@ -296,7 +344,9 @@ const CDPOTHRReceiving = () => {
                                 {visibleColumns.map((col) => (
                                   <td key={col.dataField}>
                                     {col.dataField === "#"
-                                      ? (currentPage - 1) * itemsPerPage + index + 1
+                                      ? (currentPage - 1) * itemsPerPage + index + 1 :
+                                      col.dataField === 'months'
+                                      ? formatMonths(row.months || row.quarter)
                                       : row[col.dataField]}
                                   </td>
                                 ))}
