@@ -177,10 +177,12 @@ const THRDirectorReport = () => {
         acc.quantityByUnit[unit] = 0;
       }
       acc.quantityByUnit[unit] += quantity;
+      acc.quantity += quantity;
       return acc;
     }, {
       beneficiaries: 0,
-      quantityByUnit: {}
+      quantityByUnit: {},
+      quantity: 0
     });
   }, [filteredData]);
 
@@ -467,7 +469,11 @@ const THRDirectorReport = () => {
                       }
                       if (col.dataField === 'quantity') {
                         return <td key="total_quantity">
-                          <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Totals</Button>
+                          {!isPrinting && (
+                            <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>
+                              View Totals
+                            </Button>
+                          )}
                         </td>;
                       }
                       return <td key={col.dataField}></td>;

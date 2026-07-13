@@ -273,7 +273,7 @@ const ThrDpoDistributions = () => {
     const totalRow = { '#': '' };
     visCols.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
+      else if (col.dataField === 'quantity') totalRow[col.text] = '';
       else totalRow[col.text] = '';
     });
     if (columns.find(c => c.dataField === 'dpo_remark')?.visible) totalRow['DPO Remark'] = '';

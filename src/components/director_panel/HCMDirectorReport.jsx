@@ -35,6 +35,8 @@ const HCMDirectorReport = () => {
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const initialColumns = [
     { dataField: '#', text: '#', visible: true },
@@ -131,41 +133,44 @@ const HCMDirectorReport = () => {
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
-        acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-        acc.quantity += parseFloat(item.quantity) || 0;
-        return acc;
-    }, { beneficiaries: 0, quantity: 0 });
+      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
+      const quantity = parseFloat(item.quantity) || 0;
+      const unit = item.unit || 'N/A';
+
+      acc.quantity += quantity;
+      if (!acc.quantityByUnit[unit]) {
+        acc.quantityByUnit[unit] = 0;
+      }
+      acc.quantityByUnit[unit] += quantity;
+      return acc;
+    }, { beneficiaries: 0, quantity: 0, quantityByUnit: {} });
   }, [filteredData]);
 
   const exportToPDF = () => {
-    const input = tableRef.current;
-    if (!input) {
-      console.error("Table element not found for PDF export.");
-      return;
-    }
-    html2canvas(input, {
-      scale: 2, // Higher scale for better quality
-      useCORS: true
-    }).then(canvas => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'pt',
-        format: 'a4'
+    setIsPrinting(true);
+    setTimeout(() => {
+      const input = tableRef.current;
+      if (!input) {
+        console.error("Table element not found for PDF export.");
+        setIsPrinting(false);
+        return;
+      }
+      html2canvas(input, { scale: 2, useCORS: true }).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+        const width = pdfWidth - 40;
+        const height = width / ratio;
+
+        pdf.text("HCM Distribution Report", 20, 30);
+        pdf.addImage(imgData, 'PNG', 20, 40, width, height);
+        pdf.save('hcm_director_report.pdf');
+        setIsPrinting(false);
       });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      
-      const width = pdfWidth - 40; // with some margin
-      const height = width / ratio;
-
-      pdf.text("HCM Distribution Report", 20, 30);
-      pdf.addImage(imgData, 'PNG', 20, 40, width, height);
-      pdf.save('hcm_director_report.pdf');
-    });
+    }, 100);
   };
 
   const exportToExcel = () => {
@@ -183,7 +188,7 @@ const HCMDirectorReport = () => {
     const totalRow = { '#': 'Total' };
     visibleColumns.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
+      else if (col.dataField === 'quantity') totalRow[col.text] = '';
       else if (col.text !== '#') totalRow[col.text] = '';
     });
     dataToExport.push(totalRow);
@@ -323,7 +328,13 @@ const HCMDirectorReport = () => {
                         return <td key="total_beneficiaries">{totals.beneficiaries}</td>;
                       }
                       if (col.dataField === 'quantity') {
-                        return <td key="total_quantity">{totals.quantity.toFixed(2)}</td>;
+                        return (
+                          <td key="total_quantity">
+                            {!isPrinting && (
+                              <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Total</Button>
+                            )}
+                          </td>
+                        );
                       }
                       return <td key={col.dataField}></td>;
                     })}
@@ -339,6 +350,32 @@ const HCMDirectorReport = () => {
           <Modal.Header closeButton><Modal.Title>Show/Hide Columns</Modal.Title></Modal.Header>
           <Modal.Body>
             {columns.map((col, index) => (<Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />))}
+          </Modal.Body>
+          <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button></Modal.Footer>
+        </Modal>
+
+        <Modal show={showQuantityModal} onHide={() => setShowQuantityModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Table striped bordered hover>
+              <thead>
+                <tr>
+                  <th>Unit</th>
+                  <th>Total Quantity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(totals.quantityByUnit).map(([unit, qty]) => (
+                  <tr key={unit}>
+                    <td>{unit}</td>
+                    <td>{qty.toFixed(2)}</td>
+                  </tr>
+                ))}
+               
+              </tbody>
+            </Table>
           </Modal.Body>
           <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button></Modal.Footer>
         </Modal>
