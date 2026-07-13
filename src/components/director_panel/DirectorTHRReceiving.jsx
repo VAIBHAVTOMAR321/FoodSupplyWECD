@@ -26,6 +26,28 @@ import * as XLSX from "xlsx";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
+const formatMonths = (months) => {
+  if (Array.isArray(months)) {
+    return months.map(m => monthLabels[m.toLowerCase()] || m).join(', ');
+  }
+  return months; // Fallback for old `quarter` string data
+};
+
 const DirectorTHRReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -43,14 +65,14 @@ const DirectorTHRReceiving = () => {
 
   const [filters, setFilters] = useState({
     fin_year: [],
-    quarter: [],
+    months: [],
     district: [],
     project: [],
     sector: [],
     food_item: [],
     bene_category: [],
   });
-
+  const [uniqueMonths, setUniqueMonths] = useState([]);
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
   const [uniqueQuarters, setUniqueQuarters] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
@@ -73,7 +95,7 @@ const DirectorTHRReceiving = () => {
     { dataField: "quantity", text: "Quantity", visible: true },
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
-    { dataField: "quarter", text: "Quarter", visible: true },
+    { dataField: "months", text: "Months", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
@@ -94,7 +116,10 @@ const DirectorTHRReceiving = () => {
   useEffect(() => {
     if (reports.length > 0) {
       setUniqueFinYears([...new Set(reports.map((item) => item.fin_year))]);
-      setUniqueQuarters([...new Set(reports.map((item) => item.quarter))]);
+      const allMonths = reports.flatMap(item => Array.isArray(item.months) ? item.months.map(m => m.toLowerCase()) : (item.quarter ? [item.quarter] : []));
+      const uniqueMonthKeys = [...new Set(allMonths)];
+      const formattedUniqueMonths = uniqueMonthKeys.map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b));
+      setUniqueMonths(formattedUniqueMonths);
       setUniqueDistricts([...new Set(reports.map((item) => item.district))]);
       setUniqueProjects([...new Set(reports.map((item) => item.project))]);
       setUniqueSectors([...new Set(reports.map((item) => item.sector))]);
@@ -149,10 +174,12 @@ const DirectorTHRReceiving = () => {
 
   const filteredReports = useMemo(() => {
     return reports.filter((item) => {
-      const { fin_year, quarter, district, project, sector, food_item, bene_category } = filters;
+      const { fin_year, months, district, project, sector, food_item, bene_category } = filters;
+      const itemMonths = Array.isArray(item.months) ? item.months.map(m => monthLabels[m.toLowerCase()] || m) : [item.quarter];
+
       return (
         (fin_year.length === 0 || fin_year.includes(item.fin_year)) &&
-        (quarter.length === 0 || quarter.includes(item.quarter)) &&
+        (months.length === 0 || itemMonths.some(month => months.includes(month))) &&
         (district.length === 0 || district.includes(item.district)) &&
         (project.length === 0 || project.includes(item.project)) &&
         (sector.length === 0 || sector.includes(item.sector)) &&
@@ -224,7 +251,11 @@ const DirectorTHRReceiving = () => {
     const dataToExport = filteredReports.map((row, index) => {
       const newRow = { "#": index + 1 };
       visCols.forEach((col) => {
-        newRow[col.text] = row[col.dataField];
+        if (col.dataField === 'months') {
+          newRow[col.text] = formatMonths(row.months || row.quarter);
+        } else {
+          newRow[col.text] = row[col.dataField];
+        }
       });
       return newRow;
     });
@@ -463,13 +494,13 @@ const DirectorTHRReceiving = () => {
 
                     <Col md={2}>
                       <Dropdown>
-                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.quarter.length ? `${filters.quarter.length} selected` : "All Quarters"}
+                        <Dropdown.Toggle variant="outline-secondary" id="dropdown-months" className="w-100">
+                          {filters.months.length ? `${filters.months.length} selected` : 'All Months'}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
-                          {uniqueQuarters.map((v) => (
-                            <Dropdown.Item key={v} as="div">
-                              <Form.Check type="checkbox" label={v} checked={filters.quarter.includes(v)} onChange={() => handleMultiSelectChange("quarter", v)} />
+                          {uniqueMonths.map(m => (
+                            <Dropdown.Item key={m} as="div">
+                              <Form.Check type="checkbox" label={m} checked={filters.months.includes(m)} onChange={() => handleMultiSelectChange('months', m)} />
                             </Dropdown.Item>
                           ))}
                         </Dropdown.Menu>
@@ -552,7 +583,7 @@ const DirectorTHRReceiving = () => {
                     </Col>
 
                     <Col md={2} className="d-flex align-items-end">
-                      <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], quarter: [], district: [], project: [], sector: [], food_item: [], bene_category: [] })}>
+                      <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [] })}>
                         Clear Filters
                       </Button>
                     </Col>
@@ -579,7 +610,9 @@ const DirectorTHRReceiving = () => {
                                 {visibleColumns.map((col) => (
                                   <td key={col.dataField}>
                                     {col.dataField === "#"
-                                      ? (currentPage - 1) * itemsPerPage + index + 1 : col.dataField === "date" ? new Date(report[col.dataField]).toLocaleDateString()
+                                      ? (currentPage - 1) * itemsPerPage + index + 1
+                                      : col.dataField === "months" ? formatMonths(report.months || report.quarter)
+                                      : col.dataField === "date" ? new Date(report[col.dataField]).toLocaleDateString()
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
                                       ? new Date(report[col.dataField]).toLocaleString()
                                       : report[col.dataField]}
