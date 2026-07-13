@@ -4,9 +4,33 @@ import { useAuth } from "../all_login/AuthContext";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
-import jsPDF from "jspdf";
+import jsPDF from "jspdf"; import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
+
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
+const formatMonths = (monthsArray) => {
+  if (Array.isArray(monthsArray)) {
+    // The month 'june' from input is corrected to 'jun' to match a potential key.
+    return monthsArray.map(m => monthLabels[m.toLowerCase()] || m).join(', ');
+  }
+  return monthsArray; // Fallback for old `quarter` string data
+};
+
 
 const THRDirectorReport = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -20,8 +44,8 @@ const THRDirectorReport = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(100);
   const [filters, setFilters] = useState({
-    finYear: [],
-    quarter: [],
+    finYear: [], //
+    months: [],
     district: [],
     project: [],
     sector: [],
@@ -29,7 +53,7 @@ const THRDirectorReport = () => {
     bene_category: [],
   });
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
-  const [uniqueQuarters, setUniqueQuarters] = useState([]);
+  const [uniqueMonths, setUniqueMonths] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
@@ -37,6 +61,7 @@ const THRDirectorReport = () => {
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
 
   const initialColumns = [
     { dataField: '#', text: '#', visible: true },
@@ -50,13 +75,11 @@ const THRDirectorReport = () => {
     { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin. Year', visible: true },
-    { dataField: 'quarter', text: 'Quarter', visible: true },
+    { dataField: 'months', text: 'Months', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Quantity', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
-    { dataField: 'sector_status', text: 'Sector Status', visible: true },
-    { dataField: 'cdpo_status', text: 'CDPO Status', visible: true },
-    { dataField: 'dpo_status', text: 'DPO Status', visible: true },
+    { dataField: 'sector_status', text: 'Sector Status', visible: true }
   ];
 
   const [columns, setColumns] = useState(initialColumns);
@@ -70,7 +93,13 @@ const THRDirectorReport = () => {
       const data = response.data.data || [];
       setReportData(data);
       setUniqueFinYears([...new Set(data.map((item) => item.fin_year))]);
-      setUniqueQuarters([...new Set(data.map((item) => item.quarter))]);
+
+      // Extract unique individual months for the filter
+      const allMonths = data.flatMap(item => Array.isArray(item.months) ? item.months.map(m => m.toLowerCase()) : (item.quarter ? [item.quarter] : []));
+      const uniqueMonthKeys = [...new Set(allMonths)];
+      const formattedUniqueMonths = uniqueMonthKeys.map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b));
+      setUniqueMonths(formattedUniqueMonths);
+
       setUniqueDistricts([...new Set(data.map((item) => item.district))]);
       setUniqueProjects([...new Set(data.map((item) => item.project))]);
       setUniqueSectors([...new Set(data.map((item) => item.sector))]);
@@ -100,7 +129,12 @@ const THRDirectorReport = () => {
   useEffect(() => {
     let data = [...reportData];
     if (filters.finYear.length) data = data.filter((item) => filters.finYear.includes(item.fin_year));
-    if (filters.quarter.length) data = data.filter((item) => filters.quarter.includes(item.quarter));
+    if (filters.months.length) {
+      data = data.filter(item => {
+        const itemMonths = Array.isArray(item.months) ? item.months.map(m => monthLabels[m.toLowerCase()] || m) : [item.quarter];
+        return itemMonths.some(month => filters.months.includes(month));
+      });
+    }
     if (filters.district.length) data = data.filter((item) => filters.district.includes(item.district));
     if (filters.project.length) data = data.filter((item) => filters.project.includes(item.project));
     if (filters.sector.length) data = data.filter((item) => filters.sector.includes(item.sector));
@@ -135,39 +169,53 @@ const THRDirectorReport = () => {
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
-        acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-        acc.quantity += parseFloat(item.quantity) || 0;
-        return acc;
-    }, { beneficiaries: 0, quantity: 0 });
+      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
+      const unit = item.unit || 'N/A';
+      const quantity = parseFloat(item.quantity) || 0;
+      if (!acc.quantityByUnit[unit]) {
+        acc.quantityByUnit[unit] = 0;
+      }
+      acc.quantityByUnit[unit] += quantity;
+      return acc;
+    }, {
+      beneficiaries: 0,
+      quantityByUnit: {}
+    });
   }, [filteredData]);
 
   const exportToPDF = () => {
     const input = tableRef.current;
-    if (!input) {
-      console.error("Table element not found for PDF export.");
-      return;
-    }
-    html2canvas(input, {
-      scale: 2, // Higher scale for better quality
-      useCORS: true
-    }).then(canvas => {
+    html2canvas(input, { scale: 2, useCORS: true }).then(canvas => {
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'landscape',
         unit: 'pt',
-        format: 'a4'
+        format: 'a2'
       });
-
       const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
       const ratio = canvasWidth / canvasHeight;
-      
-      const width = pdfWidth - 40; // with some margin
+      const width = pdfWidth - 40;
       const height = width / ratio;
 
       pdf.text("THR Distribution Report", 20, 30);
-      pdf.addImage(imgData, 'PNG', 20, 40, width, height);
+      pdf.addImage(imgData, 'PNG', 20, 40, width, Math.min(height, pdfHeight - 80));
+
+      if (Object.keys(totals.quantityByUnit).length > 0) {
+        pdf.addPage();
+        pdf.text("Total Quantity by Unit", 20, 30);
+        autoTable(pdf, {
+          startY: 40,
+          head: [['Unit', 'Total Quantity']],
+          body: Object.entries(totals.quantityByUnit).map(([unit, total]) => [unit, total.toFixed(2)]),
+          theme: 'striped',
+          headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+        });
+      }
+
       pdf.save('thr_director_report.pdf');
     });
   };
@@ -177,31 +225,37 @@ const THRDirectorReport = () => {
     const dataToExport = filteredData.map((row, index) => {
       const newRow = { '#': index + 1 };
       visibleColumns.forEach(col => {
-        if (col.dataField !== '#') {
+        if (col.dataField === 'months') {
+          newRow[col.text] = formatMonths(row.months || row.quarter);
+        }
+        else if (col.dataField !== '#') {
           newRow[col.text] = row[col.dataField];
         }
       });
-      if (columns.find(c => c.dataField === 'sector_status')?.visible) newRow['Sector Remark'] = row.sector_remark;
-      if (columns.find(c => c.dataField === 'cdpo_status')?.visible) newRow['CDPO Remark'] = row.cdpo_remark;
-      if (columns.find(c => c.dataField === 'dpo_status')?.visible) newRow['DPO Remark'] = row.dpo_remark;
       return newRow;
     });
 
     const totalRow = { '#': 'Total' };
     visibleColumns.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
+      else if (col.dataField === 'quantity') totalRow[col.text] = ''; // Keep quantity total empty in main sheet
       else totalRow[col.text] = '';
     });
     // Clear remark columns for the total row
-    if (columns.some(c => c.dataField === 'sector_status' && c.visible)) totalRow['Sector Remark'] = '';
-    if (columns.some(c => c.dataField === 'cdpo_status' && c.visible)) totalRow['CDPO Remark'] = '';
-    if (columns.some(c => c.dataField === 'dpo_status' && c.visible)) totalRow['DPO Remark'] = '';
     dataToExport.push(totalRow);
 
+    const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
+      'Unit': unit,
+      'Total Quantity': total.toFixed(2)
+    }));
+
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const quantityWorksheet = XLSX.utils.json_to_sheet(quantityTotalsData);
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "THR Report");
+    XLSX.utils.book_append_sheet(workbook, quantityWorksheet, "Quantity Totals");
+
     XLSX.writeFile(workbook, "thr_director_report.xlsx");
   };
 
@@ -260,13 +314,13 @@ const THRDirectorReport = () => {
             </Col>
             <Col md={2}>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" id="dropdown-quarter" className="w-100">
-                  {filters.quarter.length ? `${filters.quarter.length} quarters selected` : 'All Quarters'}
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-months" className="w-100">
+                  {filters.months.length ? `${filters.months.length} months selected` : 'All Months'}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueQuarters.map(q => (
-                    <Dropdown.Item key={q} as="div">
-                      <Form.Check type="checkbox" label={q} checked={filters.quarter.includes(q)} onChange={() => handleMultiSelectChange('quarter', q)} />
+                  {uniqueMonths.map(m => (
+                    <Dropdown.Item key={m} as="div">
+                      <Form.Check type="checkbox" label={m} checked={filters.months.includes(m)} onChange={() => handleMultiSelectChange('months', m)} />
                     </Dropdown.Item>
                   ))}
                 </Dropdown.Menu>
@@ -379,9 +433,10 @@ const THRDirectorReport = () => {
                               </div>
                             );
                             break;
+                          case 'months':
+                            cellContent = formatMonths(row.months || row.quarter);
+                            break;
                           case 'sector_status':
-                          case 'cdpo_status':
-                          case 'dpo_status':
                             cellContent = <span className={`badge bg-${row[col.dataField] === 'approved' ? 'success' : row[col.dataField] === 'rejected' ? 'danger' : 'warning'}`}>{row[col.dataField]}</span>;
                             break;
                           default:
@@ -404,7 +459,9 @@ const THRDirectorReport = () => {
                         return <td key="total_beneficiaries">{totals.beneficiaries}</td>;
                       }
                       if (col.dataField === 'quantity') {
-                        return <td key="total_quantity">{totals.quantity.toFixed(2)}</td>;
+                        return <td key="total_quantity">
+                          <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Totals</Button>
+                        </td>;
                       }
                       return <td key={col.dataField}></td>;
                     })}
@@ -440,6 +497,29 @@ const THRDirectorReport = () => {
               Close
             </Button>
           </Modal.Footer>
+        </Modal>
+
+        <Modal show={showQuantityModal} onHide={() => setShowQuantityModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Total Quantity by Unit</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {Object.keys(totals.quantityByUnit).length > 0 ? (
+              <Table striped bordered>
+                <thead>
+                  <tr>
+                    <th>Unit</th>
+                    <th>Total Quantity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(totals.quantityByUnit).map(([unit, total]) => (
+                    <tr key={unit}><td>{unit}</td><td>{total.toFixed(2)}</td></tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : <p>No quantity data to display.</p>}
+          </Modal.Body>
         </Modal>
       </div>
     </div>
