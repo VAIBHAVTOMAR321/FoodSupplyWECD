@@ -20,6 +20,8 @@ const HcmCdpoDistributions = () => {
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [showQtyModal, setShowQtyModal] = useState(false);
   const tableRef = useRef(null);
 
   const [columns, setColumns] = useState([
@@ -35,7 +37,6 @@ const HcmCdpoDistributions = () => {
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'date', text: 'Date', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
-    { dataField: 'bene_in_ang', text: 'Beneficiaries in AWC', visible: true },
     { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
   ]);
@@ -151,40 +152,52 @@ const HcmCdpoDistributions = () => {
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
         acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-        acc.quantity += parseFloat(item.quantity) || 0;
+        const quantity = parseFloat(item.quantity) || 0;
+        const unit = item.unit || 'N/A';
+
+        acc.quantity += quantity;
+        if (!acc.quantityByUnit[unit]) {
+          acc.quantityByUnit[unit] = 0;
+        }
+        acc.quantityByUnit[unit] += quantity;
         return acc;
-    }, { beneficiaries: 0, quantity: 0 });
+    }, { beneficiaries: 0, quantity: 0, quantityByUnit: {} });
   }, [filteredData]);
 
   const exportToPDF = () => {
-    const input = tableRef.current;
-    if (!input) {
-      console.error("Table element not found for PDF export.");
-      return;
-    }
-    html2canvas(input, {
-      scale: 2, // Higher scale for better quality
-      useCORS: true
-    }).then(canvas => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'pt',
-        format: 'a4'
+    setIsPrinting(true);
+    setTimeout(() => {
+      const input = tableRef.current;
+      if (!input) {
+        console.error("Table element not found for PDF export.");
+        setIsPrinting(false);
+        return;
+      }
+      html2canvas(input, {
+        scale: 2, // Higher scale for better quality
+        useCORS: true
+      }).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'pt',
+          format: 'a4'
+        });
+  
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+        
+        const width = pdfWidth - 40; // with some margin
+        const height = width / ratio;
+  
+        pdf.text("HCM CDPO Distributions Report", 20, 30);
+        pdf.addImage(imgData, 'PNG', 20, 40, width, height);
+        pdf.save('hcm_cdpo_distributions.pdf');
+        setIsPrinting(false);
       });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      
-      const width = pdfWidth - 40; // with some margin
-      const height = width / ratio;
-
-      pdf.text("HCM CDPO Distributions Report", 20, 30);
-      pdf.addImage(imgData, 'PNG', 20, 40, width, height);
-      pdf.save('hcm_cdpo_distributions.pdf');
-    });
+    }, 100);
   };
 
   const exportToExcel = () => {
@@ -444,7 +457,16 @@ const HcmCdpoDistributions = () => {
                             } else if (col.dataField === 'total_beneficiaries') {
                               cellContent = <strong>{totals.beneficiaries}</strong>;
                             } else if (col.dataField === 'quantity') {
-                              cellContent = <strong>{totals.quantity.toFixed(2)}</strong>;
+                              cellContent = (
+                                <div className="d-flex align-items-center justify-content-end">
+                                 
+                                  {!isPrinting && (
+                                    <Button variant="link" size="sm" onClick={() => setShowQtyModal(true)} className="p-1">
+                                      View Total
+                                    </Button>
+                                  )}
+                                </div>
+                              );
                             }
                             return <td key={`tf-${col.dataField}`}>{cellContent}</td>;
                           })}
@@ -478,6 +500,31 @@ const HcmCdpoDistributions = () => {
               Close
             </Button>
           </Modal.Footer>
+        </Modal>
+
+        <Modal show={showQtyModal} onHide={() => setShowQtyModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Table striped bordered hover>
+              <thead>
+                <tr>
+                  <th>Unit</th>
+                  <th>Total Quantity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(totals.quantityByUnit).map(([unit, qty]) => (
+                  <tr key={unit}>
+                    <td>{unit}</td>
+                    <td>{qty.toFixed(2)}</td>
+                  </tr>
+                ))}
+                
+              </tbody>
+            </Table>
+          </Modal.Body>
         </Modal>
 
       </div>
