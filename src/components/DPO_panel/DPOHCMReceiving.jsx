@@ -25,6 +25,28 @@ import * as XLSX from "xlsx";
 import DPOLeftNav from "./DPOLeftNav";
 import DPOHeader from "./DPOHeader";
 
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
+const quarterToMonths = {
+  'apr-may-jun': ['apr', 'may', 'jun'],
+  'jul-aug-sep': ['jul', 'aug', 'sep'],
+  'oct-nov-dec': ['oct', 'nov', 'dec'],
+  'jan-feb-mar': ['jan', 'feb', 'mar'],
+};
+
 const DPOHCMReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -42,7 +64,7 @@ const DPOHCMReceiving = () => {
 
   const [filters, setFilters] = useState({
     fin_year: [],
-    quarter: [],
+    months: [],
     district: [],
     project: [],
     sector: [],
@@ -51,7 +73,7 @@ const DPOHCMReceiving = () => {
   });
 
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
-  const [uniqueQuarters, setUniqueQuarters] = useState([]);
+  const [uniqueMonths, setUniqueMonths] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
@@ -72,7 +94,7 @@ const DPOHCMReceiving = () => {
     { dataField: "quantity", text: "Quantity", visible: true },
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
-    { dataField: "quarter", text: "Quarter", visible: true },
+    { dataField: "months", text: "Months", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
@@ -93,7 +115,13 @@ const DPOHCMReceiving = () => {
   useEffect(() => {
     if (reports.length > 0) {
       setUniqueFinYears([...new Set(reports.map((item) => item.fin_year))]);
-      setUniqueQuarters([...new Set(reports.map((item) => item.quarter))]);
+      const allMonths = reports.flatMap(item => {
+        const monthData = item.months || item.quarter;
+        if (Array.isArray(monthData)) return monthData;
+        if (typeof monthData === 'string' && quarterToMonths[monthData]) return quarterToMonths[monthData];
+        return [];
+      });
+      setUniqueMonths([...new Set(allMonths)].map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)));
       setUniqueDistricts([...new Set(reports.map((item) => item.district))]);
       setUniqueProjects([...new Set(reports.map((item) => item.project))]);
       setUniqueSectors([...new Set(reports.map((item) => item.sector))]);
@@ -149,10 +177,12 @@ const DPOHCMReceiving = () => {
 
   const filteredReports = useMemo(() => {
     return reports.filter((item) => {
-      const { fin_year, quarter, district, project, sector, food_item, bene_category } = filters;
+      const { fin_year, months, district, project, sector, food_item, bene_category } = filters;
+      const itemMonths = (Array.isArray(item.months) ? item.months : quarterToMonths[item.quarter] || []).map(m => monthLabels[m] || m);
+      const monthMatch = months.length === 0 || months.some(filterMonth => itemMonths.includes(filterMonth));
       return (
         (fin_year.length === 0 || fin_year.includes(item.fin_year)) &&
-        (quarter.length === 0 || quarter.includes(item.quarter)) &&
+        monthMatch &&
         (district.length === 0 || district.includes(item.district)) &&
         (project.length === 0 || project.includes(item.project)) &&
         (sector.length === 0 || sector.includes(item.sector)) &&
@@ -463,13 +493,13 @@ const DPOHCMReceiving = () => {
 
                     <Col md={2}>
                       <Dropdown>
-                        <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.quarter.length ? `${filters.quarter.length} selected` : "All Quarters"}
+                        <Dropdown.Toggle variant="outline-secondary" className="w-100" id="dropdown-months">
+                          {filters.months.length ? `${filters.months.length} selected` : "All Months"}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
-                          {uniqueQuarters.map((v) => (
+                          {uniqueMonths.map((v) => (
                             <Dropdown.Item key={v} as="div">
-                              <Form.Check type="checkbox" label={v} checked={filters.quarter.includes(v)} onChange={() => handleMultiSelectChange("quarter", v)} />
+                              <Form.Check type="checkbox" label={v} checked={filters.months.includes(v)} onChange={() => handleMultiSelectChange("months", v)} />
                             </Dropdown.Item>
                           ))}
                         </Dropdown.Menu>
@@ -552,7 +582,7 @@ const DPOHCMReceiving = () => {
                     </Col>
 
                     <Col md={2} className="d-flex align-items-end">
-                      <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], quarter: [], district: [], project: [], sector: [], food_item: [], bene_category: [] })}>
+                      <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [] })}>
                         Clear Filters
                       </Button>
                     </Col>
@@ -579,7 +609,9 @@ const DPOHCMReceiving = () => {
                                 {visibleColumns.map((col) => (
                                   <td key={col.dataField}>
                                     {col.dataField === "#"
-                                      ? (currentPage - 1) * itemsPerPage + index + 1 : col.dataField === "date" ? new Date(report[col.dataField]).toLocaleDateString()
+                                      ? (currentPage - 1) * itemsPerPage + index + 1
+                                      : col.dataField === "months" ? (Array.isArray(report.months) ? report.months : quarterToMonths[report.quarter] || []).map(m => monthLabels[m] || m).join(', ')
+                                      : col.dataField === "date" ? new Date(report[col.dataField]).toLocaleDateString()
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
                                       ? new Date(report[col.dataField]).toLocaleString()
                                       : report[col.dataField]}
