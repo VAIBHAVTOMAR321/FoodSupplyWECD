@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Container, Row, Col, Form, Spinner, Table, Button, Alert, Pagination, Modal, Dropdown } from "react-bootstrap";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Container, Row, Col, Form, Spinner, Table, Button, Alert, Pagination, Modal, Dropdown, Badge } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/itcellLeftnav.css";
 
 import ITCellLeftNav from "./ITCellLeftNav";
 import ITCellHeader from "./ITCellHeader";
 import { FaFilePdf, FaFileExcel, FaEye, FaEdit, FaTrash } from "react-icons/fa";
-import jsPDF from "jspdf"; 
+import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
 const ITCellHCMReport = () => {
@@ -41,6 +42,8 @@ const ITCellHCMReport = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [formErrors, setFormErrors] = useState({});
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [foodItems, setFoodItems] = useState([]);
 
@@ -56,14 +59,14 @@ const ITCellHCMReport = () => {
     { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'date', text: 'Date', visible: true },
-    { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
-    { dataField: 'bene_in_ang', text: 'Beneficiaries in AWC', visible: true },
+    { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },    
     { dataField: 'quantity', text: 'Quantity', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
     { dataField: 'action', text: 'Action', visible: true },
   ];
 
   const [columns, setColumns] = useState(initialColumns);
+  const tableRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -216,47 +219,65 @@ const ITCellHCMReport = () => {
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
-        acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-        acc.bene_in_ang += Number(item.bene_in_ang) || 0;
-        acc.quantity += parseFloat(item.quantity) || 0;
-        return acc;
-    }, { beneficiaries: 0, bene_in_ang: 0, quantity: 0 });
+      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
+      const unit = item.unit || 'N/A';
+      const quantity = parseFloat(item.quantity) || 0;
+      if (!acc.quantityByUnit[unit]) {
+        acc.quantityByUnit[unit] = 0;
+      }
+      acc.quantityByUnit[unit] += quantity;
+      return acc;
+    }, {
+      beneficiaries: 0,
+      quantityByUnit: {}
+    });
   }, [filteredData]);
 
   const exportToPDF = () => {
-    const visibleColumns = columns.filter(c => c.visible);
-    const head = [visibleColumns.map(c => c.text)];
-    const body = filteredData.map((row, index) =>
-      visibleColumns.map(col => {
-        if (col.dataField === '#') return index + 1;
-        if (col.dataField === 'action') return ''; // Skip action column in PDF
-        const value = row[col.dataField];
-        return value !== null && value !== undefined ? String(value) : '';
-      })
-    );
+    setIsPrinting(true);
+    setTimeout(() => {
+      const input = tableRef.current;
+      html2canvas(input, { scale: 2, useCORS: true }).then(canvas => {
+        try {
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'pt',
+            format: 'a2'
+          });
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
+          const canvasWidth = canvas.width;
+          const canvasHeight = canvas.height;
+          const ratio = canvasWidth / canvasHeight;
+          const width = pdfWidth - 40;
+          const height = width / ratio;
+  
+          pdf.text("HCM Distribution Report", 20, 30);
+          pdf.addImage(imgData, 'PNG', 20, 40, width, Math.min(height, pdfHeight - 80));
+  
+          if (Object.keys(totals.quantityByUnit).length > 0) {
+            pdf.addPage();
+            pdf.text("Total Quantity by Unit", 20, 30);
+            autoTable(pdf, {
+              startY: 40,
+              head: [['Unit', 'Total Quantity']],
+              body: Object.entries(totals.quantityByUnit).map(([unit, total]) => [unit, total.toFixed(2)]),
+              theme: 'striped',
+              headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
+              alternateRowStyles: { fillColor: [245, 245, 245] },
+            });
+          }
+  
+          pdf.save('hcm_it_cell_report.pdf');
+        } catch (e) {
+          console.error("Error generating PDF:", e);
+          setError("Could not generate PDF. Please try again.");
+        }
 
-    const totalRow = visibleColumns.map((col, idx) => {
-      if (idx === 0) return 'Total';
-      if (col.dataField === 'total_beneficiaries') return totals.beneficiaries.toString();
-      if (col.dataField === 'bene_in_ang') return totals.bene_in_ang.toString();
-      if (col.dataField === 'quantity') return totals.quantity.toFixed(2).toString();
-      return '';
-    });
-    body.push(totalRow);
-
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.text("HCM Distribution Report", 14, 16);
-    autoTable(doc, {
-      startY: 20,
-      head: head,
-      body: body,
-      theme: 'striped',
-      styles: { fontSize: 7, cellPadding: 2, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.1 },
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
-      bodyStyles: { fillColor: [255, 255, 255] },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-    });
-    doc.save('hcm_it_cell_report.pdf');
+        setIsPrinting(false);
+      });
+    }, 100);
   };
 
   const exportToExcel = () => {
@@ -272,15 +293,23 @@ const ITCellHCMReport = () => {
     const totalRow = { '#': 'Total' };
     visibleColumns.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'bene_in_ang') totalRow[col.text] = totals.bene_in_ang;
-      else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
+      else if (col.dataField === 'quantity') totalRow[col.text] = ''; // Keep quantity total empty in main sheet
       else if (col.text !== '#') totalRow[col.text] = '';
     });
     dataToExport.push(totalRow);
 
+    const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
+      'Unit': unit,
+      'Total Quantity': total.toFixed(2)
+    }));
+
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const quantityWorksheet = XLSX.utils.json_to_sheet(quantityTotalsData);
+
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "HCM Report");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "HCM IT Cell Report");
+    XLSX.utils.book_append_sheet(workbook, quantityWorksheet, "Quantity Totals");
+
     XLSX.writeFile(workbook, "hcm_it_cell_report.xlsx");
   };
 
@@ -343,7 +372,7 @@ const ITCellHCMReport = () => {
 
           {loading ? <div className="text-center"><Spinner animation="border" /></div> : error ? <Alert variant="danger">{error}</Alert> : (
             <>
-              <Table striped bordered hover responsive className="bg-white">
+              <Table striped bordered hover responsive className="bg-white" ref={tableRef}>
                 <thead><tr>{columns.map((col, index) => col.visible && <th key={index}>{col.text}</th>)}</tr></thead>
                 <tbody>
                   {currentItems.length > 0 ? currentItems.map((row, index) => (
@@ -378,11 +407,12 @@ const ITCellHCMReport = () => {
                       if (col.dataField === 'total_beneficiaries') {
                         return <td key="total_beneficiaries">{totals.beneficiaries}</td>;
                       }
-                      if (col.dataField === 'bene_in_ang') {
-                        return <td key="total_bene_in_ang">{totals.bene_in_ang}</td>;
-                      }
                       if (col.dataField === 'quantity') {
-                        return <td key="total_quantity">{totals.quantity.toFixed(2)}</td>;
+                        return (
+                          <td key="total_quantity">
+                            {!isPrinting && <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Totals</Button>}
+                          </td>
+                        );
                       }
                       return <td key={col.dataField}></td>;
                     })}
@@ -400,6 +430,29 @@ const ITCellHCMReport = () => {
             {columns.map((col, index) => (<Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />))}
           </Modal.Body>
           <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button></Modal.Footer>
+        </Modal>
+
+        <Modal show={showQuantityModal} onHide={() => setShowQuantityModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Total Quantity by Unit</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {Object.keys(totals.quantityByUnit).length > 0 ? (
+              <Table striped bordered>
+                <thead>
+                  <tr>
+                    <th>Unit</th>
+                    <th>Total Quantity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(totals.quantityByUnit).map(([unit, total]) => (
+                    <tr key={unit}><td>{unit}</td><td>{total.toFixed(2)}</td></tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : <p>No quantity data to display.</p>}
+          </Modal.Body>
         </Modal>
 
         {editingItem && (
@@ -464,12 +517,6 @@ const ITCellHCMReport = () => {
                     <Form.Group className="mb-3">
                       <Form.Label>Total Beneficiaries</Form.Label>
                       <Form.Control type="number" name="total_beneficiaries" value={editFormData.total_beneficiaries} onChange={handleEditFormChange} required />
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Beneficiaries in AWC</Form.Label>
-                      <Form.Control type="number" name="bene_in_ang" value={editFormData.bene_in_ang || ''} onChange={handleEditFormChange} />
                     </Form.Group>
                   </Col>
                 </Row>

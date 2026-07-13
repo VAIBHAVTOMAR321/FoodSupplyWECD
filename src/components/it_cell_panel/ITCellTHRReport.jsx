@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Container, Row, Col, Form, Spinner, Table, Button, Alert, Pagination, Modal, Dropdown } from "react-bootstrap";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Container, Row, Col, Form, Spinner, Table, Button, Alert, Pagination, Modal, Dropdown, Badge } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/itcellLeftnav.css";
 
@@ -8,7 +8,30 @@ import ITCellHeader from "./ITCellHeader";
 import { FaFilePdf, FaFileExcel, FaEye, FaEdit, FaTrash } from "react-icons/fa";
 import jsPDF from "jspdf"; 
 import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
+
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
+const formatMonths = (monthsArray) => {
+  if (Array.isArray(monthsArray)) {
+    return monthsArray.map(m => monthLabels[m.toLowerCase()] || m).join(', ');
+  }
+  return monthsArray; // Fallback for old `quarter` string data
+};
 
 const ITCellTHRReport = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -23,7 +46,7 @@ const ITCellTHRReport = () => {
   const [itemsPerPage] = useState(100);
   const [filters, setFilters] = useState({
     finYear: [],
-    quarter: [],
+    months: [],
     district: [],
     project: [],
     sector: [],
@@ -31,7 +54,7 @@ const ITCellTHRReport = () => {
     bene_category: [],
   });
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
-  const [uniqueQuarters, setUniqueQuarters] = useState([]);
+  const [uniqueMonths, setUniqueMonths] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
@@ -39,10 +62,12 @@ const ITCellTHRReport = () => {
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [formErrors, setFormErrors] = useState({});
+  const [isPrinting, setIsPrinting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [foodItems, setFoodItems] = useState([]);
 
@@ -58,17 +83,16 @@ const ITCellTHRReport = () => {
     { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin. Year', visible: true },
-    { dataField: 'quarter', text: 'Quarter', visible: true },
+    { dataField: 'months', text: 'Months', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Quantity', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
-    { dataField: 'sector_status', text: 'Sector Status', visible: true },
-    { dataField: 'cdpo_status', text: 'CDPO Status', visible: true },
-    { dataField: 'dpo_status', text: 'DPO Status', visible: true },
+    { dataField: 'sector_status', text: 'Sector Status', visible: true },    
     { dataField: 'action', text: 'Action', visible: true },
   ];
 
   const [columns, setColumns] = useState(initialColumns);
+  const tableRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -78,13 +102,16 @@ const ITCellTHRReport = () => {
       const data = response.data.data || [];
       setReportData(data);
       setUniqueFinYears([...new Set(data.map((item) => item.fin_year))]);
-      setUniqueQuarters([...new Set(data.map((item) => item.quarter))]);
+      const allMonths = data.flatMap(item => Array.isArray(item.months) ? item.months.map(m => m.toLowerCase()) : (item.quarter ? [item.quarter] : []));
+      const uniqueMonthKeys = [...new Set(allMonths)];
+      const formattedUniqueMonths = uniqueMonthKeys.map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b));
+      setUniqueMonths(formattedUniqueMonths);
       setUniqueDistricts([...new Set(data.map((item) => item.district))]);
       setUniqueProjects([...new Set(data.map((item) => item.project))]);
       setUniqueSectors([...new Set(data.map((item) => item.sector))]);
       setUniqueFoodItems([...new Set(data.map((item) => item.food_item))]);
       setUniqueBeneCategories([...new Set(data.map((item) => item.bene_category))]);
-      fetchFoodItems();
+      // fetchFoodItems(); // This might be redundant if food items are already in the main data
     } catch (err) {
       setError("Failed to fetch THR report data.");
       console.error(err);
@@ -92,7 +119,7 @@ const ITCellTHRReport = () => {
       setLoading(false);
     }
   }, [api]);
-
+  
   const fetchFoodItems = useCallback(async () => {
     try {
       const response = await api.get("/thr-food-items/");
@@ -105,14 +132,15 @@ const ITCellTHRReport = () => {
 
   useEffect(() => {
     fetchData();
-
+    fetchFoodItems();
+  
     const handleResize = () => {
       const width = window.innerWidth;
       setIsMobile(width < 768);
       setIsTablet(width >= 768 && width < 1024);
     };
-
-    handleResize();
+  
+    handleResize(); // Initial check
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [fetchData]);
@@ -120,7 +148,12 @@ const ITCellTHRReport = () => {
   useEffect(() => {
     let data = [...reportData];
     if (filters.finYear.length) data = data.filter((item) => filters.finYear.includes(item.fin_year));
-    if (filters.quarter.length) data = data.filter((item) => filters.quarter.includes(item.quarter));
+    if (filters.months.length) {
+      data = data.filter(item => {
+        const itemMonths = Array.isArray(item.months) ? item.months.map(m => monthLabels[m.toLowerCase()] || m) : [item.quarter];
+        return itemMonths.some(month => filters.months.includes(month));
+      });
+    }
     if (filters.district.length) data = data.filter((item) => filters.district.includes(item.district));
     if (filters.project.length) data = data.filter((item) => filters.project.includes(item.project));
     if (filters.sector.length) data = data.filter((item) => filters.sector.includes(item.sector));
@@ -210,53 +243,78 @@ const ITCellTHRReport = () => {
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
-        acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-        acc.quantity += parseFloat(item.quantity) || 0;
-        return acc;
-    }, { beneficiaries: 0, quantity: 0 });
+      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
+      const unit = item.unit || 'N/A';
+      const quantity = parseFloat(item.quantity) || 0;
+      if (!acc.quantityByUnit[unit]) {
+        acc.quantityByUnit[unit] = 0;
+      }
+      acc.quantityByUnit[unit] += quantity;
+      return acc;
+    }, {
+      beneficiaries: 0,
+      quantityByUnit: {}
+    });
   }, [filteredData]);
 
   const exportToPDF = () => {
-    const visibleColumns = columns.filter(c => c.visible);
-    const head = [visibleColumns.map(c => c.text)];
-    const body = filteredData.map((row, index) =>
-      visibleColumns.map(col => {
-        if (col.dataField === '#') return index + 1;
-        if (col.dataField === 'action') return ''; // Skip action column in PDF
-        const value = row[col.dataField];
-        return value !== null && value !== undefined ? String(value) : '';
-      })
-    );
+    setIsPrinting(true);
+    setTimeout(() => {
+      const input = tableRef.current;
+      html2canvas(input, { scale: 2, useCORS: true }).then(canvas => {
+        try {
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'pt',
+            format: 'a2'
+          });
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
+          const canvasWidth = canvas.width;
+          const canvasHeight = canvas.height;
+          const ratio = canvasWidth / canvasHeight;
+          const width = pdfWidth - 40;
+          const height = width / ratio;
+  
+          pdf.text("THR Distribution Report", 20, 30);
+          pdf.addImage(imgData, 'PNG', 20, 40, width, Math.min(height, pdfHeight - 80));
+  
+          if (Object.keys(totals.quantityByUnit).length > 0) {
+            pdf.addPage();
+            pdf.text("Total Quantity by Unit", 20, 30);
+            autoTable(pdf, {
+              startY: 40,
+              head: [['Unit', 'Total Quantity']],
+              body: Object.entries(totals.quantityByUnit).map(([unit, total]) => [unit, total.toFixed(2)]),
+              theme: 'striped',
+              headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
+              alternateRowStyles: { fillColor: [245, 245, 245] },
+            });
+          }
+  
+          pdf.save('thr_it_cell_report.pdf');
+        } catch (e) {
+          console.error("Error generating PDF:", e);
+          setError("Could not generate PDF. Please try again.");
+        }
 
-    const totalRow = visibleColumns.map((col, idx) => {
-      if (idx === 0) return 'Total';
-      if (col.dataField === 'total_beneficiaries') return totals.beneficiaries.toString();
-      if (col.dataField === 'quantity') return totals.quantity.toFixed(2).toString();
-      return '';
-    });
-    body.push(totalRow);
-
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.text("THR Distribution Report", 14, 16);
-    autoTable(doc, {
-      startY: 20,
-      head: head,
-      body: body,
-      theme: 'striped',
-      styles: { fontSize: 7, cellPadding: 2, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.1 },
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
-      bodyStyles: { fillColor: [255, 255, 255] },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-    });
-    doc.save('thr_it_cell_report.pdf');
+        setIsPrinting(false);
+      });
+    }, 100);
   };
 
   const exportToExcel = () => {
-    const visibleColumns = columns.filter(c => c.visible && c.dataField !== '#' && c.dataField !== 'action');
+    const visibleColumns = columns.filter(c => c.visible && c.dataField !== '#');
     const dataToExport = filteredData.map((row, index) => {
       const newRow = { '#': index + 1 };
       visibleColumns.forEach(col => {
-        newRow[col.text] = row[col.dataField];
+        if (col.dataField === 'months') {
+          newRow[col.text] = formatMonths(row.months || row.quarter);
+        }
+        else if (col.dataField !== '#') {
+          newRow[col.text] = row[col.dataField];
+        }
       });
       return newRow;
     });
@@ -264,14 +322,24 @@ const ITCellTHRReport = () => {
     const totalRow = { '#': 'Total' };
     visibleColumns.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'quantity') totalRow[col.text] = totals.quantity.toFixed(2);
+      else if (col.dataField === 'quantity') totalRow[col.text] = ''; // Keep quantity total empty in main sheet
       else totalRow[col.text] = '';
     });
+    // Clear remark columns for the total row
     dataToExport.push(totalRow);
 
+    const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
+      'Unit': unit,
+      'Total Quantity': total.toFixed(2)
+    }));
+
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const quantityWorksheet = XLSX.utils.json_to_sheet(quantityTotalsData);
+
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "THR Report");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "THR IT Cell Report");
+    XLSX.utils.book_append_sheet(workbook, quantityWorksheet, "Quantity Totals");
+
     XLSX.writeFile(workbook, "thr_it_cell_report.xlsx");
   };
 
@@ -322,7 +390,7 @@ const ITCellTHRReport = () => {
           <Row className="mb-3">
             {/* Filter Dropdowns */}
             <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.finYear.length ? `${filters.finYear.length} years selected` : 'All Fin. Years'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueFinYears.map(year => (<Dropdown.Item key={year} as="div"><Form.Check type="checkbox" label={year} checked={filters.finYear.includes(year)} onChange={() => handleMultiSelectChange('finYear', year)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
-            <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.quarter.length ? `${filters.quarter.length} quarters selected` : 'All Quarters'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueQuarters.map(q => (<Dropdown.Item key={q} as="div"><Form.Check type="checkbox" label={q} checked={filters.quarter.includes(q)} onChange={() => handleMultiSelectChange('quarter', q)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
+            <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? `${filters.months.length} selected` : 'All Months'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueMonths.map(m => (<Dropdown.Item key={m} as="div"><Form.Check type="checkbox" label={m} checked={filters.months.includes(m)} onChange={() => handleMultiSelectChange('months', m)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
             <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.district.length ? `${filters.district.length} districts selected` : 'All Districts'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueDistricts.map(d => (<Dropdown.Item key={d} as="div"><Form.Check type="checkbox" label={d} checked={filters.district.includes(d)} onChange={() => handleMultiSelectChange('district', d)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
             <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.project.length ? `${filters.project.length} projects selected` : 'All Projects'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueProjects.map(p => (<Dropdown.Item key={p} as="div"><Form.Check type="checkbox" label={p} checked={filters.project.includes(p)} onChange={() => handleMultiSelectChange('project', p)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
             <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.sector.length ? `${filters.sector.length} sectors selected` : 'All Sectors'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueSectors.map(s => (<Dropdown.Item key={s} as="div"><Form.Check type="checkbox" label={s} checked={filters.sector.includes(s)} onChange={() => handleMultiSelectChange('sector', s)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
@@ -347,7 +415,7 @@ const ITCellTHRReport = () => {
             <Alert variant="danger">{error}</Alert>
           ) : (
             <>
-              <Table striped bordered hover responsive className="bg-white">
+              <Table striped bordered hover responsive className="bg-white" ref={tableRef}>
                 <thead>
                   <tr>{columns.map((col, index) => col.visible && <th key={index}>{col.text}</th>)}</tr>
                 </thead>
@@ -361,11 +429,16 @@ const ITCellTHRReport = () => {
                           case '#':
                             cellContent = indexOfFirstItem + index + 1;
                             break;
-                          case 'sector_status':
-                          case 'cdpo_status':
-                          case 'dpo_status':
-                            cellContent = <span className={`badge bg-${row[col.dataField] === 'approved' ? 'success' : row[col.dataField] === 'rejected' ? 'danger' : 'warning'}`}>{row[col.dataField]}</span>;
+                          case 'months':
+                            cellContent = formatMonths(row.months || row.quarter);
                             break;
+                          case 'sector_status':                          
+                            cellContent = <span className={`badge bg-${row[col.dataField] === 'approved' ? 'success' : row[col.dataField] === 'rejected' ? 'danger' : 'warning'}`}>{row[col.dataField]}</span>;
+                            if (isPrinting) {
+                              cellContent = row[col.dataField];
+                            } else {
+                              cellContent = <Badge bg={row[col.dataField] === 'approved' ? 'success' : row[col.dataField] === 'rejected' ? 'danger' : 'warning'}>{row[col.dataField]}</Badge>;
+                            }                            break;
                           case 'action':
                             cellContent = (
                               <>
@@ -394,9 +467,10 @@ const ITCellTHRReport = () => {
                         return <td key="total_beneficiaries">{totals.beneficiaries}</td>;
                       }
                       if (col.dataField === 'quantity') {
-                        return <td key="total_quantity">{totals.quantity.toFixed(2)}</td>;
+                        return <td key="total_quantity">
+                          <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Totals</Button>
+                        </td>;
                       }
-                      // Render empty cells for other columns in the footer, including the action column
                       return <td key={col.dataField}></td>;
                     })}
                   </tr>
@@ -433,6 +507,29 @@ const ITCellTHRReport = () => {
           </Modal.Footer>
         </Modal>
 
+        <Modal show={showQuantityModal} onHide={() => setShowQuantityModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Total Quantity by Unit</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {Object.keys(totals.quantityByUnit).length > 0 ? (
+              <Table striped bordered>
+                <thead>
+                  <tr>
+                    <th>Unit</th>
+                    <th>Total Quantity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(totals.quantityByUnit).map(([unit, total]) => (
+                    <tr key={unit}><td>{unit}</td><td>{total.toFixed(2)}</td></tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : <p>No quantity data to display.</p>}
+          </Modal.Body>
+        </Modal>
+
         {editingItem && (
           <Modal show={showEditModal} onHide={handleCloseEditModal} centered>
             <Modal.Header closeButton>
@@ -467,14 +564,13 @@ const ITCellTHRReport = () => {
                   </Col>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>Quarter</Form.Label>
-                      <Form.Control as="select" name="quarter" value={editFormData.quarter} onChange={handleEditFormChange} required>
-                        <option value="">Select Quarter</option>
-                        <option value="apr-may-jun">April-May-June</option>
-                        <option value="jul-aug-sep">July-August-September</option>
-                        <option value="oct-nov-dec">October-November-December</option>
-                        <option value="jan-feb-mar">January-February-March</option>
-                      </Form.Control>
+                      <Form.Label>Months</Form.Label>
+                      <Form.Control 
+                        type="text" 
+                        name="months" 
+                        value={Array.isArray(editFormData.months) ? editFormData.months.join(',') : (editFormData.quarter || '')} 
+                        onChange={handleEditFormChange} 
+                        placeholder="e.g., apr,may,jun" required />
                     </Form.Group>
                   </Col>
                 </Row>
@@ -492,28 +588,6 @@ const ITCellTHRReport = () => {
                     </Form.Group>
                   </Col>
                 </Row>
-                 <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Sector Status</Form.Label>
-                      <Form.Control as="select" name="sector_status" value={editFormData.sector_status} onChange={handleEditFormChange}>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                      </Form.Control>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>CDPO Status</Form.Label>
-                      <Form.Control as="select" name="cdpo_status" value={editFormData.cdpo_status} onChange={handleEditFormChange}>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                      </Form.Control>
-                    </Form.Group>
-                  </Col>
-                </Row>
                 <Row>
                   <Col md={6}>
                     <Form.Group className="mb-3">
@@ -525,6 +599,17 @@ const ITCellTHRReport = () => {
                       </Form.Control>
                     </Form.Group>
                   </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Sector Status</Form.Label>
+                      <Form.Control as="select" name="sector_status" value={editFormData.sector_status} onChange={handleEditFormChange}>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                      </Form.Control>
+                    </Form.Group>
+                  </Col>
+
                    <Col md={6}>
                     <Form.Group className="mb-3">
                       <Form.Label>Quantity</Form.Label>
