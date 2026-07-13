@@ -689,6 +689,8 @@ const ThrCdpoDistributions = () => {
                                 </>
                               );
                             }
+                   
+                   
                             return <td key={`tf-${col.dataField}`}>{cellContent}</td>;
                           })}
                         </tr>

@@ -63,6 +63,7 @@ const ThrSupervisorDistributions = () => {
 
   const [showRemarkModal, setShowRemarkModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState(null);
+  const [showQtyModal, setShowQtyModal] = useState(false);
   const tableRef = useRef(null);
 
   const [columns, setColumns] = useState([
@@ -109,7 +110,17 @@ const ThrSupervisorDistributions = () => {
   useEffect(() => {
     if (distributions.length > 0) {
       setUniqueFinYears([...new Set(distributions.map(item => item.fin_year))]);
-      setUniqueMonths([...new Set(distributions.map(item => formatMonths(item.months || item.quarter)))]);
+      const allMonths = distributions.flatMap(item => {
+        const monthData = item.months || item.quarter;
+        if (Array.isArray(monthData)) {
+          return monthData;
+        }
+        if (typeof monthData === 'string' && quarterToMonths[monthData]) {
+          return quarterToMonths[monthData];
+        }
+        return [];
+      });
+      setUniqueMonths([...new Set(allMonths)].map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)));
       setUniqueDistricts([...new Set(distributions.map(item => item.district))]);
       setUniqueProjects([...new Set(distributions.map(item => item.project))]);
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
@@ -132,8 +143,10 @@ const ThrSupervisorDistributions = () => {
   const filteredData = useMemo(() => {
     return distributions.filter(item => {
       const { finYear, months, district, project, sector, food_item, bene_category, sector_status } = filters;
+      const itemMonths = (Array.isArray(item.months) ? item.months : quarterToMonths[item.quarter] || []).map(m => monthLabels[m] || m);      
+      const monthMatch = months.length === 0 || months.some(filterMonth => itemMonths.includes(filterMonth));
       return (finYear.length === 0 || finYear.includes(item.fin_year)) &&
-             (months.length === 0 || months.includes(formatMonths(item.months || item.quarter))) &&
+             monthMatch &&
              (district.length === 0 || district.includes(item.district)) &&
              (project.length === 0 || project.includes(item.project)) &&
              (sector.length === 0 || sector.includes(item.sector)) &&
@@ -270,9 +283,16 @@ const ThrSupervisorDistributions = () => {
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
         acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-        acc.quantity += parseFloat(item.quantity) || 0;
+        const quantity = parseFloat(item.quantity) || 0;
+        const unit = item.unit || 'N/A';
+
+        acc.quantity += quantity;
+        if (!acc.quantityByUnit[unit]) {
+          acc.quantityByUnit[unit] = 0;
+        }
+        acc.quantityByUnit[unit] += quantity;
         return acc;
-    }, { beneficiaries: 0, quantity: 0 });
+    }, { beneficiaries: 0, quantity: 0, quantityByUnit: {} });
   }, [filteredData]);
 
   const exportToPDF = () => {
@@ -655,7 +675,12 @@ const ThrSupervisorDistributions = () => {
                             } else if (col.dataField === 'total_beneficiaries') {
                               cellContent = <strong>{totals.beneficiaries}</strong>;
                             } else if (col.dataField === 'quantity') {
-                              cellContent = <strong>{totals.quantity.toFixed(2)}</strong>;
+                              cellContent = (
+                                <>
+                                  {/* <strong>{totals.quantity.toFixed(2)}</strong> */}
+                                  <Button variant="link" size="sm" onClick={() => setShowQtyModal(true)}>View Total</Button>
+                                </>
+                              );
                             }
                             return <td key={`total-${col.dataField}`}>{cellContent}</td>;
                           })}
@@ -711,6 +736,34 @@ const ThrSupervisorDistributions = () => {
               Close
             </Button>
           </Modal.Footer>
+        </Modal>
+
+        <Modal show={showQtyModal} onHide={() => setShowQtyModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Table striped bordered hover>
+              <thead>
+                <tr>
+                  <th>Unit</th>
+                  <th>Total Quantity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(totals.quantityByUnit).map(([unit, qty]) => (
+                  <tr key={unit}>
+                    <td>{unit}</td>
+                    <td>{qty.toFixed(2)}</td>
+                  </tr>
+                ))}
+                {/* <tr className="table-active">
+                  <td><strong>Grand Total</strong></td>
+                  <td><strong>{totals.quantity.toFixed(2)}</strong></td>
+                </tr> */}
+              </tbody>
+            </Table>
+          </Modal.Body>
         </Modal>
 
       </div>
