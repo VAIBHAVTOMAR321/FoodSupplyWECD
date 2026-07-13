@@ -18,6 +18,21 @@ import { FaUserCircle } from "react-icons/fa";
 import SupervisorLeftNav from "./SupervisorLeftNav";
 import SupervisorHeader from "./SupervisorHeader";
 
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
 const ThrSupervisorReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -33,7 +48,7 @@ const ThrSupervisorReceiving = () => {
     awc_name: [],
     food_item: [],
     fin_year: [],
-    quarter: [],
+    months: [],
     project: [],
     sector: [],
     district: [],
@@ -91,7 +106,7 @@ const ThrSupervisorReceiving = () => {
       awc_name: [],
       food_item: [],
       fin_year: [],
-      quarter: [],
+      months: [],
       project: [],
       sector: [],
       district: [],
@@ -105,7 +120,11 @@ const ThrSupervisorReceiving = () => {
       awc_name: [...new Set(receivings.map((item) => item.awc_name))],
       food_item: [...new Set(receivings.map((item) => item.food_item))],
       fin_year: [...new Set(receivings.map((item) => item.fin_year))],
-      quarter: [...new Set(receivings.map((item) => item.quarter))],
+      months: [...new Set(
+        receivings
+          .flatMap((item) => item.months || [])
+          .map(m => monthLabels[m] || m)
+      )].sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)),
       project: [...new Set(receivings.map((item) => item.project))],
       sector: [...new Set(receivings.map((item) => item.sector))],
       district: [...new Set(receivings.map((item) => item.district))],
@@ -117,8 +136,13 @@ const ThrSupervisorReceiving = () => {
 
   const filteredReceivings = useMemo(() => {
     return receivings.filter((item) => {
-      return Object.keys(filters).every((key) => {
-        return filters[key].length === 0 || filters[key].includes(String(item[key]));
+      return Object.entries(filters).every(([key, selectedValues]) => {
+        if (selectedValues.length === 0) return true;
+        if (key === 'months') {
+          const itemMonths = (item.months || []).map(m => monthLabels[m] || m);
+          return selectedValues.some(v => itemMonths.includes(v));
+        }
+        return selectedValues.includes(String(item[key]));
       });
     });
   }, [receivings, filters]);
@@ -198,8 +222,8 @@ const ThrSupervisorReceiving = () => {
             </Col>
             <Col md>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.quarter.length ? `${filters.quarter.length} selected` : 'All Quarters'}</Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.quarter.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.quarter.includes(v)} onChange={() => handleMultiSelectChange('quarter', v)} /></Dropdown.Item>))}</Dropdown.Menu>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? `${filters.months.length} selected` : 'All Months'}</Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.months.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.months.includes(v)} onChange={() => handleMultiSelectChange('months', v)} /></Dropdown.Item>))}</Dropdown.Menu>
               </Dropdown>
             </Col>
             <Col md>
@@ -232,7 +256,7 @@ const ThrSupervisorReceiving = () => {
                     <th>Beneficiary Category</th>
                     <th>Date</th>
                     <th>Financial Year</th>
-                    <th>Quarter</th>
+                    <th>Months</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -250,7 +274,7 @@ const ThrSupervisorReceiving = () => {
                         <td>{item.bene_category}</td>
                         <td>{new Date(item.date).toLocaleDateString()}</td>
                         <td>{item.fin_year}</td>
-                        <td>{item.quarter}</td>
+                        <td>{(item.months || []).map(m => monthLabels[m] || m).join(', ')}</td>
                       </tr>
                     ))
                   ) : (
