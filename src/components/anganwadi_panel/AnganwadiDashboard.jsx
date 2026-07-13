@@ -773,21 +773,20 @@ const AnganwadiDashboard = () => {
                   </Form.Group>
                   <Form.Group className="mb-3">
                     <Form.Label>Total Beneficiaries</Form.Label>
-                    <Form.Control 
-                      type="number"
+                    {(!distributionData.months || distributionData.months.length === 0) && (
+                      <Form.Text className="text-muted d-block mb-2">
+                        Please select month(s) first to enable this field.
+                      </Form.Text>
+                    )}
+                    <Form.Control
+                      type="text"
                       value={distributionData.total_beneficiaries}
                       onChange={(e) => {
-                        const newCount = e.target.value;
-                        setDistributionData({ ...distributionData, total_beneficiaries: newCount });
-                        if (beneficiaryCount !== null && parseInt(newCount, 10) > beneficiaryCount) {
-                          setDistributionError(`लाभार्थियों की संख्या पंजीकृत संख्या ${beneficiaryCount} से अधिक नहीं हो सकती।`);
-                        } else {
-                          setDistributionError('');
-                        }
+                        setDistributionData({ ...distributionData, total_beneficiaries: e.target.value });
                       }}
                       placeholder="Enter number of beneficiaries"
                       required
-                      disabled={(beneficiaryCount === 0 || !isRegistrationAvailable)}
+                      disabled={!distributionData.months || distributionData.months.length === 0 || beneficiaryCount === 0 || !isRegistrationAvailable}
                     />
                     {beneficiaryCount === 0 && <Form.Text className="text-danger">लाभार्थी दर्ज नहीं कर सकते क्योंकि इस अवधि और श्रेणी के लिए कोई भी पंजीकृत नहीं है।</Form.Text>}
                   </Form.Group>
@@ -895,7 +894,7 @@ const AnganwadiDashboard = () => {
                     <Button 
                       variant="primary" 
                       type="submit" 
-                      disabled={submitting || !isRegistrationAvailable || !isRegistrationApproved || beneficiaryCount === 0 || (beneficiaryCount !== null && distributionData.total_beneficiaries && parseInt(distributionData.total_beneficiaries, 10) > beneficiaryCount)}
+                      disabled={submitting || !isRegistrationAvailable || !isRegistrationApproved || beneficiaryCount === 0}
                     >
                       {submitting ? <Spinner as="span" animation="border" size="sm" /> : (selectedItem.isEdit ? 'Update' : 'Submit')}
                     </Button>
