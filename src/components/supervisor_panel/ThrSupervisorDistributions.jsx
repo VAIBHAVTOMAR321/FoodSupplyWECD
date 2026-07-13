@@ -9,6 +9,38 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
+const quarterToMonths = {
+  'apr-may-jun': ['apr', 'may', 'jun'],
+  'jul-aug-sep': ['jul', 'aug', 'sep'],
+  'oct-nov-dec': ['oct', 'nov', 'dec'],
+  'jan-feb-mar': ['jan', 'feb', 'mar'],
+};
+
+const formatMonths = (monthsOrQuarter) => {
+  if (Array.isArray(monthsOrQuarter)) {
+    return monthsOrQuarter.map((m) => monthLabels[m] || m).join(', ');
+  }
+  if (typeof monthsOrQuarter === 'string' && quarterToMonths[monthsOrQuarter]) {
+    return quarterToMonths[monthsOrQuarter].map(m => monthLabels[m] || m).join(', ');
+  }
+  return monthsOrQuarter; // Fallback for single month strings or other formats
+};
+
 const ThrSupervisorDistributions = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -45,14 +77,11 @@ const ThrSupervisorDistributions = () => {
     { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin Year', visible: true },
-    { dataField: 'quarter', text: 'Quarter', visible: true },
+    { dataField: 'months', text: 'Months', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
     { dataField: 'sector_status', text: 'Sector Status', visible: true },
-    { dataField: 'cdpo_status', text: 'CDPO Status', visible: true },
-    { dataField: 'dpo_status', text: 'DPO Status', visible: true },
-    { dataField: 'sector_remark', text: 'Sector Remark', visible: true },
     { dataField: 'action', text: 'Action', visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
@@ -60,38 +89,32 @@ const ThrSupervisorDistributions = () => {
 
   const [filters, setFilters] = useState({
     finYear: [],
-    quarter: [],
+    months: [],
     district: [],
     project: [],
     sector: [],
     food_item: [],
     bene_category: [],
     sector_status: [],
-    cdpo_status: [],
-    dpo_status: [],
   });
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
-  const [uniqueQuarters, setUniqueQuarters] = useState([]);
+  const [uniqueMonths, setUniqueMonths] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [beneficiaryCategories, setBeneficiaryCategories] = useState([]);
   const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
-  const [uniqueCdpoStatuses, setUniqueCdpoStatuses] = useState([]);
-  const [uniqueDpoStatuses, setUniqueDpoStatuses] = useState([]);
 
   useEffect(() => {
     if (distributions.length > 0) {
       setUniqueFinYears([...new Set(distributions.map(item => item.fin_year))]);
-      setUniqueQuarters([...new Set(distributions.map(item => item.quarter))]);
+      setUniqueMonths([...new Set(distributions.map(item => formatMonths(item.months || item.quarter)))]);
       setUniqueDistricts([...new Set(distributions.map(item => item.district))]);
       setUniqueProjects([...new Set(distributions.map(item => item.project))]);
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
       setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status))]);
-      setUniqueCdpoStatuses([...new Set(distributions.map(item => item.cdpo_status))]);
-      setUniqueDpoStatuses([...new Set(distributions.map(item => item.dpo_status))]);
     }
   }, [distributions]);
 
@@ -108,17 +131,15 @@ const ThrSupervisorDistributions = () => {
 
   const filteredData = useMemo(() => {
     return distributions.filter(item => {
-      const { finYear, quarter, district, project, sector, food_item, bene_category, sector_status, cdpo_status, dpo_status } = filters;
+      const { finYear, months, district, project, sector, food_item, bene_category, sector_status } = filters;
       return (finYear.length === 0 || finYear.includes(item.fin_year)) &&
-             (quarter.length === 0 || quarter.includes(item.quarter)) &&
+             (months.length === 0 || months.includes(formatMonths(item.months || item.quarter))) &&
              (district.length === 0 || district.includes(item.district)) &&
              (project.length === 0 || project.includes(item.project)) &&
              (sector.length === 0 || sector.includes(item.sector)) &&
              (food_item.length === 0 || food_item.includes(item.food_item)) &&
              (bene_category.length === 0 || bene_category.includes(item.bene_category)) &&
-             (sector_status.length === 0 || sector_status.includes(item.sector_status)) &&
-             (cdpo_status.length === 0 || cdpo_status.includes(item.cdpo_status)) &&
-             (dpo_status.length === 0 || dpo_status.includes(item.dpo_status));
+             (sector_status.length === 0 || sector_status.includes(item.sector_status));
     });
   }, [distributions, filters]);
 
@@ -406,13 +427,13 @@ const ThrSupervisorDistributions = () => {
             </Col>
             <Col md={2}>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" id="dropdown-quarter" className="w-100">
-                  {filters.quarter.length ? `${filters.quarter.length} quarters selected` : 'All Quarters'}
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-months" className="w-100">
+                  {filters.months.length ? `${filters.months.length} selected` : 'All Months'}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueQuarters.map(q => (
+                  {uniqueMonths.map(q => (
                     <Dropdown.Item key={q} as="div">
-                      <Form.Check type="checkbox" label={q} checked={filters.quarter.includes(q)} onChange={() => handleMultiSelectChange('quarter', q)} />
+                      <Form.Check type="checkbox" label={q} checked={filters.months.includes(q)} onChange={() => handleMultiSelectChange('months', q)} />
                     </Dropdown.Item>
                   ))}
                 </Dropdown.Menu>
@@ -488,53 +509,8 @@ const ThrSupervisorDistributions = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
-          </Row>
-
-          <Row className="mb-3">
-            <Col md={2}>
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status" className="w-100">
-                  {filters.sector_status.length ? `${filters.sector_status.length} selected` : 'All Sector Status'}
-                </Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueSectorStatuses.map(s => (
-                    <Dropdown.Item key={s} as="div">
-                      <Form.Check type="checkbox" label={s} checked={filters.sector_status.includes(s)} onChange={() => handleMultiSelectChange('sector_status', s)} />
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
-            </Col>
-            <Col md={2}>
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" id="dropdown-cdpo-status" className="w-100">
-                  {filters.cdpo_status.length ? `${filters.cdpo_status.length} selected` : 'All CDPO Status'}
-                </Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueCdpoStatuses.map(s => (
-                    <Dropdown.Item key={s} as="div">
-                      <Form.Check type="checkbox" label={s} checked={filters.cdpo_status.includes(s)} onChange={() => handleMultiSelectChange('cdpo_status', s)} />
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
-            </Col>
-            <Col md={2}>
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" id="dropdown-dpo-status" className="w-100">
-                  {filters.dpo_status.length ? `${filters.dpo_status.length} selected` : 'All DPO Status'}
-                </Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueDpoStatuses.map(s => (
-                    <Dropdown.Item key={s} as="div">
-                      <Form.Check type="checkbox" label={s} checked={filters.dpo_status.includes(s)} onChange={() => handleMultiSelectChange('dpo_status', s)} />
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
-            </Col>
-            <Col md={2} className="d-flex align-items-end">
-              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], quarter: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [], cdpo_status: [], dpo_status: [] })} className="me-2">Clear Filters</Button>
+            <Col md={2} className="d-flex align-items-end mt-2">
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [] })} className="me-2">Clear Filters</Button>
             </Col>
           </Row>
 
@@ -584,9 +560,10 @@ const ThrSupervisorDistributions = () => {
                                         </div>
                                       );
                                       break;
+                                    case 'months':
+                                      cellContent = formatMonths(row.months || row.quarter);
+                                      break;
                                     case 'sector_status':
-                                    case 'cdpo_status':
-                                    case 'dpo_status':
                                       cellContent = isPrinting ? row[col.dataField] : <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField]}</Badge>;
                                       break;
                                     case 'action':
@@ -699,18 +676,6 @@ const ThrSupervisorDistributions = () => {
           <Modal.Body>
             {selectedRemarks && (
               <div>
-                <div className="mb-3">
-                  <h6>CDPO Remark</h6>
-                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.cdpo_status)}>{selectedRemarks.cdpo_status || "pending"}</Badge></p>
-                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.cdpo_remark || "No remark"}</p>
-                </div>
-                <hr />
-                <div className="mb-3">
-                  <h6>DPO Remark</h6>
-                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.dpo_status)}>{selectedRemarks.dpo_status || "pending"}</Badge></p>
-                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.dpo_remark || "No remark"}</p>
-                </div>
-                <hr />
                 <div className="mb-3">
                   <h6>Sector Remark</h6>
                   <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>{selectedRemarks.sector_status}</Badge></p>
