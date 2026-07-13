@@ -27,6 +27,28 @@ import * as XLSX from "xlsx";
 import ITCellLeftNav from "./ITCellLeftNav";
 import ITCellHeader from "./ITCellHeader";
 
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
+const formatMonths = (months) => {
+  if (Array.isArray(months)) {
+    return months.map(m => monthLabels[m.toLowerCase()] || m).join(', ');
+  }
+  return months; // Fallback for old `quarter` string data
+};
+
 const ITCellTHRReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -45,7 +67,7 @@ const ITCellTHRReceiving = () => {
 
   const [filters, setFilters] = useState({
     fin_year: [],
-    quarter: [],
+    months: [],
     district: [],
     project: [],
     sector: [],
@@ -54,7 +76,7 @@ const ITCellTHRReceiving = () => {
   });
 
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
-  const [uniqueQuarters, setUniqueQuarters] = useState([]);
+  const [uniqueMonths, setUniqueMonths] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
@@ -73,7 +95,7 @@ const ITCellTHRReceiving = () => {
     { dataField: "quantity", text: "Quantity", visible: true },
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
-    { dataField: "quarter", text: "Quarter", visible: true },
+    { dataField: "months", text: "Months", visible: true },
     { dataField: "action", text: "Action", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
@@ -115,7 +137,9 @@ const ITCellTHRReceiving = () => {
         const reportData = results.data || [];
         setReports(reportData);
         setUniqueFinYears([...new Set(reportData.map((item) => item.fin_year))]);
-        setUniqueQuarters([...new Set(reportData.map((item) => item.quarter))]);
+        const allMonths = reportData.flatMap(item => Array.isArray(item.months) ? item.months.map(m => m.toLowerCase()) : (item.quarter ? [item.quarter] : []));
+        const uniqueMonthKeys = [...new Set(allMonths)];
+        setUniqueMonths(uniqueMonthKeys.map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)));
         setUniqueDistricts([...new Set(reportData.map((item) => item.district))]);
         setUniqueProjects([...new Set(reportData.map((item) => item.project))]);
         setUniqueSectors([...new Set(reportData.map((item) => item.sector))]);
@@ -148,10 +172,11 @@ const ITCellTHRReceiving = () => {
 
   const filteredReports = useMemo(() => {
     return reports.filter((item) => {
-      const { fin_year, quarter, district, project, sector, food_item, bene_category } = filters;
+      const { fin_year, months, district, project, sector, food_item, bene_category } = filters;
+      const itemMonths = Array.isArray(item.months) ? item.months.map(m => monthLabels[m.toLowerCase()] || m) : (item.quarter ? [item.quarter] : []);
       return (
         (fin_year.length === 0 || fin_year.includes(item.fin_year)) &&
-        (quarter.length === 0 || quarter.includes(item.quarter)) &&
+        (months.length === 0 || itemMonths.some(month => months.includes(month))) &&
         (district.length === 0 || district.includes(item.district)) &&
         (project.length === 0 || project.includes(item.project)) &&
         (sector.length === 0 || sector.includes(item.sector)) &&
@@ -255,7 +280,11 @@ const ITCellTHRReceiving = () => {
     const dataToExport = filteredReports.map((row, index) => {
       const newRow = { "#": index + 1 };
       visCols.forEach((col) => {
-        newRow[col.text] = row[col.dataField];
+        if (col.dataField === 'months') {
+          newRow[col.text] = formatMonths(row.months || row.quarter);
+        } else {
+          newRow[col.text] = row[col.dataField];
+        }
       });
       return newRow;
     });
@@ -331,7 +360,7 @@ const ITCellTHRReceiving = () => {
                   <Row className="mb-3 g-3">
                     {/* Filters */}
                     <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.fin_year.length ? `${filters.fin_year.length} selected` : "All Fin. Years"}</Dropdown.Toggle><Dropdown.Menu>{uniqueFinYears.map((v) => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.fin_year.includes(v)} onChange={() => handleMultiSelectChange("fin_year", v)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
-                    <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.quarter.length ? `${filters.quarter.length} selected` : "All Quarters"}</Dropdown.Toggle><Dropdown.Menu>{uniqueQuarters.map((v) => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.quarter.includes(v)} onChange={() => handleMultiSelectChange("quarter", v)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
+                    <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? `${filters.months.length} selected` : "All Months"}</Dropdown.Toggle><Dropdown.Menu>{uniqueMonths.map((v) => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.months.includes(v)} onChange={() => handleMultiSelectChange("months", v)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
                     <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.district.length ? `${filters.district.length} selected` : "All Districts"}</Dropdown.Toggle><Dropdown.Menu>{uniqueDistricts.map((v) => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.district.includes(v)} onChange={() => handleMultiSelectChange("district", v)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
                     <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.project.length ? `${filters.project.length} selected` : "All Projects"}</Dropdown.Toggle><Dropdown.Menu>{uniqueProjects.map((v) => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.project.includes(v)} onChange={() => handleMultiSelectChange("project", v)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
                     <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.sector.length ? `${filters.sector.length} selected` : "All Sectors"}</Dropdown.Toggle><Dropdown.Menu>{uniqueSectors.map((v) => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.sector.includes(v)} onChange={() => handleMultiSelectChange("sector", v)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
@@ -353,7 +382,7 @@ const ITCellTHRReceiving = () => {
                                 {visibleColumns.map((col) => (
                                   <td key={col.dataField}>
                                     {col.dataField === "#" ? (currentPage - 1) * itemsPerPage + index + 1
-                                      : col.dataField === "date" ? new Date(report.date).toLocaleDateString()
+                                      : col.dataField === "months" ? formatMonths(report.months || report.quarter) : col.dataField === "date" ? new Date(report.date).toLocaleDateString()
                                       : col.dataField === "action" ? (
                                         <>
                                           <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleShowEditModal(report)}><FaEdit /></Button>
@@ -431,8 +460,8 @@ const ITCellTHRReceiving = () => {
                   </Col>
                    <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>Quarter</Form.Label>
-                      <Form.Control type="text" name="quarter" value={editFormData.quarter} onChange={handleEditFormChange} required />
+                      <Form.Label>Months</Form.Label>
+                      <Form.Control type="text" name="months" value={Array.isArray(editFormData.months) ? editFormData.months.join(',') : (editFormData.quarter || '')} onChange={handleEditFormChange} placeholder="e.g., apr,may,jun" required />
                     </Form.Group>
                   </Col>
                 </Row>
