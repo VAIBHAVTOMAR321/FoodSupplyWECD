@@ -684,8 +684,12 @@ const ThrCdpoDistributions = () => {
                             } else if (col.dataField === 'quantity') {
                               cellContent = (
                                 <>
-                                  {/* <strong>{totals.quantity.toFixed(2)}</strong> */}
-                                  <Button variant="link" size="sm" onClick={() => setShowQtyModal(true)}>View total</Button>
+                                
+                                  {!isPrinting && (
+                                    <Button variant="link" size="sm" onClick={() => setShowQtyModal(true)}>
+                                      View Total
+                                    </Button>
+                                  )}
                                 </>
                               );
                             }
