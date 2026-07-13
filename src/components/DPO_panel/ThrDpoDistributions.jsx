@@ -9,6 +9,29 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
+const monthLabels = {
+  apr: 'April',
+  may: 'May',
+  jun: 'June',
+  jul: 'July',
+  aug: 'August',
+  sep: 'September',
+  oct: 'October',
+  nov: 'November',
+  dec: 'December',
+  jan: 'January',
+  feb: 'February',
+  mar: 'March',
+};
+
+const quarterToMonths = {
+  'apr-may-jun': ['apr', 'may', 'jun'],
+  'jul-aug-sep': ['jul', 'aug', 'sep'],
+  'oct-nov-dec': ['oct', 'nov', 'dec'],
+  'jan-feb-mar': ['jan', 'feb', 'mar'],
+};
+
+
 const ThrDpoDistributions = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -21,16 +44,13 @@ const ThrDpoDistributions = () => {
   const [successMsg, setSuccessMsg] = useState("");
   const [actionError, setActionError] = useState("");
   const [loadingAction, setLoadingAction] = useState({});
-  const [openRemarkId, setOpenRemarkId] = useState(null);
-  const [openRemarkAction, setOpenRemarkAction] = useState("");
-  const [remarkValue, setRemarkValue] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isPrinting, setIsPrinting] = useState(false);
   const [itemsPerPage] = useState(20);
 
   const [showRemarkModal, setShowRemarkModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState(null);
+  const [showQtyModal, setShowQtyModal] = useState(false);
   const tableRef = useRef(null);
 
   const [columns, setColumns] = useState([
@@ -45,41 +65,36 @@ const ThrDpoDistributions = () => {
     { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin Year', visible: true },
-    { dataField: 'quarter', text: 'Quarter', visible: true },
+    { dataField: 'months', text: 'Months', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
-    { dataField: 'cdpo_status', text: 'CDPO Status', visible: true },
-    { dataField: 'dpo_status', text: 'DPO Status', visible: true },
     { dataField: 'sector_status', text: 'Sector Status', visible: true },
-    { dataField: 'dpo_remark', text: 'DPO Remark', visible: true },
-    { dataField: 'action', text: 'Action', visible: true },
+    { dataField: 'action', text: 'Remarks', visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const visibleColumns = columns.filter(c => c.visible);
 
   const [filters, setFilters] = useState({
     finYear: [],
-    quarter: [],
+    months: [],
     district: [],
     project: [],
     sector: [],
     food_item: [],
     bene_category: [],
-    cdpo_status: [],
-    dpo_status: [],
     sector_status: [],
+    cdpo_status: [],
   });
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
-  const [uniqueQuarters, setUniqueQuarters] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
-  const [uniqueCdpoStatuses, setUniqueCdpoStatuses] = useState([]);
-  const [uniqueDpoStatuses, setUniqueDpoStatuses] = useState([]);
   const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
+  const [uniqueCdpoStatuses, setUniqueCdpoStatuses] = useState([]);
+  const [uniqueMonths, setUniqueMonths] = useState([]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -95,16 +110,22 @@ const ThrDpoDistributions = () => {
 
   useEffect(() => {
     if (distributions.length > 0) {
-      setUniqueFinYears([...new Set(distributions.map(item => item.fin_year))]);
-      setUniqueQuarters([...new Set(distributions.map(item => item.quarter))]);
+      setUniqueFinYears([...new Set(distributions.map(item => item.fin_year))].sort().reverse());
+      const allMonths = distributions.flatMap(item => {
+        const monthData = item.months || item.quarter;
+        if (Array.isArray(monthData)) return monthData;
+        if (typeof monthData === 'string' && quarterToMonths[monthData]) return quarterToMonths[monthData];
+        return [];
+      });
+      setUniqueMonths([...new Set(allMonths)].map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)));
+
       setUniqueDistricts([...new Set(distributions.map(item => item.district))]);
       setUniqueProjects([...new Set(distributions.map(item => item.project))]);
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
       setUniqueBeneCategories([...new Set(distributions.map(item => item.bene_category))]);
-      setUniqueCdpoStatuses([...new Set(distributions.map(item => item.cdpo_status))]);
-      setUniqueDpoStatuses([...new Set(distributions.map(item => item.dpo_status))]);
       setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status))]);
+      setUniqueCdpoStatuses([...new Set(distributions.map(item => item.cdpo_status))].filter(Boolean));
     }
   }, [distributions]);
 
@@ -121,17 +142,19 @@ const ThrDpoDistributions = () => {
 
   const filteredData = useMemo(() => {
     return distributions.filter(item => {
-      const { finYear, quarter, district, project, sector, food_item, bene_category, cdpo_status, dpo_status, sector_status } = filters;
+      const { finYear, months, district, project, sector, food_item, bene_category, sector_status, cdpo_status } = filters;
+      const itemMonths = (Array.isArray(item.months) ? item.months : quarterToMonths[item.quarter] || []).map(m => monthLabels[m] || m);
+      const monthMatch = months.length === 0 || months.some(filterMonth => itemMonths.includes(filterMonth));
+
       return (finYear.length === 0 || finYear.includes(item.fin_year)) &&
-             (quarter.length === 0 || quarter.includes(item.quarter)) &&
-             (district.length === 0 || district.includes(item.district)) &&
-             (project.length === 0 || project.includes(item.project)) &&
-             (sector.length === 0 || sector.includes(item.sector)) &&
-             (food_item.length === 0 || food_item.includes(item.food_item)) &&
-             (bene_category.length === 0 || bene_category.includes(item.bene_category)) &&
-             (cdpo_status.length === 0 || cdpo_status.includes(item.cdpo_status)) &&
-             (dpo_status.length === 0 || dpo_status.includes(item.dpo_status)) &&
-             (sector_status.length === 0 || sector_status.includes(item.sector_status));
+        monthMatch &&
+        (district.length === 0 || district.includes(item.district)) &&
+        (project.length === 0 || project.includes(item.project)) &&
+        (sector.length === 0 || sector.includes(item.sector)) &&
+        (food_item.length === 0 || food_item.includes(item.food_item)) &&
+        (bene_category.length === 0 || bene_category.includes(item.bene_category)) &&
+        (sector_status.length === 0 || sector_status.includes(item.sector_status)) &&
+        (cdpo_status.length === 0 || cdpo_status.includes(item.cdpo_status));
     });
   }, [distributions, filters]);
 
@@ -165,58 +188,6 @@ const ThrDpoDistributions = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const handleToggleRemark = (item, action) => {
-    if (openRemarkId === item.id) {
-      setOpenRemarkId(null);
-      setOpenRemarkAction("");
-    } else {
-      setOpenRemarkId(item.id);
-      setOpenRemarkAction(action);
-      setRemarkValue("");
-      setActionError("");
-    }
-  };
-
-  const handleStatusUpdate = async (item) => {
-    const action = openRemarkAction;
-    const remark = remarkValue.trim();
-    setActionError("");
-
-    if (action === "rejected" && !remark) {
-      setActionError("Please enter a remark for rejection.");
-      return;
-    }
-
-    setSubmitting(true);
-    setLoadingAction(prev => ({ ...prev, [item.id]: true }));
-    try {
-      const response = await api.put("/thr-dpo-distributions/", {
-        id: item.id,
-        dpo_status: action,
-        dpo_remark: remark || null,
-      });
-
-      if (response.data?.success !== false) {
-        setSuccessMsg(`Status updated to ${action} successfully.`);
-        setDistributions(prev => prev.map(d =>
-          d.id === item.id ? { ...d, dpo_status: action, dpo_remark: remark || null } : d
-        ));
-        setOpenRemarkId(null);
-        setOpenRemarkAction("");
-        setRemarkValue("");
-        setTimeout(() => setSuccessMsg(""), 3000);
-      } else {
-        setActionError(response.data?.message || "Failed to update status.");
-      }
-    } catch (err) {
-      setActionError("Failed to update status. Please try again.");
-      console.error(err);
-    } finally {
-      setSubmitting(false);
-      setLoadingAction(prev => ({ ...prev, [item.id]: false }));
-    }
-  };
-
   const handleViewRemark = (item) => {
     setSelectedRemarks(item);
     setShowRemarkModal(true);
@@ -235,10 +206,17 @@ const ThrDpoDistributions = () => {
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
-        acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-        acc.quantity += parseFloat(item.quantity) || 0;
-        return acc;
-    }, { beneficiaries: 0, quantity: 0 });
+      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
+      const quantity = parseFloat(item.quantity) || 0;
+      const unit = item.unit || 'N/A';
+
+      acc.quantity += quantity;
+      if (!acc.quantityByUnit[unit]) {
+        acc.quantityByUnit[unit] = 0;
+      }
+      acc.quantityByUnit[unit] += quantity;
+      return acc;
+    }, { beneficiaries: 0, quantity: 0, quantityByUnit: {} });
   }, [filteredData]);
 
   const exportToPDF = () => {
@@ -400,13 +378,13 @@ const ThrDpoDistributions = () => {
             </Col>
             <Col md={2}>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" id="dropdown-quarter" className="w-100">
-                  {filters.quarter.length ? `${filters.quarter.length} quarters selected` : 'All Quarters'}
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-months" className="w-100">
+                  {filters.months.length ? `${filters.months.length} selected` : 'All Months'}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueQuarters.map(q => (
+                  {uniqueMonths.map(q => (
                     <Dropdown.Item key={q} as="div">
-                      <Form.Check type="checkbox" label={q} checked={filters.quarter.includes(q)} onChange={() => handleMultiSelectChange('quarter', q)} />
+                      <Form.Check type="checkbox" label={q} checked={filters.months.includes(q)} onChange={() => handleMultiSelectChange('months', q)} />
                     </Dropdown.Item>
                   ))}
                 </Dropdown.Menu>
@@ -501,20 +479,6 @@ const ThrDpoDistributions = () => {
             </Col>
             <Col md={2}>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" id="dropdown-dpo-status" className="w-100">
-                  {filters.dpo_status.length ? `${filters.dpo_status.length} selected` : 'All DPO Status'}
-                </Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {uniqueDpoStatuses.map(s => (
-                    <Dropdown.Item key={s} as="div">
-                      <Form.Check type="checkbox" label={s} checked={filters.dpo_status.includes(s)} onChange={() => handleMultiSelectChange('dpo_status', s)} />
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
-            </Col>
-            <Col md={2}>
-              <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status" className="w-100">
                   {filters.sector_status.length ? `${filters.sector_status.length} selected` : 'All Sector Status'}
                 </Dropdown.Toggle>
@@ -526,6 +490,9 @@ const ThrDpoDistributions = () => {
                   ))}
                 </Dropdown.Menu>
               </Dropdown>
+            </Col>
+            <Col md={2} className="d-flex align-items-end">
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [], cdpo_status: [] })}>Clear Filters</Button>
             </Col>
           </Row>
 
@@ -565,100 +532,45 @@ const ThrDpoDistributions = () => {
                      </thead>
                       <tbody>
                         {currentItems.length > 0 ? currentItems.map((row, index) => (
-                          <React.Fragment key={row.id}>
-                            <tr>
-                                {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col) => {
-                                  let cellContent;
-                                  switch (col.dataField) {
-                                    case '#':
-                                      cellContent = index + 1;
-                                      break;
-                                   case 'bene_category':
-                                     cellContent = (
-                                       <div className="bene-category-cell" style={{ width: '150px' }}>
-                                         {row[col.dataField]}
-                                       </div>
-                                     );
-                                     break;
-                                    case 'cdpo_status':
-                                    case 'dpo_status':
-                                    case 'sector_status':
-                                      cellContent = isPrinting ? row[col.dataField] : <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField]}</Badge>;
-                                      break;
-                                    case 'action':
-                                      cellContent = (
-                                        <div className="d-flex align-items-center gap-2 no-print">
-                                          <Button
-                                            variant="outline-success"
-                                            size="sm"
-                                            disabled={row.cdpo_status === "pending" || row.cdpo_status === "pendings" || row.dpo_status === "approved" || row.dpo_status === "rejected" || loadingAction[row.id]}
-                                            onClick={() => handleToggleRemark(row, "approved")}
-                                          >
-                                            Approve
-                                          </Button>
-                                          <Button
-                                            variant="outline-danger"
-                                            size="sm"
-                                            disabled={row.cdpo_status === "pending" || row.cdpo_status === "pendings" || row.dpo_status === "approved" || row.dpo_status === "rejected" || loadingAction[row.id]}
-                                            onClick={() => handleToggleRemark(row, "rejected")}
-                                          >
-                                            Reject
-                                          </Button>
-                                          <Button
-                                            variant="outline-primary"
-                                            size="sm"
-                                            onClick={() => handleViewRemark(row)}
-                                          >
-                                            View Remark
-                                          </Button>
-                                        </div>
-                                      );
-                                      break;
-                                    default:
-                                      cellContent = row[col.dataField];
-                                  }
-                                  return <td key={`td-${row.id}-${col.dataField}`}>{cellContent}</td>;
-                                })}
-                            </tr>
-                            {openRemarkId === row.id && (
-                              <tr>
-                                <td colSpan={visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').length}>
-                                  <div className="d-flex align-items-start gap-2">
-                                    <Form.Control
-                                      type="text"
-                                      size="sm"
-                                      placeholder="Enter remark"
-                                      value={remarkValue}
-                                      onChange={(e) => setRemarkValue(e.target.value)}
-                                      className="me-2"
-                                      style={{ maxWidth: "300px" }}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      variant={openRemarkAction === "approved" ? "success" : "danger"}
-                                      disabled={submitting || loadingAction[row.id]}
-                                      onClick={() => handleStatusUpdate(row)}
-                                    >
-                                      {loadingAction[row.id] ? "Saving..." : "Save"}
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="secondary"
-                                      disabled={submitting || loadingAction[row.id]}
-                                      onClick={() => {
-                                        setOpenRemarkId(null);
-                                        setOpenRemarkAction("");
-                                        setRemarkValue("");
-                                        setActionError("");
-                                      }}
-                                    >
-                                       Cancel
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
+                          <tr key={row.id}>
+                            {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col) => {
+                              let cellContent;
+                              switch (col.dataField) {
+                                case '#':
+                                  cellContent = index + 1;
+                                  break;
+                                case 'bene_category':
+                                  cellContent = (
+                                    <div className="bene-category-cell" style={{ width: '150px' }}>
+                                      {row[col.dataField]}
+                                    </div>
+                                  );
+                                  break;
+                                case 'months':
+                                  cellContent = (Array.isArray(row.months) ? row.months : quarterToMonths[row.quarter] || []).map(m => monthLabels[m] || m).join(', ');
+                                  break;
+                                case 'sector_status':
+                                  cellContent = isPrinting ? row[col.dataField] : <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField]}</Badge>;
+                                  break;
+                                case 'action':
+                                  cellContent = (
+                                    <div className="d-flex align-items-center gap-2 no-print">
+                                      <Button
+                                        variant="outline-primary"
+                                        size="sm"
+                                        onClick={() => handleViewRemark(row)}
+                                      >
+                                        View Remarks
+                                      </Button>
+                                    </div>
+                                  );
+                                  break;
+                                default:
+                                  cellContent = row[col.dataField];
+                              }
+                              return <td key={`td-${row.id}-${col.dataField}`}>{cellContent}</td>;
+                            })}
+                          </tr>
                         )) : (
                           <tr>
                             <td colSpan={visibleColumns.length} className="text-center">No data available</td>
@@ -674,7 +586,12 @@ const ThrDpoDistributions = () => {
                             } else if (col.dataField === 'total_beneficiaries') {
                               cellContent = <strong>{totals.beneficiaries}</strong>;
                             } else if (col.dataField === 'quantity') {
-                              cellContent = <strong>{totals.quantity.toFixed(2)}</strong>;
+                              cellContent = (
+                                <>
+                                  {/* <strong>{totals.quantity.toFixed(2)}</strong> */}
+                                  <Button variant="link" size="sm" onClick={() => setShowQtyModal(true)}>View Total</Button>
+                                </>
+                              );
                             }
                             return <td key={`tf-${col.dataField}`}>{cellContent}</td>;
                           })}
@@ -695,18 +612,6 @@ const ThrDpoDistributions = () => {
           <Modal.Body>
             {selectedRemarks && (
               <div>
-                <div className="mb-3">
-                  <h6>CDPO Remark</h6>
-                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.cdpo_status)}>{selectedRemarks.cdpo_status || "pending"}</Badge></p>
-                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.cdpo_remark || "No remark"}</p>
-                </div>
-                <hr />
-                <div className="mb-3">
-                  <h6>DPO Remark</h6>
-                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.dpo_status)}>{selectedRemarks.dpo_status || "pending"}</Badge></p>
-                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.dpo_remark || "No remark"}</p>
-                </div>
-                <hr />
                 <div className="mb-3">
                   <h6>Sector Remark</h6>
                   <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>{selectedRemarks.sector_status}</Badge></p>
@@ -742,6 +647,34 @@ const ThrDpoDistributions = () => {
               Close
             </Button>
           </Modal.Footer>
+        </Modal>
+
+        <Modal show={showQtyModal} onHide={() => setShowQtyModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Table striped bordered hover>
+              <thead>
+                <tr>
+                  <th>Unit</th>
+                  <th>Total Quantity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(totals.quantityByUnit).map(([unit, qty]) => (
+                  <tr key={unit}>
+                    <td>{unit}</td>
+                    <td>{qty.toFixed(2)}</td>
+                  </tr>
+                ))}
+                {/* <tr className="table-active">
+                  <td><strong>Grand Total</strong></td>
+                  <td><strong>{totals.quantity.toFixed(2)}</strong></td>
+                </tr> */}
+              </tbody>
+            </Table>
+          </Modal.Body>
         </Modal>
 
       </div>
