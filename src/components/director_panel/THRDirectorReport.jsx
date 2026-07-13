@@ -62,6 +62,7 @@ const THRDirectorReport = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const initialColumns = [
     { dataField: '#', text: '#', visible: true },
@@ -184,40 +185,44 @@ const THRDirectorReport = () => {
   }, [filteredData]);
 
   const exportToPDF = () => {
-    const input = tableRef.current;
-    html2canvas(input, { scale: 2, useCORS: true }).then(canvas => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'pt',
-        format: 'a2'
-      });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const width = pdfWidth - 40;
-      const height = width / ratio;
-
-      pdf.text("THR Distribution Report", 20, 30);
-      pdf.addImage(imgData, 'PNG', 20, 40, width, Math.min(height, pdfHeight - 80));
-
-      if (Object.keys(totals.quantityByUnit).length > 0) {
-        pdf.addPage();
-        pdf.text("Total Quantity by Unit", 20, 30);
-        autoTable(pdf, {
-          startY: 40,
-          head: [['Unit', 'Total Quantity']],
-          body: Object.entries(totals.quantityByUnit).map(([unit, total]) => [unit, total.toFixed(2)]),
-          theme: 'striped',
-          headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [245, 245, 245] },
+    setIsPrinting(true);
+    setTimeout(() => {
+      const input = tableRef.current;
+      html2canvas(input, { scale: 2, useCORS: true }).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'pt',
+          format: 'a2'
         });
-      }
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+        const width = pdfWidth - 40;
+        const height = width / ratio;
 
-      pdf.save('thr_director_report.pdf');
-    });
+        pdf.text("THR Distribution Report", 20, 30);
+        pdf.addImage(imgData, 'PNG', 20, 40, width, Math.min(height, pdfHeight - 80));
+
+        if (Object.keys(totals.quantityByUnit).length > 0) {
+          pdf.addPage();
+          pdf.text("Total Quantity by Unit", 20, 30);
+          autoTable(pdf, {
+            startY: 40,
+            head: [['Unit', 'Total Quantity']],
+            body: Object.entries(totals.quantityByUnit).map(([unit, total]) => [unit, total.toFixed(2)]),
+            theme: 'striped',
+            headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [245, 245, 245] },
+          });
+        }
+
+        pdf.save('thr_director_report.pdf');
+        setIsPrinting(false);
+      });
+    }, 100);
   };
 
   const exportToExcel = () => {
@@ -437,7 +442,9 @@ const THRDirectorReport = () => {
                             cellContent = formatMonths(row.months || row.quarter);
                             break;
                           case 'sector_status':
-                            cellContent = <span className={`badge bg-${row[col.dataField] === 'approved' ? 'success' : row[col.dataField] === 'rejected' ? 'danger' : 'warning'}`}>{row[col.dataField]}</span>;
+                            cellContent = isPrinting 
+                              ? row[col.dataField] 
+                              : <span className={`badge bg-${row[col.dataField] === 'approved' ? 'success' : row[col.dataField] === 'rejected' ? 'danger' : 'warning'}`}>{row[col.dataField]}</span>;
                             break;
                           default:
                             cellContent = row[col.dataField];
