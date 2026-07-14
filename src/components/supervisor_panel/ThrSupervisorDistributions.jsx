@@ -336,7 +336,11 @@ const ThrSupervisorDistributions = () => {
     const dataToExport = filteredData.map((row, index) => {
       const newRow = { '#': index + 1 };
       visibleColumns.forEach(col => {
-        newRow[col.text] = row[col.dataField];
+        if (col.dataField === 'months') {
+          newRow[col.text] = formatMonths(row.months || row.quarter);
+        } else {
+          newRow[col.text] = row[col.dataField];
+        }
       });
       return newRow;
     });
