@@ -4,7 +4,9 @@ import {
   Table,
   Spinner,
   Alert,
+  Button,
 } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
 import "../../assets/css/dashboard.css";
 import "../../assets/css/AnganwadiProfile.css";
 import { FaEye, FaEyeSlash, FaUserCircle, FaLock } from "react-icons/fa";
@@ -18,6 +20,7 @@ const AwcAganWadi = () => {
   const [isTablet, setIsTablet] = useState(false);
 
   const { api } = useAuth();
+  const navigate = useNavigate();
   const [awcList, setAwcList] = useState([]);
   const [awcLoading, setAwcLoading] = useState(true);
   const [awcError, setAwcError] = useState("");
@@ -90,7 +93,12 @@ const AwcAganWadi = () => {
         <SupervisorHeader toggleSidebar={toggleSidebar} />
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3 className="mb-0">AWC List</h3>
+            <div className="d-flex align-items-center gap-2">
+              <Button variant="outline-secondary" size="sm" onClick={() => navigate("/SupervisorDashBoard")}>
+                &larr; Back to Dashboard
+              </Button>
+              <h3 className="mb-0">AWC List</h3>
+            </div>
             <div>
               {awcLoading ? (
                 <Spinner animation="border" size="sm" />
