@@ -14,7 +14,7 @@ import {
   Legend,
 } from "chart.js";
 
-import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
+import { FaUserShield, FaUserGraduate, FaUserCog, FaUserTie, FaHome, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 
@@ -34,6 +34,12 @@ const DirectorDashboard = () => {
   const [thrSummary, setThrSummary] = useState(null);
   const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
   const [thrFoodItemsCount, setThrFoodItemsCount] = useState(0);
+  const [roleCounts, setRoleCounts] = useState({
+    dpo: 0,
+    cdpo: 0,
+    supervisor: 0,
+    anganwadi: 0,
+  });
   const [expanded, setExpanded] = useState(null);
   const [viewMode, setViewMode] = useState("card");
 
@@ -83,11 +89,38 @@ const DirectorDashboard = () => {
     }
   };
 
+  const fetchRoleCounts = async () => {
+    try {
+      const [
+        dpoResponse,
+        cdpoResponse,
+        supervisorResponse,
+        anganwadiResponse,
+      ] = await Promise.all([
+        api.get('/director/districts/'),
+        api.get('/director/projects/'),
+        api.get('/director/sectors/'),
+        api.get('/director/awc-list/'),
+      ]);
+
+      const dpoUsers = dpoResponse.data?.data?.filter(u => u.role === 'dpo') || [];
+
+      setRoleCounts({
+        dpo: dpoUsers.length,
+        cdpo: cdpoResponse.data?.data?.length || 0,
+        supervisor: supervisorResponse.data?.data?.length || 0,
+        anganwadi: anganwadiResponse.data?.data?.length || 0,
+      });
+    } catch (err) {
+      console.error("Failed to fetch role counts:", err);
+    }
+  };
+
   const fetchAllData = async () => {
     setLoading(true);
     setError("");
     try {
-      await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems()]);
+      await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems(), fetchRoleCounts()]);
     } catch (err) {
       setError("Failed to fetch Director dashboard data.");
     } finally {
@@ -321,6 +354,66 @@ const DirectorDashboard = () => {
               <Button variant={viewMode === "card" ? "primary" : "outline-primary"} onClick={() => setViewMode("card")}>Card View</Button>
               <Button variant={viewMode === "graph" ? "primary" : "outline-primary"} onClick={() => setViewMode("graph")}>Graph View</Button>
             </ButtonGroup>
+          </div>
+
+          <div className="dashboard-section">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="section-title mb-0">User Lists Overview</h4>
+            </div>
+            <Row className="g-3">
+              <Col md={3}>
+                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=dpo')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon hcm-icon"><FaUserCog /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">DPO List</h6>
+                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : roleCounts.dpo}</div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={3}>
+                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=cdpo')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon thr-icon"><FaUserShield /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">CDPO List</h6>
+                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : roleCounts.cdpo}</div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={3}>
+                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=supervisor')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon hcm-icon"><FaUserTie /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">Supervisor List</h6>
+                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : roleCounts.supervisor}</div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={3}>
+                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=anganwadi')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon thr-icon"><FaHome /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">Anganwadi List</h6>
+                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : roleCounts.anganwadi}</div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
           </div>
 
           <div className="dashboard-section">
