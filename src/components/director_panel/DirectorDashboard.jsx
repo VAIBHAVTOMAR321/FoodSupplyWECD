@@ -13,8 +13,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-
-import { FaUserShield, FaUserGraduate, FaUserCog, FaUserTie, FaHome, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
+import { FaUsers, FaUserShield, FaUserGraduate, FaUserCog, FaUserTie, FaHome, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 
@@ -46,6 +45,8 @@ const DirectorDashboard = () => {
     supervisor: true,
     anganwadi: true,
   });
+  const [totalBeneficiaries, setTotalBeneficiaries] = useState(0);
+  const [loadingBeneficiaries, setLoadingBeneficiaries] = useState(true);
   const [expanded, setExpanded] = useState(null);
   const [viewMode, setViewMode] = useState("card");
 
@@ -112,6 +113,20 @@ const DirectorDashboard = () => {
     }
   };
 
+  const fetchTotalBeneficiaries = async () => {
+    setLoadingBeneficiaries(true);
+    try {
+      const response = await api.get('/director/beneficiary/state-total/');
+      if (response.data.success) {
+        setTotalBeneficiaries(response.data.data.total_beneficiaries);
+      }
+    } catch (err) {
+      console.error("Failed to fetch total beneficiaries count:", err);
+    } finally {
+      setLoadingBeneficiaries(false);
+    }
+  };
+
   const fetchAllData = async () => {
     setLoading(true);
     setError("");
@@ -121,6 +136,7 @@ const DirectorDashboard = () => {
     fetchRoleCount('cdpo', '/director/projects/');
     fetchRoleCount('supervisor', '/director/sectors/');
     fetchRoleCount('anganwadi', '/director/awc-list/');
+    fetchTotalBeneficiaries();
 
     // Fetch other dashboard data
     try {
@@ -676,6 +692,27 @@ const DirectorDashboard = () => {
                 </Col>
               </Row>
             )}
+          </div>
+
+          <div className="dashboard-section">
+            <h4 className="section-title mb-3">Beneficiary Overview</h4>
+            <Row className="g-3">
+              <Col md={4}>
+                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorBeneEntry')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">Total Beneficiaries</h6>
+                        <div className="dashboard-card-value">
+                          {loadingBeneficiaries ? <Spinner animation="border" size="sm" /> : totalBeneficiaries.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
           </div>
         </Container>
       </div>
