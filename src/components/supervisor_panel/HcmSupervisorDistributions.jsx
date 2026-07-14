@@ -177,38 +177,67 @@ const HcmSupervisorDistributions = () => {
 
   const exportToPDF = () => {
     setIsPrinting(true);
-    setTimeout(() => {
-      const input = tableRef.current;
-      if (!input) {
+    setTimeout(async () => {
+      const mainTableCanvas = await html2canvas(tableRef.current, {
+        scale: 2,
+        useCORS: true,
+      }).catch(e => {
         console.error("Table element not found for PDF export.");
         setIsPrinting(false);
         return;
-      }
-      html2canvas(input, {
-        scale: 2, // Higher scale for better quality
-        useCORS: true
-      }).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({
-          orientation: 'landscape',
-          unit: 'pt',
-          format: 'a4'
-        });
-  
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const ratio = canvasWidth / canvasHeight;
-        
-        const width = pdfWidth - 40; // with some margin
-        const height = width / ratio;
-  
-        pdf.text("HCM Supervisor Distributions Report", 20, 30);
-        pdf.addImage(imgData, 'PNG', 20, 40, width, height);
-        pdf.save('hcm_supervisor_distributions.pdf');
-        setIsPrinting(false);
       });
+
+      const totalsTableContainer = document.createElement('div');
+      totalsTableContainer.innerHTML = `
+        <div style="padding: 20px; font-family: sans-serif; text-align: center;">
+          <h4 style="margin-bottom: 15px;">Total Quantity by Unit</h4>
+          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
+            <thead style="background-color: #f2f2f2;">
+              <tr>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(totals.quantityByUnit)
+                .map(([unit, total]) => `
+                  <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      document.body.appendChild(totalsTableContainer);
+
+      const totalsCanvas = await html2canvas(totalsTableContainer, { scale: 2, useCORS: true });
+      document.body.removeChild(totalsTableContainer);
+
+      const mainImgData = mainTableCanvas.toDataURL('image/png');
+      const totalsImgData = totalsCanvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      pdf.text("HCM Supervisor Distributions Report", 20, 30);
+      let yPos = 40;
+      const mainRatio = mainTableCanvas.width / mainTableCanvas.height;
+      const mainWidth = pdfWidth - 40;
+      const mainHeight = mainWidth / mainRatio;
+      pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
+      yPos += mainHeight + 20;
+
+      const totalsRatio = totalsCanvas.width / totalsCanvas.height;
+      const totalsWidth = pdfWidth / 2; // Make it half the page width
+      const totalsHeight = totalsWidth / totalsRatio;
+
+      if (yPos + totalsHeight < pdfHeight - 40) { // Check if it fits on the current page
+        pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
+      }
+
+      pdf.save('hcm_supervisor_distributions.pdf');
+      setIsPrinting(false);
     }, 100);
   };
 
