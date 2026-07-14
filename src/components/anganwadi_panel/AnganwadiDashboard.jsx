@@ -482,11 +482,6 @@ const AnganwadiDashboard = () => {
     // Final validation check before submitting
     if (beneficiaryCount !== null) {
       const enteredBeneficiaries = parseInt(distributionData.total_beneficiaries, 10);
-      if (enteredBeneficiaries > beneficiaryCount) {
-        setDistributionError(`लाभार्थियों की संख्या पंजीकृत संख्या ${beneficiaryCount} से अधिक नहीं हो सकती।`);
-        setSubmitting(false);
-        return;
-      }
       // Also check if registration is missing for the selected date
       if (!isRegistrationAvailable) {
         setDistributionError(`सबमिट नहीं किया जा सकता क्योंकि चयनित अवधि के लिए कोई लाभार्थी पंजीकरण नहीं मिला।`);
@@ -773,9 +768,14 @@ const AnganwadiDashboard = () => {
                   </Form.Group>
                   <Form.Group className="mb-3">
                     <Form.Label>Total Beneficiaries</Form.Label>
-                    {(!distributionData.months || distributionData.months.length === 0) && (
+                    {activeScheme === 'thr' && (!distributionData.months || distributionData.months.length === 0) && (
                       <Form.Text className="text-muted d-block mb-2">
                         Please select month(s) first to enable this field.
+                      </Form.Text>
+                    )}
+                    {activeScheme === 'hcm' && !distributionData.date && (
+                      <Form.Text className="text-muted d-block mb-2">
+                        Please select a date first to enable this field.
                       </Form.Text>
                     )}
                     <Form.Control
@@ -786,7 +786,12 @@ const AnganwadiDashboard = () => {
                       }}
                       placeholder="Enter number of beneficiaries"
                       required
-                      disabled={!distributionData.months || distributionData.months.length === 0 || beneficiaryCount === 0 || !isRegistrationAvailable}
+                      disabled={
+                        (activeScheme === 'thr' && (!distributionData.months || distributionData.months.length === 0)) ||
+                        (activeScheme === 'hcm' && !distributionData.date) ||
+                        beneficiaryCount === 0 ||
+                        !isRegistrationAvailable
+                      }
                     />
                     {beneficiaryCount === 0 && <Form.Text className="text-danger">लाभार्थी दर्ज नहीं कर सकते क्योंकि इस अवधि और श्रेणी के लिए कोई भी पंजीकृत नहीं है।</Form.Text>}
                   </Form.Group>

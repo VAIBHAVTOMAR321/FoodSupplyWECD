@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Container, Tabs, Tab, Form, Button, Table, Modal, Spinner, Alert, Row, Col } from "react-bootstrap";
+import { Container, Tabs, Tab, Form, Button, Table, Modal, Spinner, Alert, Row, Col, InputGroup } from "react-bootstrap";
 
 import { useAuth } from "../all_login/AuthContext";
 import AnganwadiLeftNav from "./AnganwadiLeftNav";
@@ -205,6 +205,7 @@ const FoodItemReceiving = () => {
           ...prev,
           food_item: value,
           bene_category: selectedFoodItem.bene_category,
+          unit: selectedFoodItem.unit,
         }));
       }
     } else {
@@ -229,7 +230,6 @@ const FoodItemReceiving = () => {
 
     let payload = {
       ...formData,
-      unit: selectedFoodItem.unit,
       quantity: parseFloat(formData.quantity),
       months: formData.months || [],
     };
@@ -450,16 +450,20 @@ const FoodItemReceiving = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Quantity</Form.Label>
-                    <Form.Control
-                      type="number"
-                      step="0.01"
-                      name="quantity"
-                      value={formData.quantity || ''}
-                      onChange={handleFormChange}
-                      placeholder="Enter quantity"
-                      required
-                    />
+                    <Form.Label>Quantity</Form.Label> 
+                    <InputGroup>
+                      <Form.Control
+                        type="text"
+                        name="quantity"
+                        value={formData.quantity || ''}
+                        onChange={handleFormChange}
+                        placeholder="Enter quantity"
+                        required
+                      />
+                      {formData.unit && (
+                        <InputGroup.Text>{formData.unit}</InputGroup.Text>
+                      )}
+                    </InputGroup>
                   </Form.Group>
                 </Col>
               </Row>
