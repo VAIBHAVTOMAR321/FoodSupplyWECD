@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
@@ -20,6 +20,8 @@ const CDPODashboard = () => {
   const [thrSummary, setThrSummary] = useState(null);
   const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
   const [thrFoodItemsCount, setThrFoodItemsCount] = useState(0);
+  const [awcCount, setAwcCount] = useState(0);
+  const [sectorCount, setSectorCount] = useState(0);
   const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
@@ -54,6 +56,26 @@ const CDPODashboard = () => {
     }
   };
 
+  const fetchCdpoAwcCount = async () => {
+    try {
+      const response = await api.get("/cdpo-awc-dropdown/");
+      const data = response.data;
+      setAwcCount(data?.count ?? (Array.isArray(data?.data) ? data.data.length : 0));
+    } catch (err) {
+      console.error("Failed to fetch CDPO AWC count:", err);
+    }
+  };
+
+  const fetchCdpoSectorCount = async () => {
+    try {
+      const response = await api.get("/cdpo-sector/");
+      const data = response.data;
+      setSectorCount(data?.count ?? (Array.isArray(data?.data) ? data.data.length : 0));
+    } catch (err) {
+      console.error("Failed to fetch CDPO sector count:", err);
+    }
+  };
+
   const fetchDashboardSummaries = async () => {
     try {
       const [hcmRes, thrRes] = await Promise.all([ 
@@ -72,7 +94,13 @@ const CDPODashboard = () => {
     setLoading(true);
     setError("");
     try {
-      await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems()]);
+      await Promise.all([
+        fetchDashboardSummaries(),
+        fetchHcmFoodItems(),
+        fetchThrFoodItems(),
+        fetchCdpoAwcCount(),
+        fetchCdpoSectorCount(),
+      ]);
     } catch (err) {
       setError("Failed to fetch supervisor distributions.");
     } finally {
@@ -297,6 +325,42 @@ const CDPODashboard = () => {
                     <FoodItemTable scheme="thr" api={api} />
                   </div>
                 </Collapse>
+              </Col>
+            </Row>
+          </div>
+
+          <div className="dashboard-section">
+            <h4 className="section-title">AWC / Sector Summary</h4>
+            <Row className="g-3">
+              <Col md={6} lg={4}>
+                <Card className="dashboard-card card-thr" onClick={() => navigate('/CdpoAWCList')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">AWC List</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : awcCount}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={6} lg={4}>
+                <Card className="dashboard-card card-hcm" onClick={() => navigate('/CdpoAWCList')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">Sector List</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : sectorCount}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
               </Col>
             </Row>
           </div>

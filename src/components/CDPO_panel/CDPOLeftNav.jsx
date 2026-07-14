@@ -88,6 +88,13 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
       },
 
       {
+        icon: <FaUsers />,
+        label: "AWC & Sector List",
+        path: "/CdpoAWCList",
+        active: true,
+      },
+
+      {
           icon: <FaTruck />,
           label: "Distributions",
           submenu: [
