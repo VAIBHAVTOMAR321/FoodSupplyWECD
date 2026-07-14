@@ -252,8 +252,8 @@ const CDPOHCMReceiving = () => {
                       <tr>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
-                        <th>Unit</th>
                         <th>Total Quantity</th>
+                        <th>Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -261,8 +261,8 @@ const CDPOHCMReceiving = () => {
                         <tr key={i}>
                           <td>{row.food_item}</td>
                           <td>{row.bene_category}</td>
-                          <td>{row.unit}</td>
                           <td>{row.total_quantity}</td>
+                          <td>{row.unit}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -277,8 +277,8 @@ const CDPOHCMReceiving = () => {
                         <th>Sector</th>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
-                        <th>Unit</th>
                         <th>Total Quantity</th>
+                        <th>Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -287,8 +287,8 @@ const CDPOHCMReceiving = () => {
                           <td>{row.sector}</td>
                           <td>{row.food_item}</td>
                           <td>{row.bene_category}</td>
-                          <td>{row.unit}</td>
                           <td>{row.total_quantity}</td>
+                          <td>{row.unit}</td>
                         </tr>
                       ))}
                     </tbody>
