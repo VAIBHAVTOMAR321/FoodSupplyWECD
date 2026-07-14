@@ -193,7 +193,7 @@ const DirectorAwcList = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading">
-            <h3 className="mb-4 fw-bold"><FaUserShield className="me-2" />All Lists</h3>
+            <h3 className="mb-4 fw-bold"><FaUserShield className="me-2" />DPO CDPO Sector  &  AWC List</h3>
           </div>
 
           {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
