@@ -254,30 +254,6 @@ const DirectorDashboard = () => {
     setExpanded(expanded === scheme ? null : scheme);
   };
 
-  const hcmFoodItemsChartData = useMemo(() => ({
-    labels: ["HCM"],
-    datasets: [
-      {
-        label: "HCM Food Items",
-        data: [hcmFoodItemsCount],
-        backgroundColor: ["#0d6efd"],
-        borderRadius: 6,
-      },
-    ],
-  }), [hcmFoodItemsCount]);
-
-  const thrFoodItemsChartData = useMemo(() => ({
-    labels: ["THR"],
-    datasets: [
-      {
-        label: "THR Food Items",
-        data: [thrFoodItemsCount],
-        backgroundColor: ["#198754"],
-        borderRadius: 6,
-      },
-    ],
-  }), [thrFoodItemsCount]);
-
 
 
   const thrSummaryChartData = useMemo(() => ({
@@ -351,76 +327,50 @@ const DirectorDashboard = () => {
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="section-title mb-0">Food Items Overview</h4>
             </div>
-            {viewMode === "graph" ? (
-              <Row className="g-3">
-                {/* HCM Food Items Graph View */}
-                <Col lg={6} className="mb-4">
-                  <h5 className="text-center text-muted mb-3">HCM Food Items ({hcmFoodItemsCount})</h5>
-                  <Row className="g-3 align-items-start">
-                    <Col md={8}><FoodItemTable scheme="hcm" api={api} /></Col>
-                    <Col md={4}>
-                      <div style={{ height: 320 }}><Bar data={hcmFoodItemsChartData} options={chartOptions} /></div>
-                    </Col>
-                  </Row>
-                </Col>
-
-                {/* THR Food Items Graph View */}
-                <Col lg={6} className="mb-4">
-                  <h5 className="text-center text-muted mb-3">THR Food Items ({thrFoodItemsCount})</h5>
-                  <Row className="g-3 align-items-start">
-                    <Col md={8}><FoodItemTable scheme="thr" api={api} /></Col>
-                    <Col md={4}>
-                      <div style={{ height: 320 }}><Bar data={thrFoodItemsChartData} options={chartOptions} /></div>
-                    </Col>
-                  </Row>
-                </Col>
-              </Row>
-            ) : (
-              <Row className="g-3">
-                <Col md={6}>
-                  <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center">
-                        <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title">HCM Food Items</h6>
-                          <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}</div>
-                        </div>
-                        <div className="ms-auto expand-icon">
-                          {expanded === 'hcm' ? <FaChevronUp /> : <FaChevronDown />}
-                        </div>
+            <Row className="g-3">
+              <Col md={6}>
+                <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">HCM Food Items</h6>
+                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}</div>
                       </div>
-                    </Card.Body>
-                  </Card>
-                  <Collapse in={expanded === 'hcm'}>
-                    <div className="mt-3">
-                      <FoodItemTable scheme="hcm" api={api} />
-                    </div>
-                  </Collapse>
-                </Col>
-                <Col md={6}>
-                  <Card className="dashboard-card card-thr expandable-card" onClick={() => handleCardClick('thr')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center">
-                        <div className="dashboard-card-icon thr-icon"><FaBox /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title">THR Food Items</h6>
-                          <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}</div>
-                        </div>
-                        <div className="ms-auto expand-icon">
-                          {expanded === 'thr' ? <FaChevronUp /> : <FaChevronDown />}
-                        </div>
+                      <div className="ms-auto expand-icon">
+                        {expanded === 'hcm' ? <FaChevronUp /> : <FaChevronDown />}
                       </div>
-                    </Card.Body>
-                  </Card>
-                  <Collapse in={expanded === 'thr'}>
-                    <div className="mt-3">
-                      <FoodItemTable scheme="thr" api={api} />
                     </div>
-                  </Collapse>
-                </Col>
-              </Row>
-            )}
+                  </Card.Body>
+                </Card>
+                <Collapse in={expanded === 'hcm'}>
+                  <div className="mt-3">
+                    <FoodItemTable scheme="hcm" api={api} />
+                  </div>
+                </Collapse>
+              </Col>
+              <Col md={6}>
+                <Card className="dashboard-card card-thr expandable-card" onClick={() => handleCardClick('thr')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon thr-icon"><FaBox /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">THR Food Items</h6>
+                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}</div>
+                      </div>
+                      <div className="ms-auto expand-icon">
+                        {expanded === 'thr' ? <FaChevronUp /> : <FaChevronDown />}
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+                <Collapse in={expanded === 'thr'}>
+                  <div className="mt-3">
+                    <FoodItemTable scheme="thr" api={api} />
+                  </div>
+                </Collapse>
+              </Col>
+            </Row>
           </div>
 
           <div className="dashboard-section">
