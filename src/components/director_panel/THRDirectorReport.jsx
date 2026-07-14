@@ -252,9 +252,9 @@ const THRDirectorReport = () => {
       const newRow = { '#': index + 1 };
       visibleColumns.forEach(col => {
         if (col.dataField === 'months') {
-          newRow[col.text] = formatMonths(row.months || row.quarter);
+          newRow[col.text] = formatMonths(row.months || row.quarter || row.months);
         }
-        else if (col.dataField !== '#') {
+        else {
           newRow[col.text] = row[col.dataField];
         }
       });
@@ -267,7 +267,6 @@ const THRDirectorReport = () => {
       else if (col.dataField === 'quantity') totalRow[col.text] = ''; // Keep quantity total empty in main sheet
       else totalRow[col.text] = '';
     });
-    // Clear remark columns for the total row
     dataToExport.push(totalRow);
 
     const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
