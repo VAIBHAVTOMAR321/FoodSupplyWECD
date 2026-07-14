@@ -59,12 +59,18 @@ const ThrSupervisorDistributions = () => {
   const [submitting, setSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showBulkRemarkModal, setShowBulkRemarkModal] = useState(false);
+  const [bulkRemark, setBulkRemark] = useState("");
+  const [bulkAction, setBulkAction] = useState("");
+
   const [isPrinting, setIsPrinting] = useState(false);
 
   const [showRemarkModal, setShowRemarkModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState(null);
   const [showQtyModal, setShowQtyModal] = useState(false);
   const tableRef = useRef(null);
+
 
   const [columns, setColumns] = useState([
     { dataField: '#', text: '#', visible: true },
@@ -155,6 +161,30 @@ const ThrSupervisorDistributions = () => {
              (sector_status.length === 0 || sector_status.includes(item.sector_status));
     });
   }, [distributions, filters]);
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      const allFilteredIds = filteredData.map(item => item.id);
+      setSelectedIds(allFilteredIds);
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllPending = () => {
+    const pendingIds = filteredData
+      .filter(item => item.sector_status === 'pending')
+      .map(item => item.id);
+    setSelectedIds(pendingIds);
+  };
+
+  const isAllSelected = useMemo(() => filteredData.length > 0 && selectedIds.length === filteredData.length, [filteredData, selectedIds]);
 
 
   useEffect(() => {
@@ -263,6 +293,44 @@ const ThrSupervisorDistributions = () => {
       setLoadingAction(prev => ({ ...prev, [item.id]: false }));
     }
   };
+
+  const handleBulkAction = async () => {
+    if (selectedIds.length === 0) {
+      setActionError("No items selected.");
+      return;
+    }
+    if (bulkAction === "approved" && !bulkRemark) {
+      setActionError("Please enter a remark for bulk approval.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await api.put("/thr-supervisor-distributions/", {
+        ids: selectedIds,
+        sector_status: bulkAction,
+        sector_remark: bulkRemark,
+      });
+
+      if (response.data?.success !== false) {
+        setSuccessMsg(`Successfully updated ${selectedIds.length} items.`);
+        fetchDistributions(); // Refetch to get updated data
+        setSelectedIds([]);
+        setShowBulkRemarkModal(false);
+        setBulkRemark("");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } else {
+        setActionError(response.data?.message || "Failed to perform bulk action.");
+      }
+    } catch (err) {
+      setActionError("Failed to perform bulk action. Please try again.");
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+
 
   const handleViewRemark = (item) => {
     setSelectedRemarks(item);
@@ -462,6 +530,15 @@ const ThrSupervisorDistributions = () => {
             </div>
           </div>
 
+          <div className="mb-3 d-flex gap-2">
+            {selectedIds.length > 0 && (
+              <Button variant="primary" size="sm" onClick={() => { setBulkAction("approved"); setShowBulkRemarkModal(true); }}>
+                Approve Selected ({selectedIds.length})
+              </Button>
+            )}
+            <Button variant="info" size="sm" onClick={handleSelectAllPending}>Select All Pending</Button>
+          </div>
+
           <Row className="mb-3">
             <Col md={2}>
               <Dropdown>
@@ -591,6 +668,15 @@ const ThrSupervisorDistributions = () => {
                   >
                       <thead>
                         <tr>
+                          {!isPrinting && (
+                            <th style={{ width: '50px' }}>
+                              <Form.Check
+                                type="checkbox"
+                                onChange={handleSelectAll}
+                                checked={isAllSelected}
+                              />
+                            </th>
+                          )}
                           {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col) => <th key={col.dataField} style={(col.dataField === 'bene_category' || col.dataField === 'food_item') ? { width: '200px' } : {}}>{col.text}</th>)}
                         </tr>
                       </thead>
@@ -598,6 +684,15 @@ const ThrSupervisorDistributions = () => {
                         {currentItems.length > 0 ? currentItems.map((row, index) => (
                           <React.Fragment key={row.id}>
                             <tr>
+                                {!isPrinting && (
+                                  <td>
+                                    <Form.Check
+                                      type="checkbox"
+                                      checked={selectedIds.includes(row.id)}
+                                      onChange={() => handleSelectOne(row.id)}
+                                    />
+                                  </td>
+                                )}
                                 {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col, i) => {
                                   let cellContent;
                                   switch (col.dataField) {
@@ -655,7 +750,7 @@ const ThrSupervisorDistributions = () => {
                             </tr>
                             {openRemarkId === row.id && (
                               <tr>
-                                <td colSpan={visibleColumns.length}>
+                                <td colSpan={visibleColumns.length + (isPrinting ? 0 : 1)}>
                                   <div className="d-flex align-items-start gap-2">
                                     <Form.Control
                                       type="text"
@@ -694,7 +789,7 @@ const ThrSupervisorDistributions = () => {
                           </React.Fragment>
                         )) : (
                           <tr>
-                            <td colSpan={visibleColumns.length} className="text-center">No data available</td>
+                            <td colSpan={visibleColumns.length + (isPrinting ? 0 : 1)} className="text-center">No data available</td>
                           </tr>
                         )}
                       </tbody>
@@ -702,6 +797,7 @@ const ThrSupervisorDistributions = () => {
                         <tr>
                           {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col, i) => {
                             let cellContent = '';
+                            if (!isPrinting && i === 0) return <td key="total-select-spacer"></td>;
                             if (i === 0) {
                               cellContent = <strong>Total</strong>;
                             } else if (col.dataField === 'total_beneficiaries') {
@@ -802,6 +898,29 @@ const ThrSupervisorDistributions = () => {
           </Modal.Body>
         </Modal>
 
+        <Modal show={showBulkRemarkModal} onHide={() => setShowBulkRemarkModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Bulk Approve Remark</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form.Group>
+              <Form.Label>Remark for Approval</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Enter remark (e.g., Checked by sector)"
+                value={bulkRemark}
+                onChange={(e) => setBulkRemark(e.target.value)}
+              />
+            </Form.Group>
+            {actionError && <Alert variant="danger" className="mt-3">{actionError}</Alert>}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowBulkRemarkModal(false)}>Cancel</Button>
+            <Button variant="success" onClick={handleBulkAction} disabled={submitting}>
+              {submitting ? "Submitting..." : `Approve ${selectedIds.length} items`}
+            </Button>
+          </Modal.Footer>
+        </Modal>
       </div>
     </div>
   );

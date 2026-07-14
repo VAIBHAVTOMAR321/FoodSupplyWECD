@@ -11,6 +11,7 @@ import {
   Table,
   Badge,
   Pagination,
+  Modal,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 
@@ -37,6 +38,11 @@ const SupervisorBeneficiarieEntry = () => {
   const [submitting, setSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showBulkRemarkModal, setShowBulkRemarkModal] = useState(false);
+  const [bulkRemark, setBulkRemark] = useState("");
+  const [bulkAction, setBulkAction] = useState("");
+
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
@@ -70,6 +76,36 @@ const SupervisorBeneficiarieEntry = () => {
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      const allFilteredIds = currentItems.map(item => item.id);
+      setSelectedIds(allFilteredIds);
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllPending = () => {
+    const pendingIds = reports
+      .filter(item => item.sector_status === 'pending')
+      .map(item => item.id);
+    setSelectedIds(pendingIds);
+  };
+
+  const isAllSelected = useMemo(() => {
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = reports.slice(indexOfFirstItem, indexOfLastItem);
+    return currentItems.length > 0 && currentItems.every(item => selectedIds.includes(item.id));
+  }, [reports, selectedIds, currentPage, itemsPerPage]);
+
 
   const handleToggleRemark = (item, action) => {
     if (openRemarkId === item.id && openRemarkAction === action) {
@@ -124,6 +160,43 @@ const SupervisorBeneficiarieEntry = () => {
     } finally {
       setSubmitting(false);
       setLoadingAction((prev) => ({ ...prev, [item.id]: false }));
+    }
+  };
+
+  const handleBulkAction = async () => {
+    if (selectedIds.length === 0) {
+      setActionError("No items selected.");
+      return;
+    }
+    if (bulkAction === "approved" && !bulkRemark) {
+      setActionError("Please enter a remark for bulk approval.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await api.put("/supervisor-beneficiary-registration/", {
+        ids: selectedIds,
+        sector_status: bulkAction,
+        sector_remark: bulkRemark,
+      });
+
+      if (response.data?.success !== false) {
+        setSuccessMsg(`Successfully updated ${selectedIds.length} items.`);
+        fetchReports(); // Refetch to get updated data
+        setSelectedIds([]);
+        setShowBulkRemarkModal(false);
+        setBulkRemark("");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } else {
+        setActionError(response.data?.message || "Failed to perform bulk action.");
+      }
+    } catch (err) {
+      setActionError("Failed to perform bulk action. Please try again.");
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+      setShowBulkRemarkModal(false);
     }
   };
 
@@ -183,6 +256,16 @@ const SupervisorBeneficiarieEntry = () => {
           {error && <Alert variant="danger">{error}</Alert>}
           {actionError && <Alert variant="danger">{actionError}</Alert>}
 
+          <div className="mb-3 d-flex gap-2">
+            {selectedIds.length > 0 && (
+              <Button variant="primary" size="sm" onClick={() => { setBulkAction("approved"); setShowBulkRemarkModal(true); }}>
+                Approve Selected ({selectedIds.length})
+              </Button>
+            )}
+            <Button variant="info" size="sm" onClick={handleSelectAllPending}>Select All Pending</Button>
+          </div>
+
+
           <h5 className="mt-4">आंगनबाड़ियों से लाभार्थी रिपोर्ट</h5>
           {loading ? (
             <div className="text-center">
@@ -193,6 +276,13 @@ const SupervisorBeneficiarieEntry = () => {
               <Table striped bordered hover responsive>
                 <thead>
                   <tr>
+                    <th>
+                      <Form.Check
+                        type="checkbox"
+                        onChange={handleSelectAll}
+                        checked={isAllSelected}
+                      />
+                    </th>
                     <th>#</th>
                     <th>AWC का नाम</th>
                     <th>वित्तीय वर्ष</th>
@@ -214,6 +304,13 @@ const SupervisorBeneficiarieEntry = () => {
                     currentItems.map((report, index) => (
                       <React.Fragment key={report.id}>
                         <tr>
+                          <td>
+                            <Form.Check
+                              type="checkbox"
+                              checked={selectedIds.includes(report.id)}
+                              onChange={() => handleSelectOne(report.id)}
+                            />
+                          </td>
                           <td>{indexOfFirstItem + index + 1}</td>
                           <td>{report.awc_name}</td>
                           <td>{report.fin_year}</td>
@@ -238,7 +335,7 @@ const SupervisorBeneficiarieEntry = () => {
                         </tr>
                         {openRemarkId === report.id && (
                           <tr>
-                            <td colSpan="14">
+                            <td colSpan="15">
                               <div className="d-flex align-items-start gap-2 p-2">
                                 <Form.Control
                                   type="text"
@@ -264,7 +361,7 @@ const SupervisorBeneficiarieEntry = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="14" className="text-center">
+                      <td colSpan="15" className="text-center">
                         कोई रिपोर्ट नहीं मिली।
                       </td>
                     </tr>
@@ -278,6 +375,29 @@ const SupervisorBeneficiarieEntry = () => {
               {renderPagination()}
             </div>
           )}
+          <Modal show={showBulkRemarkModal} onHide={() => setShowBulkRemarkModal(false)} centered>
+            <Modal.Header closeButton>
+              <Modal.Title>Bulk Approve Remark</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <Form.Group>
+                <Form.Label>Remark for Approval</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter remark (e.g., approved)"
+                  value={bulkRemark}
+                  onChange={(e) => setBulkRemark(e.target.value)}
+                />
+              </Form.Group>
+              {actionError && <Alert variant="danger" className="mt-3">{actionError}</Alert>}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={() => setShowBulkRemarkModal(false)}>Cancel</Button>
+              <Button variant="success" onClick={handleBulkAction} disabled={submitting}>
+                {submitting ? "Submitting..." : `Approve ${selectedIds.length} items`}
+              </Button>
+            </Modal.Footer>
+          </Modal>
         </Container>
       </div>
     </div>

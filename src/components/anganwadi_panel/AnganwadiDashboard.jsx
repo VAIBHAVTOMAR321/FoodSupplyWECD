@@ -3,6 +3,7 @@ import { Container, Row, Col, Card, Spinner, Table, Alert, Button, Modal, Form, 
 
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/anganwadileftnav.css";
+import { useLocation } from "react-router-dom";
 import AnganwadiLeftNav from "./AnganwadiLeftNav";
 import AnganwadiHeader from "./AnganwadiHeader";
 import "../../assets/css/dashboard.css";
@@ -119,6 +120,7 @@ const AnganwadiDashboard = () => {
 
   const { user, api, uniqueId } = useAuth();
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
+  const location = useLocation();
 
 
   useEffect(() => {
@@ -130,8 +132,17 @@ const AnganwadiDashboard = () => {
 
     handleResize();
     window.addEventListener("resize", handleResize);
+
+    const searchParams = new URLSearchParams(location.search);
+    const openScheme = searchParams.get('open');
+    if (openScheme === 'hcm' || openScheme === 'thr') {
+      // Use a timeout to ensure the component has rendered
+      setTimeout(() => handleCardClick(openScheme), 100);
+    }
+
+
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [location.search]);
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -932,8 +943,6 @@ const AnganwadiDashboard = () => {
                   <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>Sector:</strong> {viewItem.sector}</ListGroup.Item>
                   <ListGroup.Item><FaProjectDiagram className="view-modal-icon" /> <strong>Project:</strong> {viewItem.project}</ListGroup.Item>
                   <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>District:</strong> {viewItem.district}</ListGroup.Item>
-                  {viewItem.cdpo_status && <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>CDPO Status:</strong> <span className={`badge bg-${viewItem.cdpo_status === 'approved' ? 'success' : 'warning'}`}>{viewItem.cdpo_status}</span></ListGroup.Item>}
-                  {viewItem.dpo_status && <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>DPO Status:</strong> <span className={`badge bg-${viewItem.dpo_status === 'approved' ? 'success' : 'warning'}`}>{viewItem.dpo_status}</span></ListGroup.Item>}
                   {viewItem.sector_status && <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>Sector Status:</strong> <span className={`badge bg-${viewItem.sector_status === 'approved' ? 'success' : 'warning'}`}>{viewItem.sector_status}</span></ListGroup.Item>}
                 </ListGroup>
                 <hr />

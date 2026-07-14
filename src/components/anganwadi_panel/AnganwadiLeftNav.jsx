@@ -28,7 +28,9 @@ import {
   FaGraduationCap,
   FaTasks,
   FaClock,
-  FaTruckLoading
+  FaTruckLoading,
+  FaTruck,
+  FaFileAlt
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -79,23 +81,37 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
       },
     
      
-  {
-    icon: <FaUsers />,
-    icon: <FaUserCircle />,
-    label: "Anganwadi Profile",    
-    path: "/AnganwadiProfile"
-  },
-   {
-    icon: <FaTruckLoading />,
-    label: "Food Item Receiving",
-    path: "/FoodItemReceiving"
-  },
-
-  {
-    icon: <FaUsers />,
-    label: "Beneficiaries Entry",
-    path: "/BeneficiarieEntry"
-  },
+      {
+        icon: <FaUserCircle />,
+        label: "Anganwadi Profile",    
+        path: "/AnganwadiProfile"
+      },
+      {
+        icon: <FaTruckLoading />,
+        label: "Food Item Receiving",
+        path: "/FoodItemReceiving"
+      },
+      {
+        icon: <FaUsers />,
+        label: "Beneficiaries Entry",
+        path: "/BeneficiarieEntry"
+      },
+      {
+        icon: <FaTruck />,
+        label: "Distribution",
+        submenu: [
+            {
+                label: "HCM Distribution",
+                path: "/AnganwadiDashboard?open=hcm",
+                icon: <FaFileAlt />,
+            },
+            {
+                label: "THR Distribution",
+                path: "/AnganwadiDashboard?open=thr",
+                icon: <FaFileAlt />,
+            },
+        ]
+      },
 
  
      
