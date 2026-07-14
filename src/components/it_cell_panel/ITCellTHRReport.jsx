@@ -495,9 +495,11 @@ const ITCellTHRReport = () => {
                         return <td key="total_beneficiaries">{totals.beneficiaries}</td>;
                       }
                       if (col.dataField === 'quantity') {
-                        return <td key="total_quantity">
-                          <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Totals</Button>
-                        </td>;
+                        return (
+                          <td key="total_quantity">
+                            {!isPrinting && <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Totals</Button>}
+                          </td>
+                        );
                       }
                       return <td key={col.dataField}></td>;
                     })}
