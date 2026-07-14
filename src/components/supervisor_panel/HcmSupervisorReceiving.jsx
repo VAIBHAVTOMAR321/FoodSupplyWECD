@@ -10,10 +10,15 @@ import {
   Form,
   Dropdown,
   Button,
+  Modal,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dashboard.css";
-import { FaUserCircle } from "react-icons/fa";
+import { FaUserCircle, FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import "jspdf-autotable";
+import * as XLSX from "xlsx";
 import SupervisorLeftNav from "./SupervisorLeftNav";
 import SupervisorHeader from "./SupervisorHeader";
 
@@ -21,6 +26,7 @@ const HcmSupervisorReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
+  const tableRef = React.useRef(null);
 
   const { api } = useAuth();
   const [receivings, setReceivings] = useState([]);
@@ -38,6 +44,21 @@ const HcmSupervisorReceiving = () => {
     startDate: "",
     endDate: "",
   });
+  const [columns, setColumns] = useState([
+    { dataField: "#", text: "#", visible: true },
+    { dataField: "district", text: "District", visible: true },
+    { dataField: "sector", text: "Sector", visible: true },
+    { dataField: "project", text: "Project", visible: true },
+    { dataField: "awc_name", text: "AWC Name", visible: true },
+    { dataField: "food_item", text: "Food Item", visible: true },
+    { dataField: "quantity", text: "Quantity", visible: true },
+    { dataField: "unit", text: "Unit", visible: true },
+    { dataField: "bene_category", text: "Beneficiary Category", visible: true },
+    { dataField: "date", text: "Date", visible: true },
+  ]);
+  const [showColumnModal, setShowColumnModal] = useState(false);
+
+  const visibleColumns = columns.filter((c) => c.visible);
 
   const fetchReceivings = useCallback(async () => {
     setLoading(true);
@@ -139,6 +160,85 @@ const HcmSupervisorReceiving = () => {
   const currentItems = filteredReceivings.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredReceivings.length / itemsPerPage);
 
+  const handleColumnToggle = (index) => {
+    const newColumns = [...columns];
+    newColumns[index].visible = !newColumns[index].visible;
+    setColumns(newColumns);
+  };
+
+  const exportToPDF = () => {
+    const input = tableRef.current;
+    if (!input) return;
+    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "pt",
+        format: "a2",
+      });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasWidth / canvasHeight;
+      const width = pdfWidth - 40;
+      const height = width / ratio;
+
+      pdf.text("HCM Supervisor Receiving Report", 20, 30);
+      pdf.addImage(
+        imgData,
+        "PNG",
+        20,
+        40,
+        width,
+        height > pdfHeight - 60 ? pdfHeight - 60 : height
+      );
+      pdf.save("hcm-supervisor-receiving.pdf");
+    });
+  };
+
+  const exportToExcel = () => {
+    const visCols = visibleColumns.filter(c => c.dataField !== '#');
+    const dataToExport = filteredReceivings.map((item, index) => {
+      const row = { '#': index + 1 };
+      visCols.forEach(col => {
+        if (col.dataField === 'date') {
+          row[col.text] = new Date(item.date).toLocaleDateString('en-CA'); // YYYY-MM-DD
+        } else {
+          row[col.text] = item[col.dataField];
+        }
+      });
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+
+    // Set column widths
+    const colWidths = visCols.map(col => ({
+      wch: Math.max(col.text.length, ...dataToExport.map(row => (row[col.text] || '').toString().length)) + 2
+    }));
+    ws['!cols'] = [{ wch: 5 }, ...colWidths];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "HCM Receiving");
+    XLSX.writeFile(wb, "hcm-supervisor-receiving.xlsx");
+  };
+
+  const renderColumnModal = () => (
+    <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
+      <Modal.Header closeButton>
+        <Modal.Title>Show/Hide Columns</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {columns.map((col, index) => (
+          <Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />
+        ))}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button>
+      </Modal.Footer>
+    </Modal>
+  );
   const renderPagination = () => {
     if (totalPages <= 1) return null;
     let items = [];
@@ -184,39 +284,41 @@ const HcmSupervisorReceiving = () => {
             <Col md={3}><Form.Group><Form.Label>End Date</Form.Label><Form.Control type="date" name="endDate" value={filters.endDate} onChange={handleDateChange} /></Form.Group></Col>
             <Col xs="auto"><Button variant="secondary" onClick={resetFilters}>Reset Filters</Button></Col>
           </Row>
+          <div className="d-flex justify-content-end mb-3">
+            <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2"><FaFilePdf /> PDF</Button>
+            <Button variant="outline-success" size="sm" onClick={exportToExcel} className="me-2"><FaFileExcel /> Excel</Button>
+            <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)}><FaEye /> Columns</Button>
+          </div>
           <div className="table-responsive">
             {loading ? (
               <div className="text-center"><Spinner animation="border" /></div>
             ) : (
-              <Table striped bordered hover responsive>
+              <Table striped bordered hover responsive ref={tableRef}>
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th>District</th>
-                    <th>Sector</th>
-                    <th>Project</th>
-                    <th>AWC Name</th>
-                    <th>Food Item</th>
-                    <th>Quantity</th>
-                    <th>Unit</th>
-                    <th>Beneficiary Category</th>
-                    <th>Date</th>
+                    {visibleColumns.map((col) => (
+                      <th key={col.dataField}>{col.text}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {currentItems.length > 0 ? (
                     currentItems.map((item, index) => (
                       <tr key={item.id}>
-                        <td>{indexOfFirstItem + index + 1}</td>
-                        <td>{item.district}</td>
-                        <td>{item.sector}</td>
-                        <td>{item.project}</td>
-                        <td>{item.awc_name}</td>
-                        <td>{item.food_item}</td>
-                        <td>{item.quantity}</td>
-                        <td>{item.unit}</td>
-                        <td>{item.bene_category}</td>
-                        <td>{new Date(item.date).toLocaleDateString()}</td>
+                        {visibleColumns.map((col) => {
+                          let cellContent;
+                          switch (col.dataField) {
+                            case "#":
+                              cellContent = indexOfFirstItem + index + 1;
+                              break;
+                            case "date":
+                              cellContent = new Date(item.date).toLocaleDateString();
+                              break;
+                            default:
+                              cellContent = item[col.dataField];
+                          }
+                          return <td key={col.dataField}>{cellContent}</td>;
+                        })}
                       </tr>
                     ))
                   ) : (
@@ -231,6 +333,7 @@ const HcmSupervisorReceiving = () => {
             )}
           </div>
           {filteredReceivings.length > 0 && renderPagination()}
+          {renderColumnModal()}
         </Container>
       </div>
     </div>
