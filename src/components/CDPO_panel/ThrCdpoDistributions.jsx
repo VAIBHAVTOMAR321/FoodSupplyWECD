@@ -366,7 +366,9 @@ const ThrCdpoDistributions = () => {
     const dataToExport = filteredData.map((row, index) => {
       const newRow = { '#': index + 1 };
       visCols.forEach(col => {
-        if (col.dataField !== '#') {
+        if (col.dataField === 'months') {
+          newRow[col.text] = formatMonths(row.months || row.quarter);
+        } else if (col.dataField !== '#') {
           newRow[col.text] = row[col.dataField];
         }
       });

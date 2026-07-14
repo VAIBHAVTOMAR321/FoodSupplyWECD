@@ -31,6 +31,15 @@ const quarterToMonths = {
   'jan-feb-mar': ['jan', 'feb', 'mar'],
 };
 
+const formatMonths = (monthsOrQuarter) => {
+  if (Array.isArray(monthsOrQuarter)) {
+    return monthsOrQuarter.map((m) => monthLabels[m] || m).join(', ');
+  }
+  if (typeof monthsOrQuarter === 'string' && quarterToMonths[monthsOrQuarter]) {
+    return quarterToMonths[monthsOrQuarter].map(m => monthLabels[m] || m).join(', ');
+  }
+  return monthsOrQuarter;
+};
 
 const ThrDpoDistributions = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -289,7 +298,9 @@ const ThrDpoDistributions = () => {
     const dataToExport = filteredData.map((row, index) => {
       const newRow = { '#': index + 1 };
       visCols.forEach(col => {
-        if (col.dataField !== '#') {
+        if (col.dataField === 'months') {
+          newRow[col.text] = formatMonths(row.months || row.quarter);
+        } else if (col.dataField !== '#') {
           newRow[col.text] = row[col.dataField];
         }
       });
