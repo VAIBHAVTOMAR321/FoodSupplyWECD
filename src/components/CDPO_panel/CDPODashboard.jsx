@@ -329,41 +329,7 @@ const CDPODashboard = () => {
             </Row>
           </div>
 
-          <div className="dashboard-section">
-            <h4 className="section-title">AWC / Sector Summary</h4>
-            <Row className="g-3">
-              <Col md={6} lg={4}>
-                <Card className="dashboard-card card-thr" onClick={() => navigate('/CdpoAWCList')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center">
-                      <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">AWC List</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : awcCount}
-                        </div>
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={6} lg={4}>
-                <Card className="dashboard-card card-hcm" onClick={() => navigate('/CdpoAWCList')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center">
-                      <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">Sector List</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : sectorCount}
-                        </div>
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
-          </div>
+     
 
           <div className="dashboard-section">
             <h4 className="section-title">THR Distribution & Received Summary</h4>
@@ -498,6 +464,41 @@ const CDPODashboard = () => {
                     <DistributionTable items={hcmSummary?.distribution_summary} />
                   </div>
                 </Collapse>
+              </Col>
+            </Row>
+          </div>
+               <div className="dashboard-section">
+            <h4 className="section-title">AWC / Sector Summary</h4>
+            <Row className="g-3">
+              <Col md={6} lg={4}>
+                <Card className="dashboard-card card-thr" onClick={() => navigate('/CdpoAWCList')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">AWC List</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : awcCount}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={6} lg={4}>
+                <Card className="dashboard-card card-hcm" onClick={() => navigate('/CdpoAWCList')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center">
+                      <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title">Sector List</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : sectorCount}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
               </Col>
             </Row>
           </div>
