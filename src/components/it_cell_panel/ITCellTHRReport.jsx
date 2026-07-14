@@ -260,38 +260,65 @@ const ITCellTHRReport = () => {
   const exportToPDF = () => {
     setIsPrinting(true);
     setTimeout(() => {
-      const input = tableRef.current;
-      html2canvas(input, { scale: 2, useCORS: true }).then(canvas => {
+      const mainTable = tableRef.current;
+  
+      // Create a temporary element for the totals table
+      const totalsTableContainer = document.createElement('div');
+      totalsTableContainer.innerHTML = `
+        <div style="padding: 20px; font-family: sans-serif;">
+          <h4 style="text-align: center; margin-bottom: 15px;">Total Quantity by Unit</h4>
+          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
+            <thead style="background-color: #f2f2f2;">
+              <tr>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(totals.quantityByUnit)
+                .map(([unit, total]) => `
+                  <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      document.body.appendChild(totalsTableContainer);
+  
+      Promise.all([
+        html2canvas(mainTable, { scale: 2, useCORS: true }),
+        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
+      ]).then(([mainCanvas, totalsCanvas]) => {
         try {
-          const imgData = canvas.toDataURL('image/png');
-          const pdf = new jsPDF({
-            orientation: 'landscape',
-            unit: 'pt',
-            format: 'a2'
-          });
+          const mainImgData = mainCanvas.toDataURL('image/png');
+          const totalsImgData = totalsCanvas.toDataURL('image/png');
+          const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
           const pdfWidth = pdf.internal.pageSize.getWidth();
           const pdfHeight = pdf.internal.pageSize.getHeight();
-          const canvasWidth = canvas.width;
-          const canvasHeight = canvas.height;
-          const ratio = canvasWidth / canvasHeight;
-          const width = pdfWidth - 40;
-          const height = width / ratio;
   
           pdf.text("THR Distribution Report", 20, 30);
-          pdf.addImage(imgData, 'PNG', 20, 40, width, Math.min(height, pdfHeight - 80));
+          let yPos = 40;
   
-          if (Object.keys(totals.quantityByUnit).length > 0) {
+          // Add main table image
+          const mainRatio = mainCanvas.width / mainCanvas.height;
+          const mainWidth = pdfWidth - 40;
+          const mainHeight = mainWidth / mainRatio;
+          pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
+          yPos += mainHeight + 20;
+  
+          // Add totals table image, on a new page if needed
+          const totalsRatio = totalsCanvas.width / totalsCanvas.height;
+          const totalsWidth = pdfWidth / 2; // Smaller image for the summary
+          const totalsHeight = totalsWidth / totalsRatio;
+  
+          if (yPos + totalsHeight > pdfHeight - 40) {
             pdf.addPage();
-            pdf.text("Total Quantity by Unit", 20, 30);
-            autoTable(pdf, {
-              startY: 40,
-              head: [['Unit', 'Total Quantity']],
-              body: Object.entries(totals.quantityByUnit).map(([unit, total]) => [unit, total.toFixed(2)]),
-              theme: 'striped',
-              headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
-              alternateRowStyles: { fillColor: [245, 245, 245] },
-            });
+            yPos = 40;
           }
+          pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
   
           pdf.save('thr_it_cell_report.pdf');
         } catch (e) {
@@ -299,6 +326,7 @@ const ITCellTHRReport = () => {
           setError("Could not generate PDF. Please try again.");
         }
 
+        document.body.removeChild(totalsTableContainer);
         setIsPrinting(false);
       });
     }, 100);

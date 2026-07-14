@@ -134,40 +134,74 @@ const HCMDirectorReport = () => {
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
       acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-      const quantity = parseFloat(item.quantity) || 0;
       const unit = item.unit || 'N/A';
-
-      acc.quantity += quantity;
+      const quantity = parseFloat(item.quantity) || 0;
       if (!acc.quantityByUnit[unit]) {
         acc.quantityByUnit[unit] = 0;
       }
       acc.quantityByUnit[unit] += quantity;
       return acc;
-    }, { beneficiaries: 0, quantity: 0, quantityByUnit: {} });
+    }, {
+      beneficiaries: 0,
+      quantityByUnit: {}
+    });
   }, [filteredData]);
 
   const exportToPDF = () => {
     setIsPrinting(true);
     setTimeout(() => {
-      const input = tableRef.current;
-      if (!input) {
-        console.error("Table element not found for PDF export.");
-        setIsPrinting(false);
-        return;
-      }
-      html2canvas(input, { scale: 2, useCORS: true }).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const ratio = canvasWidth / canvasHeight;
-        const width = pdfWidth - 40;
-        const height = width / ratio;
+      const mainTable = tableRef.current;
+      const totalsTableContainer = document.createElement('div');
+      totalsTableContainer.innerHTML = `
+        <div style="padding: 20px; font-family: sans-serif;">
+          <h4 style="text-align: center; margin-bottom: 15px;">Total Quantity by Unit</h4>
+          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
+            <thead style="background-color: #f2f2f2;">
+              <tr>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(totals.quantityByUnit)
+                .map(([unit, total]) => `
+                  <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      document.body.appendChild(totalsTableContainer);
 
+      Promise.all([
+        html2canvas(mainTable, { scale: 2, useCORS: true }),
+        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
+      ]).then(([mainCanvas, totalsCanvas]) => {
+        const mainImgData = mainCanvas.toDataURL('image/png');
+        const totalsImgData = totalsCanvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
         pdf.text("HCM Distribution Report", 20, 30);
-        pdf.addImage(imgData, 'PNG', 20, 40, width, height);
+        let yPos = 40;
+        const mainRatio = mainCanvas.width / mainCanvas.height;
+        const mainWidth = pdfWidth - 40;
+        const mainHeight = mainWidth / mainRatio;
+        pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
+        yPos += mainHeight + 20;
+        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
+        const totalsWidth = pdfWidth / 2;
+        const totalsHeight = totalsWidth / totalsRatio;
+        if (yPos + totalsHeight > pdfHeight - 40) {
+          pdf.addPage();
+          yPos = 40;
+        }
+        pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
         pdf.save('hcm_director_report.pdf');
+        document.body.removeChild(totalsTableContainer);
         setIsPrinting(false);
       });
     }, 100);
@@ -188,14 +222,22 @@ const HCMDirectorReport = () => {
     const totalRow = { '#': 'Total' };
     visibleColumns.forEach(col => {
       if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'quantity') totalRow[col.text] = '';
+      else if (col.dataField === 'quantity') totalRow[col.text] = ''; // Keep quantity total empty in main sheet
       else if (col.text !== '#') totalRow[col.text] = '';
     });
     dataToExport.push(totalRow);
 
+    const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
+      'Unit': unit,
+      'Total Quantity': total.toFixed(2)
+    }));
+
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const quantityWorksheet = XLSX.utils.json_to_sheet(quantityTotalsData);
+
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "HCM Report");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "HCM Director Report");
+    XLSX.utils.book_append_sheet(workbook, quantityWorksheet, "Quantity Totals");
     XLSX.writeFile(workbook, "hcm_director_report.xlsx");
   };
 
@@ -330,9 +372,7 @@ const HCMDirectorReport = () => {
                       if (col.dataField === 'quantity') {
                         return (
                           <td key="total_quantity">
-                            {!isPrinting && (
-                              <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Total</Button>
-                            )}
+                            {!isPrinting && <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Totals</Button>}
                           </td>
                         );
                       }
@@ -356,28 +396,25 @@ const HCMDirectorReport = () => {
 
         <Modal show={showQuantityModal} onHide={() => setShowQuantityModal(false)} centered>
           <Modal.Header closeButton>
-            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+            <Modal.Title>Total Quantity by Unit</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <Table striped bordered hover>
-              <thead>
-                <tr>
-                  <th>Unit</th>
-                  <th>Total Quantity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(totals.quantityByUnit).map(([unit, qty]) => (
-                  <tr key={unit}>
-                    <td>{unit}</td>
-                    <td>{qty.toFixed(2)}</td>
+            {Object.keys(totals.quantityByUnit).length > 0 ? (
+              <Table striped bordered>
+                <thead>
+                  <tr>
+                    <th>Unit</th>
+                    <th>Total Quantity</th>
                   </tr>
-                ))}
-               
-              </tbody>
-            </Table>
+                </thead>
+                <tbody>
+                  {Object.entries(totals.quantityByUnit).map(([unit, total]) => (
+                    <tr key={unit}><td>{unit}</td><td>{total.toFixed(2)}</td></tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : <p>No quantity data to display.</p>}
           </Modal.Body>
-          <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button></Modal.Footer>
         </Modal>
       </div>
     </div>
