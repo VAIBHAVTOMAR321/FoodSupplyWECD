@@ -20,6 +20,7 @@ const SupervisorDashBoard = () => {
   const [thrSummary, setThrSummary] = useState(null);
   const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
   const [thrFoodItemsCount, setThrFoodItemsCount] = useState(0);
+  const [awcCount, setAwcCount] = useState(0);
   const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
@@ -54,6 +55,17 @@ const SupervisorDashBoard = () => {
     }
   };
 
+  const fetchAwcCount = async () => {
+    try {
+      const response = await api.get("/sector-awc-dropdown/");
+      const count = Number(response.data?.count ?? 0);
+      const rawData = Array.isArray(response.data?.data) ? response.data.data : [];
+      setAwcCount(count || rawData.length);
+    } catch (err) {
+      console.error("Failed to fetch AWC count:", err);
+    }
+  };
+
   const fetchDashboardSummaries = async () => {
     try {
       const [hcmRes, thrRes] = await Promise.all([
@@ -72,7 +84,7 @@ const SupervisorDashBoard = () => {
     setLoading(true);
     setError("");
     try {
-      await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems()]);
+      await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems(), fetchAwcCount()]);
     } catch (err) {
       setError("Failed to fetch supervisor distributions.");
     } finally {
@@ -307,6 +319,8 @@ const SupervisorDashBoard = () => {
             </Row>
           </div>
 
+        
+
           <div className="dashboard-section">
             <h4 className="section-title">THR Distribution & Received Summary</h4>
             <Row className="g-3">
@@ -440,6 +454,27 @@ const SupervisorDashBoard = () => {
                     <DistributionTable items={hcmSummary?.distribution_summary} />
                   </div>
                 </Collapse>
+              </Col>
+            </Row>
+
+          </div>
+            <div className="dashboard-section">
+            <h4 className="section-title">AWC Overview</h4>
+            <Row className="g-3">
+              <Col md={4}>
+                <Card className="dashboard-card card-thr" onClick={() => navigate('/AwcAganWadi')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">AWC Count</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : awcCount.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
               </Col>
             </Row>
           </div>

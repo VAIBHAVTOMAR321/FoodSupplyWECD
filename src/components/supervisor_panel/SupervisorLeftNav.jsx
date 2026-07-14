@@ -81,6 +81,13 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
         active: true,
       },
 
+      {
+        icon: <FaTachometerAlt />,
+        label: "AwcAganWadi",
+        path: "/AwcAganWadi",
+        active: true,
+      },
+
 {
          icon: <FaBuilding />,
          label: "Sector Profile",
