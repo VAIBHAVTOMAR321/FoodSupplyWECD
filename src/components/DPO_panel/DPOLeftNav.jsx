@@ -85,6 +85,13 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
         path: "/DPOBeneEntry",
         active: true,
       },
+
+      {
+        icon: <FaUsers />,
+        label: "AWC, Sector & Project List",
+        path: "/DpoAwcList",
+        active: true,
+      },
 // {
 //         icon: <FaTachometerAlt />,
 //         label: "Student Entery Form",

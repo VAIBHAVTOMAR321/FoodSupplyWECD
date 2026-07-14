@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dpo.css";
 
-import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
+import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading, FaProjectDiagram } from "react-icons/fa";
 import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
 
@@ -21,6 +21,9 @@ const DPODashboard = () => {
   const [thrSummary, setThrSummary] = useState(null);
   const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
   const [thrFoodItemsCount, setThrFoodItemsCount] = useState(0);
+  const [awcCount, setAwcCount] = useState(0);
+  const [sectorCount, setSectorCount] = useState(0);
+  const [projectCount, setProjectCount] = useState(0);
   const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
@@ -55,6 +58,36 @@ const DPODashboard = () => {
     }
   };
 
+  const fetchDpoAwcCount = async () => {
+    try {
+      const response = await api.get("/dpo-awc-dropdown/");
+      const data = response.data;
+      setAwcCount(data?.count ?? (Array.isArray(data?.data) ? data.data.length : 0));
+    } catch (err) {
+      console.error("Failed to fetch DPO AWC count:", err);
+    }
+  };
+
+  const fetchDpoSectorCount = async () => {
+    try {
+      const response = await api.get("/dpo-sector-list/");
+      const data = response.data;
+      setSectorCount(data?.count ?? (Array.isArray(data?.data) ? data.data.length : 0));
+    } catch (err) {
+      console.error("Failed to fetch DPO sector count:", err);
+    }
+  };
+
+  const fetchDpoProjectCount = async () => {
+    try {
+      const response = await api.get("/dpo-project-list/");
+      const data = response.data;
+      setProjectCount(data?.count ?? (Array.isArray(data?.data) ? data.data.length : 0));
+    } catch (err) {
+      console.error("Failed to fetch DPO project count:", err);
+    }
+  };
+
   const fetchDashboardSummaries = async () => {
     try {
       const [hcmRes, thrRes] = await Promise.all([ 
@@ -73,7 +106,14 @@ const DPODashboard = () => {
     setLoading(true);
     setError("");
     try {
-      await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems()]);
+      await Promise.all([
+        fetchDashboardSummaries(),
+        fetchHcmFoodItems(),
+        fetchThrFoodItems(),
+        fetchDpoAwcCount(),
+        fetchDpoSectorCount(),
+        fetchDpoProjectCount(),
+      ]);
     } catch (err) {
       setError("Failed to fetch DPO distributions.");
     } finally {
@@ -435,6 +475,56 @@ const DPODashboard = () => {
                     <DistributionTable items={hcmSummary?.distribution_summary} />
                   </div>
                 </Collapse>
+              </Col>
+            </Row>
+          </div>
+          <div className="dashboard-section">
+            <h4 className="section-title">AWC, Sector & Project Summary</h4>
+            <Row className="g-3">
+              <Col md={4} lg={4} className="d-flex">
+                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DpoAwcList?tab=awc')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">AWC List</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : awcCount}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={4} lg={4} className="d-flex">
+                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DpoAwcList?tab=sector')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">Sector List</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : sectorCount}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={4} lg={4} className="d-flex">
+                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DpoAwcList?tab=project')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon thr-icon"><FaProjectDiagram /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">Project List</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : projectCount}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
               </Col>
             </Row>
           </div>
