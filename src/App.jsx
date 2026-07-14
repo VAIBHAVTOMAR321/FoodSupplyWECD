@@ -61,6 +61,7 @@ import DirFoodItemReceiving from "./components/director_panel/DirFoodItemReceivi
 import AwcAganWadi from "./components/supervisor_panel/AwcAganWadi";
 import CdpoAWCList from "./components/CDPO_panel/CdpoAWCList";
 import DpoAwcList from "./components/DPO_panel/DpoAwcList";
+import DirectorAwcList from "./components/director_panel/DirectorAwcList";
 
 
 
@@ -85,11 +86,11 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const location = useLocation();
 
-const hideNavbarRoutes = ["/DirectorHCMReceiving", "/DirectorTHRReceiving", "/DirectorBeneEntry", "/CDPOBeneEntry", "/CDPOHCMReceiving", "/AwcAganWadi",
+const hideNavbarRoutes = ["/DirectorHCMReceiving", "/DirectorAwcList", "/DirectorTHRReceiving", "/DirectorBeneEntry", "/CDPOBeneEntry", "/CDPOHCMReceiving", "/AwcAganWadi",
       "/DPOBeneEntry", "/CDPOTHRReceiving", "/DPOTHRReceiving", "/DPOHCMReceiving", "/DirFoodItemReceiving", "/CdpoAWCList",
       "/SupervisorBeneficiarieEntry", "/ThrSupervisorReceiving", "/HcmSupervisorReceiving", "/BeneficiarieEntry", "/StudentForm","/SupervisorDashBoard", "/FoodItemReceiving", "/AllRoleResetpassword", "/HcmDpoDistributions","/HcmCdpoDistributions", "/HcmSupervisorDistributions", "/DPODashboard", "/DpoAwcList", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/ITBeneEntry", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem", "/ITCellHCMReceiving", "/ITCellTHRReceiving"];
 const hideFooterRoutes = ["/DirectorHCMReceiving", "/DirectorTHRReceiving", "/DirectorBeneEntry", "/CDPOBeneEntry", "/DPOBeneEntry", "/CDPOTHRReceiving", "/CDPOHCMReceiving", "/DPOTHRReceiving", "/DirFoodItemReceiving",
-      "/SupervisorBeneficiarieEntry", "/ThrSupervisorReceiving", "/HcmSupervisorReceiving", "/BeneficiarieEntry", "/StudentForm","/SupervisorDashBoard", "/FoodItemReceiving", "/AllRoleResetpassword","/HcmDpoDistributions", "/HcmCdpoDistributions", "/AwcAganWadi", "/CdpoAWCList", "/DpoAwcList", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/ITBeneEntry", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem", "/ITCellHCMReceiving", "/ITCellTHRReceiving"];
+      "/SupervisorBeneficiarieEntry", "/ThrSupervisorReceiving", "/DirectorAwcList",  "/HcmSupervisorReceiving", "/BeneficiarieEntry", "/StudentForm","/SupervisorDashBoard", "/FoodItemReceiving", "/AllRoleResetpassword","/HcmDpoDistributions", "/HcmCdpoDistributions", "/AwcAganWadi", "/CdpoAWCList", "/DpoAwcList", "/HcmSupervisorDistributions", "/DPODashboard", "/AnganwadiDashboard", "/CDPODashboard", "/DirectorDashboard", "/AnganwadiProfile","/SectorProfile", "/director/food-items", "/ITCellDashBoard", "/ITBeneEntry", "/thr-supervisor-distributions","/HCMDirectorReport","/THRDirectorReport", "/ThrCdpoDistributions", "/ThrDpoDistributions", "/ITCellHCMDistributions", "/ITCellHCMReport", "/ITCellTHRDistributions", "/ITCellTHRReport", "/ITCellFoodItem", "/ITCellHCMReceiving", "/ITCellTHRReceiving"];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
   const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
 
@@ -101,6 +102,12 @@ const hideFooterRoutes = ["/DirectorHCMReceiving", "/DirectorTHRReceiving", "/Di
           <Route path="/SupervisorDashBoard" element={
             <ProtectedRoute>
               <SupervisorDashBoard />
+            </ProtectedRoute>
+          } />
+
+            <Route path="/DirectorAwcList" element={
+            <ProtectedRoute>
+              <DirectorAwcList />
             </ProtectedRoute>
           } />
           <Route path="/DpoAwcList" element={

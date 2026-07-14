@@ -92,6 +92,12 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
         label: "Beneficiary Entry",
         path: "/DirectorBeneEntry",
       },
+
+       {
+        icon: <FaTachometerAlt />,
+        label: "DPO, CDPO, Sector & AWC List",
+        path: "/DirectorAwcList",
+      },
       {
         icon: <FaAppleAlt />,
         label: "Food Items",
