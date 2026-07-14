@@ -14,15 +14,25 @@ const DirectorAwcList = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
 
-  const { api } = useAuth();
+  const { api, user } = useAuth();
   const [activeTab, setActiveTab] = useState("dpo"); // Default tab
   const [roleCounts, setRoleCounts] = useState({});
   const [dpoData, setDpoData] = useState([]);
   const [cdpoData, setCdpoData] = useState([]);
   const [supervisorData, setSupervisorData] = useState([]);
   const [anganwadiData, setAnganwadiData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingCounts, setLoadingCounts] = useState(true);
+  const [loading, setLoading] = useState({
+    dpo: true,
+    cdpo: true,
+    supervisor: true,
+    anganwadi: true,
+  });
+  const [loadingCounts, setLoadingCounts] = useState({
+    dpo: true,
+    cdpo: true,
+    supervisor: true,
+    anganwadi: true,
+  });
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
@@ -50,52 +60,58 @@ const DirectorAwcList = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const fetchAllData = useCallback(async () => {
-    setLoading(true);
-    setLoadingCounts(true);
+  const fetchDataForTab = useCallback(async (tab) => {
+    setLoading(prev => ({ ...prev, [tab]: true }));
+    setLoadingCounts(prev => ({ ...prev, [tab]: true }));
     setError("");
+
+    const endpoints = {
+      dpo: '/director/districts/',
+      cdpo: '/director/projects/',
+      supervisor: '/director/sectors/',
+      anganwadi: '/director/awc-list/',
+    };
+
     try {
-      const [
-        dpoResponse,
-        cdpoResponse,
-        supervisorResponse,
-        anganwadiResponse,
-      ] = await Promise.all([
-        api.get('/director/districts/'),
-        api.get('/director/projects/'),
-        api.get('/director/sectors/'),
-        api.get('/director/awc-list/'),
-      ]);
+      const response = await api.get(endpoints[tab]);
+      let data = response.data?.data || [];
 
-      const dpoUsers = dpoResponse.data?.data?.filter(u => u.role === 'dpo') || [];
-      const cdpoUsers = cdpoResponse.data?.data || [];
-      const supervisorUsers = supervisorResponse.data?.data || [];
-      const anganwadiUsers = anganwadiResponse.data?.data || [];
+      switch (tab) {
+        case 'dpo':
+          data = data.filter(u => u.role === 'dpo');
+          setDpoData(data);
+          break;
+        case 'cdpo':
+          setCdpoData(data);
+          break;
+        case 'supervisor':
+          setSupervisorData(data);
+          break;
+        case 'anganwadi':
+          setAnganwadiData(data);
+          break;
+        default:
+          break;
+      }
 
-      setDpoData(dpoUsers);
-      setCdpoData(cdpoUsers);
-      setSupervisorData(supervisorUsers);
-      setAnganwadiData(anganwadiUsers);
-
-      const newCounts = {
-        dpo: dpoUsers.length,
-        cdpo: cdpoUsers.length,
-        supervisor: supervisorUsers.length,
-        anganwadi: anganwadiUsers.length,
-      };
-      setRoleCounts(newCounts);
+      setRoleCounts(prev => ({ ...prev, [tab]: data.length }));
     } catch (err) {
-      setError("Failed to fetch user lists.");
-      console.error("Failed to fetch data:", err);
+      setError(`Failed to fetch ${tab} list.`);
+      console.error(`Failed to fetch ${tab} data:`, err);
     } finally { 
-      setLoading(false);
-      setLoadingCounts(false);
+      setLoadingCounts(prev => ({ ...prev, [tab]: false }));
+      setLoading(prev => ({ ...prev, [tab]: false }));
     }
   }, [api]);
 
   useEffect(() => {
-    if (api) fetchAllData();
-  }, [api, fetchAllData]);
+    if (api) {
+      fetchDataForTab('dpo');
+      fetchDataForTab('cdpo');
+      fetchDataForTab('supervisor');
+      fetchDataForTab('anganwadi');
+    }
+  }, [api, fetchDataForTab]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -146,8 +162,8 @@ const DirectorAwcList = () => {
     );
   };
 
-  const renderTable = (data, columnsToExclude = [], totalItems) => {
-    if (loading) return <div className="text-center p-4"><Spinner animation="border" /></div>;
+  const renderTable = (data, tabKey, columnsToExclude = [], totalItems) => {
+    if (loading[tabKey]) return <div className="text-center p-4"><Spinner animation="border" /></div>;
     if (!data || data.length === 0) return <div className="text-center p-4 text-muted">No users found for this role.</div>;
 
     const indexOfLastItem = currentPage * itemsPerPage;
@@ -209,34 +225,34 @@ const DirectorAwcList = () => {
           >
             <Tab eventKey="dpo" title={
               <span>
-                <FaUserCog className="me-2" /> DPO List {loadingCounts ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.dpo ?? 0})`}
+                <FaUserCog className="me-2" /> DPO List {loadingCounts.dpo ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.dpo ?? 0})`}
               </span>
             }>
-              {renderTable(dpoData, ['id', 'role', 'unique_id', 'name'], roleCounts.dpo)}
+              {renderTable(dpoData, 'dpo', ['id', 'role', 'unique_id', 'name'], roleCounts.dpo)}
             </Tab>
 
             <Tab eventKey="cdpo" title={
               <span>
-                <FaUserShield className="me-2" /> CDPO List {loadingCounts ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.cdpo ?? 0})`}
+                <FaUserShield className="me-2" /> CDPO List {loadingCounts.cdpo ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.cdpo ?? 0})`}
               </span>
             }>
-              {renderTable(cdpoData, ['id', 'unique_id', 'name', 'stat_fin', 'ang_pur', 'adhar_stat'], roleCounts.cdpo)}
+              {renderTable(cdpoData, 'cdpo', ['id', 'unique_id', 'name', 'stat_fin', 'ang_pur', 'adhar_stat'], roleCounts.cdpo)}
             </Tab>
 
             <Tab eventKey="supervisor" title={
               <span>
-                <FaUserTie className="me-2" /> Supervisor List {loadingCounts ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.supervisor ?? 0})`}
+                <FaUserTie className="me-2" /> Supervisor List {loadingCounts.supervisor ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.supervisor ?? 0})`}
               </span>
             }>
-              {renderTable(supervisorData, ['id', 'unique_id', 'name', 'sdname'], roleCounts.supervisor)}
+              {renderTable(supervisorData, 'supervisor', ['id', 'unique_id', 'name', 'sdname'], roleCounts.supervisor)}
             </Tab>
 
             <Tab eventKey="anganwadi" title={
               <span>
-                <FaHome className="me-2" /> Anganwadi List {loadingCounts ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.anganwadi ?? 0})`}
+                <FaHome className="me-2" /> Anganwadi List {loadingCounts.anganwadi ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.anganwadi ?? 0})`}
               </span>
             }>
-              {renderTable(anganwadiData, ['id', 'unique_id', 'name', 'code1', 'district_code', 'updated_on', 'bill_use', 'db_use'], roleCounts.anganwadi)}
+              {renderTable(anganwadiData, 'anganwadi', ['id', 'unique_id', 'name', 'code1', 'district_code', 'updated_on', 'bill_use', 'db_use'], roleCounts.anganwadi)}
             </Tab>
           </Tabs>
 
