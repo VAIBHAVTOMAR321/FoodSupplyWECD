@@ -67,8 +67,8 @@ const CDPOHCMReceiving = () => {
     { dataField: "sector", text: "Sector", visible: true },
     { dataField: "food_item", text: "Food Item", visible: true },
     { dataField: "bene_category", text: "Beneficiary Category", visible: true },
-    { dataField: "unit", text: "Unit", visible: true },
     { dataField: "quantity", text: "Quantity", visible: true },
+    { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
     { dataField: "months", text: "Months", visible: true },
     { dataField: "date", text: "Date", visible: true },
@@ -162,7 +162,13 @@ const CDPOHCMReceiving = () => {
     const visCols = columns.filter((c) => c.visible && c.dataField !== "#");
     const data = filteredReports.map((row, i) => {
       const r = { "#": i + 1 };
-      visCols.forEach((col) => { r[col.text] = row[col.dataField]; });
+      visCols.forEach((col) => {
+        if (col.dataField === 'months') {
+          r[col.text] = formatMonths(row.months || row.quarter);
+        } else {
+          r[col.text] = row[col.dataField];
+        }
+      });
       return r;
     });
     const ws = XLSX.utils.json_to_sheet(data);
