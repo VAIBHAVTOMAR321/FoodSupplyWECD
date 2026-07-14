@@ -28,7 +28,7 @@ const DirectorDashboard = () => {
   
   const navigate = useNavigate();
   const { api } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hcmSummary, setHcmSummary] = useState(null);
   const [thrSummary, setThrSummary] = useState(null);
@@ -39,6 +39,12 @@ const DirectorDashboard = () => {
     cdpo: 0,
     supervisor: 0,
     anganwadi: 0,
+  });
+  const [loadingRoles, setLoadingRoles] = useState({
+    dpo: true,
+    cdpo: true,
+    supervisor: true,
+    anganwadi: true,
   });
   const [expanded, setExpanded] = useState(null);
   const [viewMode, setViewMode] = useState("card");
@@ -89,40 +95,43 @@ const DirectorDashboard = () => {
     }
   };
 
-  const fetchRoleCounts = async () => {
+  const fetchRoleCount = async (role, endpoint) => {
+    setLoadingRoles(prev => ({ ...prev, [role]: true }));
     try {
-      const [
-        dpoResponse,
-        cdpoResponse,
-        supervisorResponse,
-        anganwadiResponse,
-      ] = await Promise.all([
-        api.get('/director/districts/'),
-        api.get('/director/projects/'),
-        api.get('/director/sectors/'),
-        api.get('/director/awc-list/'),
-      ]);
-
-      const dpoUsers = dpoResponse.data?.data?.filter(u => u.role === 'dpo') || [];
-
-      setRoleCounts({
-        dpo: dpoUsers.length,
-        cdpo: cdpoResponse.data?.data?.length || 0,
-        supervisor: supervisorResponse.data?.data?.length || 0,
-        anganwadi: anganwadiResponse.data?.data?.length || 0,
-      });
+      const response = await api.get(endpoint);
+      let data = response.data?.data || [];
+      if (role === 'dpo') {
+        data = data.filter(u => u.role === 'dpo');
+      }
+      setRoleCounts(prev => ({ ...prev, [role]: data.length }));
     } catch (err) {
-      console.error("Failed to fetch role counts:", err);
+      console.error(`Failed to fetch ${role} count:`, err);
+      // Optionally set an error state for this specific card
+    } finally {
+      setLoadingRoles(prev => ({ ...prev, [role]: false }));
     }
   };
 
   const fetchAllData = async () => {
     setLoading(true);
     setError("");
+
+    // Fetch role counts independently
+    fetchRoleCount('dpo', '/director/districts/');
+    fetchRoleCount('cdpo', '/director/projects/');
+    fetchRoleCount('supervisor', '/director/sectors/');
+    fetchRoleCount('anganwadi', '/director/awc-list/');
+
+    // Fetch other dashboard data
     try {
-      await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems(), fetchRoleCounts()]);
+      await Promise.all([
+        fetchDashboardSummaries(), 
+        fetchHcmFoodItems(), 
+        fetchThrFoodItems()
+      ]);
     } catch (err) {
       setError("Failed to fetch Director dashboard data.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -368,7 +377,7 @@ const DirectorDashboard = () => {
                       <div className="dashboard-card-icon hcm-icon"><FaUserCog /></div>
                       <div className="ms-3 text-start">
                         <h6 className="dashboard-card-title mb-1">DPO List</h6>
-                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : roleCounts.dpo}</div>
+                        <div className="dashboard-card-value">{loadingRoles.dpo ? <Spinner animation="border" size="sm" /> : roleCounts.dpo}</div>
                       </div>
                     </div>
                   </Card.Body>
@@ -381,7 +390,7 @@ const DirectorDashboard = () => {
                       <div className="dashboard-card-icon thr-icon"><FaUserShield /></div>
                       <div className="ms-3 text-start">
                         <h6 className="dashboard-card-title mb-1">CDPO List</h6>
-                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : roleCounts.cdpo}</div>
+                        <div className="dashboard-card-value">{loadingRoles.cdpo ? <Spinner animation="border" size="sm" /> : roleCounts.cdpo}</div>
                       </div>
                     </div>
                   </Card.Body>
@@ -394,7 +403,7 @@ const DirectorDashboard = () => {
                       <div className="dashboard-card-icon hcm-icon"><FaUserTie /></div>
                       <div className="ms-3 text-start">
                         <h6 className="dashboard-card-title mb-1">Supervisor List</h6>
-                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : roleCounts.supervisor}</div>
+                        <div className="dashboard-card-value">{loadingRoles.supervisor ? <Spinner animation="border" size="sm" /> : roleCounts.supervisor}</div>
                       </div>
                     </div>
                   </Card.Body>
@@ -407,7 +416,7 @@ const DirectorDashboard = () => {
                       <div className="dashboard-card-icon thr-icon"><FaHome /></div>
                       <div className="ms-3 text-start">
                         <h6 className="dashboard-card-title mb-1">Anganwadi List</h6>
-                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : roleCounts.anganwadi}</div>
+                        <div className="dashboard-card-value">{loadingRoles.anganwadi ? <Spinner animation="border" size="sm" /> : roleCounts.anganwadi}</div>
                       </div>
                     </div>
                   </Card.Body>
