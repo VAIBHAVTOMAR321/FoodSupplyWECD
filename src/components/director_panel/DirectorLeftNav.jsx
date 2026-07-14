@@ -19,6 +19,8 @@ import {
   FaCalendarAlt,
   FaPlusSquare,
   FaEdit,
+  FaUserPlus,
+  FaListUl,
   FaMusic,
   FaGlassCheers,
   FaIndustry,
@@ -88,13 +90,13 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
       // },
 
       {
-        icon: <FaTachometerAlt />,
+        icon: <FaUserPlus />,
         label: "Beneficiary Entry",
         path: "/DirectorBeneEntry",
       },
 
        {
-        icon: <FaTachometerAlt />,
+        icon: <FaListUl />,
         label: "DPO, CDPO, Sector & AWC List",
         path: "/DirectorAwcList",
       },
@@ -112,12 +114,12 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
       {
         label: "HCM Report",
         path: "/HCMDirectorReport",
-        icon: <FaPlusSquare />,
+        icon: <FaFileAlt />,
       },
       {
         label: "THR Report",
         path: "/THRDirectorReport",  
-        icon: <FaPlusSquare />,
+        icon: <FaFileAlt />,
       },
     ],
   },
