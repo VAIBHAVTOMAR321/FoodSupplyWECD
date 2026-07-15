@@ -57,6 +57,7 @@ const ThrSupervisorReceiving = () => {
   const [bulkAction, setBulkAction] = useState("");
   const [bulkRemark, setBulkRemark] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const [filters, setFilters] = useState({
     awc_name: [],
@@ -277,34 +278,41 @@ const ThrSupervisorReceiving = () => {
   };
 
   const exportToPDF = () => {
-    const input = tableRef.current;
-    if (!input) return;
-    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "pt",
-        format: "a2",
-      });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const width = pdfWidth - 40;
-      const height = width / ratio;
+    setIsPrinting(true);
+    setTimeout(() => {
+      const input = tableRef.current;
+      if (!input) {
+        setIsPrinting(false);
+        return;
+      }
+      html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({
+          orientation: "landscape",
+          unit: "pt",
+          format: "a2",
+        });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+        const width = pdfWidth - 40;
+        const height = width / ratio;
 
-      pdf.text("THR Supervisor Receiving Report", 20, 30);
-      pdf.addImage(
-        imgData,
-        "PNG",
-        20,
-        40,
-        width,
-        height > pdfHeight - 60 ? pdfHeight - 60 : height
-      );
-      pdf.save("thr-supervisor-receiving.pdf");
-    });
+        pdf.text("THR Supervisor Receiving Report", 20, 30);
+        pdf.addImage(
+          imgData,
+          "PNG",
+          20,
+          40,
+          width,
+          height > pdfHeight - 60 ? pdfHeight - 60 : height
+        );
+        pdf.save("thr-supervisor-receiving.pdf");
+        setIsPrinting(false);
+      });
+    }, 100);
   };
 
   const exportToExcel = () => {
@@ -460,12 +468,12 @@ const ThrSupervisorReceiving = () => {
               <Table striped bordered hover responsive ref={tableRef}>
                 <thead>
                   <tr>
-                    {visibleColumns.map((col) => (
+                    {visibleColumns.filter(col => !isPrinting || (col.dataField !== 'select' && col.dataField !== 'actions')).map((col) => (
                       <th key={col.dataField}>
                         {col.dataField === "select" ? (
                           <Form.Check type="checkbox" onChange={handleSelectAll} checked={areAllPendingSelected} />
                         ) : (
-                          col.text
+                          col.text 
                         )}
                       </th>
                     ))}
@@ -475,7 +483,7 @@ const ThrSupervisorReceiving = () => {
                   {currentItems.length > 0 ? (
                     currentItems.map((item, index) => (
                       <tr key={item.id}>
-                        {visibleColumns.map((col) => {
+                        {visibleColumns.filter(col => !isPrinting || (col.dataField !== 'select' && col.dataField !== 'actions')).map((col) => {
                           let cellContent;
                           if (col.dataField === 'select') {
                             return <td key="select"><Form.Check type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => handleSelectOne(item.id)} /></td>;
@@ -492,7 +500,11 @@ const ThrSupervisorReceiving = () => {
                               cellContent = (item.months || []).map(m => monthLabels[m] || m).join(', ');
                               break;
                             case "sector_status":
-                              cellContent = <Badge bg={getStatusVariant(item.sector_status)}>{item.sector_status || 'pending'}</Badge>;
+                              if (isPrinting) {
+                                cellContent = <div>{item.sector_status || 'pending'}</div>;
+                              } else {
+                                cellContent = <Badge bg={getStatusVariant(item.sector_status)}>{item.sector_status || 'pending'}</Badge>;
+                              }
                               break;
                             case "actions":
                               return (<td key="actions" className="d-flex gap-1">
