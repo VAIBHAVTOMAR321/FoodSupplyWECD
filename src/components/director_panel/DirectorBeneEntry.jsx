@@ -211,6 +211,14 @@ const DirectorBeneEntry = () => {
     );
   };
 
+  const handleSelectAllMonths = () => {
+    setSelectedMonths(monthsForSelectedFinYear);
+  };
+
+  const handleDeselectAllMonths = () => {
+    setSelectedMonths([]);
+  };
+
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
   const currentItems = filteredReports.slice(
     (currentPage - 1) * itemsPerPage,
@@ -465,6 +473,11 @@ const DirectorBeneEntry = () => {
                                 {selectedMonths.length ? `${selectedMonths.length} selected` : "All Months"}
                               </Dropdown.Toggle>
                               <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
+                                <Dropdown.Item as="div" className="d-flex justify-content-between">
+                                  <Button variant="link" size="sm" onClick={handleSelectAllMonths}>Select All</Button>
+                                  <Button variant="link" size="sm" onClick={handleDeselectAllMonths}>Deselect All</Button>
+                                </Dropdown.Item>
+                                <Dropdown.Divider />
                                 {monthsForSelectedFinYear.map((month) => (
                                   <Dropdown.Item key={month} as="div">
                                     <Form.Check type="checkbox" label={month} checked={selectedMonths.includes(month)} onChange={() => handleMonthFilterChange(month)} />
