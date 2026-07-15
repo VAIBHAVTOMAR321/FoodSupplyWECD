@@ -28,6 +28,7 @@ const HcmSupervisorReceiving = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const tableRef = React.useRef(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const { api } = useAuth();
   const [receivings, setReceivings] = useState([]);
@@ -264,34 +265,41 @@ const HcmSupervisorReceiving = () => {
   };
 
   const exportToPDF = () => {
-    const input = tableRef.current;
-    if (!input) return;
-    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "pt",
-        format: "a2",
-      });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const width = pdfWidth - 40;
-      const height = width / ratio;
+    setIsPrinting(true);
+    setTimeout(() => {
+      const input = tableRef.current;
+      if (!input) {
+        setIsPrinting(false);
+        return;
+      }
+      html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({
+          orientation: "landscape",
+          unit: "pt",
+          format: "a2",
+        });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+        const width = pdfWidth - 40;
+        const height = width / ratio;
 
-      pdf.text("HCM Supervisor Receiving Report", 20, 30);
-      pdf.addImage(
-        imgData,
-        "PNG",
-        20,
-        40,
-        width,
-        height > pdfHeight - 60 ? pdfHeight - 60 : height
-      );
-      pdf.save("hcm-supervisor-receiving.pdf");
-    });
+        pdf.text("HCM Supervisor Receiving Report", 20, 30);
+        pdf.addImage(
+          imgData,
+          "PNG",
+          20,
+          40,
+          width,
+          height > pdfHeight - 60 ? pdfHeight - 60 : height
+        );
+        pdf.save("hcm-supervisor-receiving.pdf");
+        setIsPrinting(false);
+      });
+    }, 100);
   };
 
   const exportToExcel = () => {
@@ -409,7 +417,7 @@ const HcmSupervisorReceiving = () => {
               <Table striped bordered hover responsive ref={tableRef}>
                 <thead>
                   <tr>
-                    {visibleColumns.map((col) => (
+                    {visibleColumns.filter(col => !isPrinting || (col.dataField !== 'select' && col.dataField !== 'actions')).map((col) => (
                       <th key={col.dataField}>
                         {col.dataField === "select" ? (
                           <Form.Check type="checkbox" onChange={handleSelectAll} checked={areAllPendingSelected}
@@ -424,8 +432,7 @@ const HcmSupervisorReceiving = () => {
                 <tbody>
                   {currentItems.length > 0 ? (
                     currentItems.map((item, index) => (
-                      <tr key={item.id}>
-                        {visibleColumns.map((col) => {
+                      <tr key={item.id}>{visibleColumns.filter(col => !isPrinting || (col.dataField !== 'select' && col.dataField !== 'actions')).map((col) => {
                           if (col.dataField === 'select') {
                             return <td key="select"><Form.Check type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => handleSelectOne(item.id)} /></td>;
                           }
@@ -438,7 +445,11 @@ const HcmSupervisorReceiving = () => {
                               cellContent = new Date(item.date).toLocaleDateString();
                               break;
                             case "sector_status":
-                              cellContent = <Badge bg={getStatusVariant(item.sector_status)}>{item.sector_status || 'pending'}</Badge>;
+                              if (isPrinting) {
+                                cellContent = <div>{item.sector_status || 'pending'}</div>;
+                              } else {
+                                cellContent = <Badge bg={getStatusVariant(item.sector_status)}>{item.sector_status || 'pending'}</Badge>;
+                              }
                               break;
                             case "actions":
                               return (<td key="actions" className="d-flex gap-1">
