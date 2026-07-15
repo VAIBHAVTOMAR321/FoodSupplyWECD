@@ -4,6 +4,7 @@ import {
   Spinner,
   Alert,
   Table,
+  Badge,
   Pagination,
   Row,
   Col,
@@ -32,6 +33,13 @@ const HcmSupervisorReceiving = () => {
   const [receivings, setReceivings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showBulkActionModal, setShowBulkActionModal] = useState(false);
+  const [bulkAction, setBulkAction] = useState("");
+  const [bulkRemark, setBulkRemark] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [filters, setFilters] = useState({
@@ -45,6 +53,7 @@ const HcmSupervisorReceiving = () => {
     endDate: "",
   });
   const [columns, setColumns] = useState([
+    { dataField: "select", text: "Select", visible: true },
     { dataField: "#", text: "#", visible: true },
     { dataField: "district", text: "District", visible: true },
     { dataField: "sector", text: "Sector", visible: true },
@@ -55,6 +64,9 @@ const HcmSupervisorReceiving = () => {
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "bene_category", text: "Beneficiary Category", visible: true },
     { dataField: "date", text: "Date", visible: true },
+    { dataField: "sector_status", text: "Sector Status", visible: true },
+    { dataField: "sector_remark", text: "Sector Remark", visible: true },
+    { dataField: "actions", text: "Actions", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
@@ -91,6 +103,25 @@ const HcmSupervisorReceiving = () => {
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      const pendingIds = pendingItemsOnPage.map((item) => item.id);
+      // Add only pending IDs to the selection, preserving other selections if any
+      setSelectedIds(prev => [...new Set([...prev, ...pendingIds])]);
+    } else {
+      // Deselect only the pending items shown on the current page
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((i) => i !== id)
+        : [...prev, id]
+    );
   };
 
   const handleMultiSelectChange = (filterName, value) => {
@@ -160,10 +191,76 @@ const HcmSupervisorReceiving = () => {
   const currentItems = filteredReceivings.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredReceivings.length / itemsPerPage);
 
+  const pendingItemsOnPage = useMemo(() => 
+    currentItems.filter(item => item.sector_status === 'pending' || !item.sector_status),
+    [currentItems]
+  );
+
+  const areAllPendingSelected = useMemo(() => {
+    if (pendingItemsOnPage.length === 0) return false;
+    return pendingItemsOnPage.every(item => selectedIds.includes(item.id));
+  }, [pendingItemsOnPage, selectedIds]);
+
+  const canApprove = useMemo(() => {
+    return selectedIds.some(id => {
+      const item = receivings.find(r => r.id === id);
+      return item && item.sector_status !== 'approved';
+    });
+  }, [selectedIds, receivings]);
+
+  const canReject = useMemo(() => {
+    return selectedIds.some(id => receivings.find(r => r.id === id)?.sector_status !== 'rejected');
+  }, [selectedIds, receivings]);
   const handleColumnToggle = (index) => {
     const newColumns = [...columns];
     newColumns[index].visible = !newColumns[index].visible;
     setColumns(newColumns);
+  };
+
+  const handleBulkAction = async () => {
+    if (selectedIds.length === 0) {
+      setActionError("No items selected for bulk action.");
+      return;
+    }
+    if (bulkAction === "rejected" && !bulkRemark) {
+      setActionError("Remark is required for rejection.");
+      return;
+    }
+
+    setSubmitting(true);
+    setActionError("");
+    setSuccessMsg("");
+
+    try {
+      await api.put("/supervisor/hcm-receiving/", {
+        ids: selectedIds,
+        sector_status: bulkAction,
+        sector_remark: bulkRemark,
+      });
+
+      setSuccessMsg(`Successfully ${bulkAction} ${selectedIds.length} items.`);
+      fetchReceivings(); // Refetch data
+      setSelectedIds([]);
+      setShowBulkActionModal(false);
+      setBulkRemark("");
+    } catch (err) {
+      setActionError("Failed to perform bulk action. Please try again.");
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getStatusVariant = (status) => {
+    switch (status) {
+      case "approved":
+        return "success";
+      case "rejected":
+        return "danger";
+      case "pending":
+      default:
+        return "warning";
+    }
   };
 
   const exportToPDF = () => {
@@ -198,7 +295,7 @@ const HcmSupervisorReceiving = () => {
   };
 
   const exportToExcel = () => {
-    const visCols = visibleColumns.filter(c => c.dataField !== '#');
+    const visCols = visibleColumns.filter(c => c.dataField !== '#' && c.dataField !== 'select' && c.dataField !== 'actions');
     const dataToExport = filteredReceivings.map((item, index) => {
       const row = { '#': index + 1 };
       visCols.forEach(col => {
@@ -270,7 +367,9 @@ const HcmSupervisorReceiving = () => {
           <h3 className="mb-4">
             <FaUserCircle className="me-2" /> HCM Supervisor Receiving
           </h3>
+          {successMsg && <Alert variant="success">{successMsg}</Alert>}
           {error && <Alert variant="danger">{error}</Alert>}
+          {actionError && <Alert variant="danger">{actionError}</Alert>}
           <Row className="mb-3 g-2 align-items-center">
             <Col md><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.district.length ? `${filters.district.length} selected` : 'All Districts'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.district.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.district.includes(v)} onChange={() => handleMultiSelectChange('district', v)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
             <Col md><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.sector.length ? `${filters.sector.length} selected` : 'All Sectors'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.sector.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.sector.includes(v)} onChange={() => handleMultiSelectChange('sector', v)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
@@ -283,6 +382,20 @@ const HcmSupervisorReceiving = () => {
             <Col md={3}><Form.Group><Form.Label>Start Date</Form.Label><Form.Control type="date" name="startDate" value={filters.startDate} onChange={handleDateChange} /></Form.Group></Col>
             <Col md={3}><Form.Group><Form.Label>End Date</Form.Label><Form.Control type="date" name="endDate" value={filters.endDate} onChange={handleDateChange} /></Form.Group></Col>
             <Col xs="auto"><Button variant="secondary" onClick={resetFilters}>Reset Filters</Button></Col>
+          </Row>
+          <Row className="mb-3">
+            <Col>
+              {selectedIds.length > 0 && (
+                <div className="d-flex gap-2">
+                  <Button variant="success" size="sm" onClick={() => { setBulkAction("approved"); setShowBulkActionModal(true); }} disabled={!canApprove}>
+                    Approve Selected ({selectedIds.length})
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => { setBulkAction("rejected"); setShowBulkActionModal(true); }} disabled={!canReject}>
+                    Reject Selected ({selectedIds.length})
+                  </Button>
+                </div>
+              )}
+            </Col>
           </Row>
           <div className="d-flex justify-content-end mb-3">
             <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2"><FaFilePdf /> PDF</Button>
@@ -297,7 +410,14 @@ const HcmSupervisorReceiving = () => {
                 <thead>
                   <tr>
                     {visibleColumns.map((col) => (
-                      <th key={col.dataField}>{col.text}</th>
+                      <th key={col.dataField}>
+                        {col.dataField === "select" ? (
+                          <Form.Check type="checkbox" onChange={handleSelectAll} checked={areAllPendingSelected}
+                          />
+                        ) : (
+                          col.text
+                        )}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -306,6 +426,9 @@ const HcmSupervisorReceiving = () => {
                     currentItems.map((item, index) => (
                       <tr key={item.id}>
                         {visibleColumns.map((col) => {
+                          if (col.dataField === 'select') {
+                            return <td key="select"><Form.Check type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => handleSelectOne(item.id)} /></td>;
+                          }
                           let cellContent;
                           switch (col.dataField) {
                             case "#":
@@ -314,6 +437,14 @@ const HcmSupervisorReceiving = () => {
                             case "date":
                               cellContent = new Date(item.date).toLocaleDateString();
                               break;
+                            case "sector_status":
+                              cellContent = <Badge bg={getStatusVariant(item.sector_status)}>{item.sector_status || 'pending'}</Badge>;
+                              break;
+                            case "actions":
+                              return (<td key="actions" className="d-flex gap-1">
+                                <Button variant="outline-success" size="sm" disabled={item.sector_status === 'approved'} onClick={() => { setBulkAction("approved"); setSelectedIds([item.id]); setShowBulkActionModal(true); }}>Approve</Button>
+                                <Button variant="outline-danger" size="sm" disabled={item.sector_status === 'rejected'} onClick={() => { setBulkAction("rejected"); setSelectedIds([item.id]); setShowBulkActionModal(true); }}>Reject</Button>
+                              </td>);
                             default:
                               cellContent = item[col.dataField];
                           }
@@ -323,7 +454,7 @@ const HcmSupervisorReceiving = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="10" className="text-center">
+                      <td colSpan={visibleColumns.length} className="text-center">
                         No receiving records found.
                       </td>
                     </tr>
@@ -334,6 +465,28 @@ const HcmSupervisorReceiving = () => {
           </div>
           {filteredReceivings.length > 0 && renderPagination()}
           {renderColumnModal()}
+          <Modal show={showBulkActionModal} onHide={() => setShowBulkActionModal(false)} centered>
+            <Modal.Header closeButton>
+              <Modal.Title>Bulk Action: {bulkAction.charAt(0).toUpperCase() + bulkAction.slice(1)}</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <Form.Group>
+                <Form.Label>Remark {bulkAction === 'rejected' && '(Required)'}</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  placeholder="Enter remark"
+                  value={bulkRemark}
+                  onChange={(e) => setBulkRemark(e.target.value)}
+                />
+              </Form.Group>
+              {actionError && <Alert variant="danger" className="mt-3">{actionError}</Alert>}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={() => setShowBulkActionModal(false)}>Cancel</Button>
+              <Button variant={bulkAction === 'approved' ? 'success' : 'danger'} onClick={handleBulkAction} disabled={submitting}>{submitting ? "Submitting..." : `Confirm ${bulkAction.charAt(0).toUpperCase() + bulkAction.slice(1)}`}</Button>
+            </Modal.Footer>
+          </Modal>
         </Container>
       </div>
     </div>
