@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Container, Tabs, Tab, Form, Button, Table, Modal, Spinner, Alert, Row, Col, InputGroup } from "react-bootstrap";
+import React, { useState, useEffect, useMemo } from "react";
+import { Container, Tabs, Tab, Form, Button, Table, Modal, Spinner, Alert, Row, Col, InputGroup, Badge, ListGroup, Dropdown } from "react-bootstrap";
 
 import { useAuth } from "../all_login/AuthContext";
 import AnganwadiLeftNav from "./AnganwadiLeftNav";
@@ -8,7 +8,7 @@ import AnganwadiHeader from "./AnganwadiHeader";
 import "../../assets/css/anganwadileftnav.css";
 import "../../assets/css/dashboard.css";
 import "../../assets/css/AnganwadiDashboard.css";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUtensils, FaUsers, FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes, FaProjectDiagram, FaInfoCircle, FaClock } from "react-icons/fa";
 
 const API_URLS = {
   hcm_receiving: "/hcm-anganwadi-receiving/",
@@ -85,11 +85,14 @@ const FoodItemReceiving = () => {
   const [formData, setFormData] = useState({});
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewItem, setViewItem] = useState(null);
 
-  const [filters, setFilters] = useState({ fin_year: '', quarter: '' });
+
+  const [filters, setFilters] = useState({ fin_year: '', months: [] });
   const [uniqueFilterOptions, setUniqueFilterOptions] = useState({
-    hcm: { fin_year: [], quarter: [] },
-    thr: { fin_year: [], quarter: [] },
+    hcm: { fin_year: [], months: [] },
+    thr: { fin_year: [], months: [] },
   });
 
   const fetchData = async () => {
@@ -115,12 +118,12 @@ const FoodItemReceiving = () => {
       // Extract unique filter options for each tab
       setUniqueFilterOptions({
         hcm: {
-          fin_year: [...new Set(hcmData.map(item => item.fin_year).filter(Boolean))],
-          quarter: [...new Set(hcmData.map(item => item.quarter).filter(Boolean))],
+          fin_year: [...new Set(hcmData.map(item => item.fin_year).filter(Boolean))].sort().reverse(),
+          months: [...new Set(hcmData.flatMap(item => item.months || []).map(m => monthLabels[m] || m))].sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)),
         },
         thr: {
-          fin_year: [...new Set(thrData.map(item => item.fin_year).filter(Boolean))],
-          quarter: [...new Set(thrData.map(item => item.quarter).filter(Boolean))],
+          fin_year: [...new Set(thrData.map(item => item.fin_year).filter(Boolean))].sort().reverse(),
+          months: [...new Set(thrData.flatMap(item => item.months || []).map(m => monthLabels[m] || m))].sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)),
         },
       });
     } catch (err) {
@@ -137,34 +140,27 @@ const FoodItemReceiving = () => {
 
   useEffect(() => {
     // Reset filters when tab changes
-    setFilters({ fin_year: '', quarter: '' });
+    setFilters({ fin_year: '', months: [] });
   }, [activeTab]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
   };
-
-  const applyFilters = async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (filters.fin_year) params.append('fin_year', filters.fin_year);
-    if (filters.quarter) params.append('quarter', filters.quarter);
-
-    const url = activeTab === 'thr' ? API_URLS.thr_receiving : API_URLS.hcm_receiving;
-    try {
-      const response = await api.get(`${url}?${params.toString()}`);
-      if (activeTab === 'thr') {
-        setThrReceivings(response.data || []);
+  
+  const handleMultiSelectChange = (filterName, value) => {
+    setFilters(prevFilters => {
+      const currentValues = prevFilters[filterName];
+      if (currentValues.includes(value)) {
+        return { ...prevFilters, [filterName]: currentValues.filter(v => v !== value) };
       } else {
-        setHcmReceivings(response.data || []);
+        return { ...prevFilters, [filterName]: [...currentValues, value] };
       }
-    } catch (err) {
-      setError(`Failed to fetch filtered data. Please try again.`);
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    });
+  };
+
+  const resetFilters = () => {
+    setFilters({ fin_year: '', months: [] });
   };
 
   // Toggle Sidebar
@@ -193,6 +189,16 @@ const FoodItemReceiving = () => {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingItem(null);
+  };
+
+  const handleOpenViewModal = (record) => {
+    setViewItem(record);
+    setShowViewModal(true);
+  };
+
+  const handleCloseViewModal = () => {
+    setShowViewModal(false);
+    setViewItem(null);
   };
 
   const handleFormChange = (e) => {
@@ -266,6 +272,33 @@ const FoodItemReceiving = () => {
     }
   };
 
+  const getStatusVariant = (status) => {
+    switch (status) {
+      case "approved":
+        return "success";
+      case "rejected":
+        return "danger";
+      default:
+        return "warning";
+    }
+  };
+
+  const filteredHcmReceivings = useMemo(() => {
+    return hcmReceivings.filter(item => {
+      const itemMonths = (item.months || []).map(m => monthLabels[m] || m);
+      return (!filters.fin_year || item.fin_year === filters.fin_year) &&
+             (filters.months.length === 0 || filters.months.some(m => itemMonths.includes(m)));
+    });
+  }, [hcmReceivings, filters]);
+
+  const filteredThrReceivings = useMemo(() => {
+    return thrReceivings.filter(item => {
+      const itemMonths = (item.months || []).map(m => monthLabels[m] || m);
+      return (!filters.fin_year || item.fin_year === filters.fin_year) &&
+             (filters.months.length === 0 || filters.months.some(m => itemMonths.includes(m)));
+    });
+  }, [thrReceivings, filters]);
+
   const renderTable = (records) => {
     return (
       <Table striped bordered hover responsive className="mt-4">
@@ -279,6 +312,7 @@ const FoodItemReceiving = () => {
             <th>Unit</th>
             <th>Fin. Year</th>
             <th>Months</th>
+            <th>Sector Status</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -294,17 +328,28 @@ const FoodItemReceiving = () => {
               <td>{rec.fin_year}</td>
               <td>{formatMonths(rec.months || (Array.isArray(rec.quarter) ? rec.quarter : quarterToMonths[rec.quarter] || []))}</td>
               <td>
-                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenModal(rec)}>
-                  <FaEdit />
-                </Button>
-                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(rec.id)}>
-                  <FaTrash />
-                </Button>
+                <Badge bg={getStatusVariant(rec.sector_status)}>{rec.sector_status || 'pending'}</Badge>
+              </td>
+              <td>
+                {rec.sector_status === 'approved' || rec.sector_status === 'rejected' ? (
+                  <Button variant="outline-info" size="sm" onClick={() => handleOpenViewModal(rec)}>
+                    <FaEye /> View
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenModal(rec)}>
+                      <FaEdit />
+                    </Button>
+                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(rec.id)}>
+                      <FaTrash />
+                    </Button>
+                  </>
+                )}
               </td>
             </tr>
           )) : (
             <tr>
-              <td colSpan="9" className="text-center">No records found.</td>
+              <td colSpan="10" className="text-center">No records found.</td>
             </tr>
           )}
         </tbody>
@@ -318,35 +363,27 @@ const FoodItemReceiving = () => {
       <Row className="mb-3 align-items-end">
         <Col md={4}>
           <Form.Group>
-            <Form.Label>Financial Year</Form.Label>
-            <Form.Select name="fin_year" value={filters.fin_year} onChange={handleFilterChange} disabled>
+            <Form.Label>Financial Year</Form.Label>            <Form.Select name="fin_year" value={filters.fin_year} onChange={handleFilterChange}>
               <option value="">All Years</option>
               {currentFilters.fin_year.map(year => <option key={year} value={year}>{year}</option>)}
             </Form.Select>
           </Form.Group>
         </Col>
         <Col md={4}>
-          <Form.Group>
-            <Form.Label>Quarter</Form.Label>
-            <Form.Select name="quarter" value={filters.quarter} onChange={handleFilterChange}>
-              <option value="">All Quarters</option>
-              {currentFilters.quarter.map(q => <option key={q} value={q}>{q}</option>)}
-            </Form.Select>
+          <Form.Group>            <Form.Label>Months</Form.Label>
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? `${filters.months.length} selected` : 'All Months'}</Dropdown.Toggle>
+              <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                {currentFilters.months.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.months.includes(v)} onChange={() => handleMultiSelectChange('months', v)} /></Dropdown.Item>))}
+              </Dropdown.Menu>
+            </Dropdown>
           </Form.Group>
         </Col>
         <Col md={4} className="d-flex align-items-end">
-          <Button onClick={applyFilters} className="me-2">Apply Filters</Button>
+          
           <Button
             variant="secondary"
-            onClick={() => {
-              setFilters({ fin_year: '', quarter: '' });
-              // Refetch all data for the current tab after resetting
-              const url = activeTab === 'thr' ? API_URLS.thr_receiving : API_URLS.hcm_receiving;
-              api.get(url).then(response => {
-                if (activeTab === 'thr') setThrReceivings(response.data || []);
-                else setHcmReceivings(response.data || []);
-              });
-            }}
+            onClick={resetFilters}
           >
             Reset
           </Button>
@@ -404,17 +441,15 @@ const FoodItemReceiving = () => {
               {!loading && !error && (
                 <>
                   <h5 className="mt-4">HCM Receiving Records</h5>
-                  {renderFilters()}
-                  {renderTable(hcmReceivings)}
+                  {renderFilters()}                  {renderTable(filteredHcmReceivings)}
                 </>
               )}
             </Tab>
             <Tab eventKey="thr" title="THR Receiving">
               {!loading && !error && (
                 <>
-                  <h5 className="mt-4">THR Receiving Records</h5>
-                  {renderFilters()}
-                  {renderTable(thrReceivings)}
+                  <h5 className="mt-4">THR Receiving Records</h5>                  {renderFilters()}
+                  {renderTable(filteredThrReceivings)}
                 </>
               )}
             </Tab>
@@ -539,6 +574,44 @@ const FoodItemReceiving = () => {
             </Form>
           </Modal.Body>
         </Modal>
+
+        {viewItem && (
+          <Modal show={showViewModal} onHide={handleCloseViewModal} centered>
+            <Modal.Header closeButton className="view-modal-header">
+              <Modal.Title>View Record: {viewItem.food_item}</Modal.Title>
+            </Modal.Header>
+            <Modal.Body className="view-modal-body">
+              <ListGroup variant="flush">
+                <ListGroup.Item><FaBuilding className="view-modal-icon" /> <strong>AWC Name:</strong> {viewItem.awc_name}</ListGroup.Item>
+                <ListGroup.Item><FaHashtag className="view-modal-icon" /> <strong>AWC Code:</strong> {viewItem.awc_code}</ListGroup.Item>
+                <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>Food Item:</strong> {viewItem.food_item}</ListGroup.Item>
+                <ListGroup.Item><FaWeightHanging className="view-modal-icon" /> <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}</ListGroup.Item>
+                {viewItem.date ? (
+                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Date:</strong> {new Date(viewItem.date).toLocaleDateString()}</ListGroup.Item>
+                ) : (
+                  <>
+                    <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Financial Year:</strong> {viewItem.fin_year}</ListGroup.Item>
+                    <ListGroup.Item><FaCubes className="view-modal-icon" /> <strong>Months:</strong> {formatMonths(viewItem.months || viewItem.quarter)}</ListGroup.Item>
+                  </>
+                )}
+                <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>Sector:</strong> {viewItem.sector}</ListGroup.Item>
+                <ListGroup.Item><FaProjectDiagram className="view-modal-icon" /> <strong>Project:</strong> {viewItem.project}</ListGroup.Item>
+                <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>District:</strong> {viewItem.district}</ListGroup.Item>
+                {viewItem.sector_status && (
+                  <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>Sector Status:</strong> <Badge bg={getStatusVariant(viewItem.sector_status)}>{viewItem.sector_status}</Badge></ListGroup.Item>
+                )}
+                {viewItem.sector_remark && (
+                  <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>Sector Remark:</strong> {viewItem.sector_remark}</ListGroup.Item>
+                )}
+              </ListGroup>
+            </Modal.Body>
+            <Modal.Footer className="view-modal-footer">
+              <Button variant="secondary" onClick={handleCloseViewModal}>
+                Close
+              </Button>
+            </Modal.Footer>
+          </Modal>
+        )}
       </div>
     </div>
   );
