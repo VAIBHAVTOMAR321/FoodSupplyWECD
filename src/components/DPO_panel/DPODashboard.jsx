@@ -293,7 +293,56 @@ const DPODashboard = () => {
 
         <Container fluid className="dashboard-box mt-3"> 
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
-
+ <div className="dashboard-section">
+            <h4 className="section-title">AWC, Sector & Project Summary</h4>
+            <Row className="g-3">
+              <Col md={4} lg={4} className="d-flex">
+                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DpoAwcList?tab=awc')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">AWC List</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : awcCount}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={4} lg={4} className="d-flex">
+                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DpoAwcList?tab=sector')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">Sector List</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : sectorCount}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={4} lg={4} className="d-flex">
+                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DpoAwcList?tab=project')}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center w-100">
+                      <div className="dashboard-card-icon thr-icon"><FaProjectDiagram /></div>
+                      <div className="ms-3 text-start">
+                        <h6 className="dashboard-card-title mb-1">Project List</h6>
+                        <div className="dashboard-card-value">
+                          {loading ? <Spinner animation="border" size="sm" /> : projectCount}
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          </div>
           <div className="dashboard-section">
             <h4 className="section-title">Food Items Overview</h4>
             <Row className="g-3">
@@ -478,56 +527,7 @@ const DPODashboard = () => {
               </Col>
             </Row>
           </div>
-          <div className="dashboard-section">
-            <h4 className="section-title">AWC, Sector & Project Summary</h4>
-            <Row className="g-3">
-              <Col md={4} lg={4} className="d-flex">
-                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DpoAwcList?tab=awc')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">AWC List</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : awcCount}
-                        </div>
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={4} lg={4} className="d-flex">
-                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DpoAwcList?tab=sector')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">Sector List</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : sectorCount}
-                        </div>
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={4} lg={4} className="d-flex">
-                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DpoAwcList?tab=project')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="dashboard-card-icon thr-icon"><FaProjectDiagram /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">Project List</h6>
-                        <div className="dashboard-card-value">
-                          {loading ? <Spinner animation="border" size="sm" /> : projectCount}
-                        </div>
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
-          </div>
+         
         </Container>
       </div>
     </div>
