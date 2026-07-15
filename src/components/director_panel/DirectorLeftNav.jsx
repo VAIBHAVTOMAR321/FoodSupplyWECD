@@ -97,7 +97,7 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
 
        {
         icon: <FaListUl />,
-        label: "DPO, CDPO, Sector & AWC List",
+        label: "Our Staff List",
         path: "/DirectorAwcList",
       },
       {
