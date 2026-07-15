@@ -41,6 +41,12 @@ const DirectorBeneEntry = () => {
   const [itemsPerPage] = useState(20);
   const tableRef = useRef(null);
 
+  const [monthWiseData, setMonthWiseData] = useState([]);
+  const [monthWiseLoading, setMonthWiseLoading] = useState(true);
+  const [monthWiseError, setMonthWiseError] = useState("");
+  const [selectedFinYear, setSelectedFinYear] = useState("");
+  const [selectedMonths, setSelectedMonths] = useState([]);
+
   const [filters, setFilters] = useState({
     fin_year: [],
     month: [],
@@ -124,9 +130,38 @@ const DirectorBeneEntry = () => {
     }
   }, [api]);
 
+  const fetchMonthWiseStateTotal = useCallback(async () => {
+    setMonthWiseLoading(true);
+    setMonthWiseError("");
+    try {
+      const response = await api.get(`/director/beneficiary/month-state-total/`);
+      if (response.data.success) {
+        const data = response.data.data || [];
+        setMonthWiseData(data);
+        if (data.length > 0 && !selectedFinYear) {
+          setSelectedFinYear(data[0].fin_year);
+        }
+      } else {
+        setMonthWiseError(response.data.message || "Failed to fetch month-wise state total.");
+      }
+    } catch (err) {
+      setMonthWiseError("Failed to fetch month-wise state total.");
+      console.error(err);
+    } finally {
+      setMonthWiseLoading(false);
+    }
+  }, [api, selectedFinYear]);
+
   useEffect(() => {
     fetchBeneficiarySummary();
+    fetchMonthWiseStateTotal();
   }, [fetchBeneficiarySummary]);
+
+  const monthWiseFinYears = useMemo(() => monthWiseData.map(d => d.fin_year), [monthWiseData]);
+  const monthsForSelectedFinYear = useMemo(() => {
+    const yearData = monthWiseData.find(d => d.fin_year === selectedFinYear);
+    return yearData ? yearData.month_wise.map(m => m.month) : [];
+  }, [monthWiseData, selectedFinYear]);
 
   const handleMultiSelectChange = (filterName, value) => {
     setFilters((prevFilters) => {
@@ -157,6 +192,24 @@ const DirectorBeneEntry = () => {
       );
     });
   }, [reports, filters]);
+
+  const filteredMonthWiseReport = useMemo(() => {
+    if (!selectedFinYear) return [];
+    const yearData = monthWiseData.find(d => d.fin_year === selectedFinYear);
+    if (!yearData) return [];
+
+    if (selectedMonths.length === 0) {
+      return yearData.month_wise;
+    }
+
+    return yearData.month_wise.filter(item => selectedMonths.includes(item.month));
+  }, [monthWiseData, selectedFinYear, selectedMonths]);
+
+  const handleMonthFilterChange = (month) => {
+    setSelectedMonths(prev =>
+      prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]
+    );
+  };
 
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
   const currentItems = filteredReports.slice(
@@ -377,6 +430,66 @@ const DirectorBeneEntry = () => {
                       </tr>
                     </tbody>
                   </Table>
+                </Tab>
+
+                <Tab eventKey="month_wise_summary" title="Month-wise State Summary">
+                  <h5 className="mt-4">Month-wise State Beneficiary Summary</h5>
+                  {monthWiseLoading ? (
+                    <div className="text-center"><Spinner animation="border" /></div>
+                  ) : monthWiseError ? (
+                    <Alert variant="danger">{monthWiseError}</Alert>
+                  ) : (
+                    <>
+                      <Row className="mb-3 g-3 align-items-center">
+                        <Col md={3}>
+                          <Form.Group>
+                            <Form.Label>Financial Year</Form.Label>
+                            <Form.Select
+                              value={selectedFinYear}
+                              onChange={(e) => {
+                                setSelectedFinYear(e.target.value);
+                                setSelectedMonths([]); // Reset month filter on year change
+                              }}
+                            >
+                              {monthWiseFinYears.map(year => (
+                                <option key={year} value={year}>{year}</option>
+                              ))}
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+                        <Col md={3}>
+                          <Form.Group>
+                            <Form.Label>Months</Form.Label>
+                            <Dropdown>
+                              <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                                {selectedMonths.length ? `${selectedMonths.length} selected` : "All Months"}
+                              </Dropdown.Toggle>
+                              <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
+                                {monthsForSelectedFinYear.map((month) => (
+                                  <Dropdown.Item key={month} as="div">
+                                    <Form.Check type="checkbox" label={month} checked={selectedMonths.includes(month)} onChange={() => handleMonthFilterChange(month)} />
+                                  </Dropdown.Item>
+                                ))}
+                              </Dropdown.Menu>
+                            </Dropdown>
+                          </Form.Group>
+                        </Col>
+                      </Row>
+                      <Table striped bordered hover responsive>
+                        <thead>
+                          <tr>
+                            <th>Month</th>
+                            <th>Total Beneficiaries</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredMonthWiseReport.map((item, index) => (
+                            <tr key={index}><td>{item.month}</td><td>{item.total_beneficiaries}</td></tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </>
+                  )}
                 </Tab>
 
                 <Tab eventKey="district_summary" title="District Summary">
