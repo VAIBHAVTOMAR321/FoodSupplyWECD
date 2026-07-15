@@ -1,23 +1,36 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table, Button, ButtonGroup } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table, Button, ButtonGroup, Tooltip, OverlayTrigger } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/directorleftnav.css";
-import { Bar } from "react-chartjs-2";
+import { Bar, Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
+  ArcElement,
+  DoughnutController,
   Title,
-  Tooltip,
+  Tooltip as ChartTooltip,
   Legend,
 } from "chart.js";
+import ChartDataLabels from "chartjs-plugin-datalabels";
 import { FaUsers, FaUserShield, FaUserGraduate, FaUserCog, FaUserTie, FaHome, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  DoughnutController,
+  Title,
+  ChartTooltip,
+  Legend,
+  ChartDataLabels
+);
 
 
 const DirectorDashboard = () => {
@@ -326,6 +339,20 @@ const DirectorDashboard = () => {
     setExpanded(expanded === scheme ? null : scheme);
   };
 
+  const generateTooltip = (summary, type) => {
+    const data = type === 'receiving' ? summary?.receiving_summary : summary?.distribution_summary;
+    if (!data || data.length === 0) {
+      return <Tooltip>No data available</Tooltip>;
+    }
+    const unitTotals = data.reduce((acc, item) => {
+      const unit = item.unit || 'N/A';
+      acc[unit] = (acc[unit] || 0) + safeNumber(item.total_quantity);
+      return acc;
+    }, {});
+
+    return <Tooltip>{Object.entries(unitTotals).map(([unit, total]) => <div key={unit}>{unit}: {total.toLocaleString()}</div>)}</Tooltip>;
+  };
+
 
 
   const thrSummaryChartData = useMemo(() => ({
@@ -360,20 +387,309 @@ const DirectorDashboard = () => {
     ],
   }), [hcmSummary]);
 
+  const safeNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const hasAnyValue = (values) => values.some((value) => safeNumber(value) > 0);
+
+  const roleChartData = useMemo(() => ({
+    labels: ["DPO", "CDPO", "Supervisor", "Anganwadi"],
+    datasets: [
+      {
+        label: "User counts",
+        data: [roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor, roleCounts.anganwadi],
+        backgroundColor: ["#2f6fed", "#20c997", "#ff8c00", "#6f42c1"],
+        borderColor: ["#2f6fed", "#20c997", "#ff8c00", "#6f42c1"],
+        borderWidth: 1,
+        borderRadius: 6,
+      },
+    ],
+  }), [roleCounts]);
+
+  const roleDistributionChartData = useMemo(() => ({
+    labels: ["DPO", "CDPO", "Supervisor", "Anganwadi"],
+    datasets: [
+      {
+        data: hasAnyValue([roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor, roleCounts.anganwadi])
+          ? [roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor, roleCounts.anganwadi]
+          : [1],
+        backgroundColor: ["#2f6fed", "#20c997", "#ff8c00", "#6f42c1"],
+        borderColor: ["#ffffff"],
+        borderWidth: 2,
+      },
+    ],
+  }), [roleCounts]);
+
+  const beneficiaryChartData = useMemo(() => ({
+    labels: ["Beneficiaries"],
+    datasets: [
+      {
+        label: "Total beneficiaries",
+        data: [safeNumber(totalBeneficiaries)],
+        backgroundColor: ["#2f6fed"],
+        borderColor: ["#2f6fed"],
+        borderWidth: 1,
+        borderRadius: 6,
+      },
+    ],
+  }), [totalBeneficiaries]);
+
+  const schemeComparisonChartData = useMemo(() => ({
+    labels: ["Beneficiaries", "Received Qty", "Distributed Qty"],
+    datasets: [
+      {
+        label: "THR",
+        data: [
+          thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
+          thrSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
+          thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
+        ],
+        backgroundColor: "#ff8c00",
+      },
+      {
+        label: "HCM",
+        data: [
+          hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
+          hcmSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
+          hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
+        ],
+        backgroundColor: "#20c997",
+      },
+    ],
+  }), [hcmSummary, thrSummary]);
+
+  const foodItemChartData = useMemo(() => {
+    const hcmReceiving = hcmSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0;
+    const hcmDistribution = hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0;
+    const thrReceiving = thrSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0;
+    const thrDistribution = thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0;
+
+    return {
+      labels: ["HCM Items", "THR Items"],
+      datasets: [
+        {
+          label: "Received Quantity",
+          data: [hcmReceiving, thrReceiving],
+          backgroundColor: "#20c997",
+        },
+        {
+          label: "Distributed Quantity",
+          data: [hcmDistribution, thrDistribution],
+          backgroundColor: "#fd7e14",
+        },
+      ],
+    };
+  }, [hcmSummary, thrSummary]);
+
+  const getUnitTotals = (summary) => {
+    if (!summary) return {};
+    return summary.reduce((acc, item) => {
+      const unit = item.unit || 'N/A';
+      acc[unit] = (acc[unit] || 0) + safeNumber(item.total_quantity);
+      return acc;
+    }, {});
+  };
+
+
+
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
       title: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const label = context.label || "";
+            const value = context.parsed.y?.toLocaleString() || 0;
+            let tooltipLines = [`${context.dataset.label || "Value"}: ${value}`];
+
+            const summary = context.dataset.label === "HCM Summary" ? hcmSummary : thrSummary;
+            let unitData;
+
+            if (label === "Received Qty") {
+              unitData = summary?.receiving_summary;
+            } else if (label === "Distributed Qty") {
+              unitData = summary?.distribution_summary;
+            }
+
+            if (unitData) {
+              const unitTotals = unitData.reduce((acc, item) => {
+                const unit = item.unit || 'N/A';
+                acc[unit] = (acc[unit] || 0) + safeNumber(item.total_quantity);
+                return acc;
+              }, {});
+
+              tooltipLines.push(''); // Add a separator
+              Object.entries(unitTotals).forEach(([unit, total]) => tooltipLines.push(`${unit}: ${total.toLocaleString()}`));
+            }
+            return tooltipLines;
+          },
+        },
+      },
+      datalabels: {
+        display: true,
+        color: 'black',
+        anchor: 'end',
+        align: 'top',
+        formatter: (value) => value.toLocaleString(),
+        font: {
+          weight: 'bold',
+        },
+      },
     },
     scales: {
       y: {
         beginAtZero: true,
-        ticks: { precision: 0 },
+        ticks: {
+          precision: 0,
+          callback: (value) => value.toLocaleString(),
+        },
       },
     },
   };
+
+  const groupedChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "bottom" },
+      tooltip: {
+        callbacks: {
+          label: (context) => `${context.dataset.label}: ${context.parsed.y?.toLocaleString() || 0}`,
+          footer: (tooltipItems) => {
+            const context = tooltipItems[0];
+            if (!context) return '';
+
+            const label = context.label || "";
+            let footerLines = [''];
+
+            tooltipItems.forEach(item => {
+              const summary = item.dataset.label === "HCM" ? hcmSummary : thrSummary;
+              let unitData;
+
+              if (label === "Received Qty") {
+                unitData = summary?.receiving_summary;
+              } else if (label === "Distributed Qty") {
+                unitData = summary?.distribution_summary;
+              }
+
+              if (unitData) {
+                const unitTotals = unitData.reduce((acc, item) => {
+                  const unit = item.unit || 'N/A';
+                  acc[unit] = (acc[unit] || 0) + safeNumber(item.total_quantity);
+                  return acc;
+                }, {});
+                footerLines.push(`${item.dataset.label} Totals:`, ...Object.entries(unitTotals).map(([unit, total]) => `  ${unit}: ${total.toLocaleString()}`));
+              }
+            });
+            return footerLines.length > 1 ? footerLines : '';
+          }
+        },
+      },
+      datalabels: {
+        display: true,
+        color: 'black',
+        anchor: 'end',
+        align: 'top',
+        formatter: (value) => value.toLocaleString(),
+        font: {
+          weight: 'bold',
+        },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          precision: 0,
+          callback: (value) => value.toLocaleString(),
+        },
+      },
+    },
+  };
+
+  const foodItemChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "bottom" },
+      tooltip: {
+        callbacks: {
+          label: (context) => `${context.dataset.label}: ${context.parsed.y?.toLocaleString() || 0}`,
+          footer: (tooltipItems) => {
+            const context = tooltipItems[0];
+            if (!context) return '';
+
+            const label = context.label;
+            const datasetLabel = context.dataset.label;
+            const summary = label === "HCM Items" ? hcmSummary : thrSummary;
+            const summaryType = datasetLabel === "Received Quantity" ? 'receiving_summary' : 'distribution_summary';
+            
+            const unitTotals = getUnitTotals(summary?.[summaryType]);
+            const footerLines = [''];
+            if (Object.keys(unitTotals).length > 0) {
+              footerLines.push('Unit-wise Totals:');
+              Object.entries(unitTotals).forEach(([unit, total]) => footerLines.push(`  ${unit}: ${total.toLocaleString()}`));
+            }
+            return footerLines;
+          },
+        },
+      },
+      datalabels: {
+        display: true,
+        color: 'black',
+        anchor: 'end',
+        align: 'top',
+        formatter: (value) => value.toLocaleString(),
+        font: { weight: 'bold' },
+      },
+    },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0, callback: (value) => value.toLocaleString() } } },
+  };
+
+  const doughnutChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "bottom" },
+      tooltip: {
+        callbacks: {
+          label: (context) => `${context.label}: ${context.parsed?.toLocaleString() || 0}`,
+        },
+      },
+      datalabels: {
+        display: true,
+        color: 'black',
+        formatter: (value, ctx) => {
+          const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+          return total > 0 ? `${Math.round((value / total) * 100)}%` : '';
+        },
+        font: {
+          weight: 'bold',
+        },
+      },
+    },
+    cutout: "65%",
+  };
+
+  const GraphCard = ({ title, subtitle, children }) => (
+    <Card className="dashboard-card h-100">
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <h6 className="dashboard-card-title mb-1">{title}</h6>
+            {subtitle ? <div className="text-muted small">{subtitle}</div> : null}
+          </div>
+        </div>
+        {children}
+      </Card.Body>
+    </Card>
+  );
 
   return (
     <div className="dashboard-container">
@@ -399,110 +715,109 @@ const DirectorDashboard = () => {
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="section-title mb-0">User Lists Overview</h4>
             </div>
-            <Row className="g-3">
-              <Col md={3}>
-                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=dpo')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="dashboard-card-icon hcm-icon"><FaUserCog /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">DPO List</h6>
-                        <div className="dashboard-card-value">{loadingRoles.dpo ? <Spinner animation="border" size="sm" /> : roleCounts.dpo}</div>
-                      </div>
+            {viewMode === "graph" ? (
+              <Row className="g-3">
+                <Col lg={8}>
+                  <GraphCard title="Role-wise user distribution" subtitle="Current counts across DPO, CDPO, supervisor, and anganwadi records">
+                    <div style={{ height: 320 }}>
+                      {hasAnyValue([roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor, roleCounts.anganwadi]) ? (
+                        <Bar data={roleChartData} options={chartOptions} />
+                      ) : (
+                        <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
+                      )}
                     </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={3}>
-                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=cdpo')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="dashboard-card-icon thr-icon"><FaUserShield /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">CDPO List</h6>
-                        <div className="dashboard-card-value">{loadingRoles.cdpo ? <Spinner animation="border" size="sm" /> : roleCounts.cdpo}</div>
-                      </div>
+                  </GraphCard>
+                </Col>
+                <Col lg={4}>
+                  <GraphCard title="User roles mix" subtitle="Share of each role in the current dashboard dataset">
+                    <div style={{ height: 320 }}>
+                      {hasAnyValue([roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor, roleCounts.anganwadi]) ? (
+                        <Doughnut data={roleDistributionChartData} options={doughnutChartOptions} />
+                      ) : (
+                        <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
+                      )}
                     </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={3}>
-                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=supervisor')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="dashboard-card-icon hcm-icon"><FaUserTie /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">Supervisor List</h6>
-                        <div className="dashboard-card-value">{loadingRoles.supervisor ? <Spinner animation="border" size="sm" /> : roleCounts.supervisor}</div>
+                  </GraphCard>
+                </Col>
+              </Row>
+            ) : (
+              <Row className="g-3">
+                <Col md={3}>
+                  <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=dpo')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center w-100">
+                        <div className="dashboard-card-icon hcm-icon"><FaUserCog /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title mb-1">DPO List</h6>
+                          <div className="dashboard-card-value">{loadingRoles.dpo ? <Spinner animation="border" size="sm" /> : roleCounts.dpo}</div>
+                        </div>
                       </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={3}>
-                <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=anganwadi')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="dashboard-card-icon thr-icon"><FaHome /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">Anganwadi List</h6>
-                        <div className="dashboard-card-value">{loadingRoles.anganwadi ? <Spinner animation="border" size="sm" /> : roleCounts.anganwadi}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={3}>
+                  <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=cdpo')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center w-100">
+                        <div className="dashboard-card-icon thr-icon"><FaUserShield /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title mb-1">CDPO List</h6>
+                          <div className="dashboard-card-value">{loadingRoles.cdpo ? <Spinner animation="border" size="sm" /> : roleCounts.cdpo}</div>
+                        </div>
                       </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={3}>
+                  <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=supervisor')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center w-100">
+                        <div className="dashboard-card-icon hcm-icon"><FaUserTie /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title mb-1">Supervisor List</h6>
+                          <div className="dashboard-card-value">{loadingRoles.supervisor ? <Spinner animation="border" size="sm" /> : roleCounts.supervisor}</div>
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={3}>
+                  <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=anganwadi')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center w-100">
+                        <div className="dashboard-card-icon thr-icon"><FaHome /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title mb-1">Anganwadi List</h6>
+                          <div className="dashboard-card-value">{loadingRoles.anganwadi ? <Spinner animation="border" size="sm" /> : roleCounts.anganwadi}</div>
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+            )}
           </div>
 
           <div className="dashboard-section">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h4 className="section-title mb-0">Food Items Overview</h4>
             </div>
-            <Row className="g-3">
-              <Col md={6}>
-                <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center">
-                      <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">HCM Food Items</h6>
-                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}</div>
-                      </div>
-                      <div className="ms-auto expand-icon">
-                        {expanded === 'hcm' ? <FaChevronUp /> : <FaChevronDown />}
-                      </div>
+            {viewMode === 'graph' ? (
+              <Row>
+                <Col>
+                  <GraphCard title="Food Item Quantities" subtitle="Received vs. Distributed quantities for HCM & THR">
+                    <div style={{ height: 320 }}>
+                      <Bar data={foodItemChartData} options={foodItemChartOptions} />
                     </div>
-                  </Card.Body>
-                </Card>
-                <Collapse in={expanded === 'hcm'}>
-                  <div className="mt-3">
-                    <FoodItemTable scheme="hcm" api={api} />
-                  </div>
-                </Collapse>
-              </Col>
-              <Col md={6}>
-                <Card className="dashboard-card card-thr expandable-card" onClick={() => handleCardClick('thr')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center">
-                      <div className="dashboard-card-icon thr-icon"><FaBox /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">THR Food Items</h6>
-                        <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}</div>
-                      </div>
-                      <div className="ms-auto expand-icon">
-                        {expanded === 'thr' ? <FaChevronUp /> : <FaChevronDown />}
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-                <Collapse in={expanded === 'thr'}>
-                  <div className="mt-3">
-                    <FoodItemTable scheme="thr" api={api} />
-                  </div>
-                </Collapse>
-              </Col>
-            </Row>
+                  </GraphCard>
+                </Col>
+              </Row>
+            ) : (
+              <Row className="g-3">
+                <Col md={6}><Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/director/food-items')}><Card.Body><div className="d-flex align-items-center w-100"><div className="dashboard-card-icon hcm-icon"><FaBox /></div><div className="ms-3 text-start"><h6 className="dashboard-card-title">HCM Food Items</h6><div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}</div></div></div></Card.Body></Card></Col>
+                <Col md={6}><Card className="dashboard-card card-thr h-100" onClick={() => navigate('/director/food-items')}><Card.Body><div className="d-flex align-items-center w-100"><div className="dashboard-card-icon thr-icon"><FaBox /></div><div className="ms-3 text-start"><h6 className="dashboard-card-title">THR Food Items</h6><div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}</div></div></div></Card.Body></Card></Col>
+              </Row>
+            )}
           </div>
 
           <div className="dashboard-section">
@@ -511,31 +826,42 @@ const DirectorDashboard = () => {
             </div>
             {viewMode === "graph" ? (
               <Row className="g-3">
-                <Col xs={12}>
-                  <div className="w-100">
-                    <div className="mb-3 text-center">
-                      <strong>Distribution Beneficiaries:</strong> {thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0) || 0} · <strong>Total Received Quantity:</strong> {thrSummary?.receiving_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0} · <strong>Total Distributed Quantity:</strong> {thrSummary?.distribution_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0}
+                <Col lg={8}>
+                  <GraphCard title="THR performance overview" subtitle="Comparison of beneficiaries, received quantity, and distributed quantity">
+                    <div style={{ height: 340 }}>
+                      {hasAnyValue([
+                        thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
+                        thrSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
+                        thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
+                      ]) ? (
+                        <Bar data={thrSummaryChartData} options={chartOptions} />
+                      ) : (
+                        <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
+                      )}
                     </div>
-                    <Row className="g-4 align-items-start">
-                      <Col lg={8}>
-                        <Row className="g-3">
-                          <Col xs={12}>
-                            <h6 className="text-center text-muted">THR Receiving Summary</h6>
-                            <ReceivingTable items={thrSummary?.receiving_summary} />
-                          </Col>
-                          <Col xs={12}>
-                            <h6 className="text-center text-muted mt-3">THR Distribution Summary</h6>
-                            <DistributionTable items={thrSummary?.distribution_summary} />
-                          </Col>
-                        </Row>
-                      </Col>
-                      <Col lg={4}>
-                        <div style={{ height: 320 }}>
-                          <Bar data={thrSummaryChartData} options={chartOptions} />
+                  </GraphCard>
+                </Col>
+                <Col lg={4}>
+                  <GraphCard title="THR snapshot" subtitle="Key totals at a glance">
+                    <div className="d-flex flex-column gap-3">
+                      <div className="p-3 rounded bg-light">
+                        <div className="text-muted small">Distribution beneficiaries</div>
+                        <div className="fs-4 fw-bold text-dark">{thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0}</div>
+                      </div>
+                      <OverlayTrigger placement="top" overlay={generateTooltip(thrSummary, 'receiving')}>
+                        <div className="p-3 rounded bg-light">
+                          <div className="text-muted small">Total received quantity</div>
+                          <div className="fs-4 fw-bold text-dark">{thrSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0}</div>
                         </div>
-                      </Col>
-                    </Row>
-                  </div>
+                      </OverlayTrigger>
+                      <OverlayTrigger placement="top" overlay={generateTooltip(thrSummary, 'distribution')}>
+                        <div className="p-3 rounded bg-light">
+                          <div className="text-muted small">Total distributed quantity</div>
+                          <div className="fs-4 fw-bold text-dark">{thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0}</div>
+                        </div>
+                      </OverlayTrigger>
+                    </div>
+                  </GraphCard>
                 </Col>
               </Row>
             ) : (
@@ -556,24 +882,26 @@ const DirectorDashboard = () => {
                   </Card>
                 </Col>
                 <Col md={4}>
-                  <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-receiving')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center">
-                        <div className="dashboard-card-icon thr-icon"><FaTruckLoading /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title">THR Received</h6>
-                          <div className="dashboard-card-value">
-                            {loading ? <Spinner animation="border" size="sm" /> : 
-                              thrSummary?.receiving_summary?.length || 0
-                            }
+                  <OverlayTrigger placement="top" overlay={generateTooltip(thrSummary, 'receiving')}>
+                    <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-receiving')}>
+                      <Card.Body>
+                        <div className="d-flex align-items-center">
+                          <div className="dashboard-card-icon thr-icon"><FaTruckLoading /></div>
+                          <div className="ms-3 text-start">
+                            <h6 className="dashboard-card-title">THR Received</h6>
+                            <div className="dashboard-card-value">
+                              {loading ? <Spinner animation="border" size="sm" /> : 
+                                thrSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0).toLocaleString() || 0
+                              }
+                            </div>
+                          </div>
+                          <div className="ms-auto expand-icon">
+                            {expanded === 'thr-receiving' ? <FaChevronUp /> : <FaChevronDown />}
                           </div>
                         </div>
-                        <div className="ms-auto expand-icon">
-                          {expanded === 'thr-receiving' ? <FaChevronUp /> : <FaChevronDown />}
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
+                      </Card.Body>
+                    </Card>
+                  </OverlayTrigger>
                   <Collapse in={expanded === 'thr-receiving'}>
                     <div className="mt-3">
                       <ReceivingTable items={thrSummary?.receiving_summary} />
@@ -581,22 +909,24 @@ const DirectorDashboard = () => {
                   </Collapse>
                 </Col>
                 <Col md={4}>
-                  <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-quantity')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center">
-                        <div className="dashboard-card-icon thr-icon"><FaBox /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">THR Quantity Records</h6>
-                          <div className="dashboard-card-value">
-                            {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.length || 0}
+                  <OverlayTrigger placement="top" overlay={generateTooltip(thrSummary, 'distribution')}>
+                    <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-quantity')}>
+                      <Card.Body>
+                        <div className="d-flex align-items-center">
+                          <div className="dashboard-card-icon thr-icon"><FaBox /></div>
+                          <div className="ms-3 text-start">
+                            <h6 className="dashboard-card-title mb-1">THR Distributed Quantity</h6>
+                            <div className="dashboard-card-value">
+                              {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0).toLocaleString() || 0}
+                            </div>
+                          </div>
+                          <div className="ms-auto expand-icon">
+                            {expanded === 'thr-quantity' ? <FaChevronUp /> : <FaChevronDown />}
                           </div>
                         </div>
-                        <div className="ms-auto expand-icon">
-                          {expanded === 'thr-quantity' ? <FaChevronUp /> : <FaChevronDown />}
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
+                      </Card.Body>
+                    </Card>
+                  </OverlayTrigger>
                   <Collapse in={expanded === 'thr-quantity'}>
                     <div className="mt-3">
                       <DistributionTable items={thrSummary?.distribution_summary} />
@@ -612,31 +942,42 @@ const DirectorDashboard = () => {
             </div>
             {viewMode === "graph" ? (
               <Row className="g-3">
-                <Col xs={12}>
-                  <div className="w-100">
-                    <div className="mb-3 text-center">
-                      <strong>Distribution Beneficiaries:</strong> {hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0) || 0} · <strong>Total Received Quantity:</strong> {hcmSummary?.receiving_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0} · <strong>Total Distributed Quantity:</strong> {hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0}
+                <Col lg={8}>
+                  <GraphCard title="HCM performance overview" subtitle="Comparison of beneficiaries, received quantity, and distributed quantity">
+                    <div style={{ height: 340 }}>
+                      {hasAnyValue([
+                        hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
+                        hcmSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
+                        hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
+                      ]) ? (
+                        <Bar data={hcmSummaryChartData} options={chartOptions} />
+                      ) : (
+                        <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
+                      )}
                     </div>
-                    <Row className="g-4 align-items-start">
-                      <Col lg={8}>
-                        <Row className="g-3">
-                          <Col xs={12}>
-                            <h6 className="text-center text-muted">HCM Receiving Summary</h6>
-                            <ReceivingTable items={hcmSummary?.receiving_summary} />
-                          </Col>
-                          <Col xs={12}>
-                            <h6 className="text-center text-muted mt-3">HCM Distribution Summary</h6>
-                            <DistributionTable items={hcmSummary?.distribution_summary} />
-                          </Col>
-                        </Row>
-                      </Col>
-                      <Col lg={4}>
-                        <div style={{ height: 320 }}>
-                          <Bar data={hcmSummaryChartData} options={chartOptions} />
+                  </GraphCard>
+                </Col>
+                <Col lg={4}>
+                  <GraphCard title="HCM snapshot" subtitle="Key totals at a glance">
+                    <div className="d-flex flex-column gap-3">
+                      <div className="p-3 rounded bg-light">
+                        <div className="text-muted small">Distribution beneficiaries</div>
+                        <div className="fs-4 fw-bold text-dark">{hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0}</div>
+                      </div>
+                      <OverlayTrigger placement="top" overlay={generateTooltip(hcmSummary, 'receiving')}>
+                        <div className="p-3 rounded bg-light">
+                          <div className="text-muted small">Total received quantity</div>
+                          <div className="fs-4 fw-bold text-dark">{hcmSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0}</div>
                         </div>
-                      </Col>
-                    </Row>
-                  </div>
+                      </OverlayTrigger>
+                      <OverlayTrigger placement="top" overlay={generateTooltip(hcmSummary, 'distribution')}>
+                        <div className="p-3 rounded bg-light">
+                          <div className="text-muted small">Total distributed quantity</div>
+                          <div className="fs-4 fw-bold text-dark">{hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0}</div>
+                        </div>
+                      </OverlayTrigger>
+                    </div>
+                  </GraphCard>
                 </Col>
               </Row>
             ) : (
@@ -657,24 +998,26 @@ const DirectorDashboard = () => {
                   </Card>
                 </Col>
                 <Col md={4} >
-                  <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-receiving')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center">
-                        <div className="dashboard-card-icon hcm-icon"><FaTruckLoading /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title">HCM Received</h6>
-                          <div className="dashboard-card-value">
-                            {loading ? <Spinner animation="border" size="sm" /> : 
-                              hcmSummary?.receiving_summary?.length || 0
-                            }
+                  <OverlayTrigger placement="top" overlay={generateTooltip(hcmSummary, 'receiving')}>
+                    <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-receiving')}>
+                      <Card.Body>
+                        <div className="d-flex align-items-center">
+                          <div className="dashboard-card-icon hcm-icon"><FaTruckLoading /></div>
+                          <div className="ms-3 text-start">
+                            <h6 className="dashboard-card-title">HCM Received</h6>
+                            <div className="dashboard-card-value">
+                              {loading ? <Spinner animation="border" size="sm" /> : 
+                                hcmSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0).toLocaleString() || 0
+                              }
+                            </div>
+                          </div>
+                          <div className="ms-auto expand-icon">
+                            {expanded === 'hcm-receiving' ? <FaChevronUp /> : <FaChevronDown />}
                           </div>
                         </div>
-                        <div className="ms-auto expand-icon">
-                          {expanded === 'hcm-receiving' ? <FaChevronUp /> : <FaChevronDown />}
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
+                      </Card.Body>
+                    </Card>
+                  </OverlayTrigger>
                   <Collapse in={expanded === 'hcm-receiving'}>
                     <div className="mt-3">
                       <ReceivingTable items={hcmSummary?.receiving_summary} />
@@ -682,22 +1025,24 @@ const DirectorDashboard = () => {
                   </Collapse>
                 </Col>
                 <Col md={4} >
-                  <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-quantity')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center">
-                        <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">HCM Quantity Records</h6>
-                          <div className="dashboard-card-value">
-                            {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.length || 0}
+                  <OverlayTrigger placement="top" overlay={generateTooltip(hcmSummary, 'distribution')}>
+                    <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-quantity')}>
+                      <Card.Body>
+                        <div className="d-flex align-items-center">
+                          <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
+                          <div className="ms-3 text-start">
+                            <h6 className="dashboard-card-title mb-1">HCM Distributed Quantity</h6>
+                            <div className="dashboard-card-value">
+                              {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0).toLocaleString() || 0}
+                            </div>
+                          </div>
+                          <div className="ms-auto expand-icon">
+                            {expanded === 'hcm-quantity' ? <FaChevronUp /> : <FaChevronDown />}
                           </div>
                         </div>
-                        <div className="ms-auto expand-icon">
-                          {expanded === 'hcm-quantity' ? <FaChevronUp /> : <FaChevronDown />}
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
+                      </Card.Body>
+                    </Card>
+                  </OverlayTrigger>
                   <Collapse in={expanded === 'hcm-quantity'}>
                     <div className="mt-3">
                       <DistributionTable items={hcmSummary?.distribution_summary} />
@@ -710,23 +1055,58 @@ const DirectorDashboard = () => {
 
           <div className="dashboard-section">
             <h4 className="section-title mb-3">Beneficiary Overview</h4>
-            <Row className="g-3">
-              <Col md={4}>
-                <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorBeneEntry')}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
-                      <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">Total Beneficiaries</h6>
-                        <div className="dashboard-card-value">
-                          {loadingBeneficiaries ? <Spinner animation="border" size="sm" /> : totalBeneficiaries.toLocaleString()}
-                        </div>
+            {viewMode === "graph" ? (
+              <Row className="g-3">
+                <Col lg={8}>
+                  <GraphCard title="Beneficiary trend" subtitle="Current total beneficiary count represented visually">
+                    <div className="d-flex flex-column gap-3">
+                      <div className="display-6 fw-bold text-primary">
+                        {loadingBeneficiaries ? <Spinner animation="border" size="sm" /> : totalBeneficiaries.toLocaleString()}
+                      </div>
+                      <div style={{ height: 220 }}>
+                        {!loadingBeneficiaries && safeNumber(totalBeneficiaries) > 0 ? (
+                          <Bar data={beneficiaryChartData} options={chartOptions} />
+                        ) : (
+                          <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
+                        )}
                       </div>
                     </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
+                  </GraphCard>
+                </Col>
+                <Col lg={4}>
+                  <GraphCard title="Scheme comparison" subtitle="THR and HCM performance side by side">
+                    <div style={{ height: 300 }}>
+                      {hasAnyValue([
+                        thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
+                        hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
+                      ]) ? (
+                        <Bar data={schemeComparisonChartData} options={groupedChartOptions} />
+                      ) : (
+                        <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
+                      )}
+                    </div>
+                  </GraphCard>
+                </Col>
+              </Row>
+            ) : (
+              <Row className="g-3">
+                <Col md={4}>
+                  <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorBeneEntry')}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center w-100">
+                        <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
+                        <div className="ms-3 text-start">
+                          <h6 className="dashboard-card-title mb-1">Total Beneficiaries</h6>
+                          <div className="dashboard-card-value">
+                            {loadingBeneficiaries ? <Spinner animation="border" size="sm" /> : totalBeneficiaries.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+            )}
           </div>
         </Container>
       </div>
