@@ -388,6 +388,7 @@ const DPOHCMReceiving = () => {
                   <Table striped bordered hover responsive>
                     <thead>
                       <tr>
+                        <th>District</th>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
                         <th>Unit</th>
@@ -397,6 +398,7 @@ const DPOHCMReceiving = () => {
                     <tbody>
                       {summaryData.district_summary.map((item, index) => (
                         <tr key={index}>
+                          <td>{summaryData.district}</td>
                           <td>{item.food_item}</td>
                           <td>{item.bene_category}</td>
                           <td>{item.unit}</td>
