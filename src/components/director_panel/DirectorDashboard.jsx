@@ -113,6 +113,20 @@ const DirectorDashboard = () => {
     }
   };
 
+  const fetchAwcCount = async () => {
+    setLoadingRoles(prev => ({ ...prev, anganwadi: true }));
+    try {
+      const response = await api.get('/director/awc/count/');
+      if (response.data.success) {
+        setRoleCounts(prev => ({ ...prev, anganwadi: response.data.total_awc }));
+      }
+    } catch (err) {
+      console.error(`Failed to fetch anganwadi count:`, err);
+    } finally {
+      setLoadingRoles(prev => ({ ...prev, anganwadi: false }));
+    }
+  };
+
   const fetchTotalBeneficiaries = async () => {
     setLoadingBeneficiaries(true);
     try {
@@ -135,7 +149,7 @@ const DirectorDashboard = () => {
     fetchRoleCount('dpo', '/director/districts/');
     fetchRoleCount('cdpo', '/director/projects/');
     fetchRoleCount('supervisor', '/director/sectors/');
-    fetchRoleCount('anganwadi', '/director/awc-list/');
+    fetchAwcCount();
     fetchTotalBeneficiaries();
 
     // Fetch other dashboard data
