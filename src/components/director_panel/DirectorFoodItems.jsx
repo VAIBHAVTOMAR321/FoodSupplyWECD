@@ -351,8 +351,8 @@ const DirectorFoodItems = () => {
                 <th>Qty Per Beneficiary</th>
                 <th>Beneficiary Category</th>
                 <th>Days Allotted</th>
-                <th>Unit</th>
                 <th>Total Qty</th>
+                <th>Unit</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -365,8 +365,8 @@ const DirectorFoodItems = () => {
                   <td>{item.qty_per_ben}</td>
                   <td>{item.bene_category}</td>
                   <td>{item.days_allotted}</td>
-                  <td>{item.unit}</td>
                   <td>{item.total_quantity}</td>
+                  <td>{item.unit}</td>
                   <td>{item.show_status}</td>
                   <td>
                     <Button variant="outline-primary" size="sm" className="btn-action" onClick={() => handleShowModal(scheme, item)}>
