@@ -464,15 +464,21 @@ const HcmSupervisorDistributions = () => {
                         {currentItems.length > 0 ? currentItems.map((row, index) => (
                           <tr key={`row-${row.id}`}>
                             {visibleColumns.map((col) => {
-                              let cellContent;
+                              let cellContent, cellClassName = '';
                               if (col.dataField === '#') {
                                 cellContent = index + 1;
                               } else if (col.dataField === 'date' && row[col.dataField]) {
                                 cellContent = new Date(row[col.dataField]).toLocaleDateString('en-GB');
+                              } else if (col.dataField === 'bene_category') {
+                                cellContent = row[col.dataField];
+                                cellClassName = 'bene-category-cell';
+                              } else if (col.dataField === 'food_item') {
+                                cellContent = row[col.dataField];
+                                cellClassName = 'food-item-cell';
                               } else {
                                 cellContent = row[col.dataField];
                               }
-                              return <td key={`td-${row.id}-${col.dataField}`}>{cellContent}</td>;
+                              return <td key={`td-${row.id}-${col.dataField}`} className={cellClassName}>{cellContent}</td>;
                             })}
                           </tr>
                         )) : (

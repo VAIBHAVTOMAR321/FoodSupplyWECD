@@ -391,8 +391,8 @@ const DirectorTHRReceiving = () => {
                       <tr>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
-                        <th>Unit</th>
                         <th>Total Quantity</th>
+                        <th>Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -400,8 +400,8 @@ const DirectorTHRReceiving = () => {
                         <tr key={index}>
                           <td>{item.food_item}</td>
                           <td>{item.bene_category}</td>
-                          <td>{item.unit}</td>
                           <td>{item.total_quantity}</td>
+                          <td>{item.unit}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -416,8 +416,8 @@ const DirectorTHRReceiving = () => {
                         <th>Project</th>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
-                        <th>Unit</th>
                         <th>Total Quantity</th>
+                        <th>Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -426,8 +426,8 @@ const DirectorTHRReceiving = () => {
                           <td>{project.project}</td>
                           <td>{project.food_item}</td>
                           <td>{project.bene_category}</td>
-                          <td>{project.unit}</td>
                           <td>{project.total_quantity}</td>
+                          <td>{project.unit}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -442,8 +442,8 @@ const DirectorTHRReceiving = () => {
                         <th>Sector</th>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
-                        <th>Unit</th>
                         <th>Total Quantity</th>
+                        <th>Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -452,8 +452,8 @@ const DirectorTHRReceiving = () => {
                           <td>{sector.sector}</td>
                           <td>{sector.food_item}</td>
                           <td>{sector.bene_category}</td>
-                          <td>{sector.unit}</td>
                           <td>{sector.total_quantity}</td>
+                          <td>{sector.unit}</td>
                         </tr>
                       ))}
                     </tbody>
