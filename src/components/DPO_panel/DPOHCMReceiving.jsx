@@ -391,8 +391,8 @@ const DPOHCMReceiving = () => {
                         <th>District</th>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
-                        <th>Unit</th>
                         <th>Total Quantity</th>
+                        <th>Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -401,8 +401,8 @@ const DPOHCMReceiving = () => {
                           <td>{summaryData.district}</td>
                           <td>{item.food_item}</td>
                           <td>{item.bene_category}</td>
-                          <td>{item.unit}</td>
                           <td>{item.total_quantity}</td>
+                          <td>{item.unit}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -417,8 +417,8 @@ const DPOHCMReceiving = () => {
                         <th>Project</th>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
-                        <th>Unit</th>
                         <th>Total Quantity</th>
+                        <th>Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -427,8 +427,8 @@ const DPOHCMReceiving = () => {
                           <td>{project.project}</td>
                           <td>{project.food_item}</td>
                           <td>{project.bene_category}</td>
-                          <td>{project.unit}</td>
                           <td>{project.total_quantity}</td>
+                          <td>{project.unit}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -443,8 +443,8 @@ const DPOHCMReceiving = () => {
                         <th>Sector</th>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
-                        <th>Unit</th>
                         <th>Total Quantity</th>
+                        <th>Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -453,8 +453,8 @@ const DPOHCMReceiving = () => {
                           <td>{sector.sector}</td>
                           <td>{sector.food_item}</td>
                           <td>{sector.bene_category}</td>
-                          <td>{sector.unit}</td>
                           <td>{sector.total_quantity}</td>
+                          <td>{sector.unit}</td>
                         </tr>
                       ))}
                     </tbody>
