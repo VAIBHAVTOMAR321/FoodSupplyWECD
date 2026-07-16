@@ -70,6 +70,8 @@ const HcmSupervisorReceiving = () => {
     { dataField: "actions", text: "Actions", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [modalData, setModalData] = useState({ title: "", totals: {} });
 
   const visibleColumns = columns.filter((c) => c.visible);
 
@@ -187,6 +189,31 @@ const HcmSupervisorReceiving = () => {
     });
   }, [receivings, filters]);
 
+  const totals = useMemo(() => {
+    return filteredReceivings.reduce((acc, item) => {
+      const unit = item.unit || 'N/A';
+      const quantity = parseFloat(item.quantity) || 0;
+      if (!acc.quantityByUnit[unit]) {
+        acc.quantityByUnit[unit] = 0;
+      }
+      acc.quantityByUnit[unit] += quantity;
+      return acc;
+    }, {
+      quantityByUnit: {}
+    });
+  }, [filteredReceivings]);
+
+  const calculateTotals = (data) => {
+    if (!data) return {};
+    return data.reduce((acc, item) => {
+      const unit = item.unit || 'N/A';
+      const quantity = parseFloat(item.quantity) || 0;
+      if (!acc[unit]) { acc[unit] = 0; }
+      acc[unit] += quantity;
+      return acc;
+    }, {});
+  };
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredReceivings.slice(indexOfFirstItem, indexOfLastItem);
@@ -216,6 +243,12 @@ const HcmSupervisorReceiving = () => {
     const newColumns = [...columns];
     newColumns[index].visible = !newColumns[index].visible;
     setColumns(newColumns);
+  };
+
+  const handleViewTotals = (data, title) => {
+    const totals = calculateTotals(data);
+    setModalData({ title, totals });
+    setShowQuantityModal(true);
   };
 
   const handleBulkAction = async () => {
@@ -266,47 +299,78 @@ const HcmSupervisorReceiving = () => {
 
   const exportToPDF = () => {
     setIsPrinting(true);
-    setTimeout(() => {
-      const input = tableRef.current;
-      if (!input) {
-        setIsPrinting(false);
-        return;
-      }
-      html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
-        const imgData = canvas.toDataURL("image/png");
-        const pdf = new jsPDF({
-          orientation: "landscape",
-          unit: "pt",
-          format: "a2",
-        });
+    setTimeout(() => { // Timeout to allow UI to update before capturing
+      const mainTable = tableRef.current;
+      const totalsTableContainer = document.createElement('div');
+      totalsTableContainer.innerHTML = `
+        <div style="padding: 20px; font-family: sans-serif;">
+          <h4 style="text-align: center; margin-bottom: 15px;">Total Quantity by Unit</h4>
+          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
+            <thead style="background-color: #f2f2f2;">
+              <tr>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(totals.quantityByUnit)
+                .map(([unit, total]) => `
+                  <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      document.body.appendChild(totalsTableContainer);
+
+      Promise.all([
+        html2canvas(mainTable, { scale: 2, useCORS: true }),
+        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
+      ]).then(([mainCanvas, totalsCanvas]) => {
+        const mainImgData = mainCanvas.toDataURL('image/png');
+        const totalsImgData = totalsCanvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const ratio = canvasWidth / canvasHeight;
-        const width = pdfWidth - 40;
-        const height = width / ratio;
 
         pdf.text("HCM Supervisor Receiving Report", 20, 30);
-        pdf.addImage(
-          imgData,
-          "PNG",
-          20,
-          40,
-          width,
-          height > pdfHeight - 60 ? pdfHeight - 60 : height
-        );
-        pdf.save("hcm-supervisor-receiving.pdf");
+        let yPos = 40;
+
+        const mainRatio = mainCanvas.width / mainCanvas.height;
+        const mainWidth = pdfWidth - 40;
+        const mainHeight = mainWidth / mainRatio;
+        pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
+        yPos += mainHeight + 20;
+
+        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
+        const totalsWidth = pdfWidth / 2;
+        const totalsHeight = totalsWidth / totalsRatio;
+
+        if (yPos + totalsHeight > pdfHeight - 40) {
+          pdf.addPage();
+          yPos = 40;
+        }
+        pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
+
+        pdf.save('hcm-supervisor-receiving.pdf');
+        document.body.removeChild(totalsTableContainer);
         setIsPrinting(false);
       });
     }, 100);
   };
 
   const exportToExcel = () => {
-    const visCols = visibleColumns.filter(c => c.dataField !== '#' && c.dataField !== 'select' && c.dataField !== 'actions');
+    const visCols = visibleColumns.filter(c => c.dataField !== '#' && c.dataField !== 'select' && c.dataField !== 'actions' && c.dataField !== 'sector_remark');
     const dataToExport = filteredReceivings.map((item, index) => {
       const row = { '#': index + 1 };
       visCols.forEach(col => {
+        if (col.dataField === 'quantity' && typeof item[col.dataField] === 'number') {
+          row[col.text] = item[col.dataField].toFixed(2);
+          return;
+        }
         if (col.dataField === 'date') {
           row[col.text] = new Date(item.date).toLocaleDateString('en-CA'); // YYYY-MM-DD
         } else {
@@ -316,17 +380,19 @@ const HcmSupervisorReceiving = () => {
       return row;
     });
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-
-    // Set column widths
-    const colWidths = visCols.map(col => ({
-      wch: Math.max(col.text.length, ...dataToExport.map(row => (row[col.text] || '').toString().length)) + 2
+    const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
+      'Unit': unit,
+      'Total Quantity': total.toFixed(2)
     }));
-    ws['!cols'] = [{ wch: 5 }, ...colWidths];
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "HCM Receiving");
-    XLSX.writeFile(wb, "hcm-supervisor-receiving.xlsx");
+    const mainWorksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const quantityWorksheet = XLSX.utils.json_to_sheet(quantityTotalsData);
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, mainWorksheet, "HCM Receiving Report");
+    XLSX.utils.book_append_sheet(workbook, quantityWorksheet, "Quantity Totals");
+
+    XLSX.writeFile(workbook, "hcm-supervisor-receiving.xlsx");
   };
 
   const renderColumnModal = () => (
@@ -335,7 +401,7 @@ const HcmSupervisorReceiving = () => {
         <Modal.Title>Show/Hide Columns</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        {columns.map((col, index) => (
+        {columns.map((col, index) => (col.dataField !== 'select' &&
           <Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />
         ))}
       </Modal.Body>
@@ -471,6 +537,23 @@ const HcmSupervisorReceiving = () => {
                     </tr>
                   )}
                 </tbody>
+                <tfoot>
+                  <tr className="fw-bold table-info">
+                    {/* Adjust colSpan to correctly position the 'View Totals' button */}
+                    <td colSpan={visibleColumns.findIndex(c => c.dataField === 'quantity')}>Total</td>
+                    {visibleColumns.slice(visibleColumns.findIndex(c => c.dataField === 'quantity')).map(col => {
+                      if (col.dataField === 'quantity') {
+                        return (
+                          <td key="total_quantity">
+                            {!isPrinting && <Button variant="link" size="sm" onClick={() => handleViewTotals(filteredReceivings, 'HCM Supervisor Receiving Totals')}>View Totals</Button>}
+                          </td>
+                        );
+                      }
+                      // Render empty cells for other columns in the footer
+                      return <td key={col.dataField}></td>;
+                    })}
+                  </tr>
+                </tfoot>
               </Table>
             )}
           </div>
@@ -497,6 +580,29 @@ const HcmSupervisorReceiving = () => {
               <Button variant="secondary" onClick={() => setShowBulkActionModal(false)}>Cancel</Button>
               <Button variant={bulkAction === 'approved' ? 'success' : 'danger'} onClick={handleBulkAction} disabled={submitting}>{submitting ? "Submitting..." : `Confirm ${bulkAction.charAt(0).toUpperCase() + bulkAction.slice(1)}`}</Button>
             </Modal.Footer>
+          </Modal>
+
+          <Modal show={showQuantityModal} onHide={() => setShowQuantityModal(false)} centered>
+            <Modal.Header closeButton>
+              <Modal.Title>{modalData.title}</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              {Object.keys(modalData.totals).length > 0 ? (
+                <Table striped bordered>
+                  <thead>
+                    <tr>
+                      <th>Unit</th>
+                      <th>Total Quantity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(modalData.totals).map(([unit, total]) => (
+                      <tr key={unit}><td>{unit}</td><td>{total.toFixed(2)}</td></tr>
+                    ))}
+                  </tbody>
+                </Table>
+              ) : <p>No quantity data to display.</p>}
+            </Modal.Body>
           </Modal>
         </Container>
       </div>

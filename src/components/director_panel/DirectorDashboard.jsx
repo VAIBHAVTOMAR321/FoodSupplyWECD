@@ -54,6 +54,7 @@ const DirectorDashboard = () => {
   });
   const [loadingRoles, setLoadingRoles] = useState({
     dpo: true,
+
     cdpo: true,
     supervisor: true,
     anganwadi: true,
@@ -61,7 +62,9 @@ const DirectorDashboard = () => {
   const [totalBeneficiaries, setTotalBeneficiaries] = useState(0);
   const [loadingBeneficiaries, setLoadingBeneficiaries] = useState(true);
   const [expanded, setExpanded] = useState(null);
+  const [beneficiaryCategoryTotals, setBeneficiaryCategoryTotals] = useState(null);
   const [viewMode, setViewMode] = useState("card");
+  const [overallData, setOverallData] = useState(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -142,15 +145,27 @@ const DirectorDashboard = () => {
 
   const fetchTotalBeneficiaries = async () => {
     setLoadingBeneficiaries(true);
+     try {
+       const response = await api.get('/director/beneficiary/total-category/');
+       if (response.data.success) {
+         setBeneficiaryCategoryTotals(response.data.state_total);
+         setTotalBeneficiaries(response.data.state_total.total_beneficiaries);
+       }
+     } catch (err) {
+       console.error("Failed to fetch total beneficiaries count:", err);
+     } finally {
+       setLoadingBeneficiaries(false);
+     }
+  };
+
+  const fetchOverallDashboardData = async () => {
     try {
-      const response = await api.get('/director/beneficiary/state-total/');
+      const response = await api.get("/director/dashboard/overall/");
       if (response.data.success) {
-        setTotalBeneficiaries(response.data.data.total_beneficiaries);
+        setOverallData(response.data);
       }
     } catch (err) {
-      console.error("Failed to fetch total beneficiaries count:", err);
-    } finally {
-      setLoadingBeneficiaries(false);
+      console.error("Failed to fetch overall dashboard data:", err);
     }
   };
 
@@ -164,6 +179,7 @@ const DirectorDashboard = () => {
     fetchRoleCount('supervisor', '/director/sectors/');
     fetchAwcCount();
     fetchTotalBeneficiaries();
+    fetchOverallDashboardData();
 
     // Fetch other dashboard data
     try {
@@ -395,13 +411,13 @@ const DirectorDashboard = () => {
   const hasAnyValue = (values) => values.some((value) => safeNumber(value) > 0);
 
   const roleChartData = useMemo(() => ({
-    labels: ["DPO", "CDPO", "Supervisor", "Anganwadi"],
+    labels: ["DPO", "CDPO", "Supervisor"],
     datasets: [
       {
         label: "User counts",
-        data: [roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor, roleCounts.anganwadi],
-        backgroundColor: ["#2f6fed", "#20c997", "#ff8c00", "#6f42c1"],
-        borderColor: ["#2f6fed", "#20c997", "#ff8c00", "#6f42c1"],
+        data: [roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor],
+        backgroundColor: ["#2f6fed", "#20c997", "#ff8c00"],
+        borderColor: ["#2f6fed", "#20c997", "#ff8c00"],
         borderWidth: 1,
         borderRadius: 6,
       },
@@ -409,32 +425,57 @@ const DirectorDashboard = () => {
   }), [roleCounts]);
 
   const roleDistributionChartData = useMemo(() => ({
-    labels: ["DPO", "CDPO", "Supervisor", "Anganwadi"],
+    labels: ["DPO", "CDPO", "Supervisor"],
     datasets: [
       {
-        data: hasAnyValue([roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor, roleCounts.anganwadi])
-          ? [roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor, roleCounts.anganwadi]
+        data: hasAnyValue([roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor])
+          ? [roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor]
           : [1],
-        backgroundColor: ["#2f6fed", "#20c997", "#ff8c00", "#6f42c1"],
+        backgroundColor: ["#2f6fed", "#20c997", "#ff8c00"],
         borderColor: ["#ffffff"],
         borderWidth: 2,
       },
     ],
   }), [roleCounts]);
 
-  const beneficiaryChartData = useMemo(() => ({
-    labels: ["Beneficiaries"],
-    datasets: [
-      {
-        label: "Total beneficiaries",
-        data: [safeNumber(totalBeneficiaries)],
-        backgroundColor: ["#2f6fed"],
-        borderColor: ["#2f6fed"],
-        borderWidth: 1,
-        borderRadius: 6,
-      },
-    ],
-  }), [totalBeneficiaries]);
+  const beneficiaryChartData = useMemo(() => {
+    if (!beneficiaryCategoryTotals) {
+      return { labels: [], datasets: [] };
+    }
+    const labels = [
+      "PW & LM",
+      "Child (6m-3y)",
+      "Child (3-6y)",
+      "Adol. Girls",
+      "SAM (6m-3y)",
+      "SAM (3-5y)",
+      "SUW (6m-3y)",
+      "SUW (3-6y)",
+    ];
+    const data = [
+      beneficiaryCategoryTotals.total_pw_lm,
+      beneficiaryCategoryTotals.total_children_6m_3y,
+      beneficiaryCategoryTotals.total_children_3_6y,
+      beneficiaryCategoryTotals.total_adolescent_girls,
+      beneficiaryCategoryTotals.total_sam_6m_3y,
+      beneficiaryCategoryTotals.total_sam_3_5y,
+      beneficiaryCategoryTotals.total_suw_6m_3y,
+      beneficiaryCategoryTotals.total_suw_3_6y,
+    ];
+    return {
+      labels,
+      datasets: [
+        {
+          label: "Total Beneficiaries by Category",
+          data,
+          backgroundColor: ["#2f6fed", "#20c997", "#ff8c00", "#6f42c1", "#dc3545", "#fd7e14", "#198754", "#0dcaf0"],
+          borderColor: ["#2f6fed", "#20c997", "#ff8c00", "#6f42c1", "#dc3545", "#fd7e14", "#198754", "#0dcaf0"],
+          borderWidth: 1,
+          borderRadius: 6,
+        },
+      ],
+    };
+  }, [beneficiaryCategoryTotals]);
 
   const schemeComparisonChartData = useMemo(() => ({
     labels: ["Beneficiaries", "Received Qty", "Distributed Qty"],
@@ -460,28 +501,48 @@ const DirectorDashboard = () => {
     ],
   }), [hcmSummary, thrSummary]);
 
-  const foodItemChartData = useMemo(() => {
-    const hcmReceiving = hcmSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0;
-    const hcmDistribution = hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0;
-    const thrReceiving = thrSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0;
-    const thrDistribution = thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0;
+  const categoryWiseChartData = useMemo(() => {
+    if (!overallData || !overallData.beneficiary_summary) {
+      return { labels: [], datasets: [] };
+    }
+    const fullLabels = overallData.beneficiary_summary.map(item => item.category);
+    const shortLabels = fullLabels.map(label => {
+      if (label.length > 25) {
+        return label.substring(0, 22) + '...';
+      }
+      return label;
+    });
 
     return {
-      labels: ["HCM Items", "THR Items"],
+      labels: shortLabels,
       datasets: [
         {
-          label: "Received Quantity",
-          data: [hcmReceiving, thrReceiving],
+          label: "THR Distributed",
+          fullLabels: fullLabels,
+          data: overallData.beneficiary_summary.map(item => item.thr_distributed),
+          backgroundColor: "#ff8c00",
+        },
+        {
+          label: "THR Received",
+          data: overallData.beneficiary_summary.map(item => item.thr_received),
+          fullLabels: fullLabels,
+          backgroundColor: "#dc3545",
+        },
+        {
+          label: "HCM Distributed",
+          data: overallData.beneficiary_summary.map(item => item.hcm_distributed),
+          fullLabels: fullLabels,
           backgroundColor: "#20c997",
         },
         {
-          label: "Distributed Quantity",
-          data: [hcmDistribution, thrDistribution],
+          label: "HCM Received",
+          data: overallData.beneficiary_summary.map(item => item.hcm_received),
+          fullLabels: fullLabels,
           backgroundColor: "#fd7e14",
         },
       ],
     };
-  }, [hcmSummary, thrSummary]);
+  }, [overallData]);
 
   const getUnitTotals = (summary) => {
     if (!summary) return {};
@@ -613,43 +674,73 @@ const DirectorDashboard = () => {
     },
   };
 
-  const foodItemChartOptions = {
+  const categoryWiseChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: { position: "bottom" },
       tooltip: {
         callbacks: {
+          title: (tooltipItems) => {
+            // Show the full category name in the tooltip title
+            const firstItem = tooltipItems[0];
+            return firstItem.dataset.fullLabels[firstItem.dataIndex] || firstItem.label;
+          },
           label: (context) => `${context.dataset.label}: ${context.parsed.y?.toLocaleString() || 0}`,
           footer: (tooltipItems) => {
-            const context = tooltipItems[0];
-            if (!context) return '';
-
-            const label = context.label;
-            const datasetLabel = context.dataset.label;
-            const summary = label === "HCM Items" ? hcmSummary : thrSummary;
-            const summaryType = datasetLabel === "Received Quantity" ? 'receiving_summary' : 'distribution_summary';
-            
-            const unitTotals = getUnitTotals(summary?.[summaryType]);
-            const footerLines = [''];
-            if (Object.keys(unitTotals).length > 0) {
-              footerLines.push('Unit-wise Totals:');
-              Object.entries(unitTotals).forEach(([unit, total]) => footerLines.push(`  ${unit}: ${total.toLocaleString()}`));
+            if (!overallData || !overallData.food_item_summary || tooltipItems.length === 0) {
+              return '';
             }
+
+            const tooltipItem = tooltipItems[0];
+            const category = tooltipItem.dataset.fullLabels[tooltipItem.dataIndex];
+            const datasetLabel = tooltipItem.dataset.label;
+
+            const dataKeyMap = {
+              "THR Distributed": "thr_distributed",
+              "THR Received": "thr_received",
+              "HCM Distributed": "hcm_distributed",
+              "HCM Received": "hcm_received",
+            };
+
+            const dataKey = dataKeyMap[datasetLabel];
+            if (!dataKey) return '';
+
+            const relevantFoodItems = overallData.food_item_summary.filter(
+              (item) => item.beneficiary_category === category && item[dataKey] > 0
+            );
+
+            if (relevantFoodItems.length === 0) {
+              return '';
+            }
+
+            const footerLines = ['\nFood Item Breakdown:'];
+            relevantFoodItems.forEach(item => {
+              footerLines.push(`  - ${item.food_item}: ${item[dataKey].toLocaleString()} ${item.unit}`);
+            });
+
             return footerLines;
           },
         },
       },
       datalabels: {
         display: true,
-        color: 'black',
+        color: '#444',
         anchor: 'end',
         align: 'top',
+        rotation: -45,
+        offset: 8,
         formatter: (value) => value.toLocaleString(),
+        overlap: true, // Automatically hide overlapping labels
         font: { weight: 'bold' },
       },
     },
-    scales: { y: { beginAtZero: true, ticks: { precision: 0, callback: (value) => value.toLocaleString() } } },
+    scales: {
+      x: { stacked: false },
+      y: {
+        beginAtZero: true,
+        ticks: { precision: 0, callback: (value) => value.toLocaleString() } },
+    },
   };
 
   const doughnutChartOptions = {
@@ -711,92 +802,67 @@ const DirectorDashboard = () => {
             </ButtonGroup>
           </div>
 
-          <div className="dashboard-section">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h4 className="section-title mb-0">User Lists Overview</h4>
+          {viewMode === 'card' && (
+            <div className="dashboard-section">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h4 className="section-title mb-0">User Lists Overview</h4>
+              </div>
+                <Row className="g-3">
+                  <Col md={3}>
+                    <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=dpo')}>
+                      <Card.Body>
+                        <div className="d-flex align-items-center w-100">
+                          <div className="dashboard-card-icon hcm-icon"><FaUserCog /></div>
+                          <div className="ms-3 text-start">
+                            <h6 className="dashboard-card-title mb-1">DPO List</h6>
+                            <div className="dashboard-card-value">{loadingRoles.dpo ? <Spinner animation="border" size="sm" /> : roleCounts.dpo}</div>
+                          </div>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                  <Col md={3}>
+                    <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=cdpo')}>
+                      <Card.Body>
+                        <div className="d-flex align-items-center w-100">
+                          <div className="dashboard-card-icon thr-icon"><FaUserShield /></div>
+                          <div className="ms-3 text-start">
+                            <h6 className="dashboard-card-title mb-1">CDPO List</h6>
+                            <div className="dashboard-card-value">{loadingRoles.cdpo ? <Spinner animation="border" size="sm" /> : roleCounts.cdpo}</div>
+                          </div>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                  <Col md={3}>
+                    <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=supervisor')}>
+                      <Card.Body>
+                        <div className="d-flex align-items-center w-100">
+                          <div className="dashboard-card-icon hcm-icon"><FaUserTie /></div>
+                          <div className="ms-3 text-start">
+                            <h6 className="dashboard-card-title mb-1">Supervisor List</h6>
+                            <div className="dashboard-card-value">{loadingRoles.supervisor ? <Spinner animation="border" size="sm" /> : roleCounts.supervisor}</div>
+                          </div>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                  <Col md={3}>
+                    <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=anganwadi')}>
+                      <Card.Body>
+                        <div className="d-flex align-items-center w-100">
+                          <div className="dashboard-card-icon thr-icon"><FaHome /></div>
+                          <div className="ms-3 text-start">
+                            <h6 className="dashboard-card-title mb-1">Anganwadi List</h6>
+                            <div className="dashboard-card-value">{loadingRoles.anganwadi ? <Spinner animation="border" size="sm" /> : roleCounts.anganwadi}</div>
+                          </div>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                </Row>
             </div>
-            {viewMode === "graph" ? (
-              <Row className="g-3">
-                <Col lg={8}>
-                  <GraphCard title="Role-wise user distribution" subtitle="Current counts across DPO, CDPO, supervisor, and anganwadi records">
-                    <div style={{ height: 320 }}>
-                      {hasAnyValue([roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor, roleCounts.anganwadi]) ? (
-                        <Bar data={roleChartData} options={chartOptions} />
-                      ) : (
-                        <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
-                      )}
-                    </div>
-                  </GraphCard>
-                </Col>
-                <Col lg={4}>
-                  <GraphCard title="User roles mix" subtitle="Share of each role in the current dashboard dataset">
-                    <div style={{ height: 320 }}>
-                      {hasAnyValue([roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor, roleCounts.anganwadi]) ? (
-                        <Doughnut data={roleDistributionChartData} options={doughnutChartOptions} />
-                      ) : (
-                        <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
-                      )}
-                    </div>
-                  </GraphCard>
-                </Col>
-              </Row>
-            ) : (
-              <Row className="g-3">
-                <Col md={3}>
-                  <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=dpo')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon hcm-icon"><FaUserCog /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">DPO List</h6>
-                          <div className="dashboard-card-value">{loadingRoles.dpo ? <Spinner animation="border" size="sm" /> : roleCounts.dpo}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=cdpo')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon thr-icon"><FaUserShield /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">CDPO List</h6>
-                          <div className="dashboard-card-value">{loadingRoles.cdpo ? <Spinner animation="border" size="sm" /> : roleCounts.cdpo}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=supervisor')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon hcm-icon"><FaUserTie /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">Supervisor List</h6>
-                          <div className="dashboard-card-value">{loadingRoles.supervisor ? <Spinner animation="border" size="sm" /> : roleCounts.supervisor}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=anganwadi')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon thr-icon"><FaHome /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">Anganwadi List</h6>
-                          <div className="dashboard-card-value">{loadingRoles.anganwadi ? <Spinner animation="border" size="sm" /> : roleCounts.anganwadi}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              </Row>
-            )}
-          </div>
+          )}
 
           <div className="dashboard-section">
             <div className="d-flex justify-content-between align-items-center mb-3">
@@ -805,9 +871,23 @@ const DirectorDashboard = () => {
             {viewMode === 'graph' ? (
               <Row>
                 <Col>
-                  <GraphCard title="Food Item Quantities" subtitle="Received vs. Distributed quantities for HCM & THR">
-                    <div style={{ height: 320 }}>
-                      <Bar data={foodItemChartData} options={foodItemChartOptions} />
+                  <GraphCard 
+                    title="Category-wise Quantities" 
+                    subtitle="Received vs. Distributed quantities for HCM & THR across beneficiary categories"
+                  >
+                    <div style={{ position: 'relative', height: '500px', overflowX: 'auto' }}>
+                      <div 
+                        style={{ 
+                          minWidth: `${(overallData?.beneficiary_summary.length || 0) * 120}px`,
+                          height: '100%'
+                        }}
+                      >
+                        {overallData ? (
+                          <Bar data={categoryWiseChartData} options={{...categoryWiseChartOptions, maintainAspectRatio: false}} />
+                        ) : (
+                          <div className="d-flex align-items-center justify-content-center h-100 text-muted">Loading chart data...</div>
+                        )}
+                      </div>
                     </div>
                   </GraphCard>
                 </Col>
@@ -1057,33 +1137,19 @@ const DirectorDashboard = () => {
             <h4 className="section-title mb-3">Beneficiary Overview</h4>
             {viewMode === "graph" ? (
               <Row className="g-3">
-                <Col lg={8}>
-                  <GraphCard title="Beneficiary trend" subtitle="Current total beneficiary count represented visually">
+                <Col lg={12}>
+                  <GraphCard title="Beneficiary by Category" subtitle="Current total beneficiary count represented visually">
                     <div className="d-flex flex-column gap-3">
                       <div className="display-6 fw-bold text-primary">
                         {loadingBeneficiaries ? <Spinner animation="border" size="sm" /> : totalBeneficiaries.toLocaleString()}
                       </div>
-                      <div style={{ height: 220 }}>
+                      <div style={{ height: 320 }}>
                         {!loadingBeneficiaries && safeNumber(totalBeneficiaries) > 0 ? (
                           <Bar data={beneficiaryChartData} options={chartOptions} />
                         ) : (
                           <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
                         )}
                       </div>
-                    </div>
-                  </GraphCard>
-                </Col>
-                <Col lg={4}>
-                  <GraphCard title="Scheme comparison" subtitle="THR and HCM performance side by side">
-                    <div style={{ height: 300 }}>
-                      {hasAnyValue([
-                        thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
-                        hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
-                      ]) ? (
-                        <Bar data={schemeComparisonChartData} options={groupedChartOptions} />
-                      ) : (
-                        <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
-                      )}
                     </div>
                   </GraphCard>
                 </Col>

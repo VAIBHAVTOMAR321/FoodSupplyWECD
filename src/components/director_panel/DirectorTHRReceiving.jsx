@@ -98,6 +98,10 @@ const DirectorTHRReceiving = () => {
     { dataField: "months", text: "Months", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [modalData, setModalData] = useState({ title: "", totals: {} });
+  const [isPrinting, setIsPrinting] = useState(false);
+
 
   useEffect(() => {
     const handleResize = () => {
@@ -189,6 +193,20 @@ const DirectorTHRReceiving = () => {
     });
   }, [reports, filters]);
 
+  const totals = useMemo(() => {
+    return filteredReports.reduce((acc, item) => {
+      const unit = item.unit || 'N/A';
+      const quantity = parseFloat(item.quantity) || 0;
+      if (!acc.quantityByUnit[unit]) {
+        acc.quantityByUnit[unit] = 0;
+      }
+      acc.quantityByUnit[unit] += quantity;
+      return acc;
+    }, {
+      quantityByUnit: {}
+    });
+  }, [filteredReports]);
+
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
   const currentItems = filteredReports.slice(
     (currentPage - 1) * itemsPerPage,
@@ -217,33 +235,63 @@ const DirectorTHRReceiving = () => {
   const visibleColumns = columns.filter((c) => c.visible);
 
   const exportToPDF = () => {
-    const input = tableRef.current;
-    if (!input) return;
-    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "pt",
-        format: "a2",
+    setIsPrinting(true);
+    setTimeout(() => {
+      const mainTable = tableRef.current;
+      const totalsTableContainer = document.createElement('div');
+      totalsTableContainer.innerHTML = `
+        <div style="padding: 20px; font-family: sans-serif;">
+          <h4 style="text-align: center; margin-bottom: 15px;">Total Quantity by Unit</h4>
+          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
+            <thead style="background-color: #f2f2f2;">
+              <tr>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(totals.quantityByUnit)
+                .map(([unit, total]) => `
+                  <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      document.body.appendChild(totalsTableContainer);
+
+      Promise.all([
+        html2canvas(mainTable, { scale: 2, useCORS: true }),
+        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
+      ]).then(([mainCanvas, totalsCanvas]) => {
+        const mainImgData = mainCanvas.toDataURL('image/png');
+        const totalsImgData = totalsCanvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        pdf.text("AWC THR Receiving Report", 20, 30);
+        let yPos = 40;
+        const mainRatio = mainCanvas.width / mainCanvas.height;
+        const mainWidth = pdfWidth - 40;
+        const mainHeight = mainWidth / mainRatio;
+        pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
+        yPos += mainHeight + 20;
+        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
+        const totalsWidth = pdfWidth / 2;
+        const totalsHeight = totalsWidth / totalsRatio;
+        if (yPos + totalsHeight > pdfHeight - 40) {
+          pdf.addPage();
+          yPos = 40;
+        }
+        pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
+        pdf.save('thr_receiving_report.pdf');
+        document.body.removeChild(totalsTableContainer);
+        setIsPrinting(false);
       });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const width = pdfWidth - 40;
-      const height = width / ratio;
-      pdf.text("Beneficiary Summary Report", 20, 30);
-      pdf.addImage(
-        imgData,
-        "PNG",
-        20,
-        40,
-        width,
-        height > pdfHeight - 60 ? pdfHeight - 60 : height
-      );
-      pdf.save("beneficiary_summary_report.pdf");
-    });
+    }, 100);
   };
 
   const exportToExcel = () => {
@@ -251,6 +299,10 @@ const DirectorTHRReceiving = () => {
     const dataToExport = filteredReports.map((row, index) => {
       const newRow = { "#": index + 1 };
       visCols.forEach((col) => {
+        if (col.dataField === 'quantity' && typeof row[col.dataField] === 'number') {
+          newRow[col.text] = row[col.dataField].toFixed(2);
+          return;
+        }
         if (col.dataField === 'months') {
           newRow[col.text] = formatMonths(row.months || row.quarter);
         } else {
@@ -259,10 +311,24 @@ const DirectorTHRReceiving = () => {
       });
       return newRow;
     });
+
+    const totalRow = { '#': 'Total' };
+    visCols.forEach(col => {
+      if (col.dataField !== '#') totalRow[col.text] = '';
+    });
+    dataToExport.push(totalRow);
+
+    const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
+      'Unit': unit,
+      'Total Quantity': total.toFixed(2)
+    }));
+
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const quantityWorksheet = XLSX.utils.json_to_sheet(quantityTotalsData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiary Summary");
-    XLSX.writeFile(workbook, "beneficiary_summary.xlsx");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "THR Receiving Report");
+    XLSX.utils.book_append_sheet(workbook, quantityWorksheet, "Quantity Totals");
+    XLSX.writeFile(workbook, "thr_receiving_report.xlsx");
   };
 
   const renderPagination = () => {
@@ -350,6 +416,26 @@ const DirectorTHRReceiving = () => {
     return <Pagination className="justify-content-center mt-3">{items}</Pagination>;
   };
 
+  const calculateTotals = (data, quantityField = 'total_quantity') => {
+    if (!data) return {};
+    return data.reduce((acc, item) => {
+      const unit = item.unit || 'N/A';
+      const quantity = parseFloat(item[quantityField]) || 0;
+      if (!acc[unit]) {
+        acc[unit] = 0;
+      }
+      acc[unit] += quantity;
+      return acc;
+    }, {});
+  };
+
+  const handleViewTotals = (summaryData, title, quantityField = 'total_quantity') => {
+    const totals = calculateTotals(summaryData, quantityField);
+    setModalData({ title, totals });
+    setShowQuantityModal(true);
+  };
+
+
   return (
     <div className="dashboard-container">
       <DirectorLeftNav
@@ -405,6 +491,14 @@ const DirectorTHRReceiving = () => {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr className="fw-bold table-info">
+                        <td colSpan="2">Total</td>
+                        <td colSpan="2">
+                          <Button variant="link" size="sm" onClick={() => handleViewTotals(summaryData.district_summary, 'District Summary Totals')}>View Totals</Button>
+                        </td>
+                      </tr>
+                    </tfoot>
                   </Table>
                 </Tab>
 
@@ -431,6 +525,14 @@ const DirectorTHRReceiving = () => {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr className="fw-bold table-info">
+                        <td colSpan="3">Total</td>
+                        <td colSpan="2">
+                          <Button variant="link" size="sm" onClick={() => handleViewTotals(summaryData.project_summary, 'Project Summary Totals')}>View Totals</Button>
+                        </td>
+                      </tr>
+                    </tfoot>
                   </Table>
                 </Tab>
 
@@ -457,6 +559,14 @@ const DirectorTHRReceiving = () => {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr className="fw-bold table-info">
+                        <td colSpan="3">Total</td>
+                        <td colSpan="2">
+                          <Button variant="link" size="sm" onClick={() => handleViewTotals(summaryData.sector_summary, 'Sector Summary Totals')}>View Totals</Button>
+                        </td>
+                      </tr>
+                    </tfoot>
                   </Table>
                 </Tab>
 
@@ -621,6 +731,21 @@ const DirectorTHRReceiving = () => {
                               </tr>
                             ))}
                           </tbody>
+                          <tfoot>
+                            <tr className="fw-bold table-info">
+                              <td colSpan={visibleColumns.findIndex(c => c.dataField === 'quantity')}>Total</td>
+                              {visibleColumns.slice(visibleColumns.findIndex(c => c.dataField === 'quantity')).map(col => {
+                                if (col.dataField === 'quantity') {
+                                  return (
+                                    <td key="total_quantity">
+                                      {!isPrinting && <Button variant="link" size="sm" onClick={() => handleViewTotals(filteredReports, 'AWC Report Totals', 'quantity')}>View Totals</Button>}
+                                    </td>
+                                  );
+                                }
+                                return <td key={col.dataField}></td>;
+                              })}
+                            </tr>
+                          </tfoot>
                         </Table>
                         {renderPagination()}
                       </div>
@@ -644,6 +769,29 @@ const DirectorTHRReceiving = () => {
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button>
           </Modal.Footer>
+        </Modal>
+
+        <Modal show={showQuantityModal} onHide={() => setShowQuantityModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>{modalData.title}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {Object.keys(modalData.totals).length > 0 ? (
+              <Table striped bordered>
+                <thead>
+                  <tr>
+                    <th>Unit</th>
+                    <th>Total Quantity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(modalData.totals).map(([unit, total]) => (
+                    <tr key={unit}><td>{unit}</td><td>{total.toFixed(2)}</td></tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : <p>No quantity data to display.</p>}
+          </Modal.Body>
         </Modal>
       </div>
     </div>
