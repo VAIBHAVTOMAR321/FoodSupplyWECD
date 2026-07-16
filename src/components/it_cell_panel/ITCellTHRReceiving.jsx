@@ -64,6 +64,7 @@ const ITCellTHRReceiving = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
   const tableRef = useRef(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const [filters, setFilters] = useState({
     fin_year: [],
@@ -100,6 +101,7 @@ const ITCellTHRReceiving = () => {
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showQtyModal, setShowQtyModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -186,6 +188,19 @@ const ITCellTHRReceiving = () => {
     });
   }, [reports, filters]);
 
+  const totals = useMemo(() => {
+    return filteredReports.reduce((acc, item) => {
+        const quantity = parseFloat(item.quantity) || 0;
+        const unit = item.unit || 'N/A';
+        
+        if (!acc.quantityByUnit[unit]) {
+          acc.quantityByUnit[unit] = 0;
+        }
+        acc.quantityByUnit[unit] += quantity;
+        return acc;
+    }, { quantityByUnit: {} });
+  }, [filteredReports]);
+
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
   const currentItems = filteredReports.slice(
     (currentPage - 1) * itemsPerPage,
@@ -264,15 +279,67 @@ const ITCellTHRReceiving = () => {
   };
 
   const exportToPDF = () => {
-    const input = tableRef.current;
-    if (!input) return;
-    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a2" });
-      pdf.text("THR Receiving Report", 20, 30);
-      pdf.addImage(imgData, "PNG", 20, 40, pdf.internal.pageSize.getWidth() - 40, 0);
-      pdf.save("thr_receiving_report.pdf");
-    });
+    setIsPrinting(true);
+    setTimeout(() => {
+      const mainTable = tableRef.current;
+      const totalsTableContainer = document.createElement('div');
+      totalsTableContainer.innerHTML = `
+        <div style="padding: 20px; font-family: sans-serif; text-align: center;">
+          <h4 style="margin-bottom: 15px;">Total Quantity by Unit</h4>
+          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
+            <thead style="background-color: #f2f2f2;">
+              <tr>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(totals.quantityByUnit)
+                .map(([unit, total]) => `
+                  <tr>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      document.body.appendChild(totalsTableContainer);
+
+      if (!mainTable) {
+        console.error("Table element not found for PDF export.");
+        setIsPrinting(false);
+        return;
+      }
+
+      Promise.all([
+        html2canvas(mainTable, { scale: 2, useCORS: true }),
+        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
+      ]).then(([mainCanvas, totalsCanvas]) => {
+        const mainImgData = mainCanvas.toDataURL('image/png');
+        const totalsImgData = totalsCanvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        pdf.text("THR Receiving Report", 20, 30);
+        let yPos = 40;
+        const mainRatio = mainCanvas.width / mainCanvas.height;
+        const mainWidth = pdfWidth - 40;
+        const mainHeight = mainWidth / mainRatio;
+        pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
+        yPos += mainHeight + 20;
+        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
+        const totalsWidth = pdfWidth / 2;
+        const totalsHeight = totalsWidth / totalsRatio;
+        if (yPos + totalsHeight < pdfHeight - 40) {
+          pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
+        }
+        pdf.save('it_cell_thr_receiving_report.pdf');
+        document.body.removeChild(totalsTableContainer);
+        setIsPrinting(false);
+      });
+    }, 100);
   };
 
   const exportToExcel = () => {
@@ -395,6 +462,25 @@ const ITCellTHRReceiving = () => {
                               </tr>
                             ))}
                           </tbody>
+                          {!isPrinting && (
+                            <tfoot>
+                              <tr>
+                                {visibleColumns.map((col) => {
+                                  let cellContent = '';
+                                  if (col.dataField === '#') {
+                                    cellContent = <strong>Total</strong>;
+                                  } else if (col.dataField === 'quantity') {
+                                    cellContent = (
+                                      <Button variant="link" size="sm" onClick={() => setShowQtyModal(true)}>
+                                        View Total
+                                      </Button>
+                                    );
+                                  }
+                                  return <td key={`tf-${col.dataField}`}>{cellContent}</td>;
+                                })}
+                              </tr>
+                            </tfoot>
+                          )}
                         </Table>
                         {renderPagination()}
                       </div>
@@ -503,6 +589,28 @@ const ITCellTHRReceiving = () => {
             </Modal.Body>
           </Modal>
         )}
+
+        <Modal show={showQtyModal} onHide={() => setShowQtyModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Table striped bordered hover>
+              <thead>
+                <tr>
+                  <th>Unit</th>
+                  <th>Total Quantity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(totals.quantityByUnit).map(([unit, qty]) => (
+                  <tr key={unit}><td>{unit}</td><td>{qty.toFixed(2)}</td></tr>
+                ))}
+              </tbody>
+            </Table>
+          </Modal.Body>
+        </Modal>
+
       </div>
     </div>
   );
