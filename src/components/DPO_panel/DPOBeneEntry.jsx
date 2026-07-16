@@ -349,13 +349,13 @@ const DPOBeneEntry = () => {
                 className="mb-3"
               >
                 <Tab eventKey="district_total" title="District Total">
-                
-                      District Total: {summaryData.district}
-                   
-                  
+                  <h5 className="mt-4">
+                    District Total: {summaryData.district}
+                  </h5>
                       <Table striped bordered hover responsive>
                         <thead>
                           <tr>
+                            <th>District</th>
                             <th>PW & LM</th>
                             <th>Child (6m-3y)</th>
                             <th>Child (3-6y)</th>
@@ -368,6 +368,7 @@ const DPOBeneEntry = () => {
                         </thead>
                         <tbody>
                           <tr>
+                            <td>{summaryData.district}</td>
                             <td>{summaryData.district_total.total_pw_lm}</td>
                             <td>{summaryData.district_total.total_children_6m_3y}</td>
                             <td>{summaryData.district_total.total_children_3_6y}</td>
@@ -379,8 +380,6 @@ const DPOBeneEntry = () => {
                           </tr>
                         </tbody>
                       </Table>
-                  
-                
                 </Tab>
 
                 <Tab eventKey="project_summary" title="Project Summary">
