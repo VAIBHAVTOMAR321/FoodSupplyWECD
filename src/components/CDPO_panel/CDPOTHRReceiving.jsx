@@ -67,8 +67,8 @@ const CDPOTHRReceiving = () => {
     { dataField: "sector", text: "Sector", visible: true },
     { dataField: "food_item", text: "Food Item", visible: true },
     { dataField: "bene_category", text: "Beneficiary Category", visible: true },
-    { dataField: "unit", text: "Unit", visible: true },
     { dataField: "quantity", text: "Quantity", visible: true },
+    { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
     { dataField: "months", text: "Months", visible: true },
     { dataField: "date", text: "Date", visible: true },
@@ -246,8 +246,8 @@ const CDPOTHRReceiving = () => {
                         <th>Project</th>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
-                        <th>Unit</th>
                         <th>Total Quantity</th>
+                        <th>Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -256,8 +256,8 @@ const CDPOTHRReceiving = () => {
                           <td>{summaryData.project}</td>
                           <td>{row.food_item}</td>
                           <td>{row.bene_category}</td>
-                          <td>{row.unit}</td>
                           <td>{row.total_quantity}</td>
+                          <td>{row.unit}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -272,8 +272,8 @@ const CDPOTHRReceiving = () => {
                         <th>Sector</th>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
-                        <th>Unit</th>
                         <th>Total Quantity</th>
+                        <th>Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -282,8 +282,8 @@ const CDPOTHRReceiving = () => {
                           <td>{row.sector}</td>
                           <td>{row.food_item}</td>
                           <td>{row.bene_category}</td>
-                          <td>{row.unit}</td>
                           <td>{row.total_quantity}</td>
+                          <td>{row.unit}</td>
                         </tr>
                       ))}
                     </tbody>
