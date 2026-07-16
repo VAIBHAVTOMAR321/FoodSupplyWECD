@@ -454,31 +454,43 @@ const HcmSupervisorDistributions = () => {
                 <div className="text-center py-4 text-muted">No HCM distributions found.</div>
               ) : (
                 <div className="table-responsive">
-                  <Table striped bordered hover responsive className="mb-0" ref={tableRef} style={{ tableLayout: 'fixed', width: '100%' }}>
+                  <Table striped bordered hover responsive className="mb-0" ref={tableRef}>
                      <thead>
                        <tr>
-                         {visibleColumns.map((col) => <th key={`th-${col.dataField}`} style={{ width: col.dataField === 'action' ? '180px' : undefined }}>{col.text}</th>)}
+                         {visibleColumns.map((col) => {
+                            let thStyle = {};
+                            if (col.dataField === 'awc_name') thStyle.minWidth = '250px';
+                            if (col.dataField === 'food_item') thStyle.minWidth = '200px';
+                            if (col.dataField === 'bene_category') thStyle.minWidth = '200px';
+                            return <th key={`th-${col.dataField}`} style={thStyle}>{col.text}</th>
+                         })}
                        </tr>
                      </thead>
                       <tbody>
                         {currentItems.length > 0 ? currentItems.map((row, index) => (
                           <tr key={`row-${row.id}`}>
-                            {visibleColumns.map((col) => {
-                              let cellContent, cellClassName = '';
+                            {visibleColumns.map(col => {
+                              let cellContent, cellClassName = '', cellStyle = {};
                               if (col.dataField === '#') {
                                 cellContent = index + 1;
                               } else if (col.dataField === 'date' && row[col.dataField]) {
                                 cellContent = new Date(row[col.dataField]).toLocaleDateString('en-GB');
                               } else if (col.dataField === 'bene_category') {
-                                cellContent = row[col.dataField];
-                                cellClassName = 'bene-category-cell';
+                                cellContent = <div>{row[col.dataField]}</div>;
+                                cellClassName = 'bene-category-cell'; // This class remains on the <td>
+                                cellStyle = { minWidth: '200px', wordBreak: 'break-word' };
                               } else if (col.dataField === 'food_item') {
-                                cellContent = row[col.dataField];
+                                cellContent = (
+                                  <div className="style-table-td">
+                                    {row[col.dataField]}
+                                  </div>
+                                );
                                 cellClassName = 'food-item-cell';
+                                cellStyle = { minWidth: '200px', wordBreak: 'break-word' };
                               } else {
                                 cellContent = row[col.dataField];
                               }
-                              return <td key={`td-${row.id}-${col.dataField}`} className={cellClassName}>{cellContent}</td>;
+                              return <td key={`td-${row.id}-${col.dataField}`} className={cellClassName} style={cellStyle}>{cellContent}</td>;
                             })}
                           </tr>
                         )) : (

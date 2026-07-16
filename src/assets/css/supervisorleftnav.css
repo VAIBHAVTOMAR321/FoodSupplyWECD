@@ -149,7 +149,9 @@
     margin-bottom: 4px;
 }
 .bene-category-cell{
-  width: 200px !important;
+  min-width: 200px;
+  word-wrap: break-word;
+  white-space: normal !important;
 }
 /* Dashboard Cards Row */
 .dashboard-cards-row {
