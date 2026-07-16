@@ -83,7 +83,7 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
 
       {
         icon: <FaTachometerAlt />,
-        label: "AwcAganWadi",
+        label: "AWC List",
         path: "/AwcAganWadi",
         active: true,
       },
@@ -156,7 +156,7 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
           {sidebarOpen ? (
             <div className="logo-container">
               <div className="logo">
-                  Super visor Panel
+                  Supervisor Panel
               </div>
             </div>
           ) : (
