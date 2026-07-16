@@ -358,6 +358,7 @@ const CDPOBeneEntry = () => {
                       <Table striped bordered hover responsive>
                         <thead>
                           <tr>
+                            <th>Project</th>
                             <th>PW & LM</th>
                             <th>Child (6m-3y)</th>
                             <th>Child (3-6y)</th>
@@ -370,6 +371,7 @@ const CDPOBeneEntry = () => {
                         </thead>
                         <tbody>
                           <tr>
+                            <td>{summaryData.project}</td>
                             <td>{summaryData.project_total.total_pw_lm}</td>
                             <td>
                               {summaryData.project_total.total_children_6m_3y}
