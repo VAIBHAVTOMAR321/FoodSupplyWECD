@@ -250,6 +250,7 @@ const CDPOHCMReceiving = () => {
                   <Table striped bordered hover responsive>
                     <thead>
                       <tr>
+                        <th>Project</th>
                         <th>Food Item</th>
                         <th>Beneficiary Category</th>
                         <th>Total Quantity</th>
@@ -259,6 +260,7 @@ const CDPOHCMReceiving = () => {
                     <tbody>
                       {summaryData.project_summary.map((row, i) => (
                         <tr key={i}>
+                          <td>{summaryData.project}</td>
                           <td>{row.food_item}</td>
                           <td>{row.bene_category}</td>
                           <td>{row.total_quantity}</td>
