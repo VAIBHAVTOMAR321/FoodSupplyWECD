@@ -11,6 +11,7 @@ import {
   Button,
   ButtonGroup,
   InputGroup,
+  Dropdown,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dpo.css";
@@ -26,6 +27,7 @@ import {
   FaSyncAlt,
   FaSearch,
   FaBoxes,
+  FaChevronDown,
 } from "react-icons/fa";
 import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
@@ -174,6 +176,66 @@ const SUMMARY_PILLS = [
   },
 ];
 
+// --- Custom Multi-Select Dropdown Component ---
+const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
+  const toggleOption = (opt) => {
+    if (selected.includes(opt)) {
+      onChange(selected.filter((o) => o !== opt));
+    } else {
+      onChange([...selected, opt]);
+    }
+  };
+
+  const getLabel = () => {
+    if (selected.length === 0) return `All ${label}s`;
+    if (selected.length === 1) return selected[0];
+    return `${selected.length} ${label}s selected`;
+  };
+
+  return (
+    <div className="dpo-filter-group">
+      <Form.Label className="dpo-filter-label">{label}</Form.Label>
+      <Dropdown autoClose="outside">
+        <Dropdown.Toggle size="sm" variant="light" className="dpo-multi-toggle">
+          <span
+            style={{
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {getLabel()}
+          </span>
+          <FaChevronDown className="dpo-multi-caret" />
+        </Dropdown.Toggle>
+        <Dropdown.Menu className="dpo-multi-menu">
+          {options.length === 0 ? (
+            <Dropdown.Item disabled>No options</Dropdown.Item>
+          ) : (
+            options.map((opt) => (
+              <div
+                key={opt}
+                className="dpo-multi-item"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleOption(opt);
+                }}
+              >
+                <Form.Check
+                  type="checkbox"
+                  checked={selected.includes(opt)}
+                  onChange={() => {}}
+                  label={opt}
+                />
+              </div>
+            ))
+          )}
+        </Dropdown.Menu>
+      </Dropdown>
+    </div>
+  );
+};
+
 const DPODashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -184,11 +246,14 @@ const DPODashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedFY, setSelectedFY] = useState("");
-  const [selectedProject, setSelectedProject] = useState("");
-  const [selectedSector, setSelectedSector] = useState("");
-  const [aggregateView, setAggregateView] = useState("sector"); // 'sector' | 'project'
+
+  // Multi-Select States
+  const [selectedMonths, setSelectedMonths] = useState([]);
+  const [selectedFYs, setSelectedFYs] = useState([]);
+  const [selectedProjects, setSelectedProjects] = useState([]);
+  const [selectedSectors, setSelectedSectors] = useState([]);
+
+  const [aggregateView, setAggregateView] = useState("sector");
 
   useEffect(() => {
     const handleResize = () => {
@@ -241,13 +306,23 @@ const DPODashboard = () => {
 
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
-      const m = selectedMonth ? r.month === selectedMonth : true;
-      const y = selectedFY ? r.financial_year === selectedFY : true;
-      const p = selectedProject ? r.project === selectedProject : true;
-      const s = selectedSector ? r.sector === selectedSector : true;
+      const m =
+        selectedMonths.length === 0 ? true : selectedMonths.includes(r.month);
+      const y =
+        selectedFYs.length === 0
+          ? true
+          : selectedFYs.includes(r.financial_year);
+      const p =
+        selectedProjects.length === 0
+          ? true
+          : selectedProjects.includes(r.project);
+      const s =
+        selectedSectors.length === 0
+          ? true
+          : selectedSectors.includes(r.sector);
       return m && y && p && s;
     });
-  }, [records, selectedMonth, selectedFY, selectedProject, selectedSector]);
+  }, [records, selectedMonths, selectedFYs, selectedProjects, selectedSectors]);
 
   const searchedRecords = useMemo(() => {
     if (!searchTerm.trim()) return filteredRecords;
@@ -371,7 +446,7 @@ const DPODashboard = () => {
       body,
       startY: 50,
       styles: { fontSize: 6, cellPadding: 2 },
-      headStyles: { fillColor: [111, 66, 193] }, // DPO Purple
+      headStyles: { fillColor: [111, 66, 193] },
       foot: [
         [
           "",
@@ -435,7 +510,7 @@ const DPODashboard = () => {
       body,
       startY: 50,
       styles: { fontSize: 5, cellPadding: 1.5 },
-      headStyles: { fillColor: [111, 66, 193] }, // DPO Purple
+      headStyles: { fillColor: [111, 66, 193] },
       foot: [totalRow],
       footStyles: {
         fillColor: [241, 245, 249],
@@ -484,79 +559,41 @@ const DPODashboard = () => {
             </Button>
           </div>
 
-          {/* Compact Filter Bar */}
+          {/* Compact Multi-Select Filter Bar */}
           <div className="dpo-filter-bar">
-            <div className="dpo-filter-group">
-              <Form.Label className="dpo-filter-label">Month</Form.Label>
-              <Form.Select
-                size="sm"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-              >
-                <option value="">All Months</option>
-                {uniqueMonths.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </Form.Select>
-            </div>
-            <div className="dpo-filter-group">
-              <Form.Label className="dpo-filter-label">
-                Financial Year
-              </Form.Label>
-              <Form.Select
-                size="sm"
-                value={selectedFY}
-                onChange={(e) => setSelectedFY(e.target.value)}
-              >
-                <option value="">All Years</option>
-                {uniqueFYs.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </Form.Select>
-            </div>
-            <div className="dpo-filter-group">
-              <Form.Label className="dpo-filter-label">Project</Form.Label>
-              <Form.Select
-                size="sm"
-                value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
-              >
-                <option value="">All Projects</option>
-                {uniqueProjects.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </Form.Select>
-            </div>
-            <div className="dpo-filter-group">
-              <Form.Label className="dpo-filter-label">Sector</Form.Label>
-              <Form.Select
-                size="sm"
-                value={selectedSector}
-                onChange={(e) => setSelectedSector(e.target.value)}
-              >
-                <option value="">All Sectors</option>
-                {uniqueSectors.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </Form.Select>
-            </div>
+            <MultiSelectDropdown
+              label="Month"
+              options={uniqueMonths}
+              selected={selectedMonths}
+              onChange={setSelectedMonths}
+            />
+            <MultiSelectDropdown
+              label="Financial Year"
+              options={uniqueFYs}
+              selected={selectedFYs}
+              onChange={setSelectedFYs}
+            />
+            <MultiSelectDropdown
+              label="Project"
+              options={uniqueProjects}
+              selected={selectedProjects}
+              onChange={setSelectedProjects}
+            />
+            <MultiSelectDropdown
+              label="Sector"
+              options={uniqueSectors}
+              selected={selectedSectors}
+              onChange={setSelectedSectors}
+            />
             <Button
               variant="outline-secondary"
               size="sm"
               className="dpo-filter-reset"
               onClick={() => {
-                setSelectedMonth("");
-                setSelectedFY("");
-                setSelectedProject("");
-                setSelectedSector("");
+                setSelectedMonths([]);
+                setSelectedFYs([]);
+                setSelectedProjects([]);
+                setSelectedSectors([]);
               }}
             >
               Reset
