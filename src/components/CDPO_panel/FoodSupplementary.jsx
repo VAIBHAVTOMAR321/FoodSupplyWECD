@@ -1,7 +1,24 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
-  Container, Alert, Spinner, Card, Table, Row, Col, Button, Modal, Form,
-  Badge, Dropdown,
+  Container,
+  Alert,
+  Spinner,
+  Card,
+  Table,
+  Row,
+  Col,
+  Button,
+  Modal,
+  Form,
+  Badge,
+  Dropdown,
+  ProgressBar,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/cdpo.css";
@@ -9,20 +26,396 @@ import "../../assets/css/foodSupplementary.css";
 import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
 import {
-  FaPlus, FaEdit, FaTrash, FaChartBar, FaUsers, FaBox, FaBaby,
-  FaSave, FaTimes, FaSearch, FaSyncAlt, FaUserFriends, FaArrowLeft,
+  FaEdit,
+  FaTrash,
+  FaChartBar,
+  FaUsers,
+  FaBox,
+  FaBaby,
+  FaSearch,
+  FaSyncAlt,
+  FaUserFriends,
+  FaFileExcel,
+  FaDownload,
+  FaUpload,
+  FaTimesCircle,
+  FaCheckCircle,
+  FaExclamationTriangle,
+  FaSave,
+  FaTimes,
+  FaArrowLeft,
+  FaFileDownload,
+  FaLayerGroup,
+  FaFilePdf,
 } from "react-icons/fa";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const monthNames = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/* ── Excel Column Definitions ── */
+const EXCEL_COLUMNS = [
+  {
+    header: "District",
+    key: "district",
+    send: false,
+    type: "string",
+    category: "Location Info",
+  },
+  {
+    header: "Project",
+    key: "project",
+    send: false,
+    type: "string",
+    category: "Location Info",
+  },
+  {
+    header: "Sector",
+    key: "sector",
+    send: false,
+    type: "string",
+    category: "Location Info",
+  },
+  {
+    header: "AWC Name",
+    key: "awc_name",
+    send: false,
+    type: "string",
+    category: "Location Info",
+  },
+  {
+    header: "AWC Code",
+    key: "awc_code",
+    send: true,
+    type: "string",
+    category: "Location Info",
+  },
+  {
+    header: "Month",
+    key: "month",
+    send: true,
+    type: "string",
+    category: "Period",
+  },
+  {
+    header: "Financial Year",
+    key: "financial_year",
+    send: true,
+    type: "string",
+    category: "Period",
+  },
+  {
+    header: "Active Beneficiaries",
+    key: "active_beneficiaries",
+    send: true,
+    type: "number",
+    category: "Beneficiary Summary",
+  },
+  {
+    header: "Total Beneficiaries",
+    key: "total_beneficiaries",
+    send: true,
+    type: "number",
+    category: "Beneficiary Summary",
+  },
+  {
+    header: "Pregnant/Lactating Mothers",
+    key: "pregnant_women_lactating_mothers",
+    send: true,
+    type: "number",
+    category: "Beneficiaries by Category",
+  },
+  {
+    header: "Children 6m-3y",
+    key: "children_6m_3y_beneficiaries",
+    send: true,
+    type: "number",
+    category: "Beneficiaries by Category",
+  },
+  {
+    header: "THR 25 Days FRS/HCM (3y-6y)",
+    key: "thr_25_days_frs_hcm_beneficiaries_3y_6y",
+    send: true,
+    type: "number",
+    category: "Beneficiaries by Category",
+  },
+  {
+    header: "HCM Beneficiaries (3y-6y)",
+    key: "hcm_beneficiaries_3y_6y",
+    send: true,
+    type: "number",
+    category: "Beneficiaries by Category",
+  },
+  {
+    header: "SAM Children 6m-6y",
+    key: "sam_children_6m_6y",
+    send: true,
+    type: "number",
+    category: "Beneficiaries by Category",
+  },
+  {
+    header: "SUW Children 6m-6y",
+    key: "suw_children_6m_6y",
+    send: true,
+    type: "number",
+    category: "Beneficiaries by Category",
+  },
+  {
+    header: "SAM Children 3y-6y",
+    key: "sam_children_3y_6y",
+    send: true,
+    type: "number",
+    category: "Beneficiaries by Category",
+  },
+  {
+    header: "SUW Children 3y-6y",
+    key: "suw_children_3y_6y",
+    send: true,
+    type: "number",
+    category: "Beneficiaries by Category",
+  },
+  {
+    header: "Mung Dal Khichdi Packets",
+    key: "quarterly_packets_mung_dal_khichdi",
+    send: true,
+    type: "number",
+    category: "Packets Distribution",
+  },
+  {
+    header: "Poushik Sattu Mix Packets",
+    key: "quarterly_packets_poushik_sattu_mix",
+    send: true,
+    type: "number",
+    category: "Packets Distribution",
+  },
+  {
+    header: "Poushik Sattu Mix (75d, gm)",
+    key: "poushik_sattu_mix_75_days_packet_size_gm",
+    send: true,
+    type: "number",
+    category: "Packets Distribution",
+  },
+  {
+    header: "Panjeeri 75d 2625gm Packets",
+    key: "panjeeri_75_days_2625gm_quarterly_packets",
+    send: true,
+    type: "number",
+    category: "Packets Distribution",
+  },
+  {
+    header: "Panjeeri 75d 4625gm Packets",
+    key: "panjeeri_75_days_4625gm_quarterly_packets",
+    send: true,
+    type: "number",
+    category: "Packets Distribution",
+  },
+  {
+    header: "Sattu 2250gm Packets",
+    key: "quarterly_packets_sattu_2250gm",
+    send: true,
+    type: "number",
+    category: "Packets Distribution",
+  },
+  {
+    header: "Mix 1000gm Packets",
+    key: "quarterly_packets_mix_1000gm",
+    send: true,
+    type: "number",
+    category: "Packets Distribution",
+  },
+  {
+    header: "Multi Grain Aata 1250gm Packets",
+    key: "quarterly_packets_multi_grain_aata_1250gm",
+    send: true,
+    type: "number",
+    category: "Packets Distribution",
+  },
+];
+
+/* ── Detailed Table column definitions ── */
+const TABLE_COLUMNS = [
+  { label: "#", key: "_index" },
+  { label: "District", key: "district" },
+  { label: "Project", key: "project" },
+  { label: "Sector", key: "sector" },
+  { label: "AWC Code", key: "awc_code" },
+  { label: "Month", key: "month", badge: true },
+  { label: "Fin. Year", key: "financial_year" },
+  { label: "Active Bene.", key: "active_beneficiaries", num: true },
+  { label: "Total Bene.", key: "total_beneficiaries", strong: true },
+  {
+    label: "Pregnant/Lactating",
+    key: "pregnant_women_lactating_mothers",
+    num: true,
+  },
+  { label: "Children 6m-3y", key: "children_6m_3y_beneficiaries", num: true },
+  {
+    label: "THR 25d (3-6y)",
+    key: "thr_25_days_frs_hcm_beneficiaries_3y_6y",
+    num: true,
+  },
+  { label: "HCM (3-6y)", key: "hcm_beneficiaries_3y_6y", num: true },
+  { label: "SAM 6m-6y", key: "sam_children_6m_6y", num: true },
+  { label: "SUW 6m-6y", key: "suw_children_6m_6y", num: true },
+  { label: "SAM 3y-6y", key: "sam_children_3y_6y", num: true },
+  { label: "SUW 3y-6y", key: "suw_children_3y_6y", num: true },
+  { label: "Mung Dal", key: "quarterly_packets_mung_dal_khichdi", num: true },
+  {
+    label: "Poushik Sattu",
+    key: "quarterly_packets_poushik_sattu_mix",
+    num: true,
+  },
+  {
+    label: "Sattu Mix (gm)",
+    key: "poushik_sattu_mix_75_days_packet_size_gm",
+    num: true,
+  },
+  {
+    label: "Panjeeri 2625gm",
+    key: "panjeeri_75_days_2625gm_quarterly_packets",
+    num: true,
+  },
+  {
+    label: "Panjeeri 4625gm",
+    key: "panjeeri_75_days_4625gm_quarterly_packets",
+    num: true,
+  },
+  { label: "Sattu 2250gm", key: "quarterly_packets_sattu_2250gm", num: true },
+  { label: "Mix 1000gm", key: "quarterly_packets_mix_1000gm", num: true },
+  {
+    label: "Multi Grain Aata",
+    key: "quarterly_packets_multi_grain_aata_1250gm",
+    num: true,
+  },
+  { label: "Actions", key: "_actions" },
+];
+
+/* ── Numeric columns for aggregation ── */
+const NUMERIC_AGG_FIELDS = [
+  { label: "Active Bene.", key: "active_beneficiaries" },
+  { label: "Total Bene.", key: "total_beneficiaries" },
+  { label: "Pregnant/Lactating", key: "pregnant_women_lactating_mothers" },
+  { label: "Children 6m-3y", key: "children_6m_3y_beneficiaries" },
+  { label: "THR 25d (3-6y)", key: "thr_25_days_frs_hcm_beneficiaries_3y_6y" },
+  { label: "HCM (3-6y)", key: "hcm_beneficiaries_3y_6y" },
+  { label: "SAM 6m-6y", key: "sam_children_6m_6y" },
+  { label: "SUW 6m-6y", key: "suw_children_6m_6y" },
+  { label: "SAM 3y-6y", key: "sam_children_3y_6y" },
+  { label: "SUW 3y-6y", key: "suw_children_3y_6y" },
+  { label: "Mung Dal", key: "quarterly_packets_mung_dal_khichdi" },
+  { label: "Poushik Sattu", key: "quarterly_packets_poushik_sattu_mix" },
+  { label: "Sattu Mix (gm)", key: "poushik_sattu_mix_75_days_packet_size_gm" },
+  {
+    label: "Panjeeri 2625gm",
+    key: "panjeeri_75_days_2625gm_quarterly_packets",
+  },
+  {
+    label: "Panjeeri 4625gm",
+    key: "panjeeri_75_days_4625gm_quarterly_packets",
+  },
+  { label: "Sattu 2250gm", key: "quarterly_packets_sattu_2250gm" },
+  { label: "Mix 1000gm", key: "quarterly_packets_mix_1000gm" },
+  {
+    label: "Multi Grain Aata",
+    key: "quarterly_packets_multi_grain_aata_1250gm",
+  },
+];
+
+/* ── Compact Pill Definitions for Summary ── */
+const SUMMARY_PILLS = [
+  { key: "total_beneficiaries", label: "Total", icon: <FaUsers size={10} /> },
+  {
+    key: "active_beneficiaries",
+    label: "Active",
+    icon: <FaUserFriends size={10} />,
+  },
+  {
+    key: "pregnant_women_lactating_mothers",
+    label: "Preg/Lact",
+    icon: <FaBaby size={10} />,
+  },
+  {
+    key: "children_6m_3y_beneficiaries",
+    label: "6m-3y",
+    icon: <FaBaby size={10} />,
+  },
+  {
+    key: "thr_25_days_frs_hcm_beneficiaries_3y_6y",
+    label: "THR 25d",
+    icon: <FaUsers size={10} />,
+  },
+  {
+    key: "hcm_beneficiaries_3y_6y",
+    label: "HCM 3-6y",
+    icon: <FaUsers size={10} />,
+  },
+  { key: "sam_children_6m_6y", label: "SAM 6m-6y", icon: <FaBaby size={10} /> },
+  { key: "suw_children_6m_6y", label: "SUW 6m-6y", icon: <FaBaby size={10} /> },
+  { key: "sam_children_3y_6y", label: "SAM 3-6y", icon: <FaBaby size={10} /> },
+  { key: "suw_children_3y_6y", label: "SUW 3-6y", icon: <FaBaby size={10} /> },
+  {
+    key: "quarterly_packets_mung_dal_khichdi",
+    label: "Mung Dal",
+    icon: <FaBox size={10} />,
+  },
+  {
+    key: "quarterly_packets_poushik_sattu_mix",
+    label: "P. Sattu",
+    icon: <FaBox size={10} />,
+  },
+  {
+    key: "poushik_sattu_mix_75_days_packet_size_gm",
+    label: "Sattu(gm)",
+    icon: <FaBox size={10} />,
+  },
+  {
+    key: "panjeeri_75_days_2625gm_quarterly_packets",
+    label: "Panj 2625",
+    icon: <FaBox size={10} />,
+  },
+  {
+    key: "panjeeri_75_days_4625gm_quarterly_packets",
+    label: "Panj 4625",
+    icon: <FaBox size={10} />,
+  },
+  {
+    key: "quarterly_packets_sattu_2250gm",
+    label: "Sattu 2250",
+    icon: <FaBox size={10} />,
+  },
+  {
+    key: "quarterly_packets_mix_1000gm",
+    label: "Mix 1000",
+    icon: <FaBox size={10} />,
+  },
+  {
+    key: "quarterly_packets_multi_grain_aata_1250gm",
+    label: "Multi Aata",
+    icon: <FaBox size={10} />,
+  },
 ];
 
 const initialFormData = {
   id: null,
+  awc_code: "",
   month: "July",
   financial_year: "2026-27",
   active_beneficiaries: "",
+  total_beneficiaries: "",
   thr_25_days_frs_hcm_beneficiaries_3y_6y: "",
   hcm_beneficiaries_3y_6y: "",
   quarterly_packets_mung_dal_khichdi: "",
@@ -39,23 +432,7 @@ const initialFormData = {
   suw_children_3y_6y: "",
   quarterly_packets_mix_1000gm: "",
   quarterly_packets_multi_grain_aata_1250gm: "",
-  total_beneficiaries: "",
 };
-
-const StatCard = ({ icon, title, value, color, subtext }) => (
-  <Card className="fs-card h-100 shadow-sm">
-    <Card.Body className="fs-card-body">
-      <div className="fs-card-icon-wrap" style={{ background: color }}>
-        {icon}
-      </div>
-      <div className="fs-card-info">
-        <div className="fs-card-title">{title}</div>
-        <div className="fs-card-value">{value}</div>
-        {subtext && <div className="fs-card-sub">{subtext}</div>}
-      </div>
-    </Card.Body>
-  </Card>
-);
 
 const FoodSupplementary = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -83,6 +460,19 @@ const FoodSupplementary = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
 
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({
+    total: 0,
+    uploaded: 0,
+    failed: 0,
+    errors: [],
+    currentRow: 0,
+    isUploading: false,
+    isComplete: false,
+    fileName: "",
+  });
+  const fileInputRef = useRef(null);
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -93,101 +483,433 @@ const FoodSupplementary = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  useEffect(() => {
-    const now = new Date();
-    const currentMonth = monthNames[now.getMonth()];
-    const currentYear = now.getFullYear();
-    const financialYear = now.getMonth() >= 3 ? `${currentYear}-${String(currentYear + 1).slice(2)}` : `${currentYear - 1}-${String(currentYear).slice(2)}`;
-    setSelectedMonth(currentMonth);
-    setSelectedFinancialYear(financialYear);
-  }, []);
-
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const response = await api.get("/supplementary-nutrition-details/");
-      const data = Array.isArray(response.data) ? response.data : (response.data?.results || response.data?.data || []);
+      const data = Array.isArray(response.data)
+        ? response.data
+        : response.data?.results || response.data?.data || [];
       setRecords(data);
-      const filteredSummaryData = data.filter((r) => {
-        const monthMatch = selectedMonth ? r.month === selectedMonth : true;
-        const yearMatch = selectedFinancialYear ? r.financial_year === selectedFinancialYear : true;
-        return monthMatch && yearMatch;
-      });
-      if (filteredSummaryData.length > 0) {
-        const totals = filteredSummaryData.reduce((acc, r) => ({
-          total_beneficiaries: (acc.total_beneficiaries || 0) + (parseInt(r.total_beneficiaries) || 0),
-          active_beneficiaries: (acc.active_beneficiaries || 0) + (parseInt(r.active_beneficiaries) || 0),
-          pregnant_women_lactating_mothers: (acc.pregnant_women_lactating_mothers || 0) + (parseInt(r.pregnant_women_lactating_mothers) || 0),
-          quarterly_packets_mung_dal_khichdi: (acc.quarterly_packets_mung_dal_khichdi || 0) + (parseInt(r.quarterly_packets_mung_dal_khichdi) || 0),
-          quarterly_packets_poushik_sattu_mix: (acc.quarterly_packets_poushik_sattu_mix || 0) + (parseInt(r.quarterly_packets_poushik_sattu_mix) || 0),
-          poushik_sattu_mix_75_days_packet_size_gm: (acc.poushik_sattu_mix_75_days_packet_size_gm || 0) + (parseInt(r.poushik_sattu_mix_75_days_packet_size_gm) || 0),
-          quarterly_packets_sattu_2250gm: (acc.quarterly_packets_sattu_2250gm || 0) + (parseInt(r.quarterly_packets_sattu_2250gm) || 0),
-          quarterly_packets_mix_1000gm: (acc.quarterly_packets_mix_1000gm || 0) + (parseInt(r.quarterly_packets_mix_1000gm) || 0),
-          quarterly_packets_multi_grain_aata_1250gm: (acc.quarterly_packets_multi_grain_aata_1250gm || 0) + (parseInt(r.quarterly_packets_multi_grain_aata_1250gm) || 0),
-          panjeeri_75_days_2625gm_quarterly_packets: (acc.panjeeri_75_days_2625gm_quarterly_packets || 0) + (parseInt(r.panjeeri_75_days_2625gm_quarterly_packets) || 0),
-          panjeeri_75_days_4625gm_quarterly_packets: (acc.panjeeri_75_days_4625gm_quarterly_packets || 0) + (parseInt(r.panjeeri_75_days_4625gm_quarterly_packets) || 0),
-          suw_children_3y_6y: (acc.suw_children_3y_6y || 0) + (parseInt(r.suw_children_3y_6y) || 0),
-          sam_children_6m_6y: (acc.sam_children_6m_6y || 0) + (parseInt(r.sam_children_6m_6y) || 0),
-          suw_children_6m_6y: (acc.suw_children_6m_6y || 0) + (parseInt(r.suw_children_6m_6y) || 0),
-          sam_children_3y_6y: (acc.sam_children_3y_6y || 0) + (parseInt(r.sam_children_3y_6y) || 0),
-          children_6m_3y_beneficiaries: (acc.children_6m_3y_beneficiaries || 0) + (parseInt(r.children_6m_3y_beneficiaries) || 0),
-          thr_25_days_frs_hcm_beneficiaries_3y_6y: (acc.thr_25_days_frs_hcm_beneficiaries_3y_6y || 0) + (parseInt(r.thr_25_days_frs_hcm_beneficiaries_3y_6y) || 0),
-          hcm_beneficiaries_3y_6y: (acc.hcm_beneficiaries_3y_6y || 0) + (parseInt(r.hcm_beneficiaries_3y_6y) || 0),
-        }), {});
-        setSummary(totals);
-      } else {
-        setSummary(null);
-      }
     } catch (err) {
       setError("Failed to fetch supplementary nutrition data.");
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [api, selectedMonth, selectedFinancialYear]);
+  }, [api]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
+  const uniqueMonths = useMemo(
+    () =>
+      [...new Set(records.map((r) => r.month).filter(Boolean))].sort(
+        (a, b) => monthNames.indexOf(a) - monthNames.indexOf(b),
+      ),
+    [records],
+  );
+  const uniqueFYs = useMemo(
+    () =>
+      [...new Set(records.map((r) => r.financial_year).filter(Boolean))].sort(),
+    [records],
+  );
 
   const filteredRecords = useMemo(() => {
-    if (!searchTerm.trim()) return records;
+    return records.filter((r) => {
+      const m = selectedMonth ? r.month === selectedMonth : true;
+      const y = selectedFinancialYear
+        ? r.financial_year === selectedFinancialYear
+        : true;
+      return m && y;
+    });
+  }, [records, selectedMonth, selectedFinancialYear]);
+
+  useEffect(() => {
+    if (filteredRecords.length > 0) {
+      const totals = filteredRecords.reduce(
+        (acc, r) => ({
+          total_beneficiaries:
+            (acc.total_beneficiaries || 0) +
+            (parseInt(r.total_beneficiaries) || 0),
+          active_beneficiaries:
+            (acc.active_beneficiaries || 0) +
+            (parseInt(r.active_beneficiaries) || 0),
+          pregnant_women_lactating_mothers:
+            (acc.pregnant_women_lactating_mothers || 0) +
+            (parseInt(r.pregnant_women_lactating_mothers) || 0),
+          quarterly_packets_mung_dal_khichdi:
+            (acc.quarterly_packets_mung_dal_khichdi || 0) +
+            (parseInt(r.quarterly_packets_mung_dal_khichdi) || 0),
+          quarterly_packets_poushik_sattu_mix:
+            (acc.quarterly_packets_poushik_sattu_mix || 0) +
+            (parseInt(r.quarterly_packets_poushik_sattu_mix) || 0),
+          poushik_sattu_mix_75_days_packet_size_gm:
+            (acc.poushik_sattu_mix_75_days_packet_size_gm || 0) +
+            (parseInt(r.poushik_sattu_mix_75_days_packet_size_gm) || 0),
+          quarterly_packets_sattu_2250gm:
+            (acc.quarterly_packets_sattu_2250gm || 0) +
+            (parseInt(r.quarterly_packets_sattu_2250gm) || 0),
+          quarterly_packets_mix_1000gm:
+            (acc.quarterly_packets_mix_1000gm || 0) +
+            (parseInt(r.quarterly_packets_mix_1000gm) || 0),
+          quarterly_packets_multi_grain_aata_1250gm:
+            (acc.quarterly_packets_multi_grain_aata_1250gm || 0) +
+            (parseInt(r.quarterly_packets_multi_grain_aata_1250gm) || 0),
+          panjeeri_75_days_2625gm_quarterly_packets:
+            (acc.panjeeri_75_days_2625gm_quarterly_packets || 0) +
+            (parseInt(r.panjeeri_75_days_2625gm_quarterly_packets) || 0),
+          panjeeri_75_days_4625gm_quarterly_packets:
+            (acc.panjeeri_75_days_4625gm_quarterly_packets || 0) +
+            (parseInt(r.panjeeri_75_days_4625gm_quarterly_packets) || 0),
+          suw_children_3y_6y:
+            (acc.suw_children_3y_6y || 0) +
+            (parseInt(r.suw_children_3y_6y) || 0),
+          sam_children_6m_6y:
+            (acc.sam_children_6m_6y || 0) +
+            (parseInt(r.sam_children_6m_6y) || 0),
+          suw_children_6m_6y:
+            (acc.suw_children_6m_6y || 0) +
+            (parseInt(r.suw_children_6m_6y) || 0),
+          sam_children_3y_6y:
+            (acc.sam_children_3y_6y || 0) +
+            (parseInt(r.sam_children_3y_6y) || 0),
+          children_6m_3y_beneficiaries:
+            (acc.children_6m_3y_beneficiaries || 0) +
+            (parseInt(r.children_6m_3y_beneficiaries) || 0),
+          thr_25_days_frs_hcm_beneficiaries_3y_6y:
+            (acc.thr_25_days_frs_hcm_beneficiaries_3y_6y || 0) +
+            (parseInt(r.thr_25_days_frs_hcm_beneficiaries_3y_6y) || 0),
+          hcm_beneficiaries_3y_6y:
+            (acc.hcm_beneficiaries_3y_6y || 0) +
+            (parseInt(r.hcm_beneficiaries_3y_6y) || 0),
+        }),
+        {},
+      );
+      setSummary(totals);
+    } else {
+      setSummary(null);
+    }
+  }, [filteredRecords]);
+
+  const searchedRecords = useMemo(() => {
+    if (!searchTerm.trim()) return filteredRecords;
     const term = searchTerm.toLowerCase();
-    return records.filter((r) =>
-      (r.month || "").toLowerCase().includes(term) ||
-      (r.financial_year || "").toLowerCase().includes(term) ||
-      (r.district || "").toLowerCase().includes(term) ||
-      (r.project || "").toLowerCase().includes(term)
+    return filteredRecords.filter(
+      (r) =>
+        (r.month || "").toLowerCase().includes(term) ||
+        (r.financial_year || "").toLowerCase().includes(term) ||
+        (r.district || "").toLowerCase().includes(term) ||
+        (r.project || "").toLowerCase().includes(term) ||
+        (r.sector || "").toLowerCase().includes(term) ||
+        (r.awc_code || "").toLowerCase().includes(term),
     );
-  }, [records, searchTerm]);
+  }, [filteredRecords, searchTerm]);
 
-  const validateForm = (data) => {
-    const errors = {};
-    if (!data.month) errors.month = "Month is required";
-    if (!data.financial_year) errors.financial_year = "Financial year is required";
-    if (!data.active_beneficiaries && data.active_beneficiaries !== 0) errors.active_beneficiaries = "Required";
-    if (!data.total_beneficiaries && data.total_beneficiaries !== 0) errors.total_beneficiaries = "Required";
-    return errors;
+  /* ── Aggregation Logic for Sector-wise Summary Table ── */
+  const aggregatedData = useMemo(() => {
+    if (!filteredRecords.length) return [];
+    const grouped = {};
+    filteredRecords.forEach((r) => {
+      const groupKey = r.sector || "—";
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = {
+          groupKey,
+          months: new Set(),
+          fys: new Set(),
+          totals: NUMERIC_AGG_FIELDS.reduce(
+            (acc, { key }) => ({ ...acc, [key]: 0 }),
+            {},
+          ),
+        };
+      }
+      if (r.month) grouped[groupKey].months.add(r.month);
+      if (r.financial_year) grouped[groupKey].fys.add(r.financial_year);
+      NUMERIC_AGG_FIELDS.forEach(({ key }) => {
+        grouped[groupKey].totals[key] += parseInt(r[key]) || 0;
+      });
+    });
+    return Object.values(grouped).map((g) => ({
+      groupKey: g.groupKey,
+      months: Array.from(g.months).join(", "),
+      fys: Array.from(g.fys).join(", "),
+      ...g.totals,
+    }));
+  }, [filteredRecords]);
+
+  /* ── Calculate Totals for Footer (Aggregated Table) ── */
+  const totalAggregated = useMemo(() => {
+    return NUMERIC_AGG_FIELDS.reduce((acc, { key }) => {
+      acc[key] = aggregatedData.reduce((sum, row) => sum + (row[key] || 0), 0);
+      return acc;
+    }, {});
+  }, [aggregatedData]);
+
+  /* ── Calculate Totals for Footer (Detailed Table) ── */
+  const totalDetailed = useMemo(() => {
+    return TABLE_COLUMNS.filter((c) => c.num || c.strong).reduce(
+      (acc, { key }) => {
+        acc[key] = searchedRecords.reduce(
+          (sum, row) => sum + (parseInt(row[key]) || 0),
+          0,
+        );
+        return acc;
+      },
+      {},
+    );
+  }, [searchedRecords]);
+
+  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
+
+  /* ─── Excel Template Download ─── */
+  const handleDownloadTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    const categoryRow = EXCEL_COLUMNS.map((c) => c.category);
+    const headerRow = EXCEL_COLUMNS.map((c) => c.header);
+    const sampleRow = EXCEL_COLUMNS.map((c) => {
+      if (c.key === "district") return "Almora";
+      if (c.key === "project") return "Bhaisiachana";
+      if (c.key === "sector") return "Barechhina";
+      if (c.key === "awc_name") return "Aali-01";
+      if (c.key === "awc_code") return "5064010101";
+      if (c.key === "month") return "July";
+      if (c.key === "financial_year") return "2026-27";
+      if (!c.send) return "";
+      return 0;
+    });
+    const emptyRow = EXCEL_COLUMNS.map(() => "");
+    const aoa = [
+      categoryRow,
+      headerRow,
+      sampleRow,
+      emptyRow,
+      emptyRow,
+      emptyRow,
+      emptyRow,
+      emptyRow,
+      emptyRow,
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    const merges = [];
+    let startIdx = 0;
+    for (let i = 1; i <= categoryRow.length; i++) {
+      if (
+        i === categoryRow.length ||
+        categoryRow[i] !== categoryRow[startIdx]
+      ) {
+        if (i - 1 > startIdx)
+          merges.push({ s: { r: 0, c: startIdx }, e: { r: 0, c: i - 1 } });
+        startIdx = i;
+      }
+    }
+    ws["!merges"] = merges;
+    ws["!cols"] = EXCEL_COLUMNS.map((c) => ({
+      wch: Math.max(c.header.length + 4, 16),
+    }));
+
+    XLSX.utils.book_append_sheet(wb, ws, "Supplementary Nutrition");
+    XLSX.writeFile(wb, "Supplementary_Nutrition_Template.xlsx");
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setFormErrors((prev) => ({ ...prev, [name]: "" }));
+  /* ─── Excel Upload Handler ─── */
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      setError("Please upload a valid Excel (.xlsx, .xls) or CSV file.");
+      return;
+    }
+    processExcelFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleAdd = () => {
-    setFormData({ ...initialFormData });
-    setFormErrors({});
-    setIsEditing(false);
-    setView("form");
+  const normalizeHeader = (h) =>
+    String(h || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+
+  const processExcelFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+
+        const json_aoa = XLSX.utils.sheet_to_json(ws, {
+          header: 1,
+          defval: "",
+        });
+        let headerRowIdx = -1;
+        for (let i = 0; i < Math.min(8, json_aoa.length); i++) {
+          if (
+            json_aoa[i] &&
+            json_aoa[i].some(
+              (h) => normalizeHeader(h) === normalizeHeader("AWC Code"),
+            )
+          ) {
+            headerRowIdx = i;
+            break;
+          }
+        }
+        if (headerRowIdx === -1) {
+          setError(
+            "Could not find the header row containing 'AWC Code'. Please use the downloaded template.",
+          );
+          return;
+        }
+
+        const parsedData = XLSX.utils.sheet_to_json(ws, {
+          range: headerRowIdx,
+          defval: "",
+        });
+        const parsedRecords = parsedData
+          .map((rowObj, rowIdx) => {
+            const record = {};
+            EXCEL_COLUMNS.forEach((col) => {
+              const objKey = Object.keys(rowObj).find(
+                (k) => normalizeHeader(k) === normalizeHeader(col.header),
+              );
+              if (objKey !== undefined) {
+                const rawVal = rowObj[objKey];
+                if (col.type === "string") {
+                  record[col.key] =
+                    rawVal !== "" && rawVal !== null && rawVal !== undefined
+                      ? String(rawVal).trim()
+                      : "";
+                } else {
+                  if (typeof rawVal === "number") record[col.key] = rawVal;
+                  else if (
+                    rawVal === "" ||
+                    rawVal === null ||
+                    rawVal === undefined
+                  )
+                    record[col.key] = 0;
+                  else {
+                    const cleaned = String(rawVal).replace(/[^0-9.-]/g, "");
+                    const num = parseFloat(cleaned);
+                    record[col.key] = isNaN(num) ? 0 : num;
+                  }
+                }
+              } else {
+                record[col.key] = col.type === "string" ? "" : 0;
+              }
+            });
+            return { _rowNum: headerRowIdx + rowIdx + 2, ...record };
+          })
+          .filter(
+            (r) =>
+              r.awc_code !== "" || r.month !== "" || r.financial_year !== "",
+          );
+
+        if (parsedRecords.length === 0) {
+          setError("No data rows found in the Excel file.");
+          return;
+        }
+
+        setShowUploadModal(true);
+        setUploadProgress({
+          total: parsedRecords.length,
+          uploaded: 0,
+          failed: 0,
+          errors: [],
+          currentRow: 0,
+          isUploading: true,
+          isComplete: false,
+          fileName: file.name,
+        });
+
+        let uploadedCount = 0,
+          failedCount = 0;
+        const errorsList = [];
+
+        for (let i = 0; i < parsedRecords.length; i++) {
+          const rec = parsedRecords[i];
+          setUploadProgress((prev) => ({ ...prev, currentRow: i + 1 }));
+
+          const payload = {};
+          EXCEL_COLUMNS.filter((c) => c.send).forEach((col) => {
+            if (rec[col.key] !== undefined && rec[col.key] !== "")
+              payload[col.key] = rec[col.key];
+          });
+
+          if (
+            payload.awc_code === "" ||
+            payload.awc_code === undefined ||
+            payload.month === "" ||
+            payload.month === undefined ||
+            payload.financial_year === "" ||
+            payload.financial_year === undefined
+          ) {
+            failedCount++;
+            errorsList.push({
+              row: rec._rowNum,
+              awcCode: rec.awc_code || rec.awc_name || "—",
+              error:
+                "Missing required field (AWC Code / Month / Financial Year)",
+            });
+            setUploadProgress((prev) => ({
+              ...prev,
+              uploaded: uploadedCount,
+              failed: failedCount,
+              errors: [...errorsList],
+            }));
+            continue;
+          }
+
+          try {
+            await api.post("/supplementary-nutrition-details/", payload);
+            uploadedCount++;
+          } catch (err) {
+            failedCount++;
+            const errMsg =
+              err?.response?.data?.detail ||
+              err?.response?.data?.message ||
+              err?.response?.data?.error ||
+              (typeof err?.response?.data === "object"
+                ? JSON.stringify(err.response.data)
+                : err.message) ||
+              "Unknown error";
+            errorsList.push({
+              row: rec._rowNum,
+              awcCode: rec.awc_code || rec.awc_name || "—",
+              error: errMsg,
+            });
+          }
+
+          setUploadProgress((prev) => ({
+            ...prev,
+            uploaded: uploadedCount,
+            failed: failedCount,
+            errors: [...errorsList],
+          }));
+          if (i % 3 === 0) await new Promise((r) => setTimeout(r, 30));
+        }
+
+        setUploadProgress((prev) => ({
+          ...prev,
+          isUploading: false,
+          isComplete: true,
+        }));
+        if (uploadedCount > 0)
+          setSuccess(`${uploadedCount} record(s) uploaded successfully.`);
+        fetchData();
+      } catch (err) {
+        setError(
+          "Failed to parse Excel file: " + (err.message || "Unknown error"),
+        );
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
+  /* ─── Edit / Delete ─── */
   const handleEdit = (record) => {
-    setFormData({ ...record });
+    setFormData({ ...initialFormData, ...record });
     setFormErrors({});
     setIsEditing(true);
     setView("form");
@@ -196,6 +918,21 @@ const FoodSupplementary = () => {
   const handleDeleteClick = (record) => {
     setDeleteTarget(record);
     setShowDeleteModal(true);
+  };
+
+  const validateForm = (data) => {
+    const errors = {};
+    if (!data.awc_code) errors.awc_code = "AWC Code is required";
+    if (!data.month) errors.month = "Month is required";
+    if (!data.financial_year)
+      errors.financial_year = "Financial year is required";
+    return errors;
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   const handleSubmit = async (e) => {
@@ -210,14 +947,11 @@ const FoodSupplementary = () => {
       if (isEditing) {
         await api.put("/supplementary-nutrition-details/", formData);
         setSuccess("Record updated successfully.");
-      } else {
-        await api.post("/supplementary-nutrition-details/", formData);
-        setSuccess("Record added successfully.");
       }
       setView("list");
       fetchData();
     } catch (err) {
-      setError(isEditing ? "Failed to update record." : "Failed to add record.");
+      setError("Failed to update record.");
       console.error(err);
     } finally {
       setFormLoading(false);
@@ -227,7 +961,9 @@ const FoodSupplementary = () => {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await api.delete("/supplementary-nutrition-details/", { id: deleteTarget.id });
+      await api.delete("/supplementary-nutrition-details/", {
+        data: { id: deleteTarget.id },
+      });
       setSuccess("Record deleted successfully.");
       setShowDeleteModal(false);
       setDeleteTarget(null);
@@ -251,7 +987,9 @@ const FoodSupplementary = () => {
             className={formErrors[name] ? "is-invalid" : ""}
           >
             {monthNames.map((m) => (
-              <option key={m} value={m}>{m}</option>
+              <option key={m} value={m}>
+                {m}
+              </option>
             ))}
           </Form.Select>
         ) : (
@@ -265,10 +1003,126 @@ const FoodSupplementary = () => {
           />
         )}
         {formErrors[name] && (
-          <Form.Control.Feedback type="invalid">{formErrors[name]}</Form.Control.Feedback>
+          <Form.Control.Feedback type="invalid">
+            {formErrors[name]}
+          </Form.Control.Feedback>
         )}
       </Form.Group>
     );
+  };
+
+  const closeUploadModal = () => {
+    if (uploadProgress.isUploading) return;
+    setShowUploadModal(false);
+    setUploadProgress({
+      total: 0,
+      uploaded: 0,
+      failed: 0,
+      errors: [],
+      currentRow: 0,
+      isUploading: false,
+      isComplete: false,
+      fileName: "",
+    });
+  };
+
+  /* ─── Export Handlers (Excel & PDF) ─── */
+  const exportAggToExcel = () => {
+    const dataToExport = aggregatedData.map((row) => {
+      const obj = {
+        Sector: row.groupKey,
+        Months: row.months,
+        "Fin. Years": row.fys,
+      };
+      NUMERIC_AGG_FIELDS.forEach((f) => (obj[f.label] = row[f.key]));
+      return obj;
+    });
+    // Add total row
+    const totalObj = { Sector: "Total", Months: "", "Fin. Years": "" };
+    NUMERIC_AGG_FIELDS.forEach(
+      (f) => (totalObj[f.label] = totalAggregated[f.key]),
+    );
+    dataToExport.push(totalObj);
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sector Summary");
+    XLSX.writeFile(wb, "Sector_Summary.xlsx");
+  };
+
+   const exportAggToPDF = () => {
+    const head = [["Sector", "Months", "Fin. Years", ...NUMERIC_AGG_FIELDS.map(f => f.label)]];
+    const body = aggregatedData.map(row => [row.groupKey, row.months, row.fys, ...NUMERIC_AGG_FIELDS.map(f => row[f.key]?.toLocaleString() || 0)]);
+    
+    // Removed body.push(...) from here to prevent duplication
+    
+    const doc = new jsPDF("l", "pt", "a3"); // Landscape A3 for wide tables
+    doc.text("Sector-wise Aggregated Summary", 40, 40);
+    autoTable(doc, {
+      head, 
+      body, // Body only contains the actual data rows now
+      startY: 50,
+      styles: { fontSize: 6, cellPadding: 2 },
+      headStyles: { fillColor: [79, 70, 229] },
+      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" },
+      foot: [["Total", "", "", ...NUMERIC_AGG_FIELDS.map(f => totalAggregated[f.key]?.toLocaleString() || 0)]], // Footer renders the total row
+    });
+    doc.save("Sector_Summary.pdf");
+  };
+
+  const exportDetailsToExcel = () => {
+    const cols = TABLE_COLUMNS.filter(
+      (c) => c.key !== "_index" && c.key !== "_actions",
+    );
+    const dataToExport = searchedRecords.map((row) => {
+      const obj = {};
+      cols.forEach((c) => (obj[c.label] = row[c.key] || 0));
+      return obj;
+    });
+    // Add total row
+    const totalObj = {};
+    cols.forEach((c) => {
+      if (c.num || c.strong) totalObj[c.label] = totalDetailed[c.key];
+      else totalObj[c.label] = "";
+    });
+    totalObj[cols[0].label] = "Total";
+    dataToExport.push(totalObj);
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Records");
+    XLSX.writeFile(wb, "Supplementary_Records.xlsx");
+  };
+
+    const exportDetailsToPDF = () => {
+    const cols = TABLE_COLUMNS.filter(c => c.key !== "_index" && c.key !== "_actions");
+    const head = [cols.map(c => c.label)];
+    const body = searchedRecords.map(row => cols.map(c => {
+      const val = row[c.key];
+      if (c.num || c.strong) return val ? Number(val).toLocaleString() : "0";
+      return val || "—";
+    }));
+    
+    // Create the total row array for the footer
+    const totalRow = cols.map(c => {
+      if (c.num || c.strong) return totalDetailed[c.key]?.toLocaleString() || 0;
+      return "";
+    });
+    totalRow[0] = "Total";
+    // Removed body.push(totalRow) from here to prevent duplication
+
+    const doc = new jsPDF("l", "pt", "a3"); 
+    doc.text("Supplementary Nutrition Records", 40, 40);
+    autoTable(doc, {
+      head, 
+      body, // Body only contains the actual data rows now
+      startY: 50,
+      styles: { fontSize: 5, cellPadding: 1.5 },
+      headStyles: { fillColor: [79, 70, 229] },
+      foot: [totalRow], // Footer renders the total row
+      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" },
+    });
+    doc.save("Supplementary_Records.pdf");
   };
 
   return (
@@ -283,45 +1137,92 @@ const FoodSupplementary = () => {
         <CDPOHeader toggleSidebar={toggleSidebar} />
 
         <Container fluid className="dashboard-box mt-4">
-          {error && <Alert variant="danger" dismissible onClose={() => setError("")}>{error}</Alert>}
-          {success && <Alert variant="success" dismissible onClose={() => setSuccess("")}>{success}</Alert>}
+          {error && (
+            <Alert variant="danger" dismissible onClose={() => setError("")}>
+              {error}
+            </Alert>
+          )}
+          {success && (
+            <Alert variant="success" dismissible onClose={() => setSuccess("")}>
+              {success}
+            </Alert>
+          )}
 
           {view === "list" && (
             <>
+              {/* ─── Compact Page Header ─── */}
               <div className="dashboard-section">
                 <div className="fs-page-header">
-                  <div>
-                    <h4 className="fs-page-title">Food Supplementary Nutrition</h4>
-                  </div>
+                  <h4 className="fs-page-title">
+                    <FaChartBar className="me-2" /> Food Supplementary Nutrition
+                  </h4>
                   <div className="fs-header-actions">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      style={{ display: "none" }}
+                      accept=".xlsx,.xls,.csv"
+                      onChange={handleFileSelect}
+                    />
                     <Dropdown className="fs-search-dropdown">
                       <Dropdown.Toggle variant="light" size="sm">
                         <FaSearch className="me-1" /> Search
                       </Dropdown.Toggle>
-                      <Dropdown.Menu style={{ minWidth: "300px", padding: "12px" }}>
+                      <Dropdown.Menu
+                        style={{ minWidth: "300px", padding: "12px" }}
+                      >
                         <Form.Control
                           type="text"
-                          placeholder="Search by month, year, district..."
+                          placeholder="Search month, year, district, AWC..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className="mb-2"
                         />
                         {searchTerm && (
-                          <div className="text-muted small">Results: {filteredRecords.length}</div>
+                          <div className="text-muted small">
+                            Results: {searchedRecords.length}
+                          </div>
                         )}
                       </Dropdown.Menu>
                     </Dropdown>
-                    <Button variant="primary" size="sm" onClick={handleAdd} className="fs-btn-primary">
-                      <FaPlus className="me-1" /> Add Record
+                    <Button
+                      variant="success"
+                      size="sm"
+                      onClick={handleDownloadTemplate}
+                      className="fs-btn-light"
+                      style={{
+                        background: "linear-gradient(135deg, #059669, #10b981)",
+                        border: "none",
+                        color: "#fff",
+                      }}
+                    >
+                      <FaFileDownload className="me-1" /> Template
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="fs-btn-primary"
+                    >
+                      <FaUpload className="me-1" /> Upload
                     </Button>
                     <Button
                       variant="light"
                       size="sm"
-                      onClick={() => { setRefreshing(true); setTimeout(() => { setRefreshing(false); fetchData(); }, 500); }}
+                      onClick={() => {
+                        setRefreshing(true);
+                        setTimeout(() => {
+                          setRefreshing(false);
+                          fetchData();
+                        }, 500);
+                      }}
                       disabled={refreshing}
                       className="fs-btn-light"
                     >
-                      <FaSyncAlt className={`me-1 ${refreshing ? "fs-spin" : ""}`} /> Refresh
+                      <FaSyncAlt
+                        className={`me-1 ${refreshing ? "fs-spin" : ""}`}
+                      />{" "}
+                      Refresh
                     </Button>
                   </div>
                 </div>
@@ -334,220 +1235,205 @@ const FoodSupplementary = () => {
                 </div>
               ) : (
                 <>
-                  {(summary || !summary) && (
-                    <div className="dashboard-section">
-                      <div className="fs-filter-bar">
-                        <Form.Group as={Row} className="g-2 align-items-end">
-                          <Col xs={12} sm={5} md={4}>
-                            <Form.Label className="fs-filter-label">Month</Form.Label>
-                            <Form.Select
-                              size="sm"
-                              value={selectedMonth}
-                              onChange={(e) => setSelectedMonth(e.target.value)}
-                            >
-                              <option value="">All Months</option>
-                              {monthNames.map((m) => (
-                                <option key={m} value={m}>{m}</option>
-                              ))}
-                            </Form.Select>
-                          </Col>
-                          <Col xs={12} sm={5} md={4}>
-                            <Form.Label className="fs-filter-label">Financial Year</Form.Label>
-                            <Form.Select
-                              size="sm"
-                              value={selectedFinancialYear}
-                              onChange={(e) => setSelectedFinancialYear(e.target.value)}
-                            >
-                              <option value="">All Years</option>
-                              <option value="2025-26">2025-26</option>
-                              <option value="2026-27">2026-27</option>
-                            </Form.Select>
-                          </Col>
-                          <Col xs={12} sm={2} md={2} className="d-flex">
-                            <Button
-                              variant="outline-secondary"
-                              size="sm"
-                              className="w-100 fs-filter-reset"
-                              onClick={() => {
-                                const now = new Date();
-                                const currentMonth = monthNames[now.getMonth()];
-                                const currentYear = now.getFullYear();
-                                const financialYear = now.getMonth() >= 3 ? `${currentYear}-${String(currentYear + 1).slice(2)}` : `${currentYear - 1}-${String(currentYear).slice(2)}`;
-                                setSelectedMonth(currentMonth);
-                                setSelectedFinancialYear(financialYear);
-                              }}
-                            >
-                              Reset
-                            </Button>
-                          </Col>
-                        </Form.Group>
-                      </div>
-                      {summary ? (
-                        <>
-                          <Row className="g-2 g-lg-3">
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaUsers size={14} />}
-                                title="Total Beneficiaries"
-                                value={summary.total_beneficiaries?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #667eea, #764ba2)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaUserFriends size={14} />}
-                                title="Active Beneficiaries"
-                                value={summary.active_beneficiaries?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #f093fb, #f5576c)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBaby size={14} />}
-                                title="Pregnant & Lactating"
-                                value={summary.pregnant_women_lactating_mothers?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #4facfe, #00f2fe)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaUsers size={14} />}
-                                title="THR 25 Days FRS/HCM (3y-6y)"
-                                value={summary.thr_25_days_frs_hcm_beneficiaries_3y_6y?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #43e97b, #38f9d7)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaUsers size={14} />}
-                                title="HCM Beneficiaries (3y-6y)"
-                                value={summary.hcm_beneficiaries_3y_6y?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #fa709a, #fee140)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBaby size={14} />}
-                                title="Children 6m-3y"
-                                value={summary.children_6m_3y_beneficiaries?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #30cfd0, #330867)"
-                              />
-                            </Col>
-                          </Row>
-                          <Row className="g-2 g-lg-3 mt-2">
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBox size={14} />}
-                                title="Mung Dal Khichdi"
-                                value={summary.quarterly_packets_mung_dal_khichdi?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #667eea, #764ba2)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBox size={14} />}
-                                title="Poushik Sattu Mix"
-                                value={summary.quarterly_packets_poushik_sattu_mix?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #f093fb, #f5576c)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBox size={14} />}
-                                title="Sattu Mix (75d, gm)"
-                                value={summary.poushik_sattu_mix_75_days_packet_size_gm?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #4facfe, #00f2fe)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBox size={14} />}
-                                title="Sattu 2250gm"
-                                value={summary.quarterly_packets_sattu_2250gm?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #43e97b, #38f9d7)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBox size={14} />}
-                                title="Mix 1000gm"
-                                value={summary.quarterly_packets_mix_1000gm?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #fa709a, #fee140)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBox size={14} />}
-                                title="Multi Grain Aata 1250gm"
-                                value={summary.quarterly_packets_multi_grain_aata_1250gm?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #30cfd0, #330867)"
-                              />
-                            </Col>
-                          </Row>
-                          <Row className="g-2 g-lg-3 mt-2">
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBox size={14} />}
-                                title="Panjeeri 75d 2625gm"
-                                value={summary.panjeeri_75_days_2625gm_quarterly_packets?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #a8edea, #fed6e3)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBox size={14} />}
-                                title="Panjeeri 75d 4625gm"
-                                value={summary.panjeeri_75_days_4625gm_quarterly_packets?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #ff9a9e, #fecfef)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBaby size={14} />}
-                                title="SAM Children 6m-6y"
-                                value={summary.sam_children_6m_6y?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #667eea, #764ba2)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBaby size={14} />}
-                                title="SUW Children 6m-6y"
-                                value={summary.suw_children_6m_6y?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #f093fb, #f5576c)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBaby size={14} />}
-                                title="SAM Children 3y-6y"
-                                value={summary.sam_children_3y_6y?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #4facfe, #00f2fe)"
-                              />
-                            </Col>
-                            <Col xs={12} sm={6} lg={2}>
-                              <StatCard
-                                icon={<FaBaby size={14} />}
-                                title="SUW Children 3y-6y"
-                                value={summary.suw_children_3y_6y?.toLocaleString() || 0}
-                                color="linear-gradient(135deg, #43e97b, #38f9d7)"
-                              />
-                            </Col>
-                          </Row>
-                        </>
-                      ) : null}
+                  {/* ─── Compact Filter Bar ─── */}
+                  <div className="fs-filter-bar">
+                    <div className="fs-filter-group">
+                      <Form.Label className="fs-filter-label">Month</Form.Label>
+                      <Form.Select
+                        size="sm"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                      >
+                        <option value="">All Months</option>
+                        {uniqueMonths.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </div>
+                    <div className="fs-filter-group">
+                      <Form.Label className="fs-filter-label">
+                        Financial Year
+                      </Form.Label>
+                      <Form.Select
+                        size="sm"
+                        value={selectedFinancialYear}
+                        onChange={(e) =>
+                          setSelectedFinancialYear(e.target.value)
+                        }
+                      >
+                        <option value="">All Years</option>
+                        {uniqueFYs.map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </div>
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      className="fs-filter-reset"
+                      onClick={() => {
+                        setSelectedMonth("");
+                        setSelectedFinancialYear("");
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+
+                  {/* ─── Wrapped Summary Pills ─── */}
+                  {summary && (
+                    <div className="fs-stat-strip">
+                      {SUMMARY_PILLS.map((field) => (
+                        <div key={field.key} className="fs-stat-pill">
+                          <span className="fs-stat-pill-icon">
+                            {field.icon}
+                          </span>
+                          <span className="fs-stat-pill-label">
+                            {field.label}
+                          </span>
+                          <span className="fs-stat-pill-value">
+                            {summary[field.key]?.toLocaleString() || 0}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                  <div className="dashboard-section">
+                  {/* ─── Sector-wise Aggregated Summary Table ─── */}
+                  {searchedRecords.length > 0 && (
+                    <div className="dashboard-section mt-2">
+                      <Card className="fs-table-card shadow-sm">
+                        <Card.Header className="fs-table-card-header">
+                          <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
+                            <h5 className="fs-section-title mb-0">
+                              <FaLayerGroup className="me-2" /> Sector-wise
+                              Aggregated Summary
+                            </h5>
+                            <div className="fs-export-btns">
+                              <Button
+                                variant="light"
+                                size="sm"
+                                className="fs-export-btn"
+                                onClick={exportAggToExcel}
+                              >
+                                <FaFileExcel className="text-success" /> Excel
+                              </Button>
+                              <Button
+                                variant="light"
+                                size="sm"
+                                className="fs-export-btn"
+                                onClick={exportAggToPDF}
+                              >
+                                <FaFilePdf className="text-danger" /> PDF
+                              </Button>
+                            </div>
+                          </div>
+                        </Card.Header>
+                        <Card.Body className="p-0">
+                          <div className="fs-table-wrapper">
+                            <Table hover className="fs-data-table mb-0">
+                              <thead>
+                                <tr>
+                                  <th>Sector</th>
+                                  <th>Months</th>
+                                  <th>Fin. Years</th>
+                                  {NUMERIC_AGG_FIELDS.map((col, idx) => (
+                                    <th key={idx} className="text-end">
+                                      {col.label}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {aggregatedData.length === 0 ? (
+                                  <tr>
+                                    <td
+                                      colSpan={NUMERIC_AGG_FIELDS.length + 3}
+                                      className="text-center py-4 text-muted"
+                                    >
+                                      No data available for aggregation
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  aggregatedData.map((row, idx) => (
+                                    <tr key={idx}>
+                                      <td>
+                                        <strong>{row.groupKey}</strong>
+                                      </td>
+                                      <td>{row.months}</td>
+                                      <td>{row.fys}</td>
+                                      {NUMERIC_AGG_FIELDS.map((col, cIdx) => (
+                                        <td key={cIdx} className="text-end">
+                                          {row[col.key]
+                                            ? Number(
+                                                row[col.key],
+                                              ).toLocaleString()
+                                            : 0}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                              {aggregatedData.length > 0 && (
+                                <tfoot>
+                                  <tr>
+                                    <th>Total</th>
+                                    <th></th>
+                                    <th></th>
+                                    {NUMERIC_AGG_FIELDS.map((col, cIdx) => (
+                                      <th key={cIdx} className="text-end">
+                                        {totalAggregated[
+                                          col.key
+                                        ]?.toLocaleString() || 0}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </tfoot>
+                              )}
+                            </Table>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* ─── Detailed Records Table ─── */}
+                  <div className="dashboard-section mt-3">
                     <Card className="fs-table-card shadow-sm">
                       <Card.Header className="fs-table-card-header">
-                        <div className="d-flex justify-content-between align-items-center">
+                        <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
                           <h5 className="fs-section-title mb-0">
-                            <FaChartBar className="me-2" />
-                            Supplementary Nutrition Records
+                            <FaChartBar className="me-2" /> Supplementary
+                            Nutrition Records
                           </h5>
-                          <Badge bg="primary" pill className="fs-count-badge">{filteredRecords.length} entries</Badge>
+                          <div className="d-flex align-items-center gap-2">
+                            <Badge bg="primary" pill className="fs-count-badge">
+                              {searchedRecords.length} entries
+                            </Badge>
+                            <div className="fs-export-btns">
+                              <Button
+                                variant="light"
+                                size="sm"
+                                className="fs-export-btn"
+                                onClick={exportDetailsToExcel}
+                              >
+                                <FaFileExcel className="text-success" /> Excel
+                              </Button>
+                              <Button
+                                variant="light"
+                                size="sm"
+                                className="fs-export-btn"
+                                onClick={exportDetailsToPDF}
+                              >
+                                <FaFilePdf className="text-danger" /> PDF
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       </Card.Header>
                       <Card.Body className="p-0">
@@ -555,63 +1441,130 @@ const FoodSupplementary = () => {
                           <Table hover className="fs-data-table mb-0">
                             <thead>
                               <tr>
-                                <th>#</th>
-                                <th>Month</th>
-                                <th>Fin. Year</th>
-                                <th>Active Bene.</th>
-                                <th>Total Bene.</th>
-                                <th>Pregnant/Lactating</th>
-                                <th>Pak. (Mung Dal)</th>
-                                <th>Pak. (Sattu Mix)</th>
-                                <th>Children 6m-3y</th>
-                                <th className="text-center">Actions</th>
+                                {TABLE_COLUMNS.map((col, idx) => (
+                                  <th
+                                    key={idx}
+                                    className={
+                                      col.key === "_actions"
+                                        ? "text-center"
+                                        : col.num || col.strong
+                                          ? "text-end"
+                                          : ""
+                                    }
+                                  >
+                                    {col.label}
+                                  </th>
+                                ))}
                               </tr>
                             </thead>
                             <tbody>
-                              {filteredRecords.length === 0 ? (
+                              {searchedRecords.length === 0 ? (
                                 <tr>
-                                  <td colSpan="10" className="text-center py-5 text-muted">
-                                    No records found. Click "Add Record" to create one.
+                                  <td
+                                    colSpan={TABLE_COLUMNS.length}
+                                    className="text-center py-5 text-muted"
+                                  >
+                                    No records found. Click{" "}
+                                    <strong>Upload Excel</strong> to add
+                                    records.
                                   </td>
                                 </tr>
                               ) : (
-                                filteredRecords.map((record, index) => (
-                                  <tr key={record.id}>
-                                    <td className="text-muted">{index + 1}</td>
-                                    <td><Badge bg="info-subtle" text="info-emphasis" className="fs-month-badge">{record.month}</Badge></td>
-                                    <td>{record.financial_year}</td>
-                                    <td>{record.active_beneficiaries?.toLocaleString()}</td>
-                                    <td><strong className="text-primary">{record.total_beneficiaries?.toLocaleString()}</strong></td>
-                                    <td>{record.pregnant_women_lactating_mothers?.toLocaleString()}</td>
-                                    <td>{record.quarterly_packets_mung_dal_khichdi?.toLocaleString()}</td>
-                                    <td>{record.quarterly_packets_poushik_sattu_mix?.toLocaleString()}</td>
-                                    <td>{record.children_6m_3y_beneficiaries?.toLocaleString()}</td>
-                                    <td className="text-center">
-                                      <div className="fs-action-btns">
-                                        <Button
-                                          variant="light"
-                                          size="sm"
-                                          className="fs-action-btn fs-edit-btn"
-                                          onClick={() => handleEdit(record)}
-                                          title="Edit"
-                                        >
-                                          <FaEdit />
-                                        </Button>
-                                        <Button
-                                          variant="light"
-                                          size="sm"
-                                          className="fs-action-btn fs-delete-btn"
-                                          onClick={() => handleDeleteClick(record)}
-                                          title="Delete"
-                                        >
-                                          <FaTrash />
-                                        </Button>
-                                      </div>
-                                    </td>
+                                searchedRecords.map((record, index) => (
+                                  <tr key={record.id || index}>
+                                    {TABLE_COLUMNS.map((col, cIdx) => {
+                                      if (col.key === "_index")
+                                        return (
+                                          <td key={cIdx} className="text-muted">
+                                            {index + 1}
+                                          </td>
+                                        );
+                                      if (col.key === "_actions")
+                                        return (
+                                          <td
+                                            key={cIdx}
+                                            className="text-center"
+                                          >
+                                            <div className="fs-action-btns">
+                                              <Button
+                                                variant="light"
+                                                size="sm"
+                                                className="fs-action-btn fs-edit-btn"
+                                                onClick={() =>
+                                                  handleEdit(record)
+                                                }
+                                                title="Edit"
+                                              >
+                                                <FaEdit />
+                                              </Button>
+                                              <Button
+                                                variant="light"
+                                                size="sm"
+                                                className="fs-action-btn fs-delete-btn"
+                                                onClick={() =>
+                                                  handleDeleteClick(record)
+                                                }
+                                                title="Delete"
+                                              >
+                                                <FaTrash />
+                                              </Button>
+                                            </div>
+                                          </td>
+                                        );
+                                      const val = record[col.key];
+                                      if (col.badge)
+                                        return (
+                                          <td key={cIdx}>
+                                            <Badge className="fs-month-badge">
+                                              {val}
+                                            </Badge>
+                                          </td>
+                                        );
+                                      if (col.strong)
+                                        return (
+                                          <td key={cIdx} className="text-end">
+                                            <strong className="text-primary">
+                                              {val
+                                                ? Number(val).toLocaleString()
+                                                : 0}
+                                            </strong>
+                                          </td>
+                                        );
+                                      if (col.num)
+                                        return (
+                                          <td key={cIdx} className="text-end">
+                                            {val
+                                              ? Number(val).toLocaleString()
+                                              : 0}
+                                          </td>
+                                        );
+                                      return <td key={cIdx}>{val || "—"}</td>;
+                                    })}
                                   </tr>
                                 ))
                               )}
                             </tbody>
+                            {searchedRecords.length > 0 && (
+                              <tfoot>
+                                <tr>
+                                  {TABLE_COLUMNS.map((col, cIdx) => {
+                                    if (col.key === "_index")
+                                      return <th key={cIdx}>Total</th>;
+                                    if (col.key === "_actions")
+                                      return <th key={cIdx}></th>;
+                                    if (col.num || col.strong)
+                                      return (
+                                        <th key={cIdx} className="text-end">
+                                          {totalDetailed[
+                                            col.key
+                                          ]?.toLocaleString() || 0}
+                                        </th>
+                                      );
+                                    return <th key={cIdx}></th>;
+                                  })}
+                                </tr>
+                              </tfoot>
+                            )}
                           </Table>
                         </div>
                       </Card.Body>
@@ -622,6 +1575,7 @@ const FoodSupplementary = () => {
             </>
           )}
 
+          {/* ─── Edit Form View ─── */}
           {view === "form" && (
             <div className="dashboard-section">
               <Card className="fs-table-card shadow-sm">
@@ -629,11 +1583,15 @@ const FoodSupplementary = () => {
                   <Card.Header className="fs-form-header">
                     <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
                       <h5 className="mb-0">
-                        {isEditing ? <FaEdit className="me-2" /> : <FaPlus className="me-2" />}
-                        {isEditing ? "Edit Supplementary Record" : "Add Supplementary Record"}
+                        <FaEdit className="me-2" /> Edit Supplementary Record
                       </h5>
-                      <Button variant="light" size="sm" onClick={() => setView("list")} className="fs-btn-light">
-                        <FaArrowLeft className="me-1" /> Back to List
+                      <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => setView("list")}
+                        className="fs-btn-light"
+                      >
+                        <FaArrowLeft className="me-1" /> Back
                       </Button>
                     </div>
                   </Card.Header>
@@ -641,56 +1599,221 @@ const FoodSupplementary = () => {
                     <div className="fs-form-section mb-4">
                       <h6 className="fs-section-subtitle">Basic Information</h6>
                       <Row>
-                        <Col md={6} lg={4}>{renderFormField("Month", "month", "select")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Financial Year", "financial_year", "text", "e.g. 2026-27")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Active Beneficiaries", "active_beneficiaries", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Total Beneficiaries", "total_beneficiaries", "number", "0")}</Col>
+                        <Col md={6} lg={4}>
+                          {renderFormField(
+                            "AWC Code",
+                            "awc_code",
+                            "text",
+                            "5064010101",
+                          )}
+                        </Col>
+                        <Col md={6} lg={4}>
+                          {renderFormField("Month", "month", "select")}
+                        </Col>
+                        <Col md={6} lg={4}>
+                          {renderFormField(
+                            "Financial Year",
+                            "financial_year",
+                            "text",
+                            "2026-27",
+                          )}
+                        </Col>
+                        <Col md={6} lg={4}>
+                          {renderFormField(
+                            "Active Beneficiaries",
+                            "active_beneficiaries",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={4}>
+                          {renderFormField(
+                            "Total Beneficiaries",
+                            "total_beneficiaries",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
                       </Row>
                     </div>
-
                     <div className="fs-form-section mb-4">
-                      <h6 className="fs-section-subtitle">Beneficiaries Details</h6>
+                      <h6 className="fs-section-subtitle">
+                        Beneficiaries Details
+                      </h6>
                       <Row>
-                        <Col md={6} lg={4}>{renderFormField("THR 25 Days FRS/HCM (3y-6y)", "thr_25_days_frs_hcm_beneficiaries_3y_6y", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("HCM Beneficiaries (3y-6y)", "hcm_beneficiaries_3y_6y", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Children 6m-3y", "children_6m_3y_beneficiaries", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Pregnant/Lactating Mothers", "pregnant_women_lactating_mothers", "number", "0")}</Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "THR 25 Days FRS/HCM (3y-6y)",
+                            "thr_25_days_frs_hcm_beneficiaries_3y_6y",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "HCM Beneficiaries (3y-6y)",
+                            "hcm_beneficiaries_3y_6y",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "Children 6m-3y",
+                            "children_6m_3y_beneficiaries",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "Pregnant/Lactating Mothers",
+                            "pregnant_women_lactating_mothers",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
                       </Row>
                     </div>
-
                     <div className="fs-form-section mb-4">
-                      <h6 className="fs-section-subtitle">Packets & Supplies Distribution</h6>
+                      <h6 className="fs-section-subtitle">
+                        Packets & Supplies Distribution
+                      </h6>
                       <Row>
-                        <Col md={6} lg={4}>{renderFormField("Mung Dal Khichdi Packets", "quarterly_packets_mung_dal_khichdi", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Poushik Sattu Mix Packets", "quarterly_packets_poushik_sattu_mix", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Poushik Sattu Mix (75d, gm)", "poushik_sattu_mix_75_days_packet_size_gm", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Sattu 2250gm Packets", "quarterly_packets_sattu_2250gm", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Mix 1000gm Packets", "quarterly_packets_mix_1000gm", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Multi Grain Aata 1250gm", "quarterly_packets_multi_grain_aata_1250gm", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Panjeeri 75d 2625gm", "panjeeri_75_days_2625gm_quarterly_packets", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Panjeeri 75d 4625gm", "panjeeri_75_days_4625gm_quarterly_packets", "number", "0")}</Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "Mung Dal Khichdi Packets",
+                            "quarterly_packets_mung_dal_khichdi",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "Poushik Sattu Mix Packets",
+                            "quarterly_packets_poushik_sattu_mix",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "Poushik Sattu Mix (75d, gm)",
+                            "poushik_sattu_mix_75_days_packet_size_gm",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "Sattu 2250gm Packets",
+                            "quarterly_packets_sattu_2250gm",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "Mix 1000gm Packets",
+                            "quarterly_packets_mix_1000gm",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "Multi Grain Aata 1250gm",
+                            "quarterly_packets_multi_grain_aata_1250gm",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "Panjeeri 75d 2625gm",
+                            "panjeeri_75_days_2625gm_quarterly_packets",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "Panjeeri 75d 4625gm",
+                            "panjeeri_75_days_4625gm_quarterly_packets",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
                       </Row>
                     </div>
-
                     <div className="fs-form-section">
-                      <h6 className="fs-section-subtitle">SAM & SUW Children</h6>
+                      <h6 className="fs-section-subtitle">
+                        SAM & SUW Children
+                      </h6>
                       <Row>
-                        <Col md={6} lg={3}>{renderFormField("SAM Children 6m-6y", "sam_children_6m_6y", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("SUW Children 6m-6y", "suw_children_6m_6y", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("SAM Children 3y-6y", "sam_children_3y_6y", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("SUW Children 3y-6y", "suw_children_3y_6y", "number", "0")}</Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "SAM Children 6m-6y",
+                            "sam_children_6m_6y",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "SUW Children 6m-6y",
+                            "suw_children_6m_6y",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "SAM Children 3y-6y",
+                            "sam_children_3y_6y",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
+                        <Col md={6} lg={3}>
+                          {renderFormField(
+                            "SUW Children 3y-6y",
+                            "suw_children_3y_6y",
+                            "number",
+                            "0",
+                          )}
+                        </Col>
                       </Row>
                     </div>
                   </Card.Body>
                   <Card.Footer className="fs-form-footer">
-                    <Button variant="light" onClick={() => setView("list")} className="fs-btn-light px-4">
+                    <Button
+                      variant="light"
+                      onClick={() => setView("list")}
+                      className="fs-btn-light px-4"
+                    >
                       <FaTimes className="me-1" /> Cancel
                     </Button>
-                    <Button variant="primary" type="submit" disabled={formLoading} className="fs-btn-primary px-4">
+                    <Button
+                      variant="primary"
+                      type="submit"
+                      disabled={formLoading}
+                      className="fs-btn-primary px-4"
+                    >
                       {formLoading ? (
-                        <><Spinner as="span" animation="border" size="sm" className="me-1" /> Saving...</>
+                        <>
+                          <Spinner
+                            as="span"
+                            animation="border"
+                            size="sm"
+                            className="me-1"
+                          />{" "}
+                          Saving...
+                        </>
                       ) : (
-                        <><FaSave className="me-1" /> {isEditing ? "Update Record" : "Save Record"}</>
+                        <>
+                          <FaSave className="me-1" /> Update Record
+                        </>
                       )}
                     </Button>
                   </Card.Footer>
@@ -701,23 +1824,226 @@ const FoodSupplementary = () => {
         </Container>
       </div>
 
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered className="fs-modal">
+      {/* ─── Upload Progress Modal ─── */}
+      <Modal
+        show={showUploadModal}
+        onHide={closeUploadModal}
+        centered
+        backdrop={uploadProgress.isUploading ? "static" : true}
+        className="fs-modal"
+      >
+        <Modal.Header
+          closeButton={!uploadProgress.isUploading}
+          className="fs-modal-header"
+        >
+          <Modal.Title>
+            {uploadProgress.isComplete ? (
+              <>
+                <FaCheckCircle className="me-2 text-success" /> Upload Complete
+              </>
+            ) : (
+              <>
+                <FaUpload className="me-2" /> Uploading Records...
+              </>
+            )}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="mb-3">
+            <small className="text-muted d-block mb-1">File:</small>
+            <strong style={{ wordBreak: "break-all" }}>
+              {uploadProgress.fileName}
+            </strong>
+          </div>
+          <div className="mb-3">
+            <div className="d-flex justify-content-between mb-1">
+              <span className="fw-bold">
+                {uploadProgress.isUploading
+                  ? `Uploading ${uploadProgress.currentRow} of ${uploadProgress.total}...`
+                  : `Processed ${uploadProgress.total} of ${uploadProgress.total} records`}
+              </span>
+              <span className="fw-bold text-primary">
+                {uploadProgress.total > 0
+                  ? Math.round(
+                      ((uploadProgress.uploaded + uploadProgress.failed) /
+                        uploadProgress.total) *
+                        100,
+                    )
+                  : 0}
+                %
+              </span>
+            </div>
+            <ProgressBar
+              now={
+                uploadProgress.total > 0
+                  ? ((uploadProgress.uploaded + uploadProgress.failed) /
+                      uploadProgress.total) *
+                    100
+                  : 0
+              }
+              variant={
+                uploadProgress.failed > 0 && !uploadProgress.isUploading
+                  ? "warning"
+                  : "primary"
+              }
+              animated={uploadProgress.isUploading}
+              style={{ height: "10px" }}
+            />
+          </div>
+          <Row className="g-2 mb-3">
+            <Col xs={4}>
+              <div
+                className="text-center p-2 rounded border"
+                style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}
+              >
+                <FaCheckCircle className="text-success mb-1" />
+                <div
+                  className="fw-bold text-success"
+                  style={{ fontSize: "1.3rem" }}
+                >
+                  {uploadProgress.uploaded}
+                </div>
+                <small className="text-muted">Uploaded</small>
+              </div>
+            </Col>
+            <Col xs={4}>
+              <div
+                className="text-center p-2 rounded border"
+                style={{ background: "#fef2f2", borderColor: "#fecaca" }}
+              >
+                <FaTimesCircle className="text-danger mb-1" />
+                <div
+                  className="fw-bold text-danger"
+                  style={{ fontSize: "1.3rem" }}
+                >
+                  {uploadProgress.failed}
+                </div>
+                <small className="text-muted">Failed</small>
+              </div>
+            </Col>
+            <Col xs={4}>
+              <div
+                className="text-center p-2 rounded border"
+                style={{ background: "#eff6ff", borderColor: "#bfdbfe" }}
+              >
+                <FaFileExcel className="text-primary mb-1" />
+                <div
+                  className="fw-bold text-primary"
+                  style={{ fontSize: "1.3rem" }}
+                >
+                  {uploadProgress.total}
+                </div>
+                <small className="text-muted">Total</small>
+              </div>
+            </Col>
+          </Row>
+          {uploadProgress.errors.length > 0 && (
+            <div>
+              <div className="d-flex align-items-center mb-2">
+                <FaExclamationTriangle className="text-warning me-2" />
+                <strong>Error Details ({uploadProgress.errors.length}):</strong>
+              </div>
+              <div
+                style={{
+                  maxHeight: "200px",
+                  overflowY: "auto",
+                  border: "1px solid #fecaca",
+                  borderRadius: "8px",
+                  background: "#fef2f2",
+                }}
+              >
+                {uploadProgress.errors.map((err, i) => (
+                  <div
+                    key={i}
+                    className="px-3 py-2"
+                    style={{
+                      borderBottom:
+                        i < uploadProgress.errors.length - 1
+                          ? "1px solid #fecaca"
+                          : "none",
+                      fontSize: "0.8rem",
+                    }}
+                  >
+                    <div>
+                      <strong>Row {err.row}</strong>
+                      {err.awcCode !== "—" && (
+                        <span className="text-muted">
+                          {" "}
+                          — AWC: {err.awcCode}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-danger">{err.error}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {uploadProgress.isComplete && uploadProgress.failed === 0 && (
+            <Alert variant="success" className="mt-3 mb-0">
+              <FaCheckCircle className="me-2" /> All {uploadProgress.uploaded}{" "}
+              records uploaded successfully!
+            </Alert>
+          )}
+          {uploadProgress.isComplete && uploadProgress.failed > 0 && (
+            <Alert variant="warning" className="mt-3 mb-0">
+              <FaExclamationTriangle className="me-2" />{" "}
+              {uploadProgress.uploaded} succeeded, {uploadProgress.failed}{" "}
+              failed. Check error details above.
+            </Alert>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="fs-modal-footer">
+          <Button
+            variant="light"
+            onClick={closeUploadModal}
+            disabled={uploadProgress.isUploading}
+            className="fs-btn-light px-4"
+          >
+            <FaTimes className="me-1" /> Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* ─── Delete Confirmation Modal ─── */}
+      <Modal
+        show={showDeleteModal}
+        onHide={() => setShowDeleteModal(false)}
+        centered
+        className="fs-modal"
+      >
         <Modal.Header closeButton className="fs-modal-header fs-delete-header">
-          <Modal.Title><FaTrash className="me-2" />Confirm Delete</Modal.Title>
+          <Modal.Title>
+            <FaTrash className="me-2" /> Confirm Delete
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p>Are you sure you want to delete this record?</p>
           {deleteTarget && (
             <div className="fs-delete-detail">
+              <strong>AWC Code:</strong> {deleteTarget.awc_code} &nbsp;|&nbsp;
               <strong>Month:</strong> {deleteTarget.month} &nbsp;|&nbsp;
               <strong>Year:</strong> {deleteTarget.financial_year} &nbsp;|&nbsp;
-              <strong>Total Beneficiaries:</strong> {deleteTarget.total_beneficiaries}
+              <strong>Total Beneficiaries:</strong>{" "}
+              {deleteTarget.total_beneficiaries}
             </div>
           )}
         </Modal.Body>
         <Modal.Footer className="fs-modal-footer">
-          <Button variant="light" onClick={() => setShowDeleteModal(false)} className="fs-btn-light"><FaTimes className="me-1" />Cancel</Button>
-          <Button variant="danger" onClick={confirmDelete} className="fs-btn-danger"><FaTrash className="me-1" />Delete</Button>
+          <Button
+            variant="light"
+            onClick={() => setShowDeleteModal(false)}
+            className="fs-btn-light"
+          >
+            <FaTimes className="me-1" /> Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={confirmDelete}
+            className="fs-btn-danger"
+          >
+            <FaTrash className="me-1" /> Delete
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>
