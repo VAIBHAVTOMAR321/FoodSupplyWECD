@@ -858,7 +858,6 @@ const DPODashboard = () => {
                     <tr>
                       <th>#</th>
                       <th>Food Item</th>
-                      <th>System Field Name</th>
                     </tr>
                   </thead>
                   <tbody>
