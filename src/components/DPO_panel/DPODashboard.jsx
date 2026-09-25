@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination, Modal, Badge } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dpo.css";
@@ -142,6 +142,9 @@ const DPODashboard = () => {
   const [suppliesLoading, setSuppliesLoading] = useState(true);
   const [suppliesGroupBy, setSuppliesGroupBy] = useState(['Project', 'Sector']);
 
+  // Race condition prevention for API calls
+  const suppliesReqId = useRef(0);
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -169,9 +172,15 @@ const DPODashboard = () => {
 
   // Dynamic Supplies Data Fetching (DPO Level - Project & Sector)
   const fetchSuppliesData = async (type) => {
+    const reqId = ++suppliesReqId.current; // Increment and get unique ID for this request
     setSuppliesLoading(true);
+    
     try {
       const response = await api.get(`/dpo/${type}-food-reconciliation/`);
+      
+      // If this is not the latest request, ignore the response to prevent overwriting newer data
+      if (reqId !== suppliesReqId.current) return;
+
       const flatData = [];
       if (response.data.success && response.data.project_data) {
         response.data.project_data.forEach(p => {
@@ -186,18 +195,25 @@ const DPODashboard = () => {
           }
         });
       }
-      setSuppliesData(flatData);
+      
+      // Double check it's still the latest request before setting state
+      if (reqId === suppliesReqId.current) {
+        setSuppliesData(flatData);
+      }
     } catch (err) {
-      console.error(`Failed to fetch ${type.toUpperCase()} supplies data:`, err);
-      setSuppliesData([]);
+      if (reqId === suppliesReqId.current) {
+        console.error(`Failed to fetch ${type.toUpperCase()} supplies data:`, err);
+        setSuppliesData([]);
+      }
     } finally {
-      setSuppliesLoading(false);
+      if (reqId === suppliesReqId.current) {
+        setSuppliesLoading(false);
+      }
     }
   };
 
   useEffect(() => { 
     fetchData(); 
-    fetchSuppliesData('thr');
   }, []);
 
   useEffect(() => {

@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
@@ -83,7 +82,6 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
   };
 
   return (
-    // Added relative positioning and z-index here to lift it above the table
     <div className="dpo-filter-group" style={{ position: 'relative', zIndex: 20 }}>
       <Form.Label className="dpo-filter-label">{label}</Form.Label>
       <Dropdown autoClose="outside">
@@ -149,6 +147,9 @@ const DirectorDashboard = () => {
   const [suppliesLoading, setSuppliesLoading] = useState(true);
   const [suppliesGroupBy, setSuppliesGroupBy] = useState(['District', 'Project', 'Sector']);
 
+  // Race condition prevention for API calls
+  const suppliesReqId = useRef(0);
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -196,10 +197,14 @@ const DirectorDashboard = () => {
 
   // Dynamic Supplies Data Fetching (Handles both 'thr' and 'hcm' dynamically)
   const fetchSuppliesData = async (type) => {
+    const reqId = ++suppliesReqId.current; // Increment and get unique ID for this request
     setSuppliesLoading(true);
     try {
-      // Calls /director/thr-director-food-reconciliation/ or /director/hcm-director-food-reconciliation/
       const response = await api.get(`/director/${type}-director-food-reconciliation/`);
+      
+      // If this is not the latest request, ignore the response to prevent overwriting newer data
+      if (reqId !== suppliesReqId.current) return;
+
       const flatData = [];
       
       if (response.data.success && response.data.district_data) {
@@ -220,12 +225,19 @@ const DirectorDashboard = () => {
           }
         });
       }
-      setSuppliesData(flatData);
+      
+      if (reqId === suppliesReqId.current) {
+        setSuppliesData(flatData);
+      }
     } catch (err) {
-      console.error(`Failed to fetch ${type.toUpperCase()} supplies data:`, err);
-      setSuppliesData([]);
+      if (reqId === suppliesReqId.current) {
+        console.error(`Failed to fetch ${type.toUpperCase()} supplies data:`, err);
+        setSuppliesData([]);
+      }
     } finally {
-      setSuppliesLoading(false);
+      if (reqId === suppliesReqId.current) {
+        setSuppliesLoading(false);
+      }
     }
   };
 
@@ -234,7 +246,6 @@ const DirectorDashboard = () => {
       fetchHcmFoodItems();
       fetchThrFoodItems();
       fetchData();
-      fetchSuppliesData('thr');
     }
   }, [api]);
 
