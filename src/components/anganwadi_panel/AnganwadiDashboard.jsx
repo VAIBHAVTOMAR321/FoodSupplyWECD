@@ -260,9 +260,9 @@ const AnganwadiDashboard = () => {
       food_item: selectedFoodItemDetails.food_item,
       total_beneficiaries: parseInt(distributionData.total_beneficiaries, 10),
       quantity: isNaN(calculatedQuantity) ? 0 : calculatedQuantity,
-       unit: selectedFoodItemDetails.unit,
-       bene_category: selectedFoodItemDetails.bene_category,
-     };
+      unit: selectedFoodItemDetails.unit,
+      bene_category: selectedFoodItemDetails.bene_category,
+    };
 
     if (isThr) {
       payload.fin_year = distributionData.fin_year;
