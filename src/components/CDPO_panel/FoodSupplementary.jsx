@@ -20,6 +20,7 @@ import {
   Badge,
   Dropdown,
   ProgressBar,
+  Pagination,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/cdpo.css";
@@ -29,6 +30,7 @@ import CDPOLeftNav from "./CDPOLeftNav";
 import {
   FaEdit,
   FaTrash,
+  FaEye,
   FaChartBar,
   FaUsers,
   FaBox,
@@ -252,6 +254,8 @@ const FoodSupplementary = () => {
   const [view, setView] = useState("list");
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewRecord, setViewRecord] = useState(null);
 
   const [formData, setFormData] = useState({ ...initialFormData });
   const [formErrors, setFormErrors] = useState({});
@@ -263,6 +267,10 @@ const FoodSupplementary = () => {
     total: 0, uploaded: 0, failed: 0, errors: [], currentRow: 0, isUploading: false, isComplete: false, fileName: "",
   });
   const fileInputRef = useRef(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     const handleResize = () => {
@@ -345,6 +353,23 @@ const FoodSupplementary = () => {
       (r.awc_code || "").toLowerCase().includes(term)
     );
   }, [filteredRecords, searchTerm]);
+
+  // Pagination logic
+  const totalRecords = searchedRecords.length;
+  const totalPages = Math.ceil(totalRecords / itemsPerPage);
+  const paginatedRecords = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return searchedRecords.slice(startIndex, startIndex + itemsPerPage);
+  }, [searchedRecords, currentPage, itemsPerPage]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    setItemsPerPage(Number(e.target.value));
+    setCurrentPage(1);
+  };
 
   /* ── Aggregation Logic for Sector-wise Summary Table ── */
   const aggregatedData = useMemo(() => {
@@ -547,9 +572,19 @@ const FoodSupplementary = () => {
     setFormData({ ...initialFormData, ...record });
     setFormErrors({}); setIsEditing(true); setView("form");
   };
+const handleDeleteClick = (record) => {
+    setDeleteTarget(record);
+    setShowDeleteModal(true);
+  };
 
-  const handleDeleteClick = (record) => {
-    setDeleteTarget(record); setShowDeleteModal(true);
+  const handleViewClick = (record) => {
+    setViewRecord(record);
+    setShowViewModal(true);
+  };
+
+  const handleCloseViewModal = () => {
+    setShowViewModal(false);
+    setViewRecord(null);
   };
 
   const validateForm = (data) => {
@@ -885,9 +920,9 @@ const FoodSupplementary = () => {
                                     <th key={idx} className="text-end">{col.label}</th>
                                   ))}
                                 </tr>
-                              </thead>
-                              <tbody>
-                                {aggregatedData.length === 0 ? (
+</thead>
+                                <tbody>
+                                  {aggregatedData.length === 0 ? (
                                   <tr>
                                     <td colSpan={NUMERIC_AGG_FIELDS.length + 4} className="text-center py-4 text-muted">
                                       No data available for aggregation
@@ -968,20 +1003,21 @@ const FoodSupplementary = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {searchedRecords.length === 0 ? (
+                              {paginatedRecords.length === 0 ? (
                                 <tr>
                                   <td colSpan={TABLE_COLUMNS.length} className="text-center py-5 text-muted">
                                     No records found. Click <strong>Upload Excel</strong> to add records.
                                   </td>
                                 </tr>
                               ) : (
-                                searchedRecords.map((record, index) => (
+                                paginatedRecords.map((record, index) => (
                                   <tr key={record.id || index}>
                                     {TABLE_COLUMNS.map((col, cIdx) => {
-                                      if (col.key === "_index") return <td key={cIdx} className="text-muted">{index + 1}</td>;
+                                      if (col.key === "_index") return <td key={cIdx} className="text-muted">{(currentPage - 1) * itemsPerPage + index + 1}</td>;
                                       if (col.key === "_actions") return (
                                         <td key={cIdx} className="text-center">
                                           <div className="fs-action-btns">
+                                            <Button variant="light" size="sm" className="fs-action-btn" style={{ color: '#0ea5e9', background: '#f0f9ff', borderColor: '#bae6fd' }} onClick={() => handleViewClick(record)} title="View"><FaEye /></Button>
                                             <Button variant="light" size="sm" className="fs-action-btn fs-edit-btn" onClick={() => handleEdit(record)} title="Edit"><FaEdit /></Button>
                                             <Button variant="light" size="sm" className="fs-action-btn fs-delete-btn" onClick={() => handleDeleteClick(record)} title="Delete"><FaTrash /></Button>
                                           </div>
@@ -1013,6 +1049,50 @@ const FoodSupplementary = () => {
                           </Table>
                         </div>
                       </Card.Body>
+                      {/* ─── Pagination Controls ─── */}
+                      {totalRecords > 0 && (
+                        <Card.Footer className="d-flex justify-content-between align-items-center flex-wrap gap-2 py-3 px-4">
+                          <div className="d-flex align-items-center gap-2">
+                            <Form.Label className="mb-0 small text-muted">Rows per page:</Form.Label>
+                            <Form.Select size="sm" value={itemsPerPage} onChange={handleItemsPerPageChange} style={{ width: 'auto' }}>
+                              <option value={5}>5</option>
+                              <option value={10}>10</option>
+                              <option value={25}>25</option>
+                              <option value={50}>50</option>
+                              <option value={100}>100</option>
+                            </Form.Select>
+                          </div>
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="small text-muted">
+                              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalRecords)} of {totalRecords} entries
+                            </span>
+                            <Pagination size="sm" className="mb-0">
+                              <Pagination.Prev 
+                                disabled={currentPage === 1} 
+                                onClick={() => handlePageChange(currentPage - 1)}
+                              />
+                              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                let startPage = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+                                const page = startPage + i;
+                                if (page > totalPages) return null;
+                                return (
+                                  <Pagination.Item 
+                                    key={page} 
+                                    active={page === currentPage}
+                                    onClick={() => handlePageChange(page)}
+                                  >
+                                    {page}
+                                  </Pagination.Item>
+                                );
+                              })}
+                              <Pagination.Next 
+                                disabled={currentPage === totalPages} 
+                                onClick={() => handlePageChange(currentPage + 1)}
+                              />
+                            </Pagination>
+                          </div>
+                        </Card.Footer>
+                      )}
                     </Card>
                   </div>
                 </>
@@ -1185,6 +1265,63 @@ const FoodSupplementary = () => {
         <Modal.Footer className="fs-modal-footer">
           <Button variant="light" onClick={() => setShowDeleteModal(false)} className="fs-btn-light"><FaTimes className="me-1" /> Cancel</Button>
           <Button variant="danger" onClick={confirmDelete} className="fs-btn-danger"><FaTrash className="me-1" /> Delete</Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* ─── View Record Modal ─── */}
+      <Modal show={showViewModal} onHide={handleCloseViewModal} centered className="fs-modal" size="lg">
+        <Modal.Header closeButton className="fs-modal-header">
+          <Modal.Title><FaEye className="me-2 text-primary" /> View Record Details</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {viewRecord && (
+            <div>
+              <div className="fs-form-section mb-3">
+                <h6 className="fs-section-subtitle">Basic Information</h6>
+                <Row>
+                  <Col md={6}><strong>AWC Code:</strong> {viewRecord.awc_code}</Col>
+                  <Col md={6}><strong>Month:</strong> {viewRecord.month}</Col>
+                  <Col md={6}><strong>Financial Year:</strong> {viewRecord.financial_year}</Col>
+                  <Col md={6}><strong>Active Beneficiaries:</strong> {viewRecord.active_beneficiaries?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>Total Beneficiaries:</strong> {viewRecord.total_beneficiaries?.toLocaleString() || 0}</Col>
+                </Row>
+              </div>
+              <div className="fs-form-section mb-3">
+                <h6 className="fs-section-subtitle">Beneficiaries Details</h6>
+                <Row>
+                  <Col md={6}><strong>THR 25 Days FRS/HCM (3y-6y):</strong> {viewRecord.thr_25_days_frs_hcm_beneficiaries_3y_6y?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>HCM Beneficiaries (3y-6y):</strong> {viewRecord.hcm_beneficiaries_3y_6y?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>Children 6m-3y:</strong> {viewRecord.children_6m_3y_beneficiaries?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>Pregnant/Lactating Mothers:</strong> {viewRecord.pregnant_women_lactating_mothers?.toLocaleString() || 0}</Col>
+                </Row>
+              </div>
+              <div className="fs-form-section mb-3">
+                <h6 className="fs-section-subtitle">SAM & SUW Children</h6>
+                <Row>
+                  <Col md={6}><strong>SAM Children 6m-6y:</strong> {viewRecord.sam_children_6m_6y?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>SUW Children 6m-6y:</strong> {viewRecord.suw_children_6m_6y?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>SAM Children 3y-6y:</strong> {viewRecord.sam_children_3y_6y?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>SUW Children 3y-6y:</strong> {viewRecord.suw_children_3y_6y?.toLocaleString() || 0}</Col>
+                </Row>
+              </div>
+              <div className="fs-form-section">
+                <h6 className="fs-section-subtitle">Packets & Supplies Distribution</h6>
+                <Row>
+                  <Col md={6}><strong>Mung Dal Khichdi:</strong> {viewRecord.quarterly_packets_mung_dal_khichdi?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>Poushik Sattu Mix:</strong> {viewRecord.quarterly_packets_poushik_sattu_mix?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>Sattu Mix (gm):</strong> {viewRecord.poushik_sattu_mix_75_days_packet_size_gm?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>Sattu 2250gm:</strong> {viewRecord.quarterly_packets_sattu_2250gm?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>Mix 1000gm:</strong> {viewRecord.quarterly_packets_mix_1000gm?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>Multi Grain Aata:</strong> {viewRecord.quarterly_packets_multi_grain_aata_1250gm?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>Panjeeri 2625gm:</strong> {viewRecord.panjeeri_75_days_2625gm_quarterly_packets?.toLocaleString() || 0}</Col>
+                  <Col md={6}><strong>Panjeeri 4625gm:</strong> {viewRecord.panjeeri_75_days_4625gm_quarterly_packets?.toLocaleString() || 0}</Col>
+                </Row>
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="fs-modal-footer">
+          <Button variant="light" onClick={handleCloseViewModal} className="fs-btn-light px-4"><FaTimes className="me-1" /> Close</Button>
         </Modal.Footer>
       </Modal>
     </div>
