@@ -1,3 +1,4 @@
+
 import React, {
   useState,
   useEffect,
@@ -554,6 +555,9 @@ const FoodSupplementary = () => {
   const [suppliesData, setSuppliesData] = useState([]);
   const [suppliesLoading, setSuppliesLoading] = useState(true);
 
+  // Race condition prevention for API calls
+  const suppliesReqId = useRef(0);
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -583,9 +587,14 @@ const FoodSupplementary = () => {
 
   // Dynamic Supplies Data Fetching (THR & HCM for CDPO)
   const fetchSuppliesData = async (type) => {
+    const reqId = ++suppliesReqId.current; // Increment and get unique ID for this request
     setSuppliesLoading(true);
     try {
       const response = await api.get(`/cdpo/${type}-awc-food-reconciliation/`);
+      
+      // If this is not the latest request, ignore the response to prevent overwriting newer data
+      if (reqId !== suppliesReqId.current) return;
+
       const sectorData = [];
       if (response.data.success && response.data.sector_data) {
         response.data.sector_data.forEach((s) => {
@@ -595,15 +604,23 @@ const FoodSupplementary = () => {
           });
         });
       }
-      setSuppliesData(sectorData);
+
+      // Double check it's still the latest request before setting state
+      if (reqId === suppliesReqId.current) {
+        setSuppliesData(sectorData);
+      }
     } catch (err) {
-      console.error(
-        `Failed to fetch ${type.toUpperCase()} supplies data:`,
-        err,
-      );
-      setSuppliesData([]);
+      if (reqId === suppliesReqId.current) {
+        console.error(
+          `Failed to fetch ${type.toUpperCase()} supplies data:`,
+          err,
+        );
+        setSuppliesData([]);
+      }
     } finally {
-      setSuppliesLoading(false);
+      if (reqId === suppliesReqId.current) {
+        setSuppliesLoading(false);
+      }
     }
   };
 
