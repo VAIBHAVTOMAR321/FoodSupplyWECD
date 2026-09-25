@@ -89,11 +89,11 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
       //   path: "/DirFoodItemReceiving",
       // },
 
-      {
-        icon: <FaUserPlus />,
-        label: "Beneficiary Entry",
-        path: "/DirectorBeneEntry",
-      },
+      // {
+      //   icon: <FaUserPlus />,
+      //   label: "Beneficiary Entry",
+      //   path: "/DirectorBeneEntry",
+      // },
 
        {
         icon: <FaListUl />,

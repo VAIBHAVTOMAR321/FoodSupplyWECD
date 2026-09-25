@@ -74,24 +74,24 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
   };
 
  const menuItems = [
+      // {
+      //   icon: <FaTachometerAlt />,
+      //   label: "DashBoard",
+      //   path: "/CDPODashboard",
+      //   active: true,
+      // },
       {
         icon: <FaTachometerAlt />,
         label: "DashBoard",
-        path: "/CDPODashboard",
-        active: true,
-      },
-      {
-        icon: <FaTachometerAlt />,
-        label: "Food Supplementary",
         path: "/FoodSupplementary",
         active: true,
       },
- {
-        icon: <FaUsers />,
-        label: "Beneficiary Entry",
-        path: "/CDPOBeneEntry",
-        active: true,
-      },
+//  {
+//         icon: <FaUsers />,
+//         label: "Beneficiary Entry",
+//         path: "/CDPOBeneEntry",
+//         active: true,
+//       },
 
       {
         icon: <FaUsers />,
