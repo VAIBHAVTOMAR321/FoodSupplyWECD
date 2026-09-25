@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from "react";
 import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
@@ -65,16 +66,6 @@ const SUMMARY_PILLS = [
   { key: "quarterly_packets_multi_grain_aata_1250gm", label: "Multi Aata", icon: <FaBoxes size={10} /> },
 ];
 
-// Dummy Data for Supplies Table (Added District)
-const SUPPLIES_DATA = [
-  { district: "Almora", project: "Bhaisiachana", sector: "Barechhina", received: 3500, distributed: 3000, remaining: 500 },
-  { district: "Almora", project: "Bhaisiachana", sector: "Sheragat", received: 2800, distributed: 2500, remaining: 300 },
-  { district: "Bageshwar", project: "Bhikiyasain", sector: "Basot", received: 1500, distributed: 1200, remaining: 300 },
-  { district: "Bageshwar", project: "Bhikiyasain", sector: "Bhikiyasen", received: 1600, distributed: 1400, remaining: 200 },
-  { district: "Bageshwar", project: "Bhikiyasain", sector: "Daula", received: 2000, distributed: 1800, remaining: 200 },
-  { district: "Bageshwar", project: "Bhikiyasain", sector: "Vinayak", received: 1300, distributed: 1100, remaining: 200 },
-];
-
 // Custom Multi-Select Dropdown Component
 const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
   const toggleOption = (opt) => {
@@ -92,7 +83,8 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
   };
 
   return (
-    <div className="dpo-filter-group">
+    // Added relative positioning and z-index here to lift it above the table
+    <div className="dpo-filter-group" style={{ position: 'relative', zIndex: 20 }}>
       <Form.Label className="dpo-filter-label">{label}</Form.Label>
       <Dropdown autoClose="outside">
         <Dropdown.Toggle size="sm" variant="light" className="dpo-multi-toggle">
@@ -151,6 +143,12 @@ const DirectorDashboard = () => {
   const [aggPage, setAggPage] = useState(1);
   const [detailsPage, setDetailsPage] = useState(1);
 
+  // Supplies Dynamic States
+  const [suppliesTab, setSuppliesTab] = useState("thr");
+  const [suppliesData, setSuppliesData] = useState([]);
+  const [suppliesLoading, setSuppliesLoading] = useState(true);
+  const [suppliesGroupBy, setSuppliesGroupBy] = useState(['District', 'Project', 'Sector']);
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -196,13 +194,56 @@ const DirectorDashboard = () => {
     }
   };
 
+  // Dynamic Supplies Data Fetching (Handles both 'thr' and 'hcm' dynamically)
+  const fetchSuppliesData = async (type) => {
+    setSuppliesLoading(true);
+    try {
+      // Calls /director/thr-director-food-reconciliation/ or /director/hcm-director-food-reconciliation/
+      const response = await api.get(`/director/${type}-director-food-reconciliation/`);
+      const flatData = [];
+      
+      if (response.data.success && response.data.district_data) {
+        response.data.district_data.forEach(d => {
+          if (d.project_data) {
+            d.project_data.forEach(p => {
+              if (p.sector_data) {
+                p.sector_data.forEach(s => {
+                  flatData.push({
+                    district: d.district,
+                    project: p.project,
+                    sector: s.sector,
+                    foodData: s.food_data || []
+                  });
+                });
+              }
+            });
+          }
+        });
+      }
+      setSuppliesData(flatData);
+    } catch (err) {
+      console.error(`Failed to fetch ${type.toUpperCase()} supplies data:`, err);
+      setSuppliesData([]);
+    } finally {
+      setSuppliesLoading(false);
+    }
+  };
+
   useEffect(() => { 
     if (api) {
       fetchHcmFoodItems();
       fetchThrFoodItems();
       fetchData();
+      fetchSuppliesData('thr');
     }
   }, [api]);
+
+  useEffect(() => {
+    if (api) {
+      fetchSuppliesData(suppliesTab);
+      setSuppliesPage(1);
+    }
+  }, [suppliesTab]);
 
   const uniqueMonths = useMemo(() => [...new Set(records.map(r => r.month).filter(Boolean))].sort(), [records]);
   const uniqueFYs = useMemo(() => [...new Set(records.map(r => r.financial_year).filter(Boolean))].sort(), [records]);
@@ -272,18 +313,73 @@ const DirectorDashboard = () => {
     }, {});
   }, [searchedRecords]);
 
-  const totalSupplies = useMemo(() => {
-    return SUPPLIES_DATA.reduce((acc, item) => {
-      acc.received += item.received;
-      acc.distributed += item.distributed;
-      acc.remaining += item.remaining;
-      return acc;
-    }, { received: 0, distributed: 0, remaining: 0 });
-  }, []);
+  // Extract unique food items dynamically from suppliesData
+  const suppliesFoodItems = useMemo(() => {
+    const items = new Set();
+    suppliesData.forEach(row => {
+      row.foodData.forEach(f => items.add(f.food_item));
+    });
+    return Array.from(items);
+  }, [suppliesData]);
+
+  // Get active group keys based on selection
+  const activeGroupKeys = useMemo(() => {
+    return suppliesGroupBy.length > 0 ? suppliesGroupBy.map(g => g.toLowerCase()) : ['district', 'project', 'sector'];
+  }, [suppliesGroupBy]);
+
+  // Group and aggregate Supplies Data dynamically
+  const groupedSuppliesData = useMemo(() => {
+    const groups = {};
+    suppliesData.forEach(item => {
+      const keyVals = activeGroupKeys.map(gk => item[gk]);
+      const groupKey = keyVals.join('||');
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = { keyVals, foodData: {} };
+        suppliesFoodItems.forEach(fi => {
+          groups[groupKey].foodData[fi] = { received: 0, distributed: 0, balance: 0 };
+        });
+      }
+      
+      item.foodData.forEach(fd => {
+        if (groups[groupKey].foodData[fd.food_item]) {
+          groups[groupKey].foodData[fd.food_item].received += fd.received || 0;
+          groups[groupKey].foodData[fd.food_item].distributed += fd.distributed || 0;
+          groups[groupKey].foodData[fd.food_item].balance += fd.balance || 0;
+        }
+      });
+    });
+
+    return Object.values(groups).map(g => {
+      const row = {};
+      activeGroupKeys.forEach((gk, i) => row[gk] = g.keyVals[i]);
+      row.foodData = Object.entries(g.foodData).map(([food_item, vals]) => ({ food_item, ...vals }));
+      return row;
+    });
+  }, [suppliesData, activeGroupKeys, suppliesFoodItems]);
+
+  // Calculate Totals for dynamic supplies table
+  const suppliesTotals = useMemo(() => {
+    const totals = {};
+    suppliesFoodItems.forEach(fi => {
+      totals[fi] = { received: 0, distributed: 0, balance: 0 };
+    });
+    groupedSuppliesData.forEach(row => {
+      row.foodData.forEach(fd => {
+        if (totals[fd.food_item]) {
+          totals[fd.food_item].received += fd.received || 0;
+          totals[fd.food_item].distributed += fd.distributed || 0;
+          totals[fd.food_item].balance += fd.balance || 0;
+        }
+      });
+    });
+    return totals;
+  }, [groupedSuppliesData, suppliesFoodItems]);
 
   // Reset Pagination on Filter Change
   useEffect(() => { setDetailsPage(1); }, [searchedRecords]);
   useEffect(() => { setAggPage(1); }, [aggregatedData]);
+  useEffect(() => { setSuppliesPage(1); }, [suppliesData, suppliesGroupBy]);
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
@@ -336,8 +432,8 @@ const DirectorDashboard = () => {
 
   // Paginated Data Slices
   const currentSupplies = useMemo(() => {
-    return SUPPLIES_DATA.slice((suppliesPage - 1) * ITEMS_PER_PAGE, suppliesPage * ITEMS_PER_PAGE);
-  }, [suppliesPage]);
+    return groupedSuppliesData.slice((suppliesPage - 1) * ITEMS_PER_PAGE, suppliesPage * ITEMS_PER_PAGE);
+  }, [groupedSuppliesData, suppliesPage]);
 
   const currentAggregated = useMemo(() => {
     return aggregatedData.slice((aggPage - 1) * ITEMS_PER_PAGE, aggPage * ITEMS_PER_PAGE);
@@ -349,27 +445,73 @@ const DirectorDashboard = () => {
 
   /* --- Export Functions --- */
   const exportSuppliesToExcel = () => {
-    const data = SUPPLIES_DATA.map((r, i) => ({ "S. No.": i + 1, District: r.district, Project: r.project, Sector: r.sector, Received: r.received, Distributed: r.distributed, Remaining: r.remaining }));
-    data.push({ "S. No.": "", District: "Total", Project: "", Sector: "", Received: totalSupplies.received, Distributed: totalSupplies.distributed, Remaining: totalSupplies.remaining });
+    const data = groupedSuppliesData.map((r, i) => {
+      const row = { "S. No.": i + 1 };
+      activeGroupKeys.forEach(gk => {
+        row[gk.charAt(0).toUpperCase() + gk.slice(1)] = r[gk];
+      });
+      suppliesFoodItems.forEach(fi => {
+        const fd = r.foodData.find(f => f.food_item === fi);
+        row[`${fi} - Received`] = fd ? fd.received : 0;
+        row[`${fi} - Distributed`] = fd ? fd.distributed : 0;
+        row[`${fi} - Remaining`] = fd ? fd.balance : 0;
+      });
+      return row;
+    });
+    
+    const totalRow = { "S. No.": "" };
+    activeGroupKeys.forEach((gk, idx) => {
+      totalRow[gk.charAt(0).toUpperCase() + gk.slice(1)] = idx === 0 ? "Total" : "";
+    });
+    suppliesFoodItems.forEach(fi => {
+      const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
+      totalRow[`${fi} - Received`] = t.received.toLocaleString();
+      totalRow[`${fi} - Distributed`] = t.distributed.toLocaleString();
+      totalRow[`${fi} - Remaining`] = t.balance.toLocaleString();
+    });
+    data.push(totalRow);
+
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Supplies Summary");
-    XLSX.writeFile(wb, "Supplies_Summary.xlsx");
+    XLSX.writeFile(wb, `Supplies_${suppliesTab.toUpperCase()}_Summary.xlsx`);
   };
 
   const exportSuppliesToPDF = () => {
-    const head = [["S. No.", "District", "Project", "Sector", "Received", "Distributed", "Remaining"]];
-    const body = SUPPLIES_DATA.map((r, i) => [i + 1, r.district, r.project, r.sector, r.received, r.distributed, r.remaining]);
-    const doc = new jsPDF("p", "pt", "a4");
-    doc.text("Supplies Received & Distributed Summary", 40, 40);
+    const head = [[
+      { content: 'S. No.', rowSpan: 2 },
+      ...activeGroupKeys.map(gk => ({ content: gk.charAt(0).toUpperCase() + gk.slice(1), rowSpan: 2 })),
+      ...suppliesFoodItems.map(fi => ({ content: fi, colSpan: 3 }))
+    ], [
+      ...suppliesFoodItems.flatMap(() => ['Rec.', 'Dist.', 'Rem.'])
+    ]];
+    
+    const body = groupedSuppliesData.map((r, i) => [
+      i + 1,
+      ...activeGroupKeys.map(gk => r[gk]),
+      ...suppliesFoodItems.flatMap(fi => {
+        const fd = r.foodData.find(f => f.food_item === fi);
+        return fd ? [fd.received, fd.distributed, fd.balance] : [0, 0, 0];
+      })
+    ]);
+
+    const foot = [[
+      { content: 'Total', colSpan: 1 + activeGroupKeys.length },
+      ...suppliesFoodItems.flatMap(fi => {
+        const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
+        return [t.received.toLocaleString(), t.distributed.toLocaleString(), t.balance.toLocaleString()];
+      })
+    ]];
+
+    const doc = new jsPDF("l", "pt", "a3");
+    doc.text(`Supplies ${suppliesTab.toUpperCase()} Summary`, 40, 40);
     autoTable(doc, {
-      head, body, startY: 50,
-      styles: { fontSize: 8, cellPadding: 3 },
+      head, body, foot, startY: 50,
+      styles: { fontSize: 7, cellPadding: 2 },
       headStyles: { fillColor: [111, 66, 193] }, 
-      foot: [["", "Total", "", "", totalSupplies.received, totalSupplies.distributed, totalSupplies.remaining]],
       footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" }
     });
-    doc.save("Supplies_Summary.pdf");
+    doc.save(`Supplies_${suppliesTab.toUpperCase()}_Summary.pdf`);
   };
 
   const exportAggToExcel = () => {
@@ -423,6 +565,21 @@ const DirectorDashboard = () => {
 
   return (
     <div className="dashboard-container">
+      {/* CSS Override to fix dropdown overlapping issues inside cards */}
+      <style>{`
+        .dpo-table-card {
+          overflow: visible !important;
+        }
+        .dpo-table-header {
+          border-radius: 10px 10px 0 0;
+          position: relative;
+          z-index: 20;
+        }
+        .dpo-multi-menu {
+          z-index: 1060 !important;
+        }
+      `}</style>
+
       <DirectorLeftNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} />
       <div className="main-content-dash">
         <DirectorHeader toggleSidebar={toggleSidebar} />
@@ -506,58 +663,100 @@ const DirectorDashboard = () => {
             </div>
           )}
 
-          {/* Supplies Received & Distributed Table */}
+          {/* Supplies Received & Distributed Table (Dynamic with Tabs & GroupBy) */}
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
                 <FaWarehouse /> Supplies Received & Distributed Summary
               </h5>
-              <div className="dpo-export-btns">
-                <Button className="dpo-export-btn" onClick={exportSuppliesToExcel}><FaFileExcel className="text-success" /> Excel</Button>
-                <Button className="dpo-export-btn" onClick={exportSuppliesToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                <ButtonGroup className="dpo-toggle-group">
+                  <Button className={`dpo-toggle-btn ${suppliesTab === 'thr' ? 'active' : ''}`} onClick={() => setSuppliesTab('thr')}>THR</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesTab === 'hcm' ? 'active' : ''}`} onClick={() => setSuppliesTab('hcm')}>HCM</Button>
+                </ButtonGroup>
+                <div style={{ minWidth: '180px' }}>
+                  <MultiSelectDropdown label="Group By" options={['District', 'Project', 'Sector']} selected={suppliesGroupBy} onChange={setSuppliesGroupBy} />
+                </div>
+                <div className="dpo-export-btns">
+                  <Button className="dpo-export-btn" onClick={exportSuppliesToExcel}><FaFileExcel className="text-success" /> Excel</Button>
+                  <Button className="dpo-export-btn" onClick={exportSuppliesToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
+                </div>
               </div>
             </Card.Header>
             <Card.Body className="p-0">
               <div className="dpo-table-wrapper">
-                <Table hover className="dpo-data-table mb-0">
-                  <thead>
-                    <tr>
-                      <th>S. No.</th>
-                      <th>District</th>
-                      <th>Project</th>
-                      <th>Sector</th>
-                      <th className="text-end">Received</th>
-                      <th className="text-end">Distributed</th>
-                      <th className="text-end">Remaining</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentSupplies.map((row, i) => (
-                      <tr key={i}>
-                        <td>{(suppliesPage - 1) * ITEMS_PER_PAGE + i + 1}</td>
-                        <td>{row.district}</td>
-                        <td><strong>{row.project}</strong></td>
-                        <td>{row.sector}</td>
-                        <td className="text-end">{row.received.toLocaleString()}</td>
-                        <td className="text-end">{row.distributed.toLocaleString()}</td>
-                        <td className="text-end text-primary"><strong>{row.remaining.toLocaleString()}</strong></td>
+                {suppliesLoading ? (
+                  <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div>
+                ) : (
+                  <Table hover className="dpo-data-table mb-0">
+                    <thead>
+                      <tr>
+                        <th rowSpan="2">S. No.</th>
+                        {activeGroupKeys.map(gk => (
+                          <th key={gk} rowSpan="2" style={{textTransform: 'capitalize'}}>{gk}</th>
+                        ))}
+                        {suppliesFoodItems.map((fi, idx) => (
+                          <th key={`fi-${idx}`} colSpan="3" className="text-center" style={{ borderLeft: '1px solid #e9d5ff' }}>
+                            {fi}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <th></th>
-                      <th>Total</th>
-                      <th></th>
-                      <th></th>
-                      <th className="text-end">{totalSupplies.received.toLocaleString()}</th>
-                      <th className="text-end">{totalSupplies.distributed.toLocaleString()}</th>
-                      <th className="text-end">{totalSupplies.remaining.toLocaleString()}</th>
-                    </tr>
-                  </tfoot>
-                </Table>
+                      <tr>
+                        {suppliesFoodItems.map((fi, idx) => (
+                          <React.Fragment key={`sub-${idx}`}>
+                            <th className="text-end">Rec.</th>
+                            <th className="text-end">Dist.</th>
+                            <th className="text-end">Rem.</th>
+                          </React.Fragment>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentSupplies.length === 0 ? (
+                        <tr><td colSpan={1 + activeGroupKeys.length + (suppliesFoodItems.length * 3)} className="text-center p-4 text-muted">No data available</td></tr>
+                      ) : currentSupplies.map((row, i) => (
+                        <tr key={i}>
+                          <td>{(suppliesPage - 1) * ITEMS_PER_PAGE + i + 1}</td>
+                          {activeGroupKeys.map(gk => (
+                            <td key={gk}>{gk === 'project' ? <strong>{row[gk]}</strong> : row[gk]}</td>
+                          ))}
+                          {suppliesFoodItems.map((fi, idx) => {
+                            const fd = row.foodData.find(f => f.food_item === fi);
+                            return (
+                              <React.Fragment key={`data-${idx}`}>
+                                <td className="text-end">{fd ? fd.received.toLocaleString() : 0}</td>
+                                <td className="text-end">{fd ? fd.distributed.toLocaleString() : 0}</td>
+                                <td className="text-end text-primary"><strong>{fd ? fd.balance.toLocaleString() : 0}</strong></td>
+                              </React.Fragment>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                    {groupedSuppliesData.length > 0 && (
+                      <tfoot>
+                        <tr>
+                          <th></th>
+                          {activeGroupKeys.map((gk, idx) => (
+                            <th key={gk}>{idx === 0 ? "Total" : ""}</th>
+                          ))}
+                          {suppliesFoodItems.map((fi, idx) => {
+                            const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
+                            return (
+                              <React.Fragment key={`foot-${idx}`}>
+                                <th className="text-end">{t.received.toLocaleString()}</th>
+                                <th className="text-end">{t.distributed.toLocaleString()}</th>
+                                <th className="text-end">{t.balance.toLocaleString()}</th>
+                              </React.Fragment>
+                            );
+                          })}
+                        </tr>
+                      </tfoot>
+                    )}
+                  </Table>
+                )}
               </div>
-              {renderPagination(suppliesPage, SUPPLIES_DATA.length, setSuppliesPage)}
+              {!suppliesLoading && renderPagination(suppliesPage, groupedSuppliesData.length, setSuppliesPage)}
             </Card.Body>
           </Card>
 
