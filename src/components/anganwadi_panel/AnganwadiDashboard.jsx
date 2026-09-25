@@ -260,10 +260,9 @@ const AnganwadiDashboard = () => {
       food_item: selectedFoodItemDetails.food_item,
       total_beneficiaries: parseInt(distributionData.total_beneficiaries, 10),
       quantity: isNaN(calculatedQuantity) ? 0 : calculatedQuantity,
-      unit: selectedFoodItemDetails.unit,
-      bene_category: selectedFoodItemDetails.bene_category,
-      days_allotted: selectedFoodItemDetails.days_allotted,
-    };
+       unit: selectedFoodItemDetails.unit,
+       bene_category: selectedFoodItemDetails.bene_category,
+     };
 
     if (isThr) {
       payload.fin_year = distributionData.fin_year;
@@ -534,11 +533,6 @@ const AnganwadiDashboard = () => {
                   <Form.Group className="mb-3">
                     <Form.Label>Beneficiary Category</Form.Label>
                     <Form.Control type="text" value={selectedFoodItemForCalc?.bene_category || ''} disabled />
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Days Allotted</Form.Label>
-                    <Form.Control type="text" value={selectedFoodItemForCalc?.days_allotted || ''} disabled />
                   </Form.Group>
 
                   <Form.Group className="mb-3">
