@@ -1494,7 +1494,7 @@ const FoodSupplementary = () => {
               <div className="dashboard-section">
                 <div className="fs-page-header">
                   <h4 className="fs-page-title">
-                    <FaChartBar className="me-2" /> Food Supplementary Nutrition
+                    <FaChartBar className="me-2" /> CDPO Dashboard - Supplementary Nutrition Records
                   </h4>
                   <div className="fs-header-actions">
                     <input

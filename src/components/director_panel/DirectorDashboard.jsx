@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
@@ -160,23 +161,19 @@ const DirectorDashboard = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const fetchHcmFoodItems = async () => {
+  // Fetch Food Item Counts dynamically from /categoryandfooditem/
+  const fetchFoodItemCounts = async () => {
     try {
-      const response = await api.get("/hcm-food-items/");
-      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
-      setHcmFoodItemsCount(Array.isArray(data) ? data.length : 0);
+      const response = await api.get("/categoryandfooditem/");
+      const data = response.data?.food_data || [];
+      
+      const hcmCount = data.filter(item => item.category === "HCM").length;
+      const thrCount = data.filter(item => item.category === "THR").length;
+      
+      setHcmFoodItemsCount(hcmCount);
+      setThrFoodItemsCount(thrCount);
     } catch (err) {
-      console.error("Failed to fetch HCM food items:", err);
-    }
-  };
-
-  const fetchThrFoodItems = async () => {
-    try {
-      const response = await api.get("/thr-food-items/");
-      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
-      setThrFoodItemsCount(Array.isArray(data) ? data.length : 0);
-    } catch (err) {
-      console.error("Failed to fetch THR food items:", err);
+      console.error("Failed to fetch food item counts:", err);
     }
   };
 
@@ -243,8 +240,7 @@ const DirectorDashboard = () => {
 
   useEffect(() => { 
     if (api) {
-      fetchHcmFoodItems();
-      fetchThrFoodItems();
+      fetchFoodItemCounts();
       fetchData();
     }
   }, [api]);

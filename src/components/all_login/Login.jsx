@@ -252,7 +252,7 @@ const Login = () => {
         navigate('/DPODashboard');
         break;
       case 'cdpo':
-        navigate('/CDPODashboard');
+        navigate('/FoodSupplementary');
         break;
       case 'supervisor':
         navigate('/SupervisorDashBoard');

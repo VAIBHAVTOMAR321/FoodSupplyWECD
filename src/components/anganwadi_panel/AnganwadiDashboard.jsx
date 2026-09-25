@@ -7,12 +7,11 @@ import { useLocation } from "react-router-dom";
 import AnganwadiLeftNav from "./AnganwadiLeftNav";
 import AnganwadiHeader from "./AnganwadiHeader";
 import "../../assets/css/dashboard.css";
-import { FaUtensils, FaBoxOpen, FaChevronDown, FaChevronUp, FaDolly, FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUsers, FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes, FaProjectDiagram, FaInfoCircle, FaClock } from "react-icons/fa";
+import { FaUtensils, FaBoxOpen, FaChevronDown, FaChevronUp, FaDolly, FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUsers, FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes, FaProjectDiagram, FaInfoCircle, FaClock, FaTable } from "react-icons/fa";
 import "../../assets/css/AnganwadiDashboard.css";
 
 const API_URLS = {
-  hcm: "/hcm-food-items/",
-  thr: "/thr-food-items/",
+  categoryandfooditem: "/categoryandfooditem/",
   hcm_distribution: "/hcm-anganwadi-distribution/",
   thr_distribution: "/thr-anganwadi-distribution/",
   supplementary_nutrition: "/supplementary-nutrition-anganwadi/",
@@ -61,7 +60,7 @@ const formatMonths = (monthsOrQuarter) => {
   return '';
 };
 
-// Configuration to map API keys to Food Item Names, Categories, and default properties
+// Configuration to map API keys to extra properties
 const supplementaryFoodConfig = [
   { key: 'quarterly_packets_mung_dal_khichdi', label: 'Mung Dal Khichdi', bene_category: 'Children (6m-3y)', unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
   { key: 'quarterly_packets_poushik_sattu_mix', label: 'Poushik Sattu Mix', bene_category: 'Children (6m-3y)', unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
@@ -113,11 +112,13 @@ const AnganwadiDashboard = () => {
       setLoading(prev => ({ ...prev, counts: true }));
       setError(prev => ({ ...prev, counts: "" }));
       try {
-        const [hcmResponse, thrResponse] = await Promise.all([
-          api.get(API_URLS.hcm),
-          api.get(API_URLS.thr),
-        ]);
-        setCounts({ hcm: hcmResponse.data.length, thr: thrResponse.data.length });
+        const response = await api.get(API_URLS.categoryandfooditem);
+        const foodData = response.data?.food_data || [];
+        
+        const hcmCount = foodData.filter(item => item.category === "HCM").length;
+        const thrCount = foodData.filter(item => item.category === "THR").length;
+        
+        setCounts({ hcm: hcmCount, thr: thrCount });
       } catch (err) {
         setError(prev => ({ ...prev, counts: "Failed to fetch food item counts." }));
       } finally {
@@ -143,28 +144,36 @@ const AnganwadiDashboard = () => {
     try {
       const distributionUrl = scheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution;
       
-      // Fetch Both Distribution Records and Supplementary Nutrition Data
-      const [distributionsResponse, suppResponse] = await Promise.all([
+      // Fetch Category/Food Item Data, Distribution Records, and Supplementary Nutrition Data
+      const [catResponse, distributionsResponse, suppResponse] = await Promise.all([
+        api.get(API_URLS.categoryandfooditem),
         api.get(distributionUrl),
         api.get(API_URLS.supplementary_nutrition)
       ]);
 
+      const allFoodData = catResponse.data?.food_data || [];
+      const schemeFoodData = allFoodData.filter(f => f.category === scheme.toUpperCase());
+
       const supp = suppResponse.data && suppResponse.data.length > 0 ? suppResponse.data[0] : null;
       setSupplementaryData(supp);
 
-      // Generate Food Items dynamically from supplementary API response
+      // Generate Food Items dynamically from the API response mapped with local config
       if (supp) {
-        const generatedItems = supplementaryFoodConfig
-          .filter(config => supp[config.key] > 0)
-          .map((config, index) => ({
-            id: index + 1,
-            food_item: config.label,
-            bene_category: config.bene_category,
-            unit: config.unit,
-            qty_per_ben: config.qty_per_ben,
-            days_allotted: config.days_allotted,
-            count: supp[config.key] // Attaching beneficiary count directly
-          }));
+        const generatedItems = schemeFoodData
+          .filter(data => supp[data.field_name] > 0) // Only show if count > 0
+          .map((data, index) => {
+            const config = supplementaryFoodConfig.find(c => c.key === data.field_name);
+            return {
+              id: index + 1,
+              food_item: data.food_item, // Name coming directly from the API
+              field_name: data.field_name,
+              bene_category: config?.bene_category || 'N/A',
+              unit: config?.unit || 'N/A',
+              qty_per_ben: config?.qty_per_ben || 1,
+              days_allotted: config?.days_allotted || 0,
+              count: supp[data.field_name] || 0
+            };
+          });
         setFoodItems(generatedItems);
       } else {
         setError(prev => ({ ...prev, table: "सप्लीमेंट्री न्यूट्रिशन डेटा उपलब्ध नहीं है।" }));
@@ -343,63 +352,107 @@ const AnganwadiDashboard = () => {
           </Row>
 
           {activeScheme && (
-            <Row>
-              <Col xs={12}>
-                <div className="d-flex justify-content-between align-items-center mt-4 mb-3">
-                  <h5 className="mb-0">{activeScheme.toUpperCase()} Distribution Records</h5>
-                  <Button variant="success" onClick={() => handleOpenDistributionModal(null, activeScheme, null, true)}>
-                    <FaDolly className="me-2" /> New Distribution
-                  </Button>
-                </div>
-                {loading.table ? (
-                  <div className="loading-state"><Spinner animation="border" /></div>
-                ) : distributionRecords.length === 0 ? (
-                  <div className="empty-state">No distribution records found for {activeScheme.toUpperCase()}.</div>
-                ) : (
-                  <Table striped bordered hover responsive>
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Food Item</th>
-                        {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Months</th></>}
-                        <th>Total Beneficiaries</th>
-                        <th>Quantity</th>
-                        <th>Unit</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {distributionRecords.map((record, index) => (
-                        <tr key={record.id}>
-                          <td>{index + 1}</td>
-                          <td>{record.food_item}</td>
-                          {activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{formatMonths(record.months || record.quarter)}</td></>}
-                          <td>{record.total_beneficiaries}</td>
-                          <td>{record.quantity}</td>
-                          <td>{record.unit}</td>
-                          <td>
-                            <Button variant="outline-info" size="sm" className="me-2" onClick={() => setViewItem(record) & setShowViewModal(true)}>
-                              <FaEye />
-                            </Button>
-                            <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenDistributionModal(record, activeScheme, record)}>
-                              <FaEdit />
-                            </Button>
-                            <Button variant="outline-danger" size="sm" onClick={async () => {
-                               if(window.confirm(`Delete ${record.food_item}?`)) {
-                                 await api.delete(activeScheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution, { data: { id: record.id }});
-                                 handleCardClick(activeScheme);
-                               }
-                            }}>
-                              <FaTrash />
-                            </Button>
-                          </td>
+            <>
+              {/* Food Items Details Table */}
+              <Row>
+                <Col xs={12}>
+                  <div className="d-flex justify-content-between align-items-center mt-4 mb-3">
+                    <h5 className="mb-0">
+                      <FaTable className="me-2" /> {activeScheme.toUpperCase()} Food Items Details
+                    </h5>
+                  </div>
+                  {loading.table ? (
+                    <div className="loading-state text-center p-4"><Spinner animation="border" /></div>
+                  ) : foodItems.length === 0 ? (
+                    <Alert variant="info">No food items found for {activeScheme.toUpperCase()}.</Alert>
+                  ) : (
+                    <Table striped bordered hover responsive>
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Food Item</th>
+                          <th>Beneficiary Category</th>
+                          <th>Beneficiary Count</th>
+                          <th>Unit</th>
+                          <th>Days Allotted</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                )}
-              </Col>
-            </Row>
+                      </thead>
+                      <tbody>
+                        {foodItems.map((item, index) => (
+                          <tr key={item.id}>
+                            <td>{index + 1}</td>
+                            <td><strong>{item.food_item}</strong></td>
+                            <td>{item.bene_category}</td>
+                            <td>{item.count}</td>
+                            <td>{item.unit}</td>
+                            <td>{item.days_allotted}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
+                </Col>
+              </Row>
+
+              {/* Distribution Records Table */}
+              <Row>
+                <Col xs={12}>
+                  <div className="d-flex justify-content-between align-items-center mt-5 mb-3">
+                    <h5 className="mb-0">{activeScheme.toUpperCase()} Distribution Records</h5>
+                    <Button variant="success" onClick={() => handleOpenDistributionModal(null, activeScheme, null, true)}>
+                      <FaDolly className="me-2" /> New Distribution
+                    </Button>
+                  </div>
+                  {loading.table ? (
+                    <div className="loading-state text-center p-4"><Spinner animation="border" /></div>
+                  ) : distributionRecords.length === 0 ? (
+                    <Alert variant="warning">No distribution records found for {activeScheme.toUpperCase()}.</Alert>
+                  ) : (
+                    <Table striped bordered hover responsive>
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Food Item</th>
+                          {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Months</th></>}
+                          <th>Total Beneficiaries</th>
+                          <th>Quantity</th>
+                          <th>Unit</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {distributionRecords.map((record, index) => (
+                          <tr key={record.id}>
+                            <td>{index + 1}</td>
+                            <td>{record.food_item}</td>
+                            {activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{formatMonths(record.months || record.quarter)}</td></>}
+                            <td>{record.total_beneficiaries}</td>
+                            <td>{record.quantity}</td>
+                            <td>{record.unit}</td>
+                            <td>
+                              <Button variant="outline-info" size="sm" className="me-2" onClick={() => setViewItem(record) & setShowViewModal(true)}>
+                                <FaEye />
+                              </Button>
+                              <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenDistributionModal(record, activeScheme, record)}>
+                                <FaEdit />
+                              </Button>
+                              <Button variant="outline-danger" size="sm" onClick={async () => {
+                                 if(window.confirm(`Delete ${record.food_item}?`)) {
+                                   await api.delete(activeScheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution, { data: { id: record.id }});
+                                   handleCardClick(activeScheme);
+                                 }
+                              }}>
+                                <FaTrash />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
+                </Col>
+              </Row>
+            </>
           )}
 
           {selectedItem && (
