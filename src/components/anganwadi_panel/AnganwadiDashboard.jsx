@@ -195,9 +195,12 @@ const AnganwadiDashboard = () => {
     if (existingRecord) {
       const foodItemDetails = foodItems.find(fi => fi.food_item === existingRecord.food_item);
       if (scheme === 'hcm') {
+        const existingMonths = Array.isArray(existingRecord.months) ? existingRecord.months : quarterToMonths[existingRecord.quarter] || [];
         setDistributionData({
           total_beneficiaries: existingRecord.total_beneficiaries,
           date: existingRecord.date,
+          fin_year: existingRecord.fin_year,
+          months: existingMonths,
           food_item_id: foodItemDetails?.id,
         });
       } else {
@@ -213,7 +216,7 @@ const AnganwadiDashboard = () => {
       setDistributionData({
         total_beneficiaries: '',
         date: new Date().toISOString().split('T')[0],
-        fin_year: scheme === 'thr' ? getCurrentFinancialYear() : '',
+        fin_year: getCurrentFinancialYear(),
         months: [],
         food_item_id: '',
       });
@@ -247,7 +250,7 @@ const AnganwadiDashboard = () => {
       ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10))
       : selectedItem;
 
-    if (!distributionData.total_beneficiaries || (isThr ? (!distributionData.fin_year || !distributionData.months?.length) : !distributionData.date)) {
+    if (!distributionData.total_beneficiaries || !distributionData.fin_year || !distributionData.months?.length || (!isThr && !distributionData.date)) {
       setDistributionError("कृपया सभी आवश्यक फ़ील्ड भरें।");
       setSubmitting(false);
       return;
@@ -264,10 +267,11 @@ const AnganwadiDashboard = () => {
       bene_category: selectedFoodItemDetails.bene_category,
     };
 
+    payload.fin_year = distributionData.fin_year;
+    payload.months = distributionData.months;
+
     if (isThr) {
-      payload.fin_year = distributionData.fin_year;
       payload.quarter = distributionData.months;
-      payload.months = distributionData.months;
     } else {
       payload.date = distributionData.date;
     }
@@ -419,7 +423,7 @@ const AnganwadiDashboard = () => {
                           food_item_id: newFoodItemId,
                           total_beneficiaries: '',
                           date: activeScheme === 'hcm' ? new Date().toISOString().split('T')[0] : '',
-                          fin_year: activeScheme === 'thr' ? getCurrentFinancialYear() : '',
+                          fin_year: getCurrentFinancialYear(),
                           months: []
                         });
                         setBeneficiaryCount(null);
@@ -496,39 +500,37 @@ const AnganwadiDashboard = () => {
                         required
                       />
                     </Form.Group>
-                  ) : (
-                    <>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Financial Year</Form.Label>
-                        <Form.Control
-                          type="text"
-                          value={distributionData.fin_year} disabled
-                          required
+                  ) : null}
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Financial Year</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={distributionData.fin_year} disabled
+                      required
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Months</Form.Label>
+                    <div className="month-checkbox-group d-flex flex-wrap gap-2">
+                      {monthOptions.map((month) => (
+                        <Form.Check
+                          key={month.value}
+                          inline
+                          type="checkbox"
+                          id={`month-${month.value}`}
+                          label={month.label}
+                          checked={distributionData.months?.includes(month.value) || false}
+                          onChange={(e) => {
+                            const nextMonths = e.target.checked
+                              ? [...new Set([...(distributionData.months || []), month.value])]
+                              : (distributionData.months || []).filter((m) => m !== month.value);
+                            setDistributionData({ ...distributionData, months: nextMonths });
+                          }}
                         />
-                      </Form.Group>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Months</Form.Label>
-                        <div className="month-checkbox-group d-flex flex-wrap gap-2">
-                          {monthOptions.map((month) => (
-                            <Form.Check
-                              key={month.value}
-                              inline
-                              type="checkbox"
-                              id={`month-${month.value}`}
-                              label={month.label}
-                              checked={distributionData.months?.includes(month.value) || false}
-                              onChange={(e) => {
-                                const nextMonths = e.target.checked
-                                  ? [...new Set([...(distributionData.months || []), month.value])]
-                                  : (distributionData.months || []).filter((m) => m !== month.value);
-                                setDistributionData({ ...distributionData, months: nextMonths });
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </Form.Group>
-                    </>
-                  )}
+                      ))}
+                    </div>
+                  </Form.Group>
 
                   <Form.Group className="mb-3">
                     <Form.Label>Beneficiary Category</Form.Label>
