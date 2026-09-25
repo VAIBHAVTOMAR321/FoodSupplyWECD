@@ -256,6 +256,9 @@ const FoodSupplementary = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewRecord, setViewRecord] = useState(null);
+  const [showFoodItemModal, setShowFoodItemModal] = useState(false);
+  const [foodItems, setFoodItems] = useState([]);
+  const [loadingFoodItems, setLoadingFoodItems] = useState(false);
 
   const [formData, setFormData] = useState({ ...initialFormData });
   const [formErrors, setFormErrors] = useState({});
@@ -585,6 +588,29 @@ const handleDeleteClick = (record) => {
   const handleCloseViewModal = () => {
     setShowViewModal(false);
     setViewRecord(null);
+  };
+
+  const handleOpenFoodItemModal = async () => {
+    setLoadingFoodItems(true);
+    setShowFoodItemModal(true);
+    try {
+      const [hcmResp, thrResp] = await Promise.all([
+        api.get("/hcm-food-items/"),
+        api.get("/thr-food-items/"),
+      ]);
+      const hcmItems = hcmResp.data || [];
+      const thrItems = thrResp.data || [];
+      setFoodItems([...hcmItems, ...thrItems]);
+    } catch (err) {
+      console.error("Failed to fetch food items:", err);
+    } finally {
+      setLoadingFoodItems(false);
+    }
+  };
+
+  const handleCloseFoodItemModal = () => {
+    setShowFoodItemModal(false);
+    setFoodItems([]);
   };
 
   const validateForm = (data) => {

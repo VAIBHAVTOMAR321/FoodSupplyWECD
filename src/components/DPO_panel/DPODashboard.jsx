@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination, Modal, Badge } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dpo.css";
 
-import { FaUsers, FaUserFriends, FaBaby, FaChartBar, FaLayerGroup, FaFileExcel, FaFilePdf, FaSyncAlt, FaSearch, FaBoxes, FaChevronDown, FaWarehouse } from "react-icons/fa";
+import { FaUsers, FaUserFriends, FaBaby, FaChartBar, FaLayerGroup, FaFileExcel, FaFilePdf, FaSyncAlt, FaSearch, FaBoxes, FaChevronDown, FaWarehouse, FaUtensils, FaTimes } from "react-icons/fa";
 import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
 import * as XLSX from "xlsx";
@@ -137,6 +137,15 @@ const DPODashboard = () => {
   
   const [aggregateView, setAggregateView] = useState("sector"); // 'sector' | 'project'
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Food Items Modal state
+  const [showFoodItemModal, setShowFoodItemModal] = useState(false);
+  const [foodItems, setFoodItems] = useState([]);
+  const [loadingFoodItems, setLoadingFoodItems] = useState(false);
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -242,6 +251,47 @@ const DPODashboard = () => {
       return acc;
     }, { received: 0, distributed: 0, remaining: 0 });
   }, []);
+
+  // Pagination logic
+  const totalRecords = searchedRecords.length;
+  const totalPages = Math.ceil(totalRecords / itemsPerPage);
+  const paginatedRecords = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return searchedRecords.slice(startIndex, startIndex + itemsPerPage);
+  }, [searchedRecords, currentPage, itemsPerPage]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    setItemsPerPage(Number(e.target.value));
+    setCurrentPage(1);
+  };
+
+  // Food Items Modal handler
+  const handleOpenFoodItemModal = async () => {
+    setLoadingFoodItems(true);
+    setShowFoodItemModal(true);
+    try {
+      const [hcmResp, thrResp] = await Promise.all([
+        api.get("/hcm-food-items/"),
+        api.get("/thr-food-items/"),
+      ]);
+      const hcmItems = hcmResp.data || [];
+      const thrItems = thrResp.data || [];
+      setFoodItems([...hcmItems, ...thrItems]);
+    } catch (err) {
+      console.error("Failed to fetch food items:", err);
+    } finally {
+      setLoadingFoodItems(false);
+    }
+  };
+
+  const handleCloseFoodItemModal = () => {
+    setShowFoodItemModal(false);
+    setFoodItems([]);
+  };
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
@@ -490,6 +540,7 @@ const DPODashboard = () => {
                   />
                 </InputGroup>
                 <div className="dpo-export-btns">
+                  <Button className="dpo-export-btn" onClick={handleOpenFoodItemModal} title="View Food Items"><FaUtensils className="text-primary" /> Food Items</Button>
                   <Button className="dpo-export-btn" onClick={exportDetailsToExcel}><FaFileExcel className="text-success" /> Excel</Button>
                   <Button className="dpo-export-btn" onClick={exportDetailsToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
                 </div>
@@ -506,11 +557,11 @@ const DPODashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {searchedRecords.length === 0 ? (
+                      {paginatedRecords.length === 0 ? (
                         <tr><td colSpan={TABLE_COLUMNS.length + 1} className="text-center p-5 text-muted">No records found.</td></tr>
-                      ) : searchedRecords.map((row, i) => (
+                      ) : paginatedRecords.map((row, i) => (
                         <tr key={i}>
-                          <td>{i + 1}</td>
+                          <td>{(currentPage - 1) * itemsPerPage + i + 1}</td>
                           {TABLE_COLUMNS.map((col, c) => {
                             const val = row[col.key];
                             if (col.strong) return <td key={c} className="text-end"><strong className="text-primary">{val ? Number(val).toLocaleString() : 0}</strong></td>;
@@ -536,10 +587,90 @@ const DPODashboard = () => {
                 )}
               </div>
             </Card.Body>
+            {/* Pagination Controls */}
+            {totalRecords > 0 && (
+              <Card.Footer className="d-flex justify-content-between align-items-center flex-wrap gap-2 py-3 px-4">
+                <div className="d-flex align-items-center gap-2">
+                  <Form.Label className="mb-0 small text-muted">Rows per page:</Form.Label>
+                  <Form.Select size="sm" value={itemsPerPage} onChange={handleItemsPerPageChange} style={{ width: 'auto' }}>
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </Form.Select>
+                </div>
+                <div className="d-flex align-items-center gap-2">
+                  <span className="small text-muted">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalRecords)} of {totalRecords} entries
+                  </span>
+                  <Pagination size="sm" className="mb-0">
+                    <Pagination.Prev disabled={currentPage === 1} onClick={() => handlePageChange(currentPage - 1)} />
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let startPage = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+                      const page = startPage + i;
+                      if (page > totalPages) return null;
+                      return (
+                        <Pagination.Item key={page} active={page === currentPage} onClick={() => handlePageChange(page)}>
+                          {page}
+                        </Pagination.Item>
+                      );
+                    })}
+                    <Pagination.Next disabled={currentPage === totalPages} onClick={() => handlePageChange(currentPage + 1)} />
+                  </Pagination>
+                </div>
+              </Card.Footer>
+            )}
           </Card>
 
         </Container>
       </div>
+
+      {/* ─── Food Items Modal ─── */}
+      <Modal show={showFoodItemModal} onHide={handleCloseFoodItemModal} centered className="fs-modal" size="lg">
+        <Modal.Header closeButton className="fs-modal-header">
+          <Modal.Title><FaUtensils className="me-2 text-primary" /> Food Items List</Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+          {loadingFoodItems ? (
+            <div className="text-center py-5">
+              <Spinner animation="border" variant="primary" />
+              <p className="mt-3 text-muted">Loading food items...</p>
+            </div>
+          ) : foodItems.length === 0 ? (
+            <div className="text-center py-5 text-muted">
+              <FaUtensils size={48} className="mb-3 d-block" />
+              <p>No food items found.</p>
+            </div>
+          ) : (
+            <Table hover className="dpo-data-table mb-0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Food Item</th>
+                  <th>Category</th>
+                  <th>Unit</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {foodItems.map((item, idx) => (
+                  <tr key={item.id || idx}>
+                    <td>{idx + 1}</td>
+                    <td><strong>{item.food_item}</strong></td>
+                    <td>{item.bene_category || '—'}</td>
+                    <td>{item.unit || '—'}</td>
+                    <td><Badge bg={item.type === 'hcm' ? 'info' : 'warning'}>{item.type?.toUpperCase() || '—'}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="fs-modal-footer">
+          <Button variant="light" onClick={handleCloseFoodItemModal} className="dpo-btn-light px-4"><FaTimes className="me-1" /> Close</Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };
