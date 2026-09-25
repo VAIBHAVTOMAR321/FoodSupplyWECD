@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination, Modal, Badge } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination, Modal, Badge, Tabs, Tab } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dpo.css";
 
@@ -28,8 +28,8 @@ const TABLE_COLUMNS = [
   { label: "HCM 3-6y", key: "hcm_beneficiaries_3y_6y", num: true },
   { label: "SAM 6m-6y", key: "sam_children_6m_6y", num: true },
   { label: "SUW 6m-6y", key: "suw_children_6m_6y", num: true },
-  { label: "SAM 3-6y", key: "sam_children_3y_6y", num: true },
-  { label: "SUW 3-6y", key: "suw_children_3y_6y", num: true },
+  { label: "SAM 3y-6y", key: "sam_children_3y_6y", num: true },
+  { label: "SUW 3y-6y", key: "suw_children_3y_6y", num: true },
   { label: "Mung Dal", key: "quarterly_packets_mung_dal_khichdi", num: true },
   { label: "P. Sattu", key: "quarterly_packets_poushik_sattu_mix", num: true },
   { label: "Sattu(gm)", key: "poushik_sattu_mix_75_days_packet_size_gm", num: true },
@@ -133,7 +133,7 @@ const DPODashboard = () => {
 
   // Food Items Modal state
   const [showFoodItemModal, setShowFoodItemModal] = useState(false);
-  const [foodItems, setFoodItems] = useState([]);
+  const [foodItems, setFoodItems] = useState({ hcm: [], thr: [] });
   const [loadingFoodItems, setLoadingFoodItems] = useState(false);
 
   // Supplies Dynamic States
@@ -363,20 +363,21 @@ const DPODashboard = () => {
     setCurrentPage(page);
   };
 
-  // Food Items Modal handler
+  // Food Items Modal handler (fetching dynamically from /categoryandfooditem/)
   const handleOpenFoodItemModal = async () => {
     setLoadingFoodItems(true);
     setShowFoodItemModal(true);
     try {
-      const [hcmResp, thrResp] = await Promise.all([
-        api.get("/hcm-food-items/"),
-        api.get("/thr-food-items/"),
-      ]);
-      const hcmItems = hcmResp.data || [];
-      const thrItems = thrResp.data || [];
-      setFoodItems([...hcmItems, ...thrItems]);
+      const response = await api.get("/categoryandfooditem/");
+      const data = response.data?.food_data || [];
+      
+      const hcm = data.filter(item => item.category === "HCM");
+      const thr = data.filter(item => item.category === "THR");
+      
+      setFoodItems({ hcm, thr });
     } catch (err) {
       console.error("Failed to fetch food items:", err);
+      setFoodItems({ hcm: [], thr: [] });
     } finally {
       setLoadingFoodItems(false);
     }
@@ -384,7 +385,7 @@ const DPODashboard = () => {
 
   const handleCloseFoodItemModal = () => {
     setShowFoodItemModal(false);
-    setFoodItems([]);
+    setFoodItems({ hcm: [], thr: [] });
   };
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -539,6 +540,7 @@ const DPODashboard = () => {
               <h4 className="dashboard-main-title">
                 <FaBoxes /> Supplementary Nutrition Overview
               </h4>
+              
               <p className="dashboard-subtitle">View aggregated and detailed supplementary nutrition data across sectors and projects.</p>
             </div>
             <Button className="dpo-btn-light" onClick={fetchData} disabled={loading}>
@@ -555,6 +557,8 @@ const DPODashboard = () => {
             <Button variant="outline-secondary" size="sm" className="dpo-filter-reset" onClick={() => { setSelectedMonths([]); setSelectedFYs([]); setSelectedProjects([]); setSelectedSectors([]); }}>
               Reset
             </Button>
+                              <Button className="dpo-export-btn" onClick={handleOpenFoodItemModal} title="View Food Items"><FaUtensils className="text-primary" /> Food Items</Button>
+
           </div>
 
           {/* Wrapped Summary Pills */}
@@ -740,7 +744,6 @@ const DPODashboard = () => {
                   />
                 </InputGroup>
                 <div className="dpo-export-btns">
-                  <Button className="dpo-export-btn" onClick={handleOpenFoodItemModal} title="View Food Items"><FaUtensils className="text-primary" /> Food Items</Button>
                   <Button className="dpo-export-btn" onClick={exportDetailsToExcel}><FaFileExcel className="text-success" /> Excel</Button>
                   <Button className="dpo-export-btn" onClick={exportDetailsToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
                 </div>
@@ -825,34 +828,54 @@ const DPODashboard = () => {
               <Spinner animation="border" variant="primary" />
               <p className="mt-3 text-muted">Loading food items...</p>
             </div>
-          ) : foodItems.length === 0 ? (
-            <div className="text-center py-5 text-muted">
-              <FaUtensils size={48} className="mb-3 d-block" />
-              <p>No food items found.</p>
-            </div>
           ) : (
-            <Table hover className="dpo-data-table mb-0">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Food Item</th>
-                  <th>Category</th>
-                  <th>Unit</th>
-                  <th>Type</th>
-                </tr>
-              </thead>
-              <tbody>
-                {foodItems.map((item, idx) => (
-                  <tr key={item.id || idx}>
-                    <td>{idx + 1}</td>
-                    <td><strong>{item.food_item}</strong></td>
-                    <td>{item.bene_category || '—'}</td>
-                    <td>{item.unit || '—'}</td>
-                    <td><Badge bg={item.type === 'hcm' ? 'info' : 'warning'}>{item.type?.toUpperCase() || '—'}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
+            <Tabs defaultActiveKey="hcm" id="food-items-modal-tabs" className="mb-3">
+              <Tab eventKey="hcm" title={`HCM Food Items (${foodItems.hcm?.length || 0})`}>
+                <Table striped bordered hover size="sm">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Food Item</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {foodItems.hcm?.length === 0 ? (
+                      <tr><td colSpan="3" className="text-center text-muted p-4">No HCM items found.</td></tr>
+                    ) : (
+                      foodItems.hcm?.map((item, idx) => (
+                        <tr key={idx}>
+                          <td>{idx + 1}</td>
+                          <td><strong>{item.food_item}</strong></td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </Table>
+              </Tab>
+              <Tab eventKey="thr" title={`THR Food Items (${foodItems.thr?.length || 0})`}>
+                <Table striped bordered hover size="sm">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Food Item</th>
+                      <th>System Field Name</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {foodItems.thr?.length === 0 ? (
+                      <tr><td colSpan="3" className="text-center text-muted p-4">No THR items found.</td></tr>
+                    ) : (
+                      foodItems.thr?.map((item, idx) => (
+                        <tr key={idx}>
+                          <td>{idx + 1}</td>
+                          <td><strong>{item.food_item}</strong></td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </Table>
+              </Tab>
+            </Tabs>
           )}
         </Modal.Body>
         <Modal.Footer className="fs-modal-footer">
