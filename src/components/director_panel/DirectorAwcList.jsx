@@ -4,7 +4,8 @@ import { useLocation } from "react-router-dom";
 
 import "../../assets/css/itcellLeftnav.css";
 
-import { useAuth } from "../all_login/AuthContext";import { FaUserShield, FaUserGraduate, FaUserCog, FaUserTie, FaHome } from "react-icons/fa";
+import { useAuth } from "../all_login/AuthContext";
+import { FaUserShield, FaUserGraduate, FaUserCog, FaUserTie, FaHome } from "react-icons/fa";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 
@@ -118,11 +119,17 @@ const DirectorAwcList = () => {
   };
 
   const renderPagination = (totalItems) => {
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
-    if (totalPages <= 1) return null;
+    // Ensure totalItems is a valid number
+    const validTotalItems = Number(totalItems) || 0;
+    const totalPages = Math.ceil(validTotalItems / itemsPerPage);
+    
+    // Don't render pagination if only 1 page or invalid
+    if (!Number.isFinite(totalPages) || totalPages <= 1) return null;
 
     const handlePageChange = (pageNumber) => {
-      setCurrentPage(pageNumber);
+      // Strict bounds checking to prevent blank pages
+      const safePage = Math.max(1, Math.min(totalPages, pageNumber));
+      setCurrentPage(safePage);
     };
 
     let items = [];
@@ -133,7 +140,7 @@ const DirectorAwcList = () => {
       startPage = 1;
       endPage = totalPages;
     } else {
-      if (currentPage <= Math.floor(maxPagesToShow / 2) + 1) {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
         startPage = 1;
         endPage = maxPagesToShow;
       } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
@@ -145,30 +152,53 @@ const DirectorAwcList = () => {
       }
     }
 
+    // Clamp values strictly to positive bounds
+    startPage = Math.max(1, startPage);
+    endPage = Math.min(totalPages, endPage);
+
     for (let i = startPage; i <= endPage; i++) {
-      items.push(<Pagination.Item key={i} active={i === currentPage} onClick={() => handlePageChange(i)}>{i}</Pagination.Item>);
+      items.push(
+        <Pagination.Item key={i} active={i === currentPage} onClick={() => handlePageChange(i)}>
+          {i}
+        </Pagination.Item>
+      );
     }
 
     return (
       <Pagination className="justify-content-end mt-3">
         <Pagination.First onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
         <Pagination.Prev onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
-        {startPage > 1 && <Pagination.Ellipsis />}
+        {startPage > 1 && <Pagination.Ellipsis disabled />}
         {items}
-        {endPage < totalPages && <Pagination.Ellipsis />}
+        {endPage < totalPages && <Pagination.Ellipsis disabled />}
         <Pagination.Next onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
         <Pagination.Last onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
       </Pagination>
     );
   };
 
-  const renderTable = (data, tabKey, columnsToExclude = [], totalItems) => {
+  const renderTable = (data, tabKey, columnsToExclude = []) => {
     if (loading[tabKey]) return <div className="text-center p-4"><Spinner animation="border" /></div>;
     if (!data || data.length === 0) return <div className="text-center p-4 text-muted">No users found for this role.</div>;
 
-    const indexOfLastItem = currentPage * itemsPerPage;
+    const totalPages = Math.ceil(data.length / itemsPerPage);
+    // Safety bound for currentPage in case state is out of sync momentarily
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    
+    const indexOfLastItem = safeCurrentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = data.slice(indexOfFirstItem, indexOfLastItem);
+
+    // Safety check to prevent crash if currentItems is empty (e.g. data changed but page didn't reset)
+    if (currentItems.length === 0) {
+      return (
+        <>
+          <div className="text-center p-4 text-muted">No users found for this page.</div>
+          {renderPagination(data.length)}
+        </>
+      );
+    }
+
     const headers = Object.keys(currentItems[0]).filter(key => !columnsToExclude.includes(key));
 
     return (
@@ -191,7 +221,7 @@ const DirectorAwcList = () => {
             </tbody>
           </Table>
         </div>
-        {renderPagination(totalItems)}
+        {renderPagination(data.length)}
       </>
     );
   };
@@ -218,7 +248,7 @@ const DirectorAwcList = () => {
             activeKey={activeTab}
             onSelect={(k) => {
               setActiveTab(k);
-              setCurrentPage(1);
+              setCurrentPage(1); // Reset page when tab changes
             }}
             id="director-awc-list-tabs"
             className="mb-4"
@@ -228,7 +258,7 @@ const DirectorAwcList = () => {
                 <FaUserCog className="me-2" /> DPO List {loadingCounts.dpo ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.dpo ?? 0})`}
               </span>
             }>
-              {renderTable(dpoData, 'dpo', ['id', 'role', 'unique_id', 'name'], roleCounts.dpo)}
+              {renderTable(dpoData, 'dpo', ['id', 'role', 'unique_id', 'name'])}
             </Tab>
 
             <Tab eventKey="cdpo" title={
@@ -236,7 +266,7 @@ const DirectorAwcList = () => {
                 <FaUserShield className="me-2" /> CDPO List {loadingCounts.cdpo ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.cdpo ?? 0})`}
               </span>
             }>
-              {renderTable(cdpoData, 'cdpo', ['id', 'unique_id', 'name', 'stat_fin', 'ang_pur', 'adhar_stat'], roleCounts.cdpo)}
+              {renderTable(cdpoData, 'cdpo', ['id', 'unique_id', 'name', 'stat_fin', 'ang_pur', 'adhar_stat'])}
             </Tab>
 
             <Tab eventKey="supervisor" title={
@@ -244,7 +274,7 @@ const DirectorAwcList = () => {
                 <FaUserTie className="me-2" /> Supervisor List {loadingCounts.supervisor ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.supervisor ?? 0})`}
               </span>
             }>
-              {renderTable(supervisorData, 'supervisor', ['id', 'unique_id', 'name', 'sdname'], roleCounts.supervisor)}
+              {renderTable(supervisorData, 'supervisor', ['id', 'unique_id', 'name', 'sdname'])}
             </Tab>
 
             <Tab eventKey="anganwadi" title={
@@ -252,7 +282,7 @@ const DirectorAwcList = () => {
                 <FaHome className="me-2" /> Anganwadi List {loadingCounts.anganwadi ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.anganwadi ?? 0})`}
               </span>
             }>
-              {renderTable(anganwadiData, 'anganwadi', ['id', 'unique_id', 'name', 'code1', 'district_code', 'updated_on', 'bill_use', 'db_use'], roleCounts.anganwadi)}
+              {renderTable(anganwadiData, 'anganwadi', ['id', 'unique_id', 'name', 'code1', 'district_code', 'updated_on', 'bill_use', 'db_use'])}
             </Tab>
           </Tabs>
 

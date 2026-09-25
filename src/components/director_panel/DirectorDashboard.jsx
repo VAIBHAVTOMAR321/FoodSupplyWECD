@@ -1,37 +1,124 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table, Button, ButtonGroup, Tooltip, OverlayTrigger } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/directorleftnav.css";
-import { Bar, Doughnut } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  ArcElement,
-  DoughnutController,
-  Title,
-  Tooltip as ChartTooltip,
-  Legend,
-} from "chart.js";
-import ChartDataLabels from "chartjs-plugin-datalabels";
-import { FaUsers, FaUserShield, FaUserGraduate, FaUserCog, FaUserTie, FaHome, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
+import "../../assets/css/dpo.css"; 
+
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+import { FaUsers, FaUserFriends, FaBaby, FaChartBar, FaLayerGroup, FaFileExcel, FaFilePdf, FaSyncAlt, FaSearch, FaBoxes, FaChevronDown, FaWarehouse, FaBox } from "react-icons/fa";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  ArcElement,
-  DoughnutController,
-  Title,
-  ChartTooltip,
-  Legend,
-  ChartDataLabels
-);
+const ITEMS_PER_PAGE = 100;
 
+const TABLE_COLUMNS = [
+  { label: "District", key: "district" },
+  { label: "Project", key: "project" },
+  { label: "Sector", key: "sector" },
+  { label: "AWC Code", key: "awc_code" },
+  { label: "Month", key: "month" },
+  { label: "Fin. Year", key: "financial_year" },
+  { label: "Active Bene.", key: "active_beneficiaries", num: true },
+  { label: "Total Bene.", key: "total_beneficiaries", strong: true },
+  { label: "Pregnant/Lact", key: "pregnant_women_lactating_mothers", num: true },
+  { label: "6m-3y", key: "children_6m_3y_beneficiaries", num: true },
+  { label: "THR 25d", key: "thr_25_days_frs_hcm_beneficiaries_3y_6y", num: true },
+  { label: "HCM 3-6y", key: "hcm_beneficiaries_3y_6y", num: true },
+  { label: "SAM 6m-6y", key: "sam_children_6m_6y", num: true },
+  { label: "SUW 6m-6y", key: "suw_children_6m_6y", num: true },
+  { label: "SAM 3-6y", key: "sam_children_3y_6y", num: true },
+  { label: "SUW 3-6y", key: "suw_children_3y_6y", num: true },
+  { label: "Mung Dal", key: "quarterly_packets_mung_dal_khichdi", num: true },
+  { label: "P. Sattu", key: "quarterly_packets_poushik_sattu_mix", num: true },
+  { label: "Sattu(gm)", key: "poushik_sattu_mix_75_days_packet_size_gm", num: true },
+  { label: "Panj 2625", key: "panjeeri_75_days_2625gm_quarterly_packets", num: true },
+  { label: "Panj 4625", key: "panjeeri_75_days_4625gm_quarterly_packets", num: true },
+  { label: "Sattu 2250", key: "quarterly_packets_sattu_2250gm", num: true },
+  { label: "Mix 1000", key: "quarterly_packets_mix_1000gm", num: true },
+  { label: "Multi Aata", key: "quarterly_packets_multi_grain_aata_1250gm", num: true },
+];
+
+const NUMERIC_AGG_FIELDS = TABLE_COLUMNS.filter(c => c.num || c.strong);
+
+const SUMMARY_PILLS = [
+  { key: "total_beneficiaries", label: "Total", icon: <FaUsers size={10} /> },
+  { key: "active_beneficiaries", label: "Active", icon: <FaUserFriends size={10} /> },
+  { key: "pregnant_women_lactating_mothers", label: "Preg/Lact", icon: <FaBaby size={10} /> },
+  { key: "children_6m_3y_beneficiaries", label: "6m-3y", icon: <FaBaby size={10} /> },
+  { key: "thr_25_days_frs_hcm_beneficiaries_3y_6y", label: "THR 25d", icon: <FaUsers size={10} /> },
+  { key: "hcm_beneficiaries_3y_6y", label: "HCM 3-6y", icon: <FaUsers size={10} /> },
+  { key: "sam_children_6m_6y", label: "SAM 6m-6y", icon: <FaBaby size={10} /> },
+  { key: "suw_children_6m_6y", label: "SUW 6m-6y", icon: <FaBaby size={10} /> },
+  { key: "sam_children_3y_6y", label: "SAM 3-6y", icon: <FaBaby size={10} /> },
+  { key: "suw_children_3y_6y", label: "SUW 3-6y", icon: <FaBaby size={10} /> },
+  { key: "quarterly_packets_mung_dal_khichdi", label: "Mung Dal", icon: <FaBoxes size={10} /> },
+  { key: "quarterly_packets_poushik_sattu_mix", label: "P. Sattu", icon: <FaBoxes size={10} /> },
+  { key: "poushik_sattu_mix_75_days_packet_size_gm", label: "Sattu(gm)", icon: <FaBoxes size={10} /> },
+  { key: "panjeeri_75_days_2625gm_quarterly_packets", label: "Panj 2625", icon: <FaBoxes size={10} /> },
+  { key: "panjeeri_75_days_4625gm_quarterly_packets", label: "Panj 4625", icon: <FaBoxes size={10} /> },
+  { key: "quarterly_packets_sattu_2250gm", label: "Sattu 2250", icon: <FaBoxes size={10} /> },
+  { key: "quarterly_packets_mix_1000gm", label: "Mix 1000", icon: <FaBoxes size={10} /> },
+  { key: "quarterly_packets_multi_grain_aata_1250gm", label: "Multi Aata", icon: <FaBoxes size={10} /> },
+];
+
+// Dummy Data for Supplies Table (Added District)
+const SUPPLIES_DATA = [
+  { district: "Almora", project: "Bhaisiachana", sector: "Barechhina", received: 3500, distributed: 3000, remaining: 500 },
+  { district: "Almora", project: "Bhaisiachana", sector: "Sheragat", received: 2800, distributed: 2500, remaining: 300 },
+  { district: "Bageshwar", project: "Bhikiyasain", sector: "Basot", received: 1500, distributed: 1200, remaining: 300 },
+  { district: "Bageshwar", project: "Bhikiyasain", sector: "Bhikiyasen", received: 1600, distributed: 1400, remaining: 200 },
+  { district: "Bageshwar", project: "Bhikiyasain", sector: "Daula", received: 2000, distributed: 1800, remaining: 200 },
+  { district: "Bageshwar", project: "Bhikiyasain", sector: "Vinayak", received: 1300, distributed: 1100, remaining: 200 },
+];
+
+// Custom Multi-Select Dropdown Component
+const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
+  const toggleOption = (opt) => {
+    if (selected.includes(opt)) {
+      onChange(selected.filter((o) => o !== opt));
+    } else {
+      onChange([...selected, opt]);
+    }
+  };
+
+  const getLabel = () => {
+    if (!selected || selected.length === 0) return `All ${label}s`;
+    if (selected.length === 1) return selected[0];
+    return `${selected.length} ${label}s selected`;
+  };
+
+  return (
+    <div className="dpo-filter-group">
+      <Form.Label className="dpo-filter-label">{label}</Form.Label>
+      <Dropdown autoClose="outside">
+        <Dropdown.Toggle size="sm" variant="light" className="dpo-multi-toggle">
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getLabel()}</span>
+          <FaChevronDown className="dpo-multi-caret" />
+        </Dropdown.Toggle>
+        <Dropdown.Menu className="dpo-multi-menu">
+          {options.length === 0 ? (
+            <Dropdown.Item disabled>No options</Dropdown.Item>
+          ) : (
+            options.map((opt) => (
+              <div key={opt} className="dpo-multi-item" onClick={(e) => { e.stopPropagation(); toggleOption(opt); }}>
+                <Form.Check 
+                  type="checkbox" 
+                  checked={selected.includes(opt)} 
+                  onChange={() => {}} 
+                  label={opt} 
+                />
+              </div>
+            ))
+          )}
+        </Dropdown.Menu>
+      </Dropdown>
+    </div>
+  );
+};
 
 const DirectorDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -40,47 +127,38 @@ const DirectorDashboard = () => {
   
   const navigate = useNavigate();
   const { api } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [hcmSummary, setHcmSummary] = useState(null);
-  const [thrSummary, setThrSummary] = useState(null);
+
+  // Food Items State
   const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
   const [thrFoodItemsCount, setThrFoodItemsCount] = useState(0);
-  const [roleCounts, setRoleCounts] = useState({
-    dpo: 0,
-    cdpo: 0,
-    supervisor: 0,
-    anganwadi: 0,
-  });
-  const [loadingRoles, setLoadingRoles] = useState({
-    dpo: true,
-    cdpo: true,
-    supervisor: true,
-    anganwadi: true,
-  });
-  const [totalBeneficiaries, setTotalBeneficiaries] = useState(0);
-  const [loadingBeneficiaries, setLoadingBeneficiaries] = useState(true);
-  const [expanded, setExpanded] = useState(null);
-  const [beneficiaryCategoryTotals, setBeneficiaryCategoryTotals] = useState(null);
-  const [viewMode, setViewMode] = useState("card");
-  const [overallData, setOverallData] = useState(null);
 
-  // Month-wise session & month filter states
-  const [monthWiseData, setMonthWiseData] = useState(null);
-  const [loadingMonthWise, setLoadingMonthWise] = useState(false);
-  const [selectedSession, setSelectedSession] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("All Months");
+  // DPO Data States
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Multi-Select States
+  const [selectedMonths, setSelectedMonths] = useState([]);
+  const [selectedFYs, setSelectedFYs] = useState([]);
+  const [selectedProjects, setSelectedProjects] = useState([]);
+  const [selectedSectors, setSelectedSectors] = useState([]);
+  
+  const [aggregateView, setAggregateView] = useState("sector"); // 'sector' | 'project' | 'district'
+
+  // Pagination States
+  const [suppliesPage, setSuppliesPage] = useState(1);
+  const [aggPage, setAggPage] = useState(1);
+  const [detailsPage, setDetailsPage] = useState(1);
 
   useEffect(() => {
     const handleResize = () => {
-      const width = window.innerWidth;
-      setIsMobile(width < 768);
-      setIsTablet(width >= 768 && width < 1024);
+      setIsMobile(window.innerWidth < 768);
+      setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024);
     };
-    
     handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const fetchHcmFoodItems = async () => {
@@ -103,1020 +181,511 @@ const DirectorDashboard = () => {
     }
   };
 
-  const fetchDashboardSummaries = async () => {
-    try {
-      const [hcmRes, thrRes] = await Promise.all([ 
-        api.get("/director/dashboard/hcm/"),
-        api.get("/director/dashboard/thr/")
-      ]);
-      setHcmSummary(hcmRes.data);
-      setThrSummary(thrRes.data);
-    } catch (err) {
-      setError("Failed to fetch dashboard summaries.");
-      console.error("Dashboard summary fetch error:", err);
-    }
-  };
-
-  const fetchRoleCount = async (role, endpoint) => {
-    setLoadingRoles(prev => ({ ...prev, [role]: true }));
-    try {
-      const response = await api.get(endpoint);
-      let data = response.data?.data || [];
-      if (role === 'dpo') {
-        data = data.filter(u => u.role === 'dpo');
-      }
-      setRoleCounts(prev => ({ ...prev, [role]: data.length }));
-    } catch (err) {
-      console.error(`Failed to fetch ${role} count:`, err);
-    } finally {
-      setLoadingRoles(prev => ({ ...prev, [role]: false }));
-    }
-  };
-
-  const fetchAwcCount = async () => {
-    setLoadingRoles(prev => ({ ...prev, anganwadi: true }));
-    try {
-      const response = await api.get('/director/awc/count/');
-      if (response.data.success) {
-        setRoleCounts(prev => ({ ...prev, anganwadi: response.data.total_awc }));
-      }
-    } catch (err) {
-      console.error(`Failed to fetch anganwadi count:`, err);
-    } finally {
-      setLoadingRoles(prev => ({ ...prev, anganwadi: false }));
-    }
-  };
-
-  const fetchTotalBeneficiaries = async () => {
-    setLoadingBeneficiaries(true);
-     try {
-       const response = await api.get('/director/beneficiary/total-category/');
-       if (response.data.success) {
-         setBeneficiaryCategoryTotals(response.data.state_total);
-         setTotalBeneficiaries(response.data.state_total.total_beneficiaries);
-       }
-     } catch (err) {
-       console.error("Failed to fetch total beneficiaries count:", err);
-     } finally {
-       setLoadingBeneficiaries(false);
-     }
-  };
-
-  const fetchOverallDashboardData = async () => {
-    try {
-      const response = await api.get("/director/dashboard/overall/");
-      if (response.data.success) {
-        setOverallData(response.data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch overall dashboard data:", err);
-    }
-  };
-
-  // Fetch month-wise data and default to first (current) session
-  const fetchMonthWiseData = async () => {
-    setLoadingMonthWise(true);
-    try {
-      const response = await api.get("/director-beneficiary-state-monthwise-category/");
-      if (response.data.success && Array.isArray(response.data.data) && response.data.data.length > 0) {
-        setMonthWiseData(response.data.data);
-        // Default to first session (current) with all months
-        setSelectedSession(response.data.data[0].fin_year);
-        setSelectedMonth("All Months");
-      } else {
-        setMonthWiseData([]);
-        setSelectedSession("");
-        setSelectedMonth("All Months");
-      }
-    } catch (err) {
-      console.error("Failed to fetch month-wise beneficiary data:", err);
-      setMonthWiseData([]);
-    } finally {
-      setLoadingMonthWise(false);
-    }
-  };
-
-  const fetchAllData = async () => {
+  const fetchData = async () => {
     setLoading(true);
     setError("");
-
-    fetchRoleCount('dpo', '/director/districts/');
-    fetchRoleCount('cdpo', '/director/projects/');
-    fetchRoleCount('supervisor', '/director/sectors/');
-    fetchAwcCount();
-    fetchTotalBeneficiaries();
-    fetchOverallDashboardData();
-    fetchMonthWiseData();
-
     try {
-      await Promise.all([
-        fetchDashboardSummaries(), 
-        fetchHcmFoodItems(), 
-        fetchThrFoodItems()
-      ]);
+      const response = await api.get("/supplementary-nutrition-details/");
+      const data = Array.isArray(response.data) ? response.data : (response.data?.results || response.data?.data || []);
+      setRecords(data);
     } catch (err) {
-      setError("Failed to fetch Director dashboard data.");
+      setError("Failed to fetch supplementary nutrition data.");
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
+  useEffect(() => { 
     if (api) {
-      fetchAllData();
+      fetchHcmFoodItems();
+      fetchThrFoodItems();
+      fetchData();
     }
   }, [api]);
- 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
 
-  // When session changes, reset month to "All Months"
-  const handleSessionChange = (e) => {
-    setSelectedSession(e.target.value);
-    setSelectedMonth("All Months");
-  };
+  const uniqueMonths = useMemo(() => [...new Set(records.map(r => r.month).filter(Boolean))].sort(), [records]);
+  const uniqueFYs = useMemo(() => [...new Set(records.map(r => r.financial_year).filter(Boolean))].sort(), [records]);
+  const uniqueProjects = useMemo(() => [...new Set(records.map(r => r.project).filter(Boolean))].sort(), [records]);
+  const uniqueSectors = useMemo(() => [...new Set(records.map(r => r.sector).filter(Boolean))].sort(), [records]);
 
-  const handleMonthChange = (e) => {
-    setSelectedMonth(e.target.value);
-  };
+  const filteredRecords = useMemo(() => {
+    return records.filter(r => {
+      const m = selectedMonths.length === 0 ? true : selectedMonths.includes(r.month);
+      const y = selectedFYs.length === 0 ? true : selectedFYs.includes(r.financial_year);
+      const p = selectedProjects.length === 0 ? true : selectedProjects.includes(r.project);
+      const s = selectedSectors.length === 0 ? true : selectedSectors.includes(r.sector);
+      return m && y && p && s;
+    });
+  }, [records, selectedMonths, selectedFYs, selectedProjects, selectedSectors]);
 
-  // Extract unique sessions from API response
-  const sessionList = useMemo(() => {
-    if (!monthWiseData || !Array.isArray(monthWiseData)) return [];
-    return monthWiseData.map(item => item.fin_year);
-  }, [monthWiseData]);
+  const searchedRecords = useMemo(() => {
+    if (!searchTerm.trim()) return filteredRecords;
+    const term = searchTerm.toLowerCase();
+    return filteredRecords.filter(r =>
+      (r.month || "").toLowerCase().includes(term) ||
+      (r.financial_year || "").toLowerCase().includes(term) ||
+      (r.district || "").toLowerCase().includes(term) ||
+      (r.project || "").toLowerCase().includes(term) ||
+      (r.sector || "").toLowerCase().includes(term) ||
+      (r.awc_code || "").toLowerCase().includes(term)
+    );
+  }, [filteredRecords, searchTerm]);
 
-  // Get months array for the currently selected session
-  const currentSessionMonths = useMemo(() => {
-    if (!monthWiseData || !Array.isArray(monthWiseData) || !selectedSession) return [];
-    const found = monthWiseData.find(item => item.fin_year === selectedSession);
-    return found && Array.isArray(found.month_wise) ? found.month_wise : [];
-  }, [monthWiseData, selectedSession]);
-
-  // Build chart data based on session + month selection
-  const beneficiaryChartData = useMemo(() => {
-    const labels = [
-      "PW & LM",
-      "Child (6m-3y)",
-      "Child (3-6y)",
-      "Adol. Girls",
-      "SAM (6m-3y)",
-      "SAM (3-5y)",
-      "SUW (6m-3y)",
-      "SUW (3-6y)",
-    ];
-    const colors = ["#2f6fed", "#20c997", "#ff8c00", "#6f42c1", "#dc3545", "#fd7e14", "#198754", "#0dcaf0"];
-
-    if (!selectedSession || currentSessionMonths.length === 0) {
-      return { labels, datasets: [] };
-    }
-
-    if (selectedMonth === "All Months") {
-      // Sum all months in the selected session
-      const summed = {
-        pw_lm: 0, children_3_6y: 0, children_6m_3y: 0, adolescent_girls: 0,
-        sam_6m_3y: 0, sam_3_5y: 0, suw_6m_3y: 0, suw_3_6y: 0
-      };
-      currentSessionMonths.forEach(m => {
-        summed.pw_lm += (m.pw_lm || 0);
-        summed.children_3_6y += (m.children_3_6y || 0);
-        summed.children_6m_3y += (m.children_6m_3y || 0);
-        summed.adolescent_girls += (m.adolescent_girls || 0);
-        summed.sam_6m_3y += (m.sam_6m_3y || 0);
-        summed.sam_3_5y += (m.sam_3_5y || 0);
-        summed.suw_6m_3y += (m.suw_6m_3y || 0);
-        summed.suw_3_6y += (m.suw_3_6y || 0);
+  const summaryStats = useMemo(() => {
+    return filteredRecords.reduce((acc, r) => {
+      NUMERIC_AGG_FIELDS.forEach(({ key }) => {
+        acc[key] = (acc[key] || 0) + (parseInt(r[key]) || 0);
       });
-
-      return {
-        labels,
-        datasets: [{
-          label: `All Months (FY ${selectedSession})`,
-          data: [summed.pw_lm, summed.children_6m_3y, summed.children_3_6y, summed.adolescent_girls, summed.sam_6m_3y, summed.sam_3_5y, summed.suw_6m_3y, summed.suw_3_6y],
-          backgroundColor: colors,
-          borderColor: colors,
-          borderWidth: 1,
-          borderRadius: 6,
-        }],
-      };
-    } else {
-      // Specific month selected
-      const monthData = currentSessionMonths.find(m => m.month === selectedMonth);
-      if (!monthData) return { labels, datasets: [] };
-
-      return {
-        labels,
-        datasets: [{
-          label: `${selectedMonth} (FY ${selectedSession})`,
-          data: [monthData.pw_lm || 0, monthData.children_6m_3y || 0, monthData.children_3_6y || 0, monthData.adolescent_girls || 0, monthData.sam_6m_3y || 0, monthData.sam_3_5y || 0, monthData.suw_6m_3y || 0, monthData.suw_3_6y || 0],
-          backgroundColor: colors,
-          borderColor: colors,
-          borderWidth: 1,
-          borderRadius: 6,
-        }],
-      };
-    }
-  }, [currentSessionMonths, selectedSession, selectedMonth]);
-
-  // Compute display total based on filters
-  const displayTotalBeneficiaries = useMemo(() => {
-    if (selectedMonth === "All Months") {
-      let total = 0;
-      currentSessionMonths.forEach(m => { total += (m.total_beneficiaries || 0); });
-      return total;
-    } else {
-      const monthData = currentSessionMonths.find(m => m.month === selectedMonth);
-      return monthData ? (monthData.total_beneficiaries || 0) : 0;
-    }
-  }, [currentSessionMonths, selectedMonth]);
-
-  // Check if chart has any data > 0
-  const hasBeneChartData = useMemo(() => {
-    if (!beneficiaryChartData.datasets || beneficiaryChartData.datasets.length === 0) return false;
-    return beneficiaryChartData.datasets[0].data.some(v => v > 0);
-  }, [beneficiaryChartData]);
-
-  // Subtitle text
-  const beneSubtitle = useMemo(() => {
-    if (!selectedSession) return "Loading session data...";
-    if (selectedMonth === "All Months") {
-      return `All months summary for FY ${selectedSession}`;
-    }
-    return `${selectedMonth} data for FY ${selectedSession}`;
-  }, [selectedSession, selectedMonth]);
-
-  // Chart options for beneficiary chart
-  const beneficiaryChartOptions = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      title: { display: false },
-      tooltip: {
-        callbacks: {
-          label: (context) => {
-            const value = context.parsed.y?.toLocaleString() || 0;
-            return `${context.label}: ${value}`;
-          },
-        },
-      },
-      datalabels: {
-        display: true,
-        color: 'black',
-        anchor: 'end',
-        align: 'top',
-        formatter: (value) => value > 0 ? value.toLocaleString() : '',
-        font: { weight: 'bold' },
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: { precision: 0, callback: (value) => value.toLocaleString() },
-      },
-    },
-  }), []);
-
-  const FoodItemTable = ({ scheme, api }) => {
-    const [items, setItems] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-
-    useEffect(() => {
-      const fetchItems = async () => {
-        setLoading(true);
-        setError("");
-        try {
-          const response = await api.get(`/${scheme}-food-items/`);
-          const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
-          setItems(Array.isArray(data) ? data : []);
-        } catch (err) {
-          setError(`Failed to fetch ${scheme.toUpperCase()} food items.`);
-          console.error(err);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchItems();
-    }, [scheme, api]);
-
-    if (loading) return <div className="text-center p-4"><Spinner animation="border" /></div>;
-    if (error) return <Alert variant="danger">{error}</Alert>;
-    if (items.length === 0) return <div className="text-center p-4 text-muted">No food items found.</div>;
-
-    return (
-      <div className="table-responsive food-item-table-container">
-        <Table striped bordered hover responsive className="mb-0 food-item-table">
-          <thead className="table-light sticky-top">
-            <tr>
-              <th>#</th>
-              <th>Food Item</th>
-              <th>Quantity Per Beneficiary</th>
-              <th>Unit</th>
-              <th>Beneficiary Category</th>
-              <th>Days Allotted</th>
-              <th>Total Quantity</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, index) => (
-              <tr key={item.id}>
-                <td>{index + 1}</td>
-                <td>{item.food_item}</td>
-                <td>{item.qty_per_ben}</td>
-                <td>{item.unit}</td>
-                <td>{item.bene_category}</td>
-                <td>{item.days_allotted}</td>
-                <td>{item.total_quantity}</td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      </div>
-    );
-  };
-
-  const ReceivingTable = ({ items }) => { 
-    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No receiving records found.</div>;
-    return (
-      <div className="table-responsive food-item-table-container">
-        <Table striped bordered hover responsive className="mb-0 food-item-table">
-          <thead className="table-light sticky-top">
-            <tr><th>#</th><th>Quantity</th><th>Unit</th></tr>
-          </thead>
-          <tbody>
-            {items.map((item, index) => (
-              <tr key={index}><td>{index + 1}</td><td>{item.total_quantity}</td><td>{item.unit}</td></tr>
-            ))}
-          </tbody>
-        </Table>
-      </div>
-    );
-  };
-
-  const DistributionTable = ({ items }) => { 
-    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No distribution records found.</div>;
-    return (
-      <div className="table-responsive food-item-table-container">
-        <Table striped bordered hover responsive className="mb-0 food-item-table">
-          <thead className="table-light sticky-top">
-            <tr><th>#</th><th>Total Beneficiaries</th><th>Total Quantity</th><th>Unit</th></tr>
-          </thead>
-          <tbody>
-            {items.map((item, index) => (
-              <tr key={index}><td>{index + 1}</td><td>{item.total_beneficiaries}</td><td>{item.total_quantity}</td><td>{item.unit}</td></tr>
-            ))}
-          </tbody>
-        </Table>
-      </div>
-    );
-  };
-
-  const BeneficiarySummaryTable = ({ items }) => { 
-    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No beneficiary summary found.</div>;
-    return (
-      <div className="table-responsive food-item-table-container">
-        <Table striped bordered hover responsive className="mb-0 food-item-table">
-          <thead className="table-light sticky-top">
-            <tr><th>#</th><th>Category Name</th><th>Beneficiary Count</th></tr>
-          </thead>
-          <tbody>
-            {items.map((item, index) => (
-              <tr key={item.category_id}><td>{index + 1}</td><td>{item.category_name}</td><td>{item.beneficiary_count}</td></tr>
-            ))}
-          </tbody>
-        </Table>
-      </div>
-    );
-  };
-
-  const handleCardClick = (scheme) => {
-    setExpanded(expanded === scheme ? null : scheme);
-  };
-
-  const generateTooltip = (summary, type) => {
-    const data = type === 'receiving' ? summary?.receiving_summary : summary?.distribution_summary;
-    if (!data || data.length === 0) return <Tooltip>No data available</Tooltip>;
-    const unitTotals = data.reduce((acc, item) => {
-      const unit = item.unit || 'N/A';
-      acc[unit] = (acc[unit] || 0) + safeNumber(item.total_quantity);
       return acc;
     }, {});
-    return <Tooltip>{Object.entries(unitTotals).map(([unit, total]) => <div key={unit}>{unit}: {total.toLocaleString()}</div>)}</Tooltip>;
-  };
+  }, [filteredRecords]);
 
-  const thrSummaryChartData = useMemo(() => ({
-    labels: ["Beneficiaries", "Received Qty", "Distributed Qty"],
-    datasets: [{
-      label: "THR Summary",
-      data: [
-        thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0) || 0,
-        thrSummary?.receiving_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0,
-        thrSummary?.distribution_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0,
-      ],
-      backgroundColor: ["#ff8c00", "#dc3545", "#6f42c1"],
-      borderRadius: 6,
-    }],
-  }), [thrSummary]);
+  const aggregatedData = useMemo(() => {
+    if (!filteredRecords.length) return [];
+    const grouped = {};
+    filteredRecords.forEach(r => {
+      const groupKey = r[aggregateView] || "—";
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = { groupKey, months: new Set(), fys: new Set(), totals: NUMERIC_AGG_FIELDS.reduce((a, { key }) => ({ ...a, [key]: 0 }), {}) };
+      }
+      if (r.month) grouped[groupKey].months.add(r.month);
+      if (r.financial_year) grouped[groupKey].fys.add(r.financial_year);
+      NUMERIC_AGG_FIELDS.forEach(({ key }) => { grouped[groupKey].totals[key] += parseInt(r[key]) || 0; });
+    });
+    return Object.values(grouped).map(g => ({
+      groupKey: g.groupKey, months: Array.from(g.months).join(", "), fys: Array.from(g.fys).join(", "), ...g.totals
+    }));
+  }, [filteredRecords, aggregateView]);
 
-  const hcmSummaryChartData = useMemo(() => ({
-    labels: ["Beneficiaries", "Received Qty", "Distributed Qty"],
-    datasets: [{
-      label: "HCM Summary",
-      data: [
-        hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0) || 0,
-        hcmSummary?.receiving_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0,
-        hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (parseFloat(item.total_quantity) || 0), 0) || 0,
-      ],
-      backgroundColor: ["#20c997", "#0dcaf0", "#fd7e14"],
-      borderRadius: 6,
-    }],
-  }), [hcmSummary]);
-
-  const safeNumber = (value) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  };
-
-  const hasAnyValue = (values) => values.some((value) => safeNumber(value) > 0);
-
-  const roleChartData = useMemo(() => ({
-    labels: ["DPO", "CDPO", "Supervisor"],
-    datasets: [{
-      label: "User counts",
-      data: [roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor],
-      backgroundColor: ["#2f6fed", "#20c997", "#ff8c00"],
-      borderColor: ["#2f6fed", "#20c997", "#ff8c00"],
-      borderWidth: 1,
-      borderRadius: 6,
-    }],
-  }), [roleCounts]);
-
-  const roleDistributionChartData = useMemo(() => ({
-    labels: ["DPO", "CDPO", "Supervisor"],
-    datasets: [{
-      data: hasAnyValue([roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor]) ? [roleCounts.dpo, roleCounts.cdpo, roleCounts.supervisor] : [1],
-      backgroundColor: ["#2f6fed", "#20c997", "#ff8c00"],
-      borderColor: ["#ffffff"],
-      borderWidth: 2,
-    }],
-  }), [roleCounts]);
-
-  const schemeComparisonChartData = useMemo(() => ({
-    labels: ["Beneficiaries", "Received Qty", "Distributed Qty"],
-    datasets: [
-      {
-        label: "THR",
-        data: [
-          thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
-          thrSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
-          thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
-        ],
-        backgroundColor: "#ff8c00",
-      },
-      {
-        label: "HCM",
-        data: [
-          hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
-          hcmSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
-          hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
-        ],
-        backgroundColor: "#20c997",
-      },
-    ],
-  }), [hcmSummary, thrSummary]);
-
-  const categoryWiseChartData = useMemo(() => {
-    if (!overallData || !overallData.beneficiary_summary) return { labels: [], datasets: [] };
-    const fullLabels = overallData.beneficiary_summary.map(item => item.category);
-    const shortLabels = fullLabels.map(label => label.length > 25 ? label.substring(0, 22) + '...' : label);
-    return {
-      labels: shortLabels,
-      datasets: [
-        { label: "THR Distributed", fullLabels, data: overallData.beneficiary_summary.map(item => item.thr_distributed), backgroundColor: "#ff8c00" },
-        { label: "THR Received", fullLabels, data: overallData.beneficiary_summary.map(item => item.thr_received), backgroundColor: "#dc3545" },
-        { label: "HCM Distributed", fullLabels, data: overallData.beneficiary_summary.map(item => item.hcm_distributed), backgroundColor: "#20c997" },
-        { label: "HCM Received", fullLabels, data: overallData.beneficiary_summary.map(item => item.hcm_received), backgroundColor: "#fd7e14" },
-      ],
-    };
-  }, [overallData]);
-
-  const getUnitTotals = (summary) => {
-    if (!summary) return {};
-    return summary.reduce((acc, item) => {
-      const unit = item.unit || 'N/A';
-      acc[unit] = (acc[unit] || 0) + safeNumber(item.total_quantity);
+  const totalAggregated = useMemo(() => {
+    return NUMERIC_AGG_FIELDS.reduce((acc, { key }) => {
+      acc[key] = aggregatedData.reduce((sum, row) => sum + (row[key] || 0), 0);
       return acc;
     }, {});
-  };
+  }, [aggregatedData]);
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      title: { display: false },
-      tooltip: {
-        callbacks: {
-          label: (context) => {
-            const label = context.label || "";
-            const value = context.parsed.y?.toLocaleString() || 0;
-            let tooltipLines = [`${context.dataset.label || "Value"}: ${value}`];
-            const summary = context.dataset.label === "HCM Summary" ? hcmSummary : thrSummary;
-            let unitData;
-            if (label === "Received Qty") unitData = summary?.receiving_summary;
-            else if (label === "Distributed Qty") unitData = summary?.distribution_summary;
-            if (unitData) {
-              const unitTotals = unitData.reduce((acc, item) => {
-                const unit = item.unit || 'N/A';
-                acc[unit] = (acc[unit] || 0) + safeNumber(item.total_quantity);
-                return acc;
-              }, {});
-              tooltipLines.push('');
-              Object.entries(unitTotals).forEach(([unit, total]) => tooltipLines.push(`${unit}: ${total.toLocaleString()}`));
-            }
-            return tooltipLines;
-          },
-        },
-      },
-      datalabels: { display: true, color: 'black', anchor: 'end', align: 'top', formatter: (value) => value.toLocaleString(), font: { weight: 'bold' } },
-    },
-    scales: { y: { beginAtZero: true, ticks: { precision: 0, callback: (value) => value.toLocaleString() } } },
-  };
+  const totalDetailed = useMemo(() => {
+    return NUMERIC_AGG_FIELDS.reduce((acc, { key }) => {
+      acc[key] = searchedRecords.reduce((sum, row) => sum + (parseInt(row[key]) || 0), 0);
+      return acc;
+    }, {});
+  }, [searchedRecords]);
 
-  const groupedChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { position: "bottom" },
-      tooltip: {
-        callbacks: {
-          label: (context) => `${context.dataset.label}: ${context.parsed.y?.toLocaleString() || 0}`,
-          footer: (tooltipItems) => {
-            const context = tooltipItems[0];
-            if (!context) return '';
-            const label = context.label || "";
-            let footerLines = [''];
-            tooltipItems.forEach(item => {
-              const summary = item.dataset.label === "HCM" ? hcmSummary : thrSummary;
-              let unitData;
-              if (label === "Received Qty") unitData = summary?.receiving_summary;
-              else if (label === "Distributed Qty") unitData = summary?.distribution_summary;
-              if (unitData) {
-                const unitTotals = unitData.reduce((acc, item) => {
-                  const unit = item.unit || 'N/A';
-                  acc[unit] = (acc[unit] || 0) + safeNumber(item.total_quantity);
-                  return acc;
-                }, {});
-                footerLines.push(`${item.dataset.label} Totals:`, ...Object.entries(unitTotals).map(([unit, total]) => `  ${unit}: ${total.toLocaleString()}`));
-              }
-            });
-            return footerLines.length > 1 ? footerLines : '';
-          }
-        },
-      },
-      datalabels: { display: true, color: 'black', anchor: 'end', align: 'top', formatter: (value) => value.toLocaleString(), font: { weight: 'bold' } },
-    },
-    scales: { y: { beginAtZero: true, ticks: { precision: 0, callback: (value) => value.toLocaleString() } } },
-  };
+  const totalSupplies = useMemo(() => {
+    return SUPPLIES_DATA.reduce((acc, item) => {
+      acc.received += item.received;
+      acc.distributed += item.distributed;
+      acc.remaining += item.remaining;
+      return acc;
+    }, { received: 0, distributed: 0, remaining: 0 });
+  }, []);
 
-  const categoryWiseChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { position: "bottom" },
-      tooltip: {
-        callbacks: {
-          title: (tooltipItems) => {
-            const firstItem = tooltipItems[0];
-            return firstItem.dataset.fullLabels[firstItem.dataIndex] || firstItem.label;
-          },
-          label: (context) => `${context.dataset.label}: ${context.parsed.y?.toLocaleString() || 0}`,
-          footer: (tooltipItems) => {
-            if (!overallData || !overallData.food_item_summary || tooltipItems.length === 0) return '';
-            const tooltipItem = tooltipItems[0];
-            const category = tooltipItem.dataset.fullLabels[tooltipItem.dataIndex];
-            const datasetLabel = tooltipItem.dataset.label;
-            const dataKeyMap = { "THR Distributed": "thr_distributed", "THR Received": "thr_received", "HCM Distributed": "hcm_distributed", "HCM Received": "hcm_received" };
-            const dataKey = dataKeyMap[datasetLabel];
-            if (!dataKey) return '';
-            const relevantFoodItems = overallData.food_item_summary.filter((item) => item.beneficiary_category === category && item[dataKey] > 0);
-            if (relevantFoodItems.length === 0) return '';
-            const footerLines = ['\nFood Item Breakdown:'];
-            relevantFoodItems.forEach(item => { footerLines.push(`  - ${item.food_item}: ${item[dataKey].toLocaleString()} ${item.unit}`); });
-            return footerLines;
-          },
-        },
-      },
-      datalabels: { display: true, color: '#444', anchor: 'end', align: 'top', rotation: -45, offset: 8, formatter: (value) => value.toLocaleString(), overlap: true, font: { weight: 'bold' } },
-    },
-    scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { precision: 0, callback: (value) => value.toLocaleString() } } },
-  };
+  // Reset Pagination on Filter Change
+  useEffect(() => { setDetailsPage(1); }, [searchedRecords]);
+  useEffect(() => { setAggPage(1); }, [aggregatedData]);
 
-  const doughnutChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { position: "bottom" },
-      tooltip: { callbacks: { label: (context) => `${context.label}: ${context.parsed?.toLocaleString() || 0}` } },
-      datalabels: { display: true, color: 'black', formatter: (value, ctx) => { const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); return total > 0 ? `${Math.round((value / total) * 100)}%` : ''; }, font: { weight: 'bold' } },
-    },
-    cutout: "65%",
-  };
+  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
-  const GraphCard = ({ title, subtitle, children }) => (
-    <Card className="dashboard-card h-100">
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div>
-            <h6 className="dashboard-card-title mb-1">{title}</h6>
-            {subtitle ? <div className="text-muted small">{subtitle}</div> : null}
-          </div>
+  // Pagination Renderer
+  const renderPagination = (currentPage, totalItems, setPage) => {
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+    if (totalPages <= 1) return null;
+
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage + 1 < maxPagesToShow) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    const pages = [];
+    pages.push(<Pagination.First key="first" disabled={currentPage === 1} onClick={() => setPage(1)} />);
+    pages.push(<Pagination.Prev key="prev" disabled={currentPage === 1} onClick={() => setPage(p => Math.max(1, p - 1))} />);
+    
+    if (startPage > 1) {
+      pages.push(<Pagination.Item key={1} onClick={() => setPage(1)}>{1}</Pagination.Item>);
+      if (startPage > 2) pages.push(<Pagination.Ellipsis key="ell1" disabled />);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(<Pagination.Item key={i} active={i === currentPage} onClick={() => setPage(i)}>{i}</Pagination.Item>);
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) pages.push(<Pagination.Ellipsis key="ell2" disabled />);
+      pages.push(<Pagination.Item key={totalPages} onClick={() => setPage(totalPages)}>{totalPages}</Pagination.Item>);
+    }
+
+    pages.push(<Pagination.Next key="next" disabled={currentPage === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} />);
+    pages.push(<Pagination.Last key="last" disabled={currentPage === totalPages} onClick={() => setPage(totalPages)} />);
+
+    const startItem = Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, totalItems);
+    const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
+
+    return (
+      <div className="d-flex justify-content-between align-items-center p-2 flex-wrap" style={{ borderTop: '1px solid #e2e8f0' }}>
+        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+          Showing {startItem} to {endItem} of {totalItems} entries
         </div>
-        {children}
-      </Card.Body>
-    </Card>
-  );
+        <Pagination size="sm" className="mb-0">{pages}</Pagination>
+      </div>
+    );
+  };
+
+  // Paginated Data Slices
+  const currentSupplies = useMemo(() => {
+    return SUPPLIES_DATA.slice((suppliesPage - 1) * ITEMS_PER_PAGE, suppliesPage * ITEMS_PER_PAGE);
+  }, [suppliesPage]);
+
+  const currentAggregated = useMemo(() => {
+    return aggregatedData.slice((aggPage - 1) * ITEMS_PER_PAGE, aggPage * ITEMS_PER_PAGE);
+  }, [aggregatedData, aggPage]);
+
+  const currentDetailed = useMemo(() => {
+    return searchedRecords.slice((detailsPage - 1) * ITEMS_PER_PAGE, detailsPage * ITEMS_PER_PAGE);
+  }, [searchedRecords, detailsPage]);
+
+  /* --- Export Functions --- */
+  const exportSuppliesToExcel = () => {
+    const data = SUPPLIES_DATA.map((r, i) => ({ "S. No.": i + 1, District: r.district, Project: r.project, Sector: r.sector, Received: r.received, Distributed: r.distributed, Remaining: r.remaining }));
+    data.push({ "S. No.": "", District: "Total", Project: "", Sector: "", Received: totalSupplies.received, Distributed: totalSupplies.distributed, Remaining: totalSupplies.remaining });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Supplies Summary");
+    XLSX.writeFile(wb, "Supplies_Summary.xlsx");
+  };
+
+  const exportSuppliesToPDF = () => {
+    const head = [["S. No.", "District", "Project", "Sector", "Received", "Distributed", "Remaining"]];
+    const body = SUPPLIES_DATA.map((r, i) => [i + 1, r.district, r.project, r.sector, r.received, r.distributed, r.remaining]);
+    const doc = new jsPDF("p", "pt", "a4");
+    doc.text("Supplies Received & Distributed Summary", 40, 40);
+    autoTable(doc, {
+      head, body, startY: 50,
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [111, 66, 193] }, 
+      foot: [["", "Total", "", "", totalSupplies.received, totalSupplies.distributed, totalSupplies.remaining]],
+      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" }
+    });
+    doc.save("Supplies_Summary.pdf");
+  };
+
+  const exportAggToExcel = () => {
+    const data = aggregatedData.map((r, i) => ({ "S. No.": i + 1, [aggregateView]: r.groupKey, Months: r.months, "Fin. Years": r.fys, ...NUMERIC_AGG_FIELDS.reduce((o, f) => ({ ...o, [f.label]: r[f.key] }), {}) }));
+    data.push({ "S. No.": "", [aggregateView]: "Total", ...NUMERIC_AGG_FIELDS.reduce((o, f) => ({ ...o, [f.label]: totalAggregated[f.key] }), {}) });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Summary");
+    XLSX.writeFile(wb, `${aggregateView}_Summary.xlsx`);
+  };
+
+  const exportAggToPDF = () => {
+    const head = [["S. No.", aggregateView, "Months", "Fin. Years", ...NUMERIC_AGG_FIELDS.map(f => f.label)]];
+    const body = aggregatedData.map((r, i) => [i + 1, r.groupKey, r.months, r.fys, ...NUMERIC_AGG_FIELDS.map(f => r[f.key])]);
+    const doc = new jsPDF("l", "pt", "a3");
+    doc.text(`${aggregateView}-wise Aggregated Summary`, 40, 40);
+    autoTable(doc, {
+      head, body, startY: 50,
+      styles: { fontSize: 6, cellPadding: 2 },
+      headStyles: { fillColor: [111, 66, 193] }, 
+      foot: [["", "Total", "", "", ...NUMERIC_AGG_FIELDS.map(f => totalAggregated[f.key])]],
+      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" }
+    });
+    doc.save(`${aggregateView}_Summary.pdf`);
+  };
+
+  const exportDetailsToExcel = () => {
+    const data = searchedRecords.map((r, i) => ({ "S. No.": i + 1, ...TABLE_COLUMNS.reduce((o, c) => ({ ...o, [c.label]: r[c.key] || 0 }), {}) }));
+    data.push({ "S. No.": "", [TABLE_COLUMNS[0].label]: "Total", ...NUMERIC_AGG_FIELDS.reduce((o, f) => ({ ...o, [f.label]: totalDetailed[f.key] }), {}) });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Records");
+    XLSX.writeFile(wb, "Supplementary_Records.xlsx");
+  };
+
+  const exportDetailsToPDF = () => {
+    const head = [["S. No.", ...TABLE_COLUMNS.map(c => c.label)]];
+    const body = searchedRecords.map((r, i) => [i + 1, ...TABLE_COLUMNS.map(c => r[c.key] || "—")]);
+    const totalRow = ["", ...TABLE_COLUMNS.map(c => (c.num || c.strong) ? totalDetailed[c.key] : (c.key === "district" ? "Total" : ""))];
+    const doc = new jsPDF("l", "pt", "a3");
+    doc.text("Supplementary Nutrition Records", 40, 40);
+    autoTable(doc, {
+      head, body, startY: 50,
+      styles: { fontSize: 5, cellPadding: 1.5 },
+      headStyles: { fillColor: [111, 66, 193] }, 
+      foot: [totalRow],
+      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" }
+    });
+    doc.save("Supplementary_Records.pdf");
+  };
 
   return (
     <div className="dashboard-container">
       <DirectorLeftNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} />
       <div className="main-content-dash">
         <DirectorHeader toggleSidebar={toggleSidebar} />
-
-        <Container fluid className="dashboard-box mt-3"> 
+        
+        <Container fluid className="dashboard-box mt-3">
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
-          <div className="d-flex justify-content-end mb-3">
-            <ButtonGroup size="sm">
-              <Button variant={viewMode === "card" ? "primary" : "outline-primary"} onClick={() => setViewMode("card")}>Card View</Button>
-              <Button variant={viewMode === "graph" ? "primary" : "outline-primary"} onClick={() => setViewMode("graph")}>Graph View</Button>
-            </ButtonGroup>
+
+          {/* DPO Purple Header Section */}
+          <div className="dashboard-header-section mt-4">
+            <div>
+              <h4 className="dashboard-main-title">
+                <FaBoxes /> Director Dashboard
+              </h4>
+            </div>
+            <Button className="dpo-btn-light" onClick={fetchData} disabled={loading}>
+              <FaSyncAlt className={loading ? "fa-spin" : ""} /> Refresh Data
+            </Button>
           </div>
 
-          {viewMode === 'card' && (
-            <div className="dashboard-section">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h4 className="section-title mb-0">User Lists Overview</h4>
-              </div>
-              <Row className="g-3">
-                <Col md={3}>
-                  <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=dpo')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon hcm-icon"><FaUserCog /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">DPO List</h6>
-                          <div className="dashboard-card-value">{loadingRoles.dpo ? <Spinner animation="border" size="sm" /> : roleCounts.dpo}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=cdpo')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon thr-icon"><FaUserShield /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">CDPO List</h6>
-                          <div className="dashboard-card-value">{loadingRoles.cdpo ? <Spinner animation="border" size="sm" /> : roleCounts.cdpo}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorAwcList?tab=supervisor')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon hcm-icon"><FaUserTie /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">Supervisor List</h6>
-                          <div className="dashboard-card-value">{loadingRoles.supervisor ? <Spinner animation="border" size="sm" /> : roleCounts.supervisor}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/DirectorAwcList?tab=anganwadi')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon thr-icon"><FaHome /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">Anganwadi List</h6>
-                          <div className="dashboard-card-value">{loadingRoles.anganwadi ? <Spinner animation="border" size="sm" /> : roleCounts.anganwadi}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              </Row>
+          {/* Optimized Compact Food Items Overview */}
+          <div className="mb-4">
+            <Row className="g-3">
+              <Col md={6}>
+                <div 
+                  onClick={() => navigate('/director/food-items')} 
+                  className="d-flex align-items-center p-1 bg-white rounded shadow-sm " 
+                  style={{ cursor: 'pointer', borderLeft: '4px solid #ffc107', transition: 'all 0.2s' }}
+                >
+                  <div className="me-3 d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px', background: 'rgba(255, 193, 7, 0.1)', color: '#ffc107', borderRadius: '8px' }}>
+                    <FaBox size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: '#6c757d', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>HCM Food Items</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1e293b' }}>
+                      {loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}
+                    </div>
+                  </div>
+                </div>
+              </Col>
+              <Col md={6}>
+                <div 
+                  onClick={() => navigate('/director/food-items')} 
+                  className="d-flex align-items-center p-1 bg-white rounded shadow-sm " 
+                  style={{ cursor: 'pointer', borderLeft: '4px solid #0dcaf0', transition: 'all 0.2s' }}
+                >
+                  <div className="me-3 d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px', background: 'rgba(13, 202, 240, 0.1)', color: '#0dcaf0', borderRadius: '8px' }}>
+                    <FaBox size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: '#6c757d', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>THR Food Items</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1e293b' }}>
+                      {loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}
+                    </div>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </div>
+
+          {/* Compact Multi-Select Filter Bar */}
+          <div className="dpo-filter-bar">
+            <MultiSelectDropdown label="Month" options={uniqueMonths} selected={selectedMonths} onChange={setSelectedMonths} />
+            <MultiSelectDropdown label="Financial Year" options={uniqueFYs} selected={selectedFYs} onChange={setSelectedFYs} />
+            <MultiSelectDropdown label="Project" options={uniqueProjects} selected={selectedProjects} onChange={setSelectedProjects} />
+            <MultiSelectDropdown label="Sector" options={uniqueSectors} selected={selectedSectors} onChange={setSelectedSectors} />
+            <Button variant="outline-secondary" size="sm" className="dpo-filter-reset" onClick={() => { setSelectedMonths([]); setSelectedFYs([]); setSelectedProjects([]); setSelectedSectors([]); }}>
+              Reset
+            </Button>
+          </div>
+
+          {/* Wrapped Summary Pills */}
+          {summaryStats && (
+            <div className="dpo-stat-strip">
+              {SUMMARY_PILLS.map(field => (
+                <div key={field.key} className="dpo-stat-pill">
+                  <span className="dpo-stat-pill-icon">{field.icon}</span>
+                  <span className="dpo-stat-pill-label">{field.label}</span>
+                  <span className="dpo-stat-pill-value">{summaryStats[field.key]?.toLocaleString() || 0}</span>
+                </div>
+              ))}
             </div>
           )}
 
-          <div className="dashboard-section">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h4 className="section-title mb-0">Food Items Overview</h4>
-            </div>
-            {viewMode === 'graph' ? (
-              <Row>
-                <Col>
-                  <GraphCard title="Category-wise Quantities" subtitle="Received vs. Distributed quantities for HCM & THR across beneficiary categories">
-                    <div style={{ position: 'relative', height: '500px', overflowX: 'auto' }}>
-                      <div style={{ minWidth: `${(overallData?.beneficiary_summary?.length || 0) * 120}px`, height: '100%' }}>
-                        {overallData ? (
-                          <Bar data={categoryWiseChartData} options={{...categoryWiseChartOptions, maintainAspectRatio: false}} />
-                        ) : (
-                          <div className="d-flex align-items-center justify-content-center h-100 text-muted">Loading chart data...</div>
-                        )}
-                      </div>
-                    </div>
-                  </GraphCard>
-                </Col>
-              </Row>
-            ) : (
-              <Row className="g-3">
-                <Col md={6}><Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/director/food-items')}><Card.Body><div className="d-flex align-items-center w-100"><div className="dashboard-card-icon hcm-icon"><FaBox /></div><div className="ms-3 text-start"><h6 className="dashboard-card-title">HCM Food Items</h6><div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}</div></div></div></Card.Body></Card></Col>
-                <Col md={6}><Card className="dashboard-card card-thr h-100" onClick={() => navigate('/director/food-items')}><Card.Body><div className="d-flex align-items-center w-100"><div className="dashboard-card-icon thr-icon"><FaBox /></div><div className="ms-3 text-start"><h6 className="dashboard-card-title">THR Food Items</h6><div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}</div></div></div></Card.Body></Card></Col>
-              </Row>
-            )}
-          </div>
+          {/* Supplies Received & Distributed Table */}
+          <Card className="dpo-table-card">
+            <Card.Header className="dpo-table-header">
+              <h5 className="dpo-section-title">
+                <FaWarehouse /> Supplies Received & Distributed Summary
+              </h5>
+              <div className="dpo-export-btns">
+                <Button className="dpo-export-btn" onClick={exportSuppliesToExcel}><FaFileExcel className="text-success" /> Excel</Button>
+                <Button className="dpo-export-btn" onClick={exportSuppliesToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
+              </div>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <div className="dpo-table-wrapper">
+                <Table hover className="dpo-data-table mb-0">
+                  <thead>
+                    <tr>
+                      <th>S. No.</th>
+                      <th>District</th>
+                      <th>Project</th>
+                      <th>Sector</th>
+                      <th className="text-end">Received</th>
+                      <th className="text-end">Distributed</th>
+                      <th className="text-end">Remaining</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentSupplies.map((row, i) => (
+                      <tr key={i}>
+                        <td>{(suppliesPage - 1) * ITEMS_PER_PAGE + i + 1}</td>
+                        <td>{row.district}</td>
+                        <td><strong>{row.project}</strong></td>
+                        <td>{row.sector}</td>
+                        <td className="text-end">{row.received.toLocaleString()}</td>
+                        <td className="text-end">{row.distributed.toLocaleString()}</td>
+                        <td className="text-end text-primary"><strong>{row.remaining.toLocaleString()}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th></th>
+                      <th>Total</th>
+                      <th></th>
+                      <th></th>
+                      <th className="text-end">{totalSupplies.received.toLocaleString()}</th>
+                      <th className="text-end">{totalSupplies.distributed.toLocaleString()}</th>
+                      <th className="text-end">{totalSupplies.remaining.toLocaleString()}</th>
+                    </tr>
+                  </tfoot>
+                </Table>
+              </div>
+              {renderPagination(suppliesPage, SUPPLIES_DATA.length, setSuppliesPage)}
+            </Card.Body>
+          </Card>
 
-          <div className="dashboard-section">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h4 className="section-title mb-0">THR Distribution & Received Summary</h4>
-            </div>
-            {viewMode === "graph" ? (
-              <Row className="g-3">
-                <Col lg={8}>
-                  <GraphCard title="THR performance overview" subtitle="Comparison of beneficiaries, received quantity, and distributed quantity">
-                    <div style={{ height: 340 }}>
-                      {hasAnyValue([
-                        thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
-                        thrSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
-                        thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
-                      ]) ? (
-                        <Bar data={thrSummaryChartData} options={chartOptions} />
-                      ) : (
-                        <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
-                      )}
-                    </div>
-                  </GraphCard>
-                </Col>
-                <Col lg={4}>
-                  <GraphCard title="THR snapshot" subtitle="Key totals at a glance">
-                    <div className="d-flex flex-column gap-3">
-                      <div className="p-3 rounded bg-light"><div className="text-muted small">Distribution beneficiaries</div><div className="fs-4 fw-bold text-dark">{thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0}</div></div>
-                      <OverlayTrigger placement="top" overlay={generateTooltip(thrSummary, 'receiving')}><div className="p-3 rounded bg-light"><div className="text-muted small">Total received quantity</div><div className="fs-4 fw-bold text-dark">{thrSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0}</div></div></OverlayTrigger>
-                      <OverlayTrigger placement="top" overlay={generateTooltip(thrSummary, 'distribution')}><div className="p-3 rounded bg-light"><div className="text-muted small">Total distributed quantity</div><div className="fs-4 fw-bold text-dark">{thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0}</div></div></OverlayTrigger>
-                    </div>
-                  </GraphCard>
-                </Col>
-              </Row>
-            ) : (
-              <Row className="g-3"> 
-                <Col md={4} className="d-flex">
-                  <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/THRDirectorReport')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
-                          <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={4}>
-                  <OverlayTrigger placement="top" overlay={generateTooltip(thrSummary, 'receiving')}>
-                    <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-receiving')}>
-                      <Card.Body>
-                        <div className="d-flex align-items-center">
-                          <div className="dashboard-card-icon thr-icon"><FaTruckLoading /></div>
-                          <div className="ms-3 text-start">
-                            <h6 className="dashboard-card-title">THR Received</h6>
-                            <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0).toLocaleString() || 0}</div>
-                          </div>
-                          <div className="ms-auto expand-icon">{expanded === 'thr-receiving' ? <FaChevronUp /> : <FaChevronDown />}</div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  </OverlayTrigger>
-                  <Collapse in={expanded === 'thr-receiving'}><div className="mt-3"><ReceivingTable items={thrSummary?.receiving_summary} /></div></Collapse>
-                </Col>
-                <Col md={4}>
-                  <OverlayTrigger placement="top" overlay={generateTooltip(thrSummary, 'distribution')}>
-                    <Card className="dashboard-card card-thr expandable-card w-100" onClick={() => handleCardClick('thr-quantity')}>
-                      <Card.Body>
-                        <div className="d-flex align-items-center">
-                          <div className="dashboard-card-icon thr-icon"><FaBox /></div>
-                          <div className="ms-3 text-start">
-                            <h6 className="dashboard-card-title mb-1">THR Distributed Quantity</h6>
-                            <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0).toLocaleString() || 0}</div>
-                          </div>
-                          <div className="ms-auto expand-icon">{expanded === 'thr-quantity' ? <FaChevronUp /> : <FaChevronDown />}</div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  </OverlayTrigger>
-                  <Collapse in={expanded === 'thr-quantity'}><div className="mt-3"><DistributionTable items={thrSummary?.distribution_summary} /></div></Collapse>
-                </Col>
-              </Row>
-            )}
-          </div>
+          {/* Aggregated Table */}
+          <Card className="dpo-table-card">
+            <Card.Header className="dpo-table-header">
+              <h5 className="dpo-section-title">
+                <FaLayerGroup /> {aggregateView === "sector" ? "Sector-wise" : aggregateView === "project" ? "Project-wise" : "District-wise"} Aggregated Summary
+              </h5>
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                <ButtonGroup className="dpo-toggle-group">
+                  <Button className={`dpo-toggle-btn ${aggregateView === 'district' ? 'active' : ''}`} onClick={() => setAggregateView('district')}>District-wise</Button>
+                  <Button className={`dpo-toggle-btn ${aggregateView === 'project' ? 'active' : ''}`} onClick={() => setAggregateView('project')}>Project-wise</Button>
+                  <Button className={`dpo-toggle-btn ${aggregateView === 'sector' ? 'active' : ''}`} onClick={() => setAggregateView('sector')}>Sector-wise</Button>
+                </ButtonGroup>
+                <div className="dpo-export-btns">
+                  <Button className="dpo-export-btn" onClick={exportAggToExcel}><FaFileExcel className="text-success" /> Excel</Button>
+                  <Button className="dpo-export-btn" onClick={exportAggToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
+                </div>
+              </div>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <div className="dpo-table-wrapper">
+                {loading ? <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div> : (
+                  <Table hover className="dpo-data-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>S. No.</th>
+                        <th style={{textTransform: 'capitalize'}}>{aggregateView}</th>
+                        <th>Months</th>
+                        <th>Fin. Years</th>
+                        {NUMERIC_AGG_FIELDS.map((col, i) => <th key={i} className="text-end">{col.label}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentAggregated.length === 0 ? (
+                        <tr><td colSpan={NUMERIC_AGG_FIELDS.length + 4} className="text-center p-4 text-muted">No data available</td></tr>
+                      ) : currentAggregated.map((row, i) => (
+                        <tr key={i}>
+                          <td>{(aggPage - 1) * ITEMS_PER_PAGE + i + 1}</td>
+                          <td><strong>{row.groupKey}</strong></td>
+                          <td>{row.months}</td>
+                          <td>{row.fys}</td>
+                          {NUMERIC_AGG_FIELDS.map((col, c) => <td key={c} className="text-end">{row[col.key]?.toLocaleString() || 0}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                    {aggregatedData.length > 0 && (
+                      <tfoot>
+                        <tr>
+                          <th></th>
+                          <th>Total</th><th></th><th></th>
+                          {NUMERIC_AGG_FIELDS.map((col, c) => <th key={c} className="text-end">{totalAggregated[col.key]?.toLocaleString() || 0}</th>)}
+                        </tr>
+                      </tfoot>
+                    )}
+                  </Table>
+                )}
+              </div>
+              {!loading && renderPagination(aggPage, aggregatedData.length, setAggPage)}
+            </Card.Body>
+          </Card>
 
-          <div className="dashboard-section">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h4 className="section-title mb-0">HCM Distribution & Received Summary</h4>
-            </div>
-            {viewMode === "graph" ? (
-              <Row className="g-3">
-                <Col lg={8}>
-                  <GraphCard title="HCM performance overview" subtitle="Comparison of beneficiaries, received quantity, and distributed quantity">
-                    <div style={{ height: 340 }}>
-                      {hasAnyValue([
-                        hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0,
-                        hcmSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
-                        hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0,
-                      ]) ? (
-                        <Bar data={hcmSummaryChartData} options={chartOptions} />
-                      ) : (
-                        <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
-                      )}
-                    </div>
-                  </GraphCard>
-                </Col>
-                <Col lg={4}>
-                  <GraphCard title="HCM snapshot" subtitle="Key totals at a glance">
-                    <div className="d-flex flex-column gap-3">
-                      <div className="p-3 rounded bg-light"><div className="text-muted small">Distribution beneficiaries</div><div className="fs-4 fw-bold text-dark">{hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_beneficiaries), 0) || 0}</div></div>
-                      <OverlayTrigger placement="top" overlay={generateTooltip(hcmSummary, 'receiving')}><div className="p-3 rounded bg-light"><div className="text-muted small">Total received quantity</div><div className="fs-4 fw-bold text-dark">{hcmSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0}</div></div></OverlayTrigger>
-                      <OverlayTrigger placement="top" overlay={generateTooltip(hcmSummary, 'distribution')}><div className="p-3 rounded bg-light"><div className="text-muted small">Total distributed quantity</div><div className="fs-4 fw-bold text-dark">{hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0) || 0}</div></div></OverlayTrigger>
-                    </div>
-                  </GraphCard>
-                </Col>
-              </Row>
-            ) : (
-              <Row className="g-3"> 
-                <Col md={4} className="d-flex">
-                  <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/HCMDirectorReport')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
-                          <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={4}>
-                  <OverlayTrigger placement="top" overlay={generateTooltip(hcmSummary, 'receiving')}>
-                    <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-receiving')}>
-                      <Card.Body>
-                        <div className="d-flex align-items-center">
-                          <div className="dashboard-card-icon hcm-icon"><FaTruckLoading /></div>
-                          <div className="ms-3 text-start">
-                            <h6 className="dashboard-card-title">HCM Received</h6>
-                            <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.receiving_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0).toLocaleString() || 0}</div>
-                          </div>
-                          <div className="ms-auto expand-icon">{expanded === 'hcm-receiving' ? <FaChevronUp /> : <FaChevronDown />}</div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  </OverlayTrigger>
-                  <Collapse in={expanded === 'hcm-receiving'}><div className="mt-3"><ReceivingTable items={hcmSummary?.receiving_summary} /></div></Collapse>
-                </Col>
-                <Col md={4}>
-                  <OverlayTrigger placement="top" overlay={generateTooltip(hcmSummary, 'distribution')}>
-                    <Card className="dashboard-card card-hcm expandable-card w-100" onClick={() => handleCardClick('hcm-quantity')}>
-                      <Card.Body>
-                        <div className="d-flex align-items-center">
-                          <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
-                          <div className="ms-3 text-start">
-                            <h6 className="dashboard-card-title mb-1">HCM Distributed Quantity</h6>
-                            <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + safeNumber(item.total_quantity), 0).toLocaleString() || 0}</div>
-                          </div>
-                          <div className="ms-auto expand-icon">{expanded === 'hcm-quantity' ? <FaChevronUp /> : <FaChevronDown />}</div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  </OverlayTrigger>
-                  <Collapse in={expanded === 'hcm-quantity'}><div className="mt-3"><DistributionTable items={hcmSummary?.distribution_summary} /></div></Collapse>
-                </Col>
-              </Row>
-            )}
-          </div>
+          {/* Detailed Records Table */}
+          <Card className="dpo-table-card">
+            <Card.Header className="dpo-table-header">
+              <h5 className="dpo-section-title">
+                <FaChartBar /> Detailed Records
+              </h5>
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                <InputGroup style={{maxWidth: '300px'}}>
+                  <InputGroup.Text><FaSearch /></InputGroup.Text>
+                  <Form.Control 
+                    placeholder="Search AWC, District..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </InputGroup>
+                <div className="dpo-export-btns">
+                  <Button className="dpo-export-btn" onClick={exportDetailsToExcel}><FaFileExcel className="text-success" /> Excel</Button>
+                  <Button className="dpo-export-btn" onClick={exportDetailsToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
+                </div>
+              </div>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <div className="dpo-table-wrapper">
+                {loading ? <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div> : (
+                  <Table hover className="dpo-data-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>S. No.</th>
+                        {TABLE_COLUMNS.map((col, i) => <th key={i} className={col.num || col.strong ? "text-end" : ""}>{col.label}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentDetailed.length === 0 ? (
+                        <tr><td colSpan={TABLE_COLUMNS.length + 1} className="text-center p-5 text-muted">No records found.</td></tr>
+                      ) : currentDetailed.map((row, i) => (
+                        <tr key={i}>
+                          <td>{(detailsPage - 1) * ITEMS_PER_PAGE + i + 1}</td>
+                          {TABLE_COLUMNS.map((col, c) => {
+                            const val = row[col.key];
+                            if (col.strong) return <td key={c} className="text-end"><strong className="text-primary">{val ? Number(val).toLocaleString() : 0}</strong></td>;
+                            if (col.num) return <td key={c} className="text-end">{val ? Number(val).toLocaleString() : 0}</td>;
+                            return <td key={c}>{val || "—"}</td>;
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                    {searchedRecords.length > 0 && (
+                      <tfoot>
+                        <tr>
+                          <th></th>
+                          {TABLE_COLUMNS.map((col, c) => (
+                            <th key={c} className={col.num || col.strong ? "text-end" : ""}>
+                              {col.num || col.strong ? (totalDetailed[col.key]?.toLocaleString() || 0) : (c === 0 ? "Total" : "")}
+                            </th>
+                          ))}
+                        </tr>
+                      </tfoot>
+                    )}
+                  </Table>
+                )}
+              </div>
+              {!loading && renderPagination(detailsPage, searchedRecords.length, setDetailsPage)}
+            </Card.Body>
+          </Card>
 
-          {/* ====== Beneficiary Overview - Session + Month Filter ====== */}
-          <div className="dashboard-section">
-            <h4 className="section-title mb-3">Beneficiary Overview</h4>
-            {viewMode === "graph" ? (
-              <Row className="g-3">
-                <Col lg={12}>
-                  <GraphCard title="Beneficiary by Category" subtitle={beneSubtitle}>
-                    
-                    {/* Session Dropdown */}
-                    <div className="d-flex align-items-center gap-3 mb-2">
-                      <span className="text-muted small fw-medium" style={{ whiteSpace: 'nowrap' }}>Session:</span>
-                      <select
-                        className="form-select form-select-sm"
-                        value={selectedSession}
-                        onChange={handleSessionChange}
-                        disabled={loadingMonthWise || sessionList.length === 0}
-                        style={{ maxWidth: '180px', fontSize: '0.875rem' }}
-                      >
-                        {loadingMonthWise ? (
-                          <option>Loading...</option>
-                        ) : sessionList.length === 0 ? (
-                          <option>No sessions found</option>
-                        ) : (
-                          sessionList.map(fy => (
-                            <option key={fy} value={fy}>FY {fy}</option>
-                          ))
-                        )}
-                      </select>
-                    </div>
-
-                    {/* Month Dropdown - populated from selected session's months */}
-                    <div className="d-flex align-items-center gap-3 mb-3">
-                      <span className="text-muted small fw-medium" style={{ whiteSpace: 'nowrap' }}>Month:</span>
-                      <select
-                        className="form-select form-select-sm"
-                        value={selectedMonth}
-                        onChange={handleMonthChange}
-                        disabled={loadingMonthWise || !selectedSession}
-                        style={{ maxWidth: '180px', fontSize: '0.875rem' }}
-                      >
-                        <option value="All Months">All Months</option>
-                        {currentSessionMonths.map(m => (
-                          <option key={m.month} value={m.month}>{m.month}</option>
-                        ))}
-                      </select>
-                      {loadingMonthWise && <Spinner animation="border" size="sm" />}
-                    </div>
-
-                    <div className="d-flex flex-column gap-3">
-                      {/* Total count with badge */}
-                      <div className="d-flex align-items-center gap-3">
-                        <div className="display-6 fw-bold" style={{ color: '#0d6efd' }}>
-                          {loadingMonthWise ? (
-                            <Spinner animation="border" size="sm" />
-                          ) : (
-                            displayTotalBeneficiaries.toLocaleString()
-                          )}
-                        </div>
-                        {selectedSession && !loadingMonthWise && (
-                          <span className="badge rounded-pill" style={{ background: '#e8f0fe', color: '#2f6fed', fontSize: '0.75rem', fontWeight: 600 }}>
-                            {selectedMonth === "All Months" ? `All Months - FY ${selectedSession}` : `${selectedMonth} - FY ${selectedSession}`}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Chart */}
-                      <div style={{ height: 320 }}>
-                        {loadingMonthWise ? (
-                          <div className="d-flex align-items-center justify-content-center h-100 text-muted">
-                            <Spinner animation="border" />
-                          </div>
-                        ) : hasBeneChartData ? (
-                          <Bar data={beneficiaryChartData} options={beneficiaryChartOptions} />
-                        ) : (
-                          <div className="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
-                            <FaUsers size={40} className="mb-2" style={{ opacity: 0.25 }} />
-                            <span>
-                              {!selectedSession ? "No session data available" : `No beneficiary data for ${selectedMonth === "All Months" ? "this session" : selectedMonth}`}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </GraphCard>
-                </Col>
-              </Row>
-            ) : (
-              <Row className="g-3">
-                <Col md={4}>
-                  <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/DirectorBeneEntry')}>
-                    <Card.Body>
-                      <div className="d-flex align-items-center w-100">
-                        <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
-                        <div className="ms-3 text-start">
-                          <h6 className="dashboard-card-title mb-1">Total Beneficiaries</h6>
-                          <div className="dashboard-card-value">{loadingBeneficiaries ? <Spinner animation="border" size="sm" /> : totalBeneficiaries.toLocaleString()}</div>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              </Row>
-            )}
-          </div>
         </Container>
       </div>
     </div>
