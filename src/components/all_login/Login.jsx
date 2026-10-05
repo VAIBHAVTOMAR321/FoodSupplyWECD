@@ -9,7 +9,7 @@ import Womenlogo from '../../assets/images/women_logo.jpeg';
 const Login = () => {
   const [formData, setFormData] = useState({
     role: 'it-cell',
-    phone: 'itcell', // Auto-filled by default for IT Cell
+    phone: 'IT Cell', // Auto-filled exactly as required by the API payload
     password: '',
     otp: '',
   });
@@ -85,7 +85,7 @@ const Login = () => {
       const isItCell = value === 'it-cell';
       setFormData((prev) => ({ 
         ...prev, 
-        phone: isItCell ? 'itcell' : '', 
+        phone: isItCell ? 'IT Cell' : '', 
         password: '', 
         otp: '' 
       }));
@@ -94,6 +94,8 @@ const Login = () => {
   };
 
   // ===== Password Login API (For IT Cell) =====
+  // POST https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/login/
+  // Payload: { username: "IT Cell", password: "123", role: "it-cell" }
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
 
@@ -107,7 +109,7 @@ const Login = () => {
 
     try {
       const payload = {
-        username: formData.phone, // Sending the auto-filled 'itcell' as username
+        username: formData.phone, // Sends 'IT Cell'
         password: formData.password,
         role: formData.role,
       };
@@ -259,7 +261,7 @@ const Login = () => {
     }
   };
 
-  // Form submit handler
+  // Form submit handler — decides which API to trigger
   const handleSubmit = (e) => {
     e.preventDefault();
     if (formData.role === 'it-cell') {
@@ -332,7 +334,7 @@ const Login = () => {
               {formData.role === 'it-cell' ? (
                 <>
                   {/* IT CELL: Direct Password Login Flow */}
-                  {/* Username field is hidden and auto-filled with 'itcell' */}
+                  {/* Username field is hidden and auto-filled with 'IT Cell' */}
                   <div className="form-group">
                     <label>{content.passwordLabel}</label>
                     <div className="input-wrapper">
@@ -428,17 +430,7 @@ const Login = () => {
                         )}
                       </button>
 
-                      <button
-                        type="button"
-                        className="login-btn-secondary"
-                        onClick={() => {
-                          setOtpSent(false);
-                          setFormData((prev) => ({ ...prev, otp: '' }));
-                          setError('');
-                        }}
-                      >
-                        मोबाइल नंबर बदलें
-                      </button>
+                     
                     </>
                   )}
                 </>
