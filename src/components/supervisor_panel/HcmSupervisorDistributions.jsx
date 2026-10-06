@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Container, Card, Spinner, Table, Button, Alert, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
+import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/supervisorleftnav.css";
 import SupervisorHeader from "./SupervisorHeader";
@@ -22,6 +22,19 @@ const HcmSupervisorDistributions = () => {
   const [itemsPerPage] = useState(20);
   const [isPrinting, setIsPrinting] = useState(false);
   const [showQtyModal, setShowQtyModal] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingAction, setLoadingAction] = useState({});
+  const [openRemarkId, setOpenRemarkId] = useState(null);
+  const [openRemarkAction, setOpenRemarkAction] = useState("");
+  const [remarkValue, setRemarkValue] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showBulkRemarkModal, setShowBulkRemarkModal] = useState(false);
+  const [bulkRemark, setBulkRemark] = useState("");
+  const [bulkAction, setBulkAction] = useState("");
+  const [showRemarkModal, setShowRemarkModal] = useState(false);
+  const [selectedRemarks, setSelectedRemarks] = useState(null);
   const tableRef = useRef(null);
 
   const [columns, setColumns] = useState([
@@ -39,6 +52,8 @@ const HcmSupervisorDistributions = () => {
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
+    { dataField: 'sector_status', text: 'Sector Status', visible: true },
+    { dataField: 'action', text: 'Action', visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
@@ -49,6 +64,7 @@ const HcmSupervisorDistributions = () => {
     food_item: [],
     bene_category: [],
     awc_type: [],
+    sector_status: [],
     startDate: '',
     endDate: '',
   });
@@ -57,6 +73,7 @@ const HcmSupervisorDistributions = () => {
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueAwcTypes, setUniqueAwcTypes] = useState([]);
+  const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
   const [beneficiaryCategories, setBeneficiaryCategories] = useState([]);
 
   useEffect(() => {
@@ -78,6 +95,7 @@ const HcmSupervisorDistributions = () => {
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
       setUniqueAwcTypes([...new Set(distributions.map(item => item.awc_type))]);
+      setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status))]);
     }
   }, [distributions]);
 
@@ -94,13 +112,14 @@ const HcmSupervisorDistributions = () => {
 
   const filteredData = useMemo(() => {
     return distributions.filter(item => {
-      const { district, project, sector, food_item, awc_type, bene_category, startDate, endDate } = filters;
+      const { district, project, sector, food_item, awc_type, bene_category, sector_status, startDate, endDate } = filters;
       const matchesFilters = (district.length === 0 || district.includes(item.district)) &&
              (project.length === 0 || project.includes(item.project)) &&
              (sector.length === 0 || sector.includes(item.sector)) &&
              (food_item.length === 0 || food_item.includes(item.food_item)) &&
              (bene_category.length === 0 || bene_category.includes(item.bene_category)) &&
-             (awc_type.length === 0 || awc_type.includes(item.awc_type));
+             (awc_type.length === 0 || awc_type.includes(item.awc_type)) &&
+             (sector_status.length === 0 || sector_status.includes(item.sector_status));
 
       const itemDate = item.date ? new Date(item.date) : null;
       const matchesDateRange = (!startDate || (itemDate && itemDate >= new Date(startDate))) &&
@@ -147,6 +166,136 @@ const HcmSupervisorDistributions = () => {
       fetchBeneficiaryCategories();
     }
   }, [api]);
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      const allFilteredIds = filteredData.map(item => item.id);
+      setSelectedIds(allFilteredIds);
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllPending = () => {
+    const pendingIds = filteredData
+      .filter(item => item.sector_status === 'pending' || !item.sector_status)
+      .map(item => item.id);
+    setSelectedIds(pendingIds);
+  };
+
+  const isAllSelected = useMemo(() => filteredData.length > 0 && selectedIds.length === filteredData.length, [filteredData, selectedIds]);
+
+  const handleToggleRemark = (item, action) => {
+    if (openRemarkId === item.id) {
+      setOpenRemarkId(null);
+      setOpenRemarkAction("");
+    } else {
+      setOpenRemarkId(item.id);
+      setOpenRemarkAction(action);
+      setRemarkValue("");
+      setActionError("");
+    }
+  };
+
+  const handleStatusUpdate = async (item) => {
+    const action = openRemarkAction;
+    const remark = remarkValue.trim();
+    setActionError("");
+
+    if (action === "rejected" && !remark) {
+      setActionError("Please enter a remark for rejection.");
+      return;
+    }
+
+    setSubmitting(true);
+    setLoadingAction(prev => ({ ...prev, [item.id]: true }));
+    try {
+      const response = await api.put("/hcm-supervisor-distributions/", {
+        ids: [item.id],
+        sector_status: action,
+        sector_remark: remark || "",
+      });
+
+      if (response.data?.success !== false) {
+        setSuccessMsg(`Status updated to ${action} successfully.`);
+        setDistributions(prev => prev.map(d =>
+          d.id === item.id ? { ...d, sector_status: action, sector_remark: remark || "" } : d
+        ));
+        setOpenRemarkId(null);
+        setOpenRemarkAction("");
+        setRemarkValue("");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } else {
+        setActionError(response.data?.message || "Failed to update status.");
+      }
+    } catch (err) {
+      setActionError("Failed to update status. Please try again.");
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+      setLoadingAction(prev => ({ ...prev, [item.id]: false }));
+    }
+  };
+
+  const handleBulkAction = async () => {
+    if (selectedIds.length === 0) {
+      setActionError("No items selected.");
+      return;
+    }
+    if (bulkAction === "rejected" && !bulkRemark.trim()) {
+      setActionError("Please enter a remark for rejection.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await api.put("/hcm-supervisor-distributions/", {
+        ids: selectedIds,
+        sector_status: bulkAction,
+        sector_remark: bulkRemark.trim(),
+      });
+
+      if (response.data?.success !== false) {
+        setSuccessMsg(`Successfully updated ${selectedIds.length} items.`);
+        fetchDistributions();
+        setSelectedIds([]);
+        setShowBulkRemarkModal(false);
+        setBulkRemark("");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } else {
+        setActionError(response.data?.message || "Failed to perform bulk action.");
+      }
+    } catch (err) {
+      setActionError("Failed to perform bulk action. Please try again.");
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleViewRemark = (item) => {
+    setSelectedRemarks(item);
+    setShowRemarkModal(true);
+  };
+
+  const handleCloseRemarkModal = () => {
+    setShowRemarkModal(false);
+    setSelectedRemarks(null);
+  };
+
+  const getStatusVariant = (status) => {
+    switch (status) {
+      case "approved": return "success";
+      case "rejected": return "danger";
+      default: return "warning";
+    }
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -242,7 +391,7 @@ const HcmSupervisorDistributions = () => {
   };
 
   const exportToExcel = () => {
-    const visCols = columns.filter(c => c.visible && c.dataField !== '#');
+    const visCols = columns.filter(c => c.visible && c.dataField !== '#' && c.dataField !== 'action');
     const dataToExport = filteredData.map((row, index) => {
       const newRow = { '#': index + 1 };
       visCols.forEach(col => {
@@ -339,6 +488,20 @@ const HcmSupervisorDistributions = () => {
             </div>
           </div>
 
+          <div className="mb-3 d-flex gap-2 flex-wrap">
+            {selectedIds.length > 0 && (
+              <>
+                <Button variant="primary" size="sm" onClick={() => { setBulkAction("approved"); setShowBulkRemarkModal(true); }}>
+                  Approve Selected ({selectedIds.length})
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => { setBulkAction("rejected"); setShowBulkRemarkModal(true); }}>
+                  Reject Selected ({selectedIds.length})
+                </Button>
+              </>
+            )}
+            <Button variant="info" size="sm" onClick={handleSelectAllPending}>Select All Pending</Button>
+          </div>
+
           <Row className="mb-3">
             <Col md={2}>
               <Dropdown>
@@ -424,6 +587,20 @@ const HcmSupervisorDistributions = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
+            <Col md={2}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status" className="w-100">
+                  {filters.sector_status.length ? `${filters.sector_status.length} statuses selected` : 'All Statuses'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueSectorStatuses.map(s => (
+                    <Dropdown.Item key={String(s)} as="div">
+                      <Form.Check type="checkbox" label={s || 'pending'} checked={filters.sector_status.includes(s)} onChange={() => handleMultiSelectChange('sector_status', s)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
           </Row>
 
           <Row className="mb-3">
@@ -436,13 +613,15 @@ const HcmSupervisorDistributions = () => {
               <Form.Control type="date" value={filters.endDate} onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))} />
             </Col>
             <Col md={3} className="d-flex align-items-end">
-              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ district: [], project: [], sector: [], food_item: [], awc_type: [], bene_category: [], startDate: '', endDate: '' })} className="me-2">
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ district: [], project: [], sector: [], food_item: [], awc_type: [], bene_category: [], sector_status: [], startDate: '', endDate: '' })} className="me-2">
                 Clear Filters
               </Button>
             </Col>
           </Row>
 
+          {!isPrinting && successMsg && <Alert variant="success" className="mb-3">{successMsg}</Alert>}
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
+          {actionError && <Alert variant="danger" className="mb-3">{actionError}</Alert>}
 
           <Card className="shadow-sm">
           
@@ -455,53 +634,142 @@ const HcmSupervisorDistributions = () => {
               ) : (
                 <div className="table-responsive">
                   <Table striped bordered hover responsive className="mb-0" ref={tableRef}>
-                     <thead>
-                       <tr>
-                         {visibleColumns.map((col) => {
+                      <thead>
+                        <tr>
+                          {!isPrinting && (
+                            <th style={{ width: '50px' }}>
+                              <Form.Check
+                                type="checkbox"
+                                onChange={handleSelectAll}
+                                checked={isAllSelected}
+                              />
+                            </th>
+                          )}
+                          {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col) => {
                             let thStyle = {};
                             if (col.dataField === 'awc_name') thStyle.minWidth = '250px';
                             if (col.dataField === 'food_item') thStyle.minWidth = '200px';
                             if (col.dataField === 'bene_category') thStyle.minWidth = '200px';
                             return <th key={`th-${col.dataField}`} style={thStyle}>{col.text}</th>
-                         })}
-                       </tr>
-                     </thead>
+                          })}
+                        </tr>
+                      </thead>
                       <tbody>
                         {currentItems.length > 0 ? currentItems.map((row, index) => (
-                          <tr key={`row-${row.id}`}>
-                            {visibleColumns.map(col => {
-                              let cellContent, cellClassName = '', cellStyle = {};
-                              if (col.dataField === '#') {
-                                cellContent = index + 1;
-                              } else if (col.dataField === 'date' && row[col.dataField]) {
-                                cellContent = new Date(row[col.dataField]).toLocaleDateString('en-GB');
-                              } else if (col.dataField === 'bene_category') {
-                                cellContent = <div>{row[col.dataField]}</div>;
-                                cellClassName = 'bene-category-cell'; // This class remains on the <td>
-                                cellStyle = { minWidth: '200px', wordBreak: 'break-word' };
-                              } else if (col.dataField === 'food_item') {
-                                cellContent = (
-                                  <div className="style-table-td">
-                                    {row[col.dataField]}
+                          <React.Fragment key={`row-${row.id}`}>
+                            <tr>
+                              {!isPrinting && (
+                                <td>
+                                  <Form.Check
+                                    type="checkbox"
+                                    checked={selectedIds.includes(row.id)}
+                                    onChange={() => handleSelectOne(row.id)}
+                                  />
+                                </td>
+                              )}
+                              {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map(col => {
+                                let cellContent, cellClassName = '', cellStyle = {};
+                                if (col.dataField === '#') {
+                                  cellContent = index + 1;
+                                } else if (col.dataField === 'date' && row[col.dataField]) {
+                                  cellContent = new Date(row[col.dataField]).toLocaleDateString('en-GB');
+                                } else if (col.dataField === 'bene_category') {
+                                  cellContent = <div>{row[col.dataField]}</div>;
+                                  cellClassName = 'bene-category-cell'; // This class remains on the <td>
+                                  cellStyle = { minWidth: '200px', wordBreak: 'break-word' };
+                                } else if (col.dataField === 'food_item') {
+                                  cellContent = (
+                                    <div className="style-table-td">
+                                      {row[col.dataField]}
+                                    </div>
+                                  );
+                                  cellClassName = 'food-item-cell';
+                                  cellStyle = { minWidth: '200px', wordBreak: 'break-word' };
+                                } else if (col.dataField === 'sector_status') {
+                                  cellContent = isPrinting ? (row[col.dataField] || 'pending') : <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField] || 'pending'}</Badge>;
+                                } else if (col.dataField === 'action') {
+                                  cellContent = (
+                                    <div className="d-flex align-items-center gap-2">
+                                      <Button
+                                        variant="outline-success"
+                                        size="sm"
+                                        disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
+                                        onClick={() => handleToggleRemark(row, "approved")}
+                                      >
+                                        Approve
+                                      </Button>
+                                      <Button
+                                        variant="outline-danger"
+                                        size="sm"
+                                        disabled={row.sector_status === "approved" || row.sector_status === "rejected" || loadingAction[row.id]}
+                                        onClick={() => handleToggleRemark(row, "rejected")}
+                                      >
+                                        Reject
+                                      </Button>
+                                      <Button
+                                        variant="outline-primary"
+                                        size="sm"
+                                        onClick={() => handleViewRemark(row)}
+                                      >
+                                        View Remark
+                                      </Button>
+                                    </div>
+                                  );
+                                } else {
+                                  cellContent = row[col.dataField];
+                                }
+                                return <td key={`td-${row.id}-${col.dataField}`} className={cellClassName} style={cellStyle}>{cellContent}</td>;
+                              })}
+                            </tr>
+                            {openRemarkId === row.id && (
+                              <tr>
+                                <td colSpan={visibleColumns.length + (isPrinting ? 0 : 1)}>
+                                  <div className="d-flex align-items-start gap-2">
+                                    <Form.Control
+                                      type="text"
+                                      size="sm"
+                                      placeholder="Enter remark"
+                                      value={remarkValue}
+                                      onChange={(e) => setRemarkValue(e.target.value)}
+                                      className="me-2"
+                                      style={{ maxWidth: "300px" }}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant={openRemarkAction === "approved" ? "success" : "danger"}
+                                      disabled={submitting || loadingAction[row.id]}
+                                      onClick={() => handleStatusUpdate(row)}
+                                    >
+                                      {loadingAction[row.id] ? "Saving..." : "Save"}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      disabled={submitting || loadingAction[row.id]}
+                                      onClick={() => {
+                                        setOpenRemarkId(null);
+                                        setOpenRemarkAction("");
+                                        setRemarkValue("");
+                                        setActionError("");
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
                                   </div>
-                                );
-                                cellClassName = 'food-item-cell';
-                                cellStyle = { minWidth: '200px', wordBreak: 'break-word' };
-                              } else {
-                                cellContent = row[col.dataField];
-                              }
-                              return <td key={`td-${row.id}-${col.dataField}`} className={cellClassName} style={cellStyle}>{cellContent}</td>;
-                            })}
-                          </tr>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         )) : (
                           <tr>
-                            <td colSpan={visibleColumns.length} className="text-center">No data available</td>
+                            <td colSpan={visibleColumns.length + (isPrinting ? 0 : 1)} className="text-center">No data available</td>
                           </tr>
                         )}
                       </tbody>
                       <tfoot>
                         <tr>
-                          {visibleColumns.map((col) => {
+                          {!isPrinting && <td key="total-select-spacer"></td>}
+                          {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col) => {
                             let cellContent = '';
                             if (col.dataField === '#') {
                               cellContent = <strong>Total</strong>;
@@ -572,10 +840,57 @@ const HcmSupervisorDistributions = () => {
                     <td>{qty.toFixed(2)}</td>
                   </tr>
                 ))}
-               
               </tbody>
             </Table>
           </Modal.Body>
+        </Modal>
+
+        <Modal show={showRemarkModal} onHide={handleCloseRemarkModal} centered size="lg">
+          <Modal.Header closeButton>
+            <Modal.Title>All Remarks - {selectedRemarks?.awc_name}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {selectedRemarks && (
+              <div className="mb-3">
+                <h6>Sector Remark</h6>
+                <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>{selectedRemarks.sector_status || 'pending'}</Badge></p>
+                <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.sector_remark || "No remark"}</p>
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseRemarkModal}>
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        <Modal show={showBulkRemarkModal} onHide={() => setShowBulkRemarkModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>{bulkAction === "approved" ? "Bulk Approve Remark" : "Bulk Reject Remark"}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form.Group>
+              <Form.Label>Remark for {bulkAction === "approved" ? "Approval" : "Rejection"}</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder={bulkAction === "approved" ? "Enter remark (e.g., वितरण सत्यापित है)" : "Enter reason for rejection"}
+                value={bulkRemark}
+                onChange={(e) => setBulkRemark(e.target.value)}
+              />
+            </Form.Group>
+            {actionError && <Alert variant="danger" className="mt-3">{actionError}</Alert>}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowBulkRemarkModal(false)}>Cancel</Button>
+            <Button
+              variant={bulkAction === "approved" ? "success" : "danger"}
+              onClick={handleBulkAction}
+              disabled={submitting}
+            >
+              {submitting ? "Submitting..." : `${bulkAction === "approved" ? "Approve" : "Reject"} ${selectedIds.length} items`}
+            </Button>
+          </Modal.Footer>
         </Modal>
 
       </div>
