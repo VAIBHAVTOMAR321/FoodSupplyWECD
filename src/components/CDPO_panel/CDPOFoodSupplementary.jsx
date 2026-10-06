@@ -396,7 +396,7 @@ function CDPOFoodSupplementary() {
                         <option value="">-- चुनें --</option>
                         {currentDropdownItems.map((item) => (
                           <option key={item.id} value={item.id}>
-                            {item.food_item} ({item.bene_category?.substring(0, 20)}...)
+                            {item.food_item} ({item.bene_category})
                           </option>
                         ))}
                       </Form.Select>
