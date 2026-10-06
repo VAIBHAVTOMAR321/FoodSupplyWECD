@@ -50,6 +50,21 @@ export function AuthProvider({ children }) {
   const refreshPromiseRef = useRef(null);
   const logoutTimerRef = useRef(null);
 
+  // Synchronously restore tokens from localStorage to prevent API calls without auth
+  if (!tokensRef.current.accessToken) {
+    const savedAuth = localStorage.getItem(STORAGE_KEY);
+    if (savedAuth) {
+      try {
+        const parsed = JSON.parse(savedAuth);
+        if (parsed.access && parsed.refresh) {
+          tokensRef.current = { accessToken: parsed.access, refreshToken: parsed.refresh };
+        }
+      } catch (err) {
+        console.error('Failed to parse auth data synchronously:', err);
+      }
+    }
+  }
+
   // 🔐 Check if refresh token is expired
   const isRefreshTokenExpired = () => {
     if (!refreshTokenExpiry) return false;
@@ -199,8 +214,11 @@ export function AuthProvider({ children }) {
             return;
           }
 
-          // Proactively refresh tokens immediately on page load/refresh
-          // Removed: Proactive refresh is handled by a separate useEffect with an interval.
+          // Proactively refresh access token on page load/refresh if it's expired or about to expire
+          if (parsed.accessTokenExpiry && Date.now() >= parsed.accessTokenExpiry - 5000) {
+            console.log('🔄 Access token expired or about to expire, refreshing on mount...');
+            refreshAccessToken();
+          }
         } else {
           logout();
         }
@@ -301,7 +319,8 @@ export function AuthProvider({ children }) {
         const originalRequest = error.config;
         const refresh = tokensRef.current.refreshToken;
 
-        if (error.response?.status === 401) {
+        // Treat both 401 and 403 as authentication failures
+        if (error.response?.status === 401 || error.response?.status === 403) {
           // If we already tried to refresh and failed, or if no refresh token is available, log out immediately
           if (originalRequest._retry || !refresh) {
             logout();
