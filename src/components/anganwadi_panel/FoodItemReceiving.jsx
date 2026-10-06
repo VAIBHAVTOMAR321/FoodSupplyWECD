@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Tabs, Tab, Form, Button, Table, Modal, Spinner, Alert, Row, Col, InputGroup, Badge, ListGroup, Dropdown } from "react-bootstrap";
+import {
+  Container, Tabs, Tab, Form, Button, Table, Modal, Spinner, Alert,
+  Row, Col, InputGroup, Badge, ListGroup, Dropdown
+} from "react-bootstrap";
 
 import { useAuth } from "../all_login/AuthContext";
 import AnganwadiLeftNav from "./AnganwadiLeftNav";
@@ -8,30 +11,26 @@ import AnganwadiHeader from "./AnganwadiHeader";
 import "../../assets/css/anganwadileftnav.css";
 import "../../assets/css/dashboard.css";
 import "../../assets/css/AnganwadiDashboard.css";
-import { FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUtensils, FaUsers, FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes, FaProjectDiagram, FaInfoCircle, FaClock } from "react-icons/fa";
+import {
+  FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUtensils, FaUsers,
+  FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes,
+  FaProjectDiagram, FaInfoCircle, FaClock
+} from "react-icons/fa";
 
 const API_URLS = {
   hcm_receiving: "/hcm-anganwadi-receiving/",
   thr_receiving: "/thr-anganwadi-receiving/",
   supp_nutrition: "/supplementary-nutrition-anganwadi/",
+  category_food_item: "/categoryandfooditem/",
 };
-
-// Extracted from Supplementary Nutrition table columns and mapped to Beneficiary Categories, Units, and Supp API Keys
-const quarterlyPacketsOptions = [
-  { label: "Mung Dal Khichdi", bene_category: "Children (6m-3y)", supp_key: "quarterly_packets_mung_dal_khichdi", unit: "Packets" },
-  { label: "Sattu Mix (Packets)", bene_category: "Children (6m-3y)", supp_key: "quarterly_packets_poushik_sattu_mix", unit: "Packets" },
-  { label: "Panjeeri (2625gm)", bene_category: "SAM Children", supp_key: "panjeeri_75_days_2625gm_quarterly_packets", unit: "Packets" },
-  { label: "Panjeeri (4625gm)", bene_category: "SAM Children", supp_key: "panjeeri_75_days_4625gm_quarterly_packets", unit: "Packets" },
-  { label: "Sattu (2250gm)", bene_category: "SUW Children", supp_key: "quarterly_packets_sattu_2250gm", unit: "Packets" },
-  { label: "Mix (1000gm)", bene_category: "SUW Children", supp_key: "quarterly_packets_mix_1000gm", unit: "Packets" },
-  { label: "Aata (1250gm)", bene_category: "PW & LM", supp_key: "quarterly_packets_multi_grain_aata_1250gm", unit: "Packets" }
-];
 
 const getCurrentFinancialYear = () => {
   const today = new Date();
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
-  return currentMonth >= 3 ? `${currentYear}-${(currentYear + 1).toString().slice(-2)}` : `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
+  return currentMonth >= 3
+    ? `${currentYear}-${(currentYear + 1).toString().slice(-2)}`
+    : `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
 };
 
 const monthOptions = [
@@ -66,7 +65,8 @@ const FoodItemReceiving = () => {
   const [activeTab, setActiveTab] = useState("hcm");
   const [hcmReceivings, setHcmReceivings] = useState([]);
   const [thrReceivings, setThrReceivings] = useState([]);
-  const [suppNutritionData, setSuppNutritionData] = useState([]); 
+  const [suppNutritionData, setSuppNutritionData] = useState([]);
+  const [foodItemOptions, setFoodItemOptions] = useState([]); // NEW: dynamic food items
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -75,7 +75,7 @@ const FoodItemReceiving = () => {
   const [formData, setFormData] = useState({});
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  
+
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewItem, setViewItem] = useState(null);
 
@@ -89,19 +89,26 @@ const FoodItemReceiving = () => {
     setLoading(true);
     setError("");
     try {
-      const [hcmRec, thrRec, suppResp] = await Promise.all([
+      const [hcmRec, thrRec, suppResp, foodItemResp] = await Promise.all([
         api.get(API_URLS.hcm_receiving),
         api.get(API_URLS.thr_receiving),
-        api.get(API_URLS.supp_nutrition), 
+        api.get(API_URLS.supp_nutrition),
+        api.get(API_URLS.category_food_item),
       ]);
-      
+
       const hcmData = hcmRec.data || [];
       const thrData = thrRec.data || [];
       const suppData = suppResp.data || [];
+      // API returns { success: true, food_data: [...] }
+      const foodData =
+        (foodItemResp.data && foodItemResp.data.food_data)
+        ? foodItemResp.data.food_data
+        : (Array.isArray(foodItemResp.data) ? foodItemResp.data : []);
 
       setHcmReceivings(hcmData);
       setThrReceivings(thrData);
-      setSuppNutritionData(suppData); 
+      setSuppNutritionData(suppData);
+      setFoodItemOptions(foodData);
 
       setUniqueFilterOptions({
         hcm: {
@@ -133,7 +140,7 @@ const FoodItemReceiving = () => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
   };
-  
+
   const handleMultiSelectChange = (filterName, value) => {
     setFilters(prevFilters => {
       const currentValues = prevFilters[filterName];
@@ -183,32 +190,37 @@ const FoodItemReceiving = () => {
     setViewItem(null);
   };
 
+  // Food items filtered by active tab (HCM / THR)
+  const availableFoodItems = useMemo(() => {
+    const tabCategory = activeTab.toUpperCase(); // 'HCM' or 'THR'
+    return foodItemOptions.filter(item => item.category === tabCategory);
+  }, [foodItemOptions, activeTab]);
+
   const handleFormChange = (e) => {
     const { name, value } = e.target;
-    
-    // Auto-fill Beneficiary Category, Unit, and Quantity when selecting a Quarterly Packet
+
     if (name === 'food_item') {
-      const selectedItem = quarterlyPacketsOptions.find(item => item.label === value);
-      let autoBeneCategory = '';
-      let autoUnit = '';
+      // Find the selected food item from dynamic options
+      const selectedItem = foodItemOptions.find(item => item.food_item === value);
+      let autoUnit = 'Packets';
       let autoQuantity = '';
+      let autoFieldName = '';
 
       if (selectedItem) {
-        autoBeneCategory = selectedItem.bene_category;
-        autoUnit = selectedItem.unit;
-        
+        autoFieldName = selectedItem.field_name || '';
+
         // Find matching record in supplementary data to auto-fill quantity
-        if (suppNutritionData.length > 0) {
+        if (suppNutritionData.length > 0 && autoFieldName) {
           const matchingRecord = suppNutritionData.find(rec => {
             const matchesYear = formData.fin_year ? rec.financial_year === formData.fin_year : true;
-            const matchesMonth = formData.months && formData.months.length > 0 
-              ? formData.months.some(m => rec.month.toLowerCase().includes(m)) 
+            const matchesMonth = formData.months && formData.months.length > 0
+              ? formData.months.some(m => rec.month && rec.month.toLowerCase().includes(m))
               : true;
             return matchesYear && matchesMonth;
-          }) || suppNutritionData[0]; // Fallback to first record if no exact match
-          
-          if (matchingRecord && selectedItem.supp_key) {
-            autoQuantity = matchingRecord[selectedItem.supp_key] || '';
+          }) || suppNutritionData[0];
+
+          if (matchingRecord) {
+            autoQuantity = matchingRecord[autoFieldName] || '';
           }
         }
       }
@@ -216,7 +228,7 @@ const FoodItemReceiving = () => {
       setFormData(prev => ({
         ...prev,
         food_item: value,
-        bene_category: autoBeneCategory,
+        field_name: autoFieldName,
         unit: autoUnit,
         quantity: autoQuantity
       }));
@@ -248,7 +260,7 @@ const FoodItemReceiving = () => {
     try {
       await api[method](url, payload);
       handleCloseModal();
-      fetchData(); 
+      fetchData();
     } catch (err) {
       setFormError(`Failed to ${editingItem ? 'update' : 'create'} record. Please try again.`);
       console.error(err);
@@ -282,7 +294,7 @@ const FoodItemReceiving = () => {
     return hcmReceivings.filter(item => {
       const itemMonths = (item.months || []).map(m => monthLabels[m] || m);
       return (!filters.fin_year || item.fin_year === filters.fin_year) &&
-             (filters.months.length === 0 || filters.months.some(m => itemMonths.includes(m)));
+        (filters.months.length === 0 || filters.months.some(m => itemMonths.includes(m)));
     });
   }, [hcmReceivings, filters]);
 
@@ -290,14 +302,13 @@ const FoodItemReceiving = () => {
     return thrReceivings.filter(item => {
       const itemMonths = (item.months || []).map(m => monthLabels[m] || m);
       return (!filters.fin_year || item.fin_year === filters.fin_year) &&
-             (filters.months.length === 0 || filters.months.some(m => itemMonths.includes(m)));
+        (filters.months.length === 0 || filters.months.some(m => itemMonths.includes(m)));
     });
   }, [thrReceivings, filters]);
 
-  // HCM/THR Table with Totals
   const renderTable = (records) => {
     const totalQuantity = records.reduce((sum, rec) => sum + (parseFloat(rec.quantity) || 0), 0);
-    
+
     return (
       <Table striped bordered hover responsive className="mt-4">
         <thead>
@@ -364,7 +375,6 @@ const FoodItemReceiving = () => {
     );
   };
 
-  // Supp Table with Totals
   const renderSuppTable = (records) => {
     const totals = records.reduce((acc, rec) => {
       acc.active_beneficiaries += rec.active_beneficiaries || 0;
@@ -435,15 +445,15 @@ const FoodItemReceiving = () => {
               <td>{rec.financial_year}</td>
               <td>{rec.active_beneficiaries}</td>
               <td>{rec.total_beneficiaries}</td>
-              
+
               <td>{rec.hcm_beneficiaries_3y_6y}</td>
               <td>{rec.thr_25_days_frs_hcm_beneficiaries_3y_6y}</td>
               <td>{rec.children_6m_3y_beneficiaries}</td>
               <td>{rec.pregnant_women_lactating_mothers}</td>
-              
+
               <td>{rec.sam_children_6m_6y}</td>
               <td>{rec.suw_children_6m_6y}</td>
-              
+
               <td>{rec.quarterly_packets_mung_dal_khichdi}</td>
               <td>{rec.quarterly_packets_poushik_sattu_mix}</td>
               <td>{rec.panjeeri_75_days_2625gm_quarterly_packets}</td>
@@ -490,7 +500,7 @@ const FoodItemReceiving = () => {
       <Row className="mb-3 align-items-end">
         <Col md={4}>
           <Form.Group>
-            <Form.Label>Financial Year</Form.Label>            
+            <Form.Label>Financial Year</Form.Label>
             <Form.Select name="fin_year" value={filters.fin_year} onChange={handleFilterChange}>
               <option value="">All Years</option>
               {currentFilters?.fin_year.map(year => <option key={year} value={year}>{year}</option>)}
@@ -498,7 +508,7 @@ const FoodItemReceiving = () => {
           </Form.Group>
         </Col>
         <Col md={4}>
-          <Form.Group>            
+          <Form.Group>
             <Form.Label>Months</Form.Label>
             <Dropdown>
               <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? `${filters.months.length} selected` : 'All Months'}</Dropdown.Toggle>
@@ -562,21 +572,21 @@ const FoodItemReceiving = () => {
           {error && <Alert variant="danger">{error}</Alert>}
 
           <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k)} id="receiving-tabs" className="mb-3">
-            
+
             <Tab eventKey="hcm" title="HCM Receiving">
               {!loading && !error && (
                 <>
                   <h5 className="mt-4">HCM Receiving Records</h5>
-                  {renderFilters()}                  
+                  {renderFilters()}
                   {renderTable(filteredHcmReceivings)}
                 </>
               )}
             </Tab>
-            
+
             <Tab eventKey="thr" title="THR Receiving">
               {!loading && !error && (
                 <>
-                  <h5 className="mt-4">THR Receiving Records</h5>                  
+                  <h5 className="mt-4">THR Receiving Records</h5>
                   {renderFilters()}
                   {renderTable(filteredThrReceivings)}
                 </>
@@ -613,9 +623,9 @@ const FoodItemReceiving = () => {
                       required
                     >
                       <option value="">Select Quarterly Packets Distribution</option>
-                      {quarterlyPacketsOptions.map((item, index) => (
-                        <option key={index} value={item.label}>
-                          {item.label}
+                      {availableFoodItems.map((item, index) => (
+                        <option key={index} value={item.food_item}>
+                          {item.food_item}
                         </option>
                       ))}
                     </Form.Select>
@@ -623,7 +633,7 @@ const FoodItemReceiving = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Packets</Form.Label> 
+                    <Form.Label>Packets</Form.Label>
                     <InputGroup>
                       <Form.Control
                         type="number"
@@ -639,7 +649,7 @@ const FoodItemReceiving = () => {
                         value={formData.unit || ''}
                         onChange={handleFormChange}
                         placeholder="Unit"
-                        readOnly // Made read-only as it auto-fills
+                        readOnly
                         required
                       />
                     </InputGroup>
@@ -650,14 +660,13 @@ const FoodItemReceiving = () => {
                 <Col>
                   <Form.Group className="mb-3">
                     <Form.Label>Beneficiary Category</Form.Label>
-                    <Form.Control 
-                      type="text" 
-                      name="bene_category" 
-                      value={formData.bene_category || ''} 
+                    <Form.Control
+                      type="text"
+                      name="bene_category"
+                      value={formData.bene_category || ''}
                       onChange={handleFormChange}
-                      placeholder="Auto-filled Beneficiary Category" 
-                      readOnly // Made read-only as it auto-fills
-                      required 
+                      placeholder="Enter Beneficiary Category"
+                      required
                     />
                   </Form.Group>
                 </Col>
@@ -675,7 +684,7 @@ const FoodItemReceiving = () => {
                     />
                   </Form.Group>
                 </Col>
-                
+
                 <>
                   <Col md={6}>
                     <Form.Group className="mb-3">
