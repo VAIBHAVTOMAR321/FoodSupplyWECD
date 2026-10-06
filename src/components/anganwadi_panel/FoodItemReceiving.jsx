@@ -55,6 +55,23 @@ const formatMonths = (months = []) => {
   return months.map((month) => monthLabels[month] || month).join(', ');
 };
 
+// Helper to safely parse months regardless of backend format
+const getMonthsArray = (item) => {
+  if (Array.isArray(item.months)) return item.months;
+  if (typeof item.months === 'string' && item.months) {
+    try {
+      const parsed = JSON.parse(item.months);
+      if (Array.isArray(parsed)) return parsed;
+      return item.months.split(',').map(m => m.trim());
+    } catch (e) {
+      return item.months.split(',').map(m => m.trim());
+    }
+  }
+  if (Array.isArray(item.quarter)) return item.quarter;
+  if (typeof item.quarter === 'string' && quarterToMonths[item.quarter]) return quarterToMonths[item.quarter];
+  return [];
+};
+
 const FoodItemReceiving = () => {
   const { api } = useAuth();
 
@@ -66,7 +83,7 @@ const FoodItemReceiving = () => {
   const [hcmReceivings, setHcmReceivings] = useState([]);
   const [thrReceivings, setThrReceivings] = useState([]);
   const [suppNutritionData, setSuppNutritionData] = useState([]);
-  const [foodItemOptions, setFoodItemOptions] = useState([]); // NEW: dynamic food items
+  const [foodItemOptions, setFoodItemOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -111,7 +128,6 @@ const FoodItemReceiving = () => {
       const hcmData = hcmRec.data || [];
       const thrData = thrRec.data || [];
       const suppData = suppResp.data || [];
-      // API returns { success: true, food_data: [...] }
       const foodData =
         (foodItemResp.data && foodItemResp.data.food_data)
         ? foodItemResp.data.food_data
@@ -125,11 +141,11 @@ const FoodItemReceiving = () => {
       setUniqueFilterOptions({
         hcm: {
           fin_year: [...new Set(hcmData.map(item => item.fin_year).filter(Boolean))].sort().reverse(),
-          months: [...new Set(hcmData.flatMap(item => item.months || []).map(m => monthLabels[m] || m))].sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)),
+          months: [...new Set(hcmData.flatMap(item => getMonthsArray(item)).map(m => monthLabels[m] || m))].sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)),
         },
         thr: {
           fin_year: [...new Set(thrData.map(item => item.fin_year).filter(Boolean))].sort().reverse(),
-          months: [...new Set(thrData.flatMap(item => item.months || []).map(m => monthLabels[m] || m))].sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)),
+          months: [...new Set(thrData.flatMap(item => getMonthsArray(item)).map(m => monthLabels[m] || m))].sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)),
         },
       });
     } catch (err) {
@@ -174,15 +190,21 @@ const FoodItemReceiving = () => {
 
   const handleOpenModal = (item = null) => {
     setEditingItem(item);
-    setFormData(item ? {
-      ...item,
-      date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
-      months: item.months || (Array.isArray(item.quarter) ? item.quarter : quarterToMonths[item.quarter] || []),
-    } : {
-      food_item: '', quantity: '', bene_category: '', unit: '',
-      date: new Date().toISOString().split('T')[0],
-      fin_year: getCurrentFinancialYear(), months: [],
-    });
+    if (item) {
+      const parsedMonths = getMonthsArray(item);
+      setFormData({
+        ...item,
+        date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
+        months: parsedMonths,
+        quarter: item.quarter || ''
+      });
+    } else {
+      setFormData({
+        food_item: '', quantity: '', bene_category: '', unit: '',
+        date: new Date().toISOString().split('T')[0],
+        fin_year: getCurrentFinancialYear(), months: [], quarter: ''
+      });
+    }
     setFormError('');
     setShowModal(true);
   };
@@ -202,9 +224,8 @@ const FoodItemReceiving = () => {
     setViewItem(null);
   };
 
-  // Food items filtered by active tab (HCM / THR)
   const availableFoodItems = useMemo(() => {
-    const tabCategory = activeTab.toUpperCase(); // 'HCM' or 'THR'
+    const tabCategory = activeTab.toUpperCase();
     return foodItemOptions.filter(item => item.category === tabCategory);
   }, [foodItemOptions, activeTab]);
 
@@ -212,14 +233,12 @@ const FoodItemReceiving = () => {
     const { name, value } = e.target;
 
     if (name === 'food_item') {
-      // Find the selected food item from dynamic options
       const selectedItem = foodItemOptions.find(item => item.food_item === value);
       let autoUnit = 'Packets';
       let autoQuantity = '';
       let autoFieldName = '';
       let autoBeneCategory = '';
 
-      // Beneficiary category mapping based on food items
       const beneCategoryMap = {
         'पौष्टिक सत्तू मिक्स': 'Pregnant Women & Lactating Mothers',
         'पंजीरी': 'Children (6m-3y)',
@@ -231,13 +250,15 @@ const FoodItemReceiving = () => {
       if (selectedItem) {
         autoFieldName = selectedItem.field_name || '';
         autoBeneCategory = beneCategoryMap[value] || selectedItem.bene_category || selectedItem.category || '';
+      }
 
-        // Find matching record in supplementary data to auto-fill quantity
+      // Use functional updater to get the absolute latest state for auto-filling logic
+      setFormData(prev => {
         if (suppNutritionData.length > 0 && autoFieldName) {
           const matchingRecord = suppNutritionData.find(rec => {
-            const matchesYear = formData.fin_year ? rec.financial_year === formData.fin_year : true;
-            const matchesMonth = formData.months && formData.months.length > 0
-              ? formData.months.some(m => rec.month && rec.month.toLowerCase().includes(m))
+            const matchesYear = prev.fin_year ? rec.financial_year === prev.fin_year : true;
+            const matchesMonth = prev.months && prev.months.length > 0
+              ? prev.months.some(m => rec.month && rec.month.toLowerCase().includes(m))
               : true;
             return matchesYear && matchesMonth;
           }) || suppNutritionData[0];
@@ -246,16 +267,16 @@ const FoodItemReceiving = () => {
             autoQuantity = matchingRecord[autoFieldName] || '';
           }
         }
-      }
 
-      setFormData(prev => ({
-        ...prev,
-        food_item: value,
-        field_name: autoFieldName,
-        unit: autoUnit,
-        quantity: autoQuantity,
-        bene_category: autoBeneCategory
-      }));
+        return {
+          ...prev,
+          food_item: value,
+          field_name: autoFieldName,
+          unit: autoUnit,
+          quantity: autoQuantity,
+          bene_category: autoBeneCategory
+        };
+      });
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -268,14 +289,41 @@ const FoodItemReceiving = () => {
 
     const isThr = activeTab === 'thr';
 
+    // Safely parse and calculate payload values
+    const parsedQuantity = parseFloat(formData.quantity) || 0;
+    const selectedMonths = Array.isArray(formData.months) ? formData.months : [];
+    
+    // Calculate Quarter string from selected months
+    let quarterString = formData.quarter || '';
+    if (selectedMonths.length > 0) {
+      const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
+        const qMonths = quarterToMonths[qKey];
+        return selectedMonths.length === qMonths.length && selectedMonths.every(m => qMonths.includes(m));
+      });
+      if (matchedQuarter) {
+        quarterString = matchedQuarter;
+      } else {
+        quarterString = selectedMonths.join(',');
+      }
+    }
+
+    // Construct a clean payload explicitly to avoid backend schema rejection
     let payload = {
-      ...formData,
-      quantity: parseFloat(formData.quantity),
-      months: formData.months || [],
+      food_item: formData.food_item || '',
+      quantity: parsedQuantity,
+      unit: formData.unit || '',
+      bene_category: formData.bene_category || '',
+      date: formData.date || new Date().toISOString().split('T')[0],
+      fin_year: formData.fin_year || getCurrentFinancialYear(),
+      months: selectedMonths,
+      quarter: quarterString, 
     };
 
     if (editingItem) {
       payload.id = editingItem.id;
+      if (editingItem.sector_status) {
+        payload.sector_status = editingItem.sector_status;
+      }
     }
 
     const url = isThr ? API_URLS.thr_receiving : API_URLS.hcm_receiving;
@@ -287,7 +335,7 @@ const FoodItemReceiving = () => {
       fetchData();
     } catch (err) {
       setFormError(`Failed to ${editingItem ? 'update' : 'create'} record. Please try again.`);
-      console.error(err);
+      console.error("API Error:", err.response?.data || err);
     } finally {
       setSubmitting(false);
     }
@@ -316,7 +364,7 @@ const FoodItemReceiving = () => {
 
   const filteredHcmReceivings = useMemo(() => {
     return hcmReceivings.filter(item => {
-      const itemMonths = (item.months || []).map(m => monthLabels[m] || m);
+      const itemMonths = getMonthsArray(item).map(m => monthLabels[m] || m);
       return (!filters.fin_year || item.fin_year === filters.fin_year) &&
         (filters.months.length === 0 || filters.months.some(m => itemMonths.includes(m)));
     });
@@ -324,7 +372,7 @@ const FoodItemReceiving = () => {
 
   const filteredThrReceivings = useMemo(() => {
     return thrReceivings.filter(item => {
-      const itemMonths = (item.months || []).map(m => monthLabels[m] || m);
+      const itemMonths = getMonthsArray(item).map(m => monthLabels[m] || m);
       return (!filters.fin_year || item.fin_year === filters.fin_year) &&
         (filters.months.length === 0 || filters.months.some(m => itemMonths.includes(m)));
     });
@@ -359,7 +407,7 @@ const FoodItemReceiving = () => {
               <td>{rec.quantity}</td>
               <td>{rec.unit}</td>
               <td>{rec.fin_year}</td>
-              <td>{formatMonths(rec.months || (Array.isArray(rec.quarter) ? rec.quarter : quarterToMonths[rec.quarter] || []))}</td>
+              <td>{formatMonths(getMonthsArray(rec))}</td>
               <td>
                 <Badge bg={getStatusVariant(rec.sector_status)}>{rec.sector_status || 'pending'}</Badge>
               </td>
@@ -537,7 +585,7 @@ const FoodItemReceiving = () => {
             <Dropdown>
               <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? `${filters.months.length} selected` : 'All Months'}</Dropdown.Toggle>
               <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                {currentFilters?.months.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.months.includes(v)} onChange={() => handleMultiSelectChange('months', v)} /></Dropdown.Item>))}
+                {currentFilters?.months.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.months.includes(v)} onChange={() => handleMultiSelectChange('months', v)} /></Dropdown.Item>)) }
               </Dropdown.Menu>
             </Dropdown>
           </Form.Group>
@@ -737,12 +785,28 @@ const FoodItemReceiving = () => {
                               id={`month-${month.value}`}
                               label={month.label}
                               checked={(formData.months || []).includes(month.value)}
+                              // FIX: Used functional state updater to prevent stale closure bugs
                               onChange={(e) => {
                                 if (!isAvailable) return;
-                                const nextMonths = e.target.checked
-                                  ? [...new Set([...(formData.months || []), month.value])]
-                                  : (formData.months || []).filter((m) => m !== month.value);
-                                setFormData(prev => ({ ...prev, months: nextMonths }));
+                                setFormData(prev => {
+                                  const currentMonths = prev.months || [];
+                                  const nextMonths = e.target.checked
+                                    ? [...new Set([...currentMonths, month.value])]
+                                    : currentMonths.filter((m) => m !== month.value);
+
+                                  // Keep Quarter state synced up
+                                  let quarterString = '';
+                                  if (nextMonths.length > 0) {
+                                    const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
+                                      const qMonths = quarterToMonths[qKey];
+                                      return nextMonths.length === qMonths.length && nextMonths.every(m => qMonths.includes(m));
+                                    });
+                                    if (matchedQuarter) quarterString = matchedQuarter;
+                                    else quarterString = nextMonths.join(',');
+                                  }
+
+                                  return { ...prev, months: nextMonths, quarter: quarterString };
+                                });
                               }}
                               disabled={!isAvailable}
                             />
@@ -785,7 +849,7 @@ const FoodItemReceiving = () => {
                 ) : (
                   <>
                     <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Financial Year:</strong> {viewItem.fin_year}</ListGroup.Item>
-                    <ListGroup.Item><FaCubes className="view-modal-icon" /> <strong>Months:</strong> {formatMonths(viewItem.months || viewItem.quarter)}</ListGroup.Item>
+                    <ListGroup.Item><FaCubes className="view-modal-icon" /> <strong>Months:</strong> {formatMonths(getMonthsArray(viewItem))}</ListGroup.Item>
                   </>
                 )}
                 <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>Sector:</strong> {viewItem.sector}</ListGroup.Item>

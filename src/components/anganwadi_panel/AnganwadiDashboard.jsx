@@ -10,15 +10,17 @@ import "../../assets/css/dashboard.css";
 import { FaUtensils, FaBoxOpen, FaChevronDown, FaChevronUp, FaDolly, FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUsers, FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes, FaProjectDiagram, FaInfoCircle, FaClock } from "react-icons/fa";
 import "../../assets/css/AnganwadiDashboard.css";
 
+// ✅ Same API URLs as used in FoodReceiving (supplementary-nutrition-anganwadi/ included)
 const API_URLS = {
   categoryandfooditem: "/categoryandfooditem/",
   hcm_distribution: "/hcm-anganwadi-distribution/",
   thr_distribution: "/thr-anganwadi-distribution/",
   hcm_receiving: "/hcm-anganwadi-receiving/",
   thr_receiving: "/thr-anganwadi-receiving/",
+  supp_nutrition: "/supplementary-nutrition-anganwadi/",   // ✅ added for auto-fill
 };
 
-// Configuration to map API field_name to required properties used in existing logic
+// Configuration to map API field_name to required properties
 const supplementaryFoodConfig = [
   { key: 'quarterly_packets_mung_dal_khichdi', bene_category: "6 माह से 3 वर्ष के सामान्य बच्चे", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
   { key: 'quarterly_packets_poushik_sattu_mix', bene_category: "6 माह से 3 वर्ष के सामान्य बच्चे", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
@@ -31,10 +33,9 @@ const getCurrentFinancialYear = () => {
   const today = new Date();
   const currentMonth = today.getMonth(); // 0-11
   const currentYear = today.getFullYear();
-
-  if (currentMonth >= 3) { // April (index 3) to December
+  if (currentMonth >= 3) {
     return `${currentYear}-${(currentYear + 1).toString().slice(-2)}`;
-  } else { // January to March
+  } else {
     return `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
   }
 };
@@ -85,7 +86,7 @@ const areSameMonthSets = (monthsA, monthsB) => {
 };
 
 const AnganwadiDashboard = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true); 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [counts, setCounts] = useState({ hcm: 0, thr: 0 });
@@ -95,12 +96,19 @@ const AnganwadiDashboard = () => {
   const [activeScheme, setActiveScheme] = useState(null);
   const [foodItems, setFoodItems] = useState([]);
   const [distributionRecords, setDistributionRecords] = useState([]);
-  const [receivedMonths, setReceivedMonths] = useState([]); // Tracks allowed months from Receiving
-  
-  // State for distribution modal
+  const [receivedMonths, setReceivedMonths] = useState([]);
+  // ✅ Supplementary nutrition data (used for auto-filling Total Beneficiaries)
+  const [suppNutritionData, setSuppNutritionData] = useState([]);
+
   const [showDistributionModal, setShowDistributionModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [distributionData, setDistributionData] = useState({ total_beneficiaries: '', fin_year: '', months: [] });
+  const [distributionData, setDistributionData] = useState({ 
+    total_beneficiaries: '', 
+    fin_year: '', 
+    months: [], 
+    food_item_id: '',
+    date: new Date().toISOString().split('T')[0] // ✅ Added Date to state
+  });
   const [distributionError, setDistributionError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -116,7 +124,6 @@ const AnganwadiDashboard = () => {
       setIsMobile(width < 768);
       setIsTablet(width >= 768 && width < 1024);
     };
-
     handleResize();
     window.addEventListener("resize", handleResize);
 
@@ -136,10 +143,10 @@ const AnganwadiDashboard = () => {
       try {
         const response = await api.get(API_URLS.categoryandfooditem);
         const foodData = response.data?.food_data || [];
-        
+
         const hcmCount = foodData.filter(item => item.category === "HCM").length;
         const thrCount = foodData.filter(item => item.category === "THR").length;
-        
+
         setCounts({ hcm: hcmCount, thr: thrCount });
       } catch (err) {
         setError(prev => ({ ...prev, counts: "Failed to fetch food item counts." }));
@@ -155,11 +162,47 @@ const AnganwadiDashboard = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
+  // ✅ Helper: compute auto Total Beneficiaries from supplementary nutrition data
+  const computeAutoTotalBeneficiaries = (foodItemObj, finYear, months) => {
+    if (!foodItemObj || !suppNutritionData || suppNutritionData.length === 0) return '';
+
+    const matchingRecord = suppNutritionData.find(rec => {
+      const matchesYear = finYear ? rec.financial_year === finYear : true;
+      const matchesMonth = months && months.length > 0
+        ? months.some(m => rec.month && rec.month.toLowerCase().includes(m))
+        : true;
+      return matchesYear && matchesMonth;
+    }) || suppNutritionData[0];
+
+    if (!matchingRecord) return '';
+
+    const fieldName = foodItemObj?.field_name;
+
+    if (matchingRecord.total_beneficiaries) {
+      return matchingRecord.total_beneficiaries;
+    }
+
+    const beneMap = {
+      'quarterly_packets_mung_dal_khichdi': matchingRecord.children_6m_3y_beneficiaries,
+      'quarterly_packets_poushik_sattu_mix': matchingRecord.children_6m_3y_beneficiaries,
+      'panjeeri_75_days_4625gm_quarterly_packets': matchingRecord.children_6m_3y_beneficiaries,
+      'quarterly_packets_sattu_2250gm': matchingRecord.hcm_beneficiaries_3y_6y,
+      'quarterly_packets_multi_grain_aata_1250gm': matchingRecord.pregnant_women_lactating_mothers,
+    };
+
+    if (fieldName && beneMap[fieldName] !== undefined) {
+      return beneMap[fieldName] || '';
+    }
+
+    return '';
+  };
+
   const handleCardClick = async (scheme) => {
     if (activeScheme === scheme) {
-      setActiveScheme(null); 
+      setActiveScheme(null);
       setFoodItems([]);
       setReceivedMonths([]);
+      setSuppNutritionData([]);
       return;
     }
 
@@ -169,15 +212,17 @@ const AnganwadiDashboard = () => {
     setFoodItems([]);
     setDistributionRecords([]);
     setReceivedMonths([]);
+    setSuppNutritionData([]);
 
     try {
       const distributionUrl = scheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution;
       const receivingUrl = scheme === 'hcm' ? API_URLS.hcm_receiving : API_URLS.thr_receiving;
-      
-      const [catResponse, distributionsResponse, receivingResponse] = await Promise.all([
+
+      const [catResponse, distributionsResponse, receivingResponse, suppResponse] = await Promise.all([
         api.get(API_URLS.categoryandfooditem),
         api.get(distributionUrl),
-        api.get(receivingUrl) // Fetch receiving records to determine allowed months
+        api.get(receivingUrl),
+        api.get(API_URLS.supp_nutrition),
       ]);
 
       const allFoodData = catResponse.data?.food_data || [];
@@ -197,17 +242,20 @@ const AnganwadiDashboard = () => {
         };
       });
 
-      // Extract months from receiving records to allow only those in distribution
       const allowedMonths = new Set();
       (receivingResponse.data || []).forEach(rec => {
-        const m = Array.isArray(rec.months) 
-          ? rec.months 
-          : Array.isArray(rec.quarter) 
-            ? rec.quarter 
+        const m = Array.isArray(rec.months)
+          ? rec.months
+          : Array.isArray(rec.quarter)
+            ? rec.quarter
             : quarterToMonths[rec.quarter] || [];
         m.forEach(month => allowedMonths.add(month));
       });
       setReceivedMonths(Array.from(allowedMonths));
+
+      const suppData = suppResponse.data || [];
+      const normalizedSupp = Array.isArray(suppData) ? suppData : (suppData.food_data || []);
+      setSuppNutritionData(normalizedSupp);
 
       setFoodItems(mappedFoodItems);
       setDistributionRecords(distributionsResponse.data);
@@ -240,20 +288,22 @@ const AnganwadiDashboard = () => {
         : Array.isArray(existingRecord.quarter)
           ? existingRecord.quarter
           : quarterToMonths[existingRecord.quarter] || [];
-          
+
       setDistributionData({
         total_beneficiaries: existingRecord.total_beneficiaries,
         fin_year: existingRecord.fin_year,
         months: existingMonths,
         food_item_id: foodItemDetails?.id,
+        date: existingRecord.date ? new Date(existingRecord.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0], // ✅ Include Date
       });
       setSelectedFoodItem(foodItemDetails);
     } else {
-      setDistributionData({ 
+      setDistributionData({
         total_beneficiaries: '',
-        fin_year: getCurrentFinancialYear(), // Applied to both HCM and THR
+        fin_year: getCurrentFinancialYear(),
         months: [],
         food_item_id: '',
+        date: new Date().toISOString().split('T')[0], // ✅ Include Date
       });
     }
 
@@ -319,6 +369,22 @@ const AnganwadiDashboard = () => {
     const isEdit = selectedItem.isEdit;
     const calculatedQuantity = parseFloat(selectedFoodItemDetails.qty_per_ben) * parseInt(distributionData.total_beneficiaries, 10);
 
+    // ✅ Calculate Quarter string properly to avoid Bad Request
+    const selectedMonths = Array.isArray(distributionData.months) ? distributionData.months : [];
+    let quarterString = '';
+    if (selectedMonths.length > 0) {
+      const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
+        const qMonths = quarterToMonths[qKey];
+        return selectedMonths.length === qMonths.length && selectedMonths.every(m => qMonths.includes(m));
+      });
+      if (matchedQuarter) {
+        quarterString = matchedQuarter;
+      } else {
+        quarterString = selectedMonths.join(',');
+      }
+    }
+
+    // ✅ Construct a clean payload with 'date' included
     let payload = {
       food_item: selectedFoodItemDetails.food_item,
       total_beneficiaries: parseInt(distributionData.total_beneficiaries, 10),
@@ -327,14 +393,13 @@ const AnganwadiDashboard = () => {
       bene_category: selectedFoodItemDetails.bene_category,
       days_allotted: selectedFoodItemDetails.days_allotted,
       fin_year: distributionData.fin_year,
-      quarter: distributionData.months,
-      months: distributionData.months
+      months: selectedMonths,
+      quarter: quarterString, // Send as string instead of array
+      date: distributionData.date || new Date().toISOString().split('T')[0], // ✅ Include Date
     };
 
     if (isEdit) {
       payload.id = selectedItem.id;
-    } else {
-      payload.food_item = selectedFoodItemDetails.food_item;
     }
 
     const url = activeScheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution;
@@ -346,8 +411,25 @@ const AnganwadiDashboard = () => {
       handleCloseDistributionModal();
       handleCardClick(activeScheme);
     } catch (err) {
-      setDistributionError(`वितरण ${isEdit ? 'अपडेट' : 'रिकॉर्ड'} करने में विफल। कृपया पुन: प्रयास करें।`);
-      console.error(err);
+      console.error("API Error:", err.response?.data || err);
+      
+      // ✅ Extract and display exact backend validation errors
+      let errorMessage = `वितरण ${isEdit ? 'अपडेट' : 'रिकॉर्ड'} करने में विफल। कृपया पुन: प्रयास करें।`;
+      if (err.response && err.response.data) {
+        const errorData = err.response.data;
+        if (typeof errorData === 'object' && !Array.isArray(errorData)) {
+          const errorMessages = Object.entries(errorData).map(([key, value]) => {
+            const valStr = Array.isArray(value) ? value.join(', ') : String(value);
+            return `${key}: ${valStr}`;
+          });
+          if (errorMessages.length > 0) {
+            errorMessage = errorMessages.join(' | ');
+          }
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+      }
+      setDistributionError(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -368,8 +450,8 @@ const AnganwadiDashboard = () => {
   };
 
   const selectedFoodItemForCalc = (selectedItem?.isNew || selectedItem?.isEdit || selectedItem)
-  ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10))
-  : selectedItem;
+    ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10))
+    : selectedItem;
 
   const calculatedQuantity = selectedFoodItemForCalc
     ? (parseFloat(selectedFoodItemForCalc.qty_per_ben) * (parseInt(distributionData.total_beneficiaries, 10) || 0)).toFixed(2)
@@ -389,13 +471,12 @@ const AnganwadiDashboard = () => {
 
       <div className="main-content-dash">
         <AnganwadiHeader toggleSidebar={toggleSidebar} />
-  
+
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading d-flex justify-content-between align-items-center">
-            <h3 className="mb-4 fw-bold">
-              Anganwadi Dashboard
-            </h3>
+            <h3 className="mb-4 fw-bold">Anganwadi Dashboard</h3>
           </div>
+
           <Row>
             <Col lg={6} md={6} xs={12} className="mb-4">
               <Card className={`card-hcm ${activeScheme === 'hcm' ? 'active' : ''}`} onClick={() => handleCardClick('hcm')}>
@@ -408,7 +489,7 @@ const AnganwadiDashboard = () => {
                     <h2 className="fw-bold">{counts.hcm}</h2>
                   )}
                   <Card.Text className="d-flex align-items-center">
-                    Total Items 
+                    Total Items
                     {activeScheme === 'hcm' ? <FaChevronUp className="ms-2" /> : <FaChevronDown className="ms-2" />}
                   </Card.Text>
                 </Card.Body>
@@ -432,6 +513,7 @@ const AnganwadiDashboard = () => {
               </Card>
             </Col>
           </Row>
+
           {error.counts && !loading.counts && (
             <div className="alert alert-danger" role="alert">
               {error.counts}
@@ -459,6 +541,7 @@ const AnganwadiDashboard = () => {
                       <tr>
                         <th>#</th>
                         <th>Food Item</th>
+                        <th>Date</th>
                         <th>Month</th>
                         <th>Year</th>
                         <th>Total Beneficiaries</th>
@@ -472,6 +555,7 @@ const AnganwadiDashboard = () => {
                         <tr key={record.id}>
                           <td>{index + 1}</td>
                           <td>{record.food_item}</td>
+                          <td>{record.date ? new Date(record.date).toLocaleDateString() : '-'}</td>
                           <td>{formatMonths(record.months || record.quarter)}</td>
                           <td>{record.fin_year}</td>
                           <td>{record.total_beneficiaries}</td>
@@ -498,43 +582,44 @@ const AnganwadiDashboard = () => {
                   </Table>
                 )}
               </Col>
+
               <Col xs={12}>
                 <div className="food-items-table-container mt-4">
                   <h5 className="mb-3">{activeScheme.toUpperCase()} Food Item List</h5>
                   {loading.table ? (
-                      <div className="loading-state"><Spinner animation="border" /></div>
-                    ) : error.table ? (
-                      <Alert variant="danger">{error.table}</Alert>
-                    ) : foodItems.length === 0 ? (
-                      <div className="empty-state">No items found for {activeScheme.toUpperCase()}.</div>
-                    ) : (
-                      <Table striped bordered hover responsive>
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>Food Item</th>
-                            <th>Qty Per Beneficiary</th>
-                            <th>Unit</th>
-                            <th>Beneficiary Category</th>
-                            <th>Days Allotted</th>
-                            <th>Total Quantity</th>
+                    <div className="loading-state"><Spinner animation="border" /></div>
+                  ) : error.table ? (
+                    <Alert variant="danger">{error.table}</Alert>
+                  ) : foodItems.length === 0 ? (
+                    <div className="empty-state">No items found for {activeScheme.toUpperCase()}.</div>
+                  ) : (
+                    <Table striped bordered hover responsive>
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Food Item</th>
+                          <th>Qty Per Beneficiary</th>
+                          <th>Unit</th>
+                          <th>Beneficiary Category</th>
+                          <th>Days Allotted</th>
+                          <th>Total Quantity</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {foodItems.map((item, index) => (
+                          <tr key={item.id}>
+                            <td>{index + 1}</td>
+                            <td>{item.food_item}</td>
+                            <td>{item.qty_per_ben}</td>
+                            <td>{item.unit}</td>
+                            <td>{item.bene_category}</td>
+                            <td>{item.days_allotted}</td>
+                            <td>{item.total_quantity}</td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {foodItems.map((item, index) => (
-                            <tr key={item.id}>
-                              <td>{index + 1}</td>
-                              <td>{item.food_item}</td>
-                              <td>{item.qty_per_ben}</td>
-                              <td>{item.unit}</td>
-                              <td>{item.bene_category}</td>
-                              <td>{item.days_allotted}</td>
-                              <td>{item.total_quantity}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </Table>
-                    )}
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
                 </div>
               </Col>
             </Row>
@@ -542,12 +627,12 @@ const AnganwadiDashboard = () => {
 
           {selectedItem && (
             <Modal show={showDistributionModal} onHide={handleCloseDistributionModal} centered size="lg">
-              <Modal.Header closeButton>                
+              <Modal.Header closeButton>
                 <Modal.Title>{selectedItem.isEdit ? 'Edit' : 'Record'} Distribution</Modal.Title>
               </Modal.Header>
               <Modal.Body>
                 {distributionError && <Alert variant="danger">{distributionError}</Alert>}
-                <Form onSubmit={handleDistributionSubmit}>                  
+                <Form onSubmit={handleDistributionSubmit}>
                   <Form.Group className="mb-3">
                     <Form.Label>Food Item</Form.Label>
                     <Form.Select
@@ -555,7 +640,19 @@ const AnganwadiDashboard = () => {
                       value={distributionData.food_item_id || ''}
                       onChange={(e) => {
                         const newFoodItemId = e.target.value;
-                        setDistributionData(prev => ({ ...prev, food_item_id: newFoodItemId, total_beneficiaries: '' }));
+                        const selectedFoodItem = foodItems.find(fi => fi.id === parseInt(newFoodItemId, 10));
+
+                        const autoTotalBene = computeAutoTotalBeneficiaries(
+                          selectedFoodItem,
+                          distributionData.fin_year,
+                          distributionData.months
+                        );
+
+                        setDistributionData(prev => ({
+                          ...prev,
+                          food_item_id: newFoodItemId,
+                          total_beneficiaries: autoTotalBene,
+                        }));
                       }}
                     >
                       <option value="">Select a food item...</option>
@@ -566,6 +663,17 @@ const AnganwadiDashboard = () => {
                         <option key={`${item.id}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>&nbsp;&nbsp;↳ Category: {item.bene_category}</option>
                       ])}
                     </Form.Select>
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Date of Distribution</Form.Label>
+                    <Form.Control
+                      type="date"
+                      name="date"
+                      value={distributionData.date || ''}
+                      onChange={(e) => setDistributionData({ ...distributionData, date: e.target.value })}
+                      required
+                    />
                   </Form.Group>
 
                   <Form.Group className="mb-3">
@@ -581,7 +689,7 @@ const AnganwadiDashboard = () => {
                       onChange={(e) => {
                         setDistributionData({ ...distributionData, total_beneficiaries: e.target.value });
                       }}
-                      placeholder="Enter number of beneficiaries"
+                      placeholder="Auto-filled from Supplementary Nutrition"
                       required
                       disabled={!distributionData.months || distributionData.months.length === 0}
                     />
@@ -589,12 +697,12 @@ const AnganwadiDashboard = () => {
 
                   <Form.Group className="mb-3">
                     <Form.Label>Financial Year</Form.Label>
-                    <Form.Control 
-                      type="text" 
-                      placeholder="e.g., 2025-26" 
-                      value={distributionData.fin_year} 
-                      readOnly 
-                      required 
+                    <Form.Control
+                      type="text"
+                      placeholder="e.g., 2025-26"
+                      value={distributionData.fin_year}
+                      readOnly
+                      required
                     />
                   </Form.Group>
 
@@ -620,7 +728,21 @@ const AnganwadiDashboard = () => {
                                 const nextMonths = e.target.checked
                                   ? [...new Set([...(distributionData.months || []), month.value])]
                                   : (distributionData.months || []).filter((m) => m !== month.value);
-                                setDistributionData({ ...distributionData, months: nextMonths });
+
+                                const selectedFoodItem = foodItems.find(
+                                  fi => fi.id === parseInt(distributionData.food_item_id, 10)
+                                );
+                                const autoTotalBene = computeAutoTotalBeneficiaries(
+                                  selectedFoodItem,
+                                  distributionData.fin_year,
+                                  nextMonths
+                                );
+
+                                setDistributionData({
+                                  ...distributionData,
+                                  months: nextMonths,
+                                  total_beneficiaries: autoTotalBene || distributionData.total_beneficiaries,
+                                });
                               }}
                             />
                           );
@@ -647,10 +769,10 @@ const AnganwadiDashboard = () => {
                   </Form.Group>
                   <Form.Group className="mb-3">
                     <Form.Label>Total Quantity</Form.Label>
-                    <Form.Control 
-                      type="text" 
+                    <Form.Control
+                      type="text"
                       value={selectedFoodItemForCalc ? `${calculatedQuantity} ${selectedFoodItemForCalc.unit}` : '0.00'}
-                      disabled 
+                      disabled
                     />
                     <Form.Text>
                       ({selectedFoodItemForCalc?.qty_per_ben || 0} {selectedFoodItemForCalc?.unit} per beneficiary)
@@ -668,11 +790,7 @@ const AnganwadiDashboard = () => {
                     <Button variant="secondary" onClick={handleCloseDistributionModal} className="me-2">
                       Cancel
                     </Button>
-                    <Button 
-                      variant="primary" 
-                      type="submit" 
-                      disabled={submitting}
-                    >
+                    <Button variant="primary" type="submit" disabled={submitting}>
                       {submitting ? <Spinner as="span" animation="border" size="sm" /> : (selectedItem.isEdit ? 'Update' : 'Submit')}
                     </Button>
                   </div>
@@ -693,6 +811,7 @@ const AnganwadiDashboard = () => {
                   <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>Food Item:</strong> {viewItem.food_item}</ListGroup.Item>
                   <ListGroup.Item><FaUsers className="view-modal-icon" /> <strong>Beneficiaries:</strong> {viewItem.total_beneficiaries}</ListGroup.Item>
                   <ListGroup.Item><FaWeightHanging className="view-modal-icon" /> <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}</ListGroup.Item>
+                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Date:</strong> {viewItem.date ? new Date(viewItem.date).toLocaleDateString() : '-'}</ListGroup.Item>
                   <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Financial Year:</strong> {viewItem.fin_year}</ListGroup.Item>
                   <ListGroup.Item><FaCubes className="view-modal-icon" /> <strong>Months:</strong> {formatMonths(viewItem.months || viewItem.quarter)}</ListGroup.Item>
                   <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>Sector:</strong> {viewItem.sector}</ListGroup.Item>
@@ -702,17 +821,17 @@ const AnganwadiDashboard = () => {
                 </ListGroup>
                 <hr />
                 <Row className="text-muted small">
-                   <Col>
-                    <FaClock className="me-1" /> 
+                  <Col>
+                    <FaClock className="me-1" />
                     <strong>Recorded:</strong>
                     <br />
                     {new Date(viewItem.created_at).toLocaleString()}
                   </Col>
                   <Col className="text-end">
-                     <FaEdit className="me-1" /> 
-                     <strong>Updated:</strong>
-                     <br />
-                     {new Date(viewItem.updated_at).toLocaleString()}
+                    <FaEdit className="me-1" />
+                    <strong>Updated:</strong>
+                    <br />
+                    {new Date(viewItem.updated_at).toLocaleString()}
                   </Col>
                 </Row>
               </Modal.Body>
