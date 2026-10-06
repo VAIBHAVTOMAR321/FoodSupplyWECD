@@ -86,6 +86,12 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
         path: "/FoodSupplementary",
         active: true,
       },
+       {
+        icon: <FaTachometerAlt />,
+        label: "New FoodSupplementary",
+        path: "/CDPOFoodSupplementary",
+        active: true,
+      },
 //  {
 //         icon: <FaUsers />,
 //         label: "Beneficiary Entry",
