@@ -14,6 +14,8 @@ const API_URLS = {
   categoryandfooditem: "/categoryandfooditem/",
   hcm_distribution: "/hcm-anganwadi-distribution/",
   thr_distribution: "/thr-anganwadi-distribution/",
+  hcm_receiving: "/hcm-anganwadi-receiving/",
+  thr_receiving: "/thr-anganwadi-receiving/",
 };
 
 // Configuration to map API field_name to required properties used in existing logic
@@ -93,6 +95,7 @@ const AnganwadiDashboard = () => {
   const [activeScheme, setActiveScheme] = useState(null);
   const [foodItems, setFoodItems] = useState([]);
   const [distributionRecords, setDistributionRecords] = useState([]);
+  const [receivedMonths, setReceivedMonths] = useState([]); // New state to track received months
   
   // State for distribution modal
   const [showDistributionModal, setShowDistributionModal] = useState(false);
@@ -154,8 +157,9 @@ const AnganwadiDashboard = () => {
 
   const handleCardClick = async (scheme) => {
     if (activeScheme === scheme) {
-      setActiveScheme(null); // Hide table if clicking the active scheme again
+      setActiveScheme(null); 
       setFoodItems([]);
+      setReceivedMonths([]);
       return;
     }
 
@@ -164,12 +168,16 @@ const AnganwadiDashboard = () => {
     setError(prev => ({ ...prev, table: "" }));
     setFoodItems([]);
     setDistributionRecords([]);
+    setReceivedMonths([]);
 
     try {
       const distributionUrl = scheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution;
-      const [catResponse, distributionsResponse] = await Promise.all([
+      const receivingUrl = scheme === 'hcm' ? API_URLS.hcm_receiving : API_URLS.thr_receiving;
+      
+      const [catResponse, distributionsResponse, receivingResponse] = await Promise.all([
         api.get(API_URLS.categoryandfooditem),
-        api.get(distributionUrl)
+        api.get(distributionUrl),
+        api.get(receivingUrl) // Fetch receiving records to determine allowed months
       ]);
 
       const allFoodData = catResponse.data?.food_data || [];
@@ -188,6 +196,18 @@ const AnganwadiDashboard = () => {
           total_quantity: 0
         };
       });
+
+      // Extract months from receiving records
+      const allowedMonths = new Set();
+      (receivingResponse.data || []).forEach(rec => {
+        const m = Array.isArray(rec.months) 
+          ? rec.months 
+          : Array.isArray(rec.quarter) 
+            ? rec.quarter 
+            : quarterToMonths[rec.quarter] || [];
+        m.forEach(month => allowedMonths.add(month));
+      });
+      setReceivedMonths(Array.from(allowedMonths));
 
       setFoodItems(mappedFoodItems);
       setDistributionRecords(distributionsResponse.data);
@@ -374,6 +394,9 @@ const AnganwadiDashboard = () => {
   const calculatedQuantity = selectedFoodItemForCalc
     ? (parseFloat(selectedFoodItemForCalc.qty_per_ben) * (parseInt(distributionData.total_beneficiaries, 10) || 0)).toFixed(2)
     : '0.00';
+
+  // Filter month options to only show months that exist in receivedMonths
+  const availableMonthsForDistribution = monthOptions.filter(m => receivedMonths.includes(m.value));
 
   return (
     <div className="dashboard-container">
@@ -623,33 +646,39 @@ const AnganwadiDashboard = () => {
                           type="text" 
                           placeholder="e.g., 2025-26" 
                           value={distributionData.fin_year} 
-                          readOnly // Changed to readOnly so the auto-filled value submits properly
+                          readOnly 
                           required 
                         />
                       </Form.Group>
                       <Form.Group className="mb-3">
                         <Form.Label>Months</Form.Label>
-                        <div className="month-checkbox-group d-flex flex-wrap gap-2">
-                          {monthOptions.map((month) => {
-                            const checked = distributionData.months?.includes(month.value) || false;
-                            return (
-                              <Form.Check
-                                key={month.value}
-                                inline
-                                type="checkbox"
-                                id={`month-${month.value}`}
-                                label={month.label}
-                                checked={checked}
-                                onChange={(e) => {
-                                  const nextMonths = e.target.checked
-                                    ? [...new Set([...(distributionData.months || []), month.value])]
-                                    : (distributionData.months || []).filter((m) => m !== month.value);
-                                  setDistributionData({ ...distributionData, months: nextMonths });
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
+                        {availableMonthsForDistribution.length === 0 ? (
+                          <Alert variant="warning" className="p-2 mt-2">
+                            No months available for distribution. Please add receiving records for a month first.
+                          </Alert>
+                        ) : (
+                          <div className="month-checkbox-group d-flex flex-wrap gap-2">
+                            {availableMonthsForDistribution.map((month) => {
+                              const checked = distributionData.months?.includes(month.value) || false;
+                              return (
+                                <Form.Check
+                                  key={month.value}
+                                  inline
+                                  type="checkbox"
+                                  id={`month-${month.value}`}
+                                  label={month.label}
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    const nextMonths = e.target.checked
+                                      ? [...new Set([...(distributionData.months || []), month.value])]
+                                      : (distributionData.months || []).filter((m) => m !== month.value);
+                                    setDistributionData({ ...distributionData, months: nextMonths });
+                                  }}
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
                       </Form.Group>
                     </>
                   )}
