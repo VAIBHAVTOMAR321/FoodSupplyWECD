@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Nav, Offcanvas, Collapse } from "react-bootstrap";
+import { Nav, Offcanvas, Collapse, ListGroup } from "react-bootstrap";
 import {
   FaTachometerAlt,
   FaSignOutAlt,
@@ -30,7 +30,8 @@ import {
   FaClock,
   FaTruck,
   FaFileAlt,
-  FaTruckLoading
+  FaTruckLoading,
+  FaList
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -82,7 +83,7 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
       },
 
       {
-        icon: <FaTachometerAlt />,
+        icon: <FaBook />,
         label: "AWC List",
         path: "/AwcAganWadi",
         active: true,
@@ -96,12 +97,12 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
        },
        
 
-        {
-         icon: <FaUsers />,
-         label: "Beneficiarie Entry",
-         path: "/SupervisorBeneficiarieEntry",
-         active: true,
-       },
+      //   {
+      //    icon: <FaUsers />,
+      //    label: "Beneficiarie Entry",
+      //    path: "/SupervisorBeneficiarieEntry",
+      //    active: true,
+      //  },
        
      
          {
