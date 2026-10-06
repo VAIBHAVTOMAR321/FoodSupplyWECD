@@ -474,10 +474,6 @@ function CDPOFoodSupplementary() {
                </Button>
           </div>
           <Card className="mb-4 shadow-sm food-card">
-
-              
-             
-             
                <Tabs
                  activeKey={recordTab}
                  onSelect={setRecordTab}
@@ -543,22 +539,9 @@ function CDPOFoodSupplementary() {
                           <td>{rec.thr_25_days_frs_hcm_beneficiaries_3y_6y}</td>
                           <td>{rec.total_beneficiaries}</td>
                           <td>
-                            {(() => {
-                              const grouped = {};
-                              (rec.food_items || []).forEach((fi) => {
-                                const cat = fi.category || "अन्य";
-                                if (!grouped[cat]) grouped[cat] = [];
-                                grouped[cat].push(fi);
-                              });
-                              return Object.entries(grouped).map(([cat, items]) => (
-                                <div key={cat} className="mb-2">
-                                  <div className="fw-bold small text-primary">{cat}</div>
-                                  {items.map((fi, i) => (
-                                    <Badge key={i} bg="secondary" className="me-1 mb-1">{fi.food_item} ({fi.allo_quan})</Badge>
-                                  ))}
-                                </div>
-                              ));
-                            })()}
+                            {rec.food_items?.map((fi, i) => (
+                              <Badge key={i} bg="secondary" className="me-1 mb-1">{fi.food_item} ({fi.allo_quan})</Badge>
+                            ))}
                           </td>
                           <td>{rec.created_at?.substring(0, 16)}</td>
                           <td>{rec.updated_at?.substring(0, 16)}</td>
