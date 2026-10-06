@@ -11,12 +11,19 @@ import { FaUtensils, FaBoxOpen, FaChevronDown, FaChevronUp, FaDolly, FaEdit, FaT
 import "../../assets/css/AnganwadiDashboard.css";
 
 const API_URLS = {
-  hcm: "/hcm-food-items/",
-  thr: "/thr-food-items/",
+  categoryandfooditem: "/categoryandfooditem/",
   hcm_distribution: "/hcm-anganwadi-distribution/",
   thr_distribution: "/thr-anganwadi-distribution/",
-  beneficiary_registration: "/beneficiary-registration/",
 };
+
+// Configuration to map API field_name to required properties used in existing logic
+const supplementaryFoodConfig = [
+  { key: 'quarterly_packets_mung_dal_khichdi', bene_category: "6 माह से 3 वर्ष के सामान्य बच्चे", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
+  { key: 'quarterly_packets_poushik_sattu_mix', bene_category: "6 माह से 3 वर्ष के सामान्य बच्चे", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
+  { key: 'panjeeri_75_days_4625gm_quarterly_packets', bene_category: "3 वर्ष से 5 वर्ष के अतिकुपोषित बच्चे (अतिरिक्त THR हेतु)", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
+  { key: 'quarterly_packets_sattu_2250gm', bene_category: "3 वर्ष से 6 वर्ष के गंभीर कम वजन वाले बच्चे (अतिरिक्त THR हेतु)", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
+  { key: 'quarterly_packets_multi_grain_aata_1250gm', bene_category: "गर्भवती एवं धात्री महिलायें", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
+];
 
 const getCurrentFinancialYear = () => {
   const today = new Date();
@@ -29,13 +36,6 @@ const getCurrentFinancialYear = () => {
     return `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
   }
 };
-
-const allQuarters = [
-  { value: 'apr-may-jun', label: 'April-May-June' },
-  { value: 'jul-aug-sep', label: 'July-August-September' },
-  { value: 'oct-nov-dec', label: 'October-November-December' },
-  { value: 'jan-feb-mar', label: 'January-February-March' },
-];
 
 const monthOptions = [
   { value: 'apr', label: 'April' },
@@ -60,18 +60,8 @@ const quarterToMonths = {
 };
 
 const monthLabels = {
-  apr: 'April',
-  may: 'May',
-  jun: 'June',
-  jul: 'July',
-  aug: 'August',
-  sep: 'September',
-  oct: 'October',
-  nov: 'November',
-  dec: 'December',
-  jan: 'January',
-  feb: 'February',
-  mar: 'March',
+  apr: 'April', may: 'May', jun: 'June', jul: 'July', aug: 'August', sep: 'September',
+  oct: 'October', nov: 'November', dec: 'December', jan: 'January', feb: 'February', mar: 'March',
 };
 
 const formatMonths = (monthsOrQuarter) => {
@@ -112,16 +102,10 @@ const AnganwadiDashboard = () => {
   const [submitting, setSubmitting] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewItem, setViewItem] = useState(null);
-  const [beneficiaryCount, setBeneficiaryCount] = useState(null);
-  const [beneficiaryCountLoading, setBeneficiaryCountLoading] = useState(false);
-  const [isRegistrationAvailable, setIsRegistrationAvailable] = useState(true); // New state for submit button
-  const [isRegistrationApproved, setIsRegistrationApproved] = useState(true);
   const [selectedFoodItem, setSelectedFoodItem] = useState(null);
 
   const { user, api, uniqueId } = useAuth();
-  const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   const location = useLocation();
-
 
   useEffect(() => {
     const handleResize = () => {
@@ -136,10 +120,8 @@ const AnganwadiDashboard = () => {
     const searchParams = new URLSearchParams(location.search);
     const openScheme = searchParams.get('open');
     if (openScheme === 'hcm' || openScheme === 'thr') {
-      // Use a timeout to ensure the component has rendered
       setTimeout(() => handleCardClick(openScheme), 100);
     }
-
 
     return () => window.removeEventListener("resize", handleResize);
   }, [location.search]);
@@ -149,11 +131,13 @@ const AnganwadiDashboard = () => {
       setLoading(prev => ({ ...prev, counts: true }));
       setError(prev => ({ ...prev, counts: "" }));
       try {
-        const [hcmResponse, thrResponse] = await Promise.all([
-          api.get(API_URLS.hcm),
-          api.get(API_URLS.thr),
-        ]);
-        setCounts({ hcm: hcmResponse.data.length, thr: thrResponse.data.length });
+        const response = await api.get(API_URLS.categoryandfooditem);
+        const foodData = response.data?.food_data || [];
+        
+        const hcmCount = foodData.filter(item => item.category === "HCM").length;
+        const thrCount = foodData.filter(item => item.category === "THR").length;
+        
+        setCounts({ hcm: hcmCount, thr: thrCount });
       } catch (err) {
         setError(prev => ({ ...prev, counts: "Failed to fetch food item counts." }));
         console.error(err);
@@ -162,7 +146,7 @@ const AnganwadiDashboard = () => {
       }
     };
     fetchCounts();
-  }, [api, API_URLS.hcm, API_URLS.thr]);
+  }, [api]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -183,12 +167,29 @@ const AnganwadiDashboard = () => {
 
     try {
       const distributionUrl = scheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution;
-      const [itemsResponse, distributionsResponse] = await Promise.all([
-        api.get(API_URLS[scheme]),
+      const [catResponse, distributionsResponse] = await Promise.all([
+        api.get(API_URLS.categoryandfooditem),
         api.get(distributionUrl)
       ]);
 
-      setFoodItems(itemsResponse.data);
+      const allFoodData = catResponse.data?.food_data || [];
+      const schemeFoodData = allFoodData.filter(f => f.category === scheme.toUpperCase());
+
+      const mappedFoodItems = schemeFoodData.map((data, index) => {
+        const config = supplementaryFoodConfig.find(c => c.key === data.field_name);
+        return {
+          id: index + 1,
+          food_item: data.food_item,
+          field_name: data.field_name,
+          bene_category: config?.bene_category || 'N/A',
+          unit: config?.unit || 'Packets',
+          qty_per_ben: config?.qty_per_ben || 1,
+          days_allotted: config?.days_allotted || 75,
+          total_quantity: 0
+        };
+      });
+
+      setFoodItems(mappedFoodItems);
       setDistributionRecords(distributionsResponse.data);
     } catch (err) {
       setError(prev => ({ ...prev, table: `Failed to fetch ${scheme.toUpperCase()} items.` }));
@@ -198,175 +199,14 @@ const AnganwadiDashboard = () => {
     }
   };
 
-  const beneCategoryMap = {
-    "6 माह से 3 वर्ष के सामान्य बच्चे": "children_6m_3y",
-    "6 माह से 3 वर्ष के अतिकुपोषित (SAM) बच्चे": "sam_6m_3y",
-    "6 माह से 3 वर्ष के गंभीर कम वजन (SUW) वाले बच्चे": "suw_6m_3y",
-    "3 वर्ष से 6 वर्ष तक के बच्चे (सामान्य, अतिकुपोषित एवं गंभीर कम वजन वाले)": "children_3_6y",
-    "3 वर्ष से 5 वर्ष के अतिकुपोषित बच्चे (अतिरिक्त THR हेतु)": "sam_3_5y",
-    "3 वर्ष से 6 वर्ष के गंभीर कम वजन वाले बच्चे (अतिरिक्त THR हेतु)": "suw_3_6y",
-    "गर्भवती एवं धात्री महिलायें": "pw_lm",
-    "किशोरी बालिकाएँ": "adolescent_girls",
-  };
-
-  const handleDateChange = async (date, foodItemId) => {
-    // 1. Immediately update the date and clear all validation and beneficiary-related state.
-    setDistributionData(prev => ({ ...prev, date, total_beneficiaries: '' }));
-    setBeneficiaryCount(null);
-    setDistributionError('');
-    setIsRegistrationAvailable(false); // Assume not available until verified
-    setIsRegistrationApproved(false);
-    setBeneficiaryCountLoading(true);
-
-    const currentFoodItem = foodItems.find(fi => fi.id === parseInt(foodItemId, 10));
-
-    if (!date || !currentFoodItem) {
-      setBeneficiaryCountLoading(false); // Stop loading if there's no date or food item
-      return;
-    }
-    setDistributionError(''); // Clear previous errors
-
-    const d = new Date(date);
-    const month = d.toLocaleString('default', { month: 'short' }).toLowerCase();
-    const year = d.getFullYear();
-    const fin_year = d.getMonth() >= 3 ? `${year}-${(year + 1).toString().slice(-2)}` : `${year - 1}-${year.toString().slice(-2)}`;
-
-    try {      
-      const response = await api.get(`${API_URLS.beneficiary_registration}?fin_year=${fin_year}&month=${month}`);      
-      const registrationData = response.data;      
-
-      if (registrationData && registrationData.length > 0) {
-        const registration = registrationData.find(r => r.fin_year === fin_year && r.month === month);
-        if (registration) {
-          if (registration.sector_status !== 'approved') {
-            setDistributionError("लाभार्थी प्रविष्टि आपके संबंधित पर्यवेक्षक द्वारा अनुमोदित नहीं है।");
-            setIsRegistrationApproved(false);
-          } else {
-            setIsRegistrationApproved(true);
-          }
-          const categoryKey = beneCategoryMap[currentFoodItem.bene_category];
-          
-          if (categoryKey && registration.hasOwnProperty(categoryKey)) {
-            const count = registration[categoryKey];
-            if (count > 0) {
-              setBeneficiaryCount(count);
-              setIsRegistrationAvailable(true); // Registration exists and has beneficiaries
-            } else {
-              setDistributionError(`"${currentFoodItem.bene_category}" के लिए ${month}, ${fin_year} में कोई लाभार्थी पंजीकृत नहीं है।`);
-              setBeneficiaryCount(0);
-              setIsRegistrationAvailable(false);
-            }
-          } else {
-            setDistributionError(`पंजीकरण डेटा में लाभार्थी श्रेणी "${currentFoodItem.bene_category}" नहीं मिली।`);
-            setBeneficiaryCount(0); // Or handle as an error state
-            setIsRegistrationAvailable(false);
-          }
-        } else {
-          setDistributionError(`${month}, ${fin_year} के लिए कोई लाभार्थी पंजीकरण नहीं मिला। कृपया पहले लाभार्थी डेटा जोड़ें।`);
-          setBeneficiaryCount(0);
-          setIsRegistrationAvailable(false);
-        }
-      } else {
-        setDistributionError(`${month}, ${fin_year} के लिए कोई लाभार्थी पंजीकरण नहीं मिला। कृपया पहले लाभार्थी डेटा जोड़ें।`);
-        setBeneficiaryCount(0);
-        setIsRegistrationAvailable(false); // No registration found
-      }
-    } catch (err) {
-      setDistributionError("लाभार्थी पंजीकरण डेटा लाने में विफल।");
-      console.error("Error fetching beneficiary data:", err);
-      setBeneficiaryCount(null);
-      setIsRegistrationAvailable(false);
-    } finally {
-      setBeneficiaryCountLoading(false);
-    }
-  };
-
-  const handleThrPeriodChange = async (fin_year, months, foodItemId, isEditing = false) => {
-    if (!isEditing) {
-      setDistributionData(prev => ({ ...prev, fin_year, months: months || [], total_beneficiaries: '' }));
-    }
-    setBeneficiaryCount(null);
-    setDistributionError('');
-    setIsRegistrationAvailable(false);
-    setIsRegistrationApproved(false);
-    setBeneficiaryCountLoading(true);
-
-    const currentFoodItem = foodItems.find(fi => fi.id === parseInt(foodItemId, 10));
-
-    if (!fin_year || !months?.length || !currentFoodItem) {
-      setBeneficiaryCountLoading(false);
-      return;
-    }
-
-    const selectedMonths = Array.isArray(months) ? months : [months];
-    const validMonths = selectedMonths.filter(m => monthOptions.some(opt => opt.value === m));
-    if (!validMonths.length) {
-      setDistributionError("अमान्य महीने चयनित।");
-      setBeneficiaryCountLoading(false);
-      return;
-    }
-
-    try {
-      // Fetch all registrations for the financial year at once to be more efficient
-      const response = await api.get(`${API_URLS.beneficiary_registration}?fin_year=${fin_year}`);
-      const allYearRegistrations = response.data || [];
-
-      let totalBeneficiaries = 0;
-      let atLeastOneMonthRegistered = false;
-      let allMonthsApproved = true;
-      const categoryKey = beneCategoryMap[currentFoodItem.bene_category];
-
-      for (const month of validMonths) {
-        const registration = allYearRegistrations.find(r => r.month === month && r.fin_year === fin_year);
-
-        if (registration && categoryKey && Object.prototype.hasOwnProperty.call(registration, categoryKey)) {
-          atLeastOneMonthRegistered = true;
-          if (registration.sector_status !== 'approved') {
-            setDistributionError(`महीना ${monthLabels[month] || month} के लिए चयनित महीनों में से एक रिकॉर्ड अनुमोदित नहीं है।`);
-            allMonthsApproved = false;
-            break;
-          }
-          totalBeneficiaries += registration[categoryKey] || 0;
-        }
-      }
-      setIsRegistrationApproved(allMonthsApproved);
-
-      if (atLeastOneMonthRegistered) {
-        setBeneficiaryCount(totalBeneficiaries);
-        setIsRegistrationAvailable(totalBeneficiaries > 0);
-        if (totalBeneficiaries === 0 && allMonthsApproved) {
-          setDistributionError(`चयनित महीनों में "${currentFoodItem.bene_category}" के लिए कोई लाभार्थी पंजीकृत नहीं है।`);
-        }
-      } else if (allMonthsApproved) {
-        setDistributionError(`चयनित महीनों के लिए अभी तक कोई लाभार्थी पंजीकरण नहीं किया गया है।`);
-        setBeneficiaryCount(0);
-        setIsRegistrationAvailable(false);
-      }
-    } catch (err) {
-      setDistributionError("THR के लिए लाभार्थी पंजीकरण डेटा लाने में विफल।");
-      console.error("Error fetching THR beneficiary data:", err);
-      setBeneficiaryCount(null);
-      setIsRegistrationAvailable(false);
-    } finally {
-      setBeneficiaryCountLoading(false);
-    }
-  };
-
   const handleOpenDistributionModal = (item, scheme, existingRecord = null, isNew = false) => {
-    // If editing, the `item` is the distribution record, which also has food_item details
-    // If adding, the `item` is the food item from the list
     let modalItem;
     if (isNew) {
-      // For brand new entries from the main button
       modalItem = { scheme, isNew: true };
     } else if (existingRecord) {
-      // Find the full food item details from the list to get qty_per_ben
       const fullFoodItem = foodItems.find(fi => fi.food_item === existingRecord.food_item);
-      modalItem = { ...item, ...existingRecord, scheme, isEdit: true };
       modalItem = { ...fullFoodItem, ...existingRecord, scheme, isEdit: true };
     } else {
-      // This case might be deprecated if we only add from the new modal
-      // This is for adding a distribution from the food item list (not used anymore)
       modalItem = { ...item, scheme };
     }
 
@@ -395,19 +235,6 @@ const AnganwadiDashboard = () => {
         });
         setSelectedFoodItem(foodItemDetails);
       }
-      // If editing, immediately trigger a validation check for the existing date
-      if (scheme === 'hcm' && existingRecord.date) {
-        // Pass the date and the correct food item ID to ensure validation runs with the right context
-        handleDateChange(existingRecord.date, foodItemDetails?.id);
-      } else if (scheme === 'thr' && existingRecord.fin_year && (existingRecord.months?.length || existingRecord.quarter)) {
-        const existingMonths = Array.isArray(existingRecord.months)
-          ? existingRecord.months
-          : Array.isArray(existingRecord.quarter)
-            ? existingRecord.quarter
-            : quarterToMonths[existingRecord.quarter] || [];
-        // Trigger validation for existing THR records
-        handleThrPeriodChange(existingRecord.fin_year, existingMonths, foodItemDetails?.id, true);
-      }
     } else {
       setDistributionData({ 
         total_beneficiaries: '',
@@ -418,21 +245,14 @@ const AnganwadiDashboard = () => {
       });
     }
 
-    // Reset validation state when opening the modal
     setDistributionError('');
-    setBeneficiaryCount(null); // Explicitly clear beneficiary count on modal open
-    setIsRegistrationAvailable(true);
-    setIsRegistrationApproved(true);
     setShowDistributionModal(true);
   };
 
   const handleCloseDistributionModal = () => {
     setShowDistributionModal(false);
     setSelectedItem(null);
-    setBeneficiaryCount(null);
     setSelectedFoodItem(null);
-    setIsRegistrationApproved(true);
-    setIsRegistrationAvailable(true); // Reset on close
   };
 
   const handleOpenViewModal = (record) => {
@@ -450,7 +270,6 @@ const AnganwadiDashboard = () => {
     setSubmitting(true);
     setDistributionError('');
 
-    // If it's a new entry, a food item must be selected from the dropdown.
     if (!distributionData.food_item_id) {
       setDistributionError("कृपया एक खाद्य सामग्री चुनें।");
       setSubmitting(false);
@@ -462,7 +281,6 @@ const AnganwadiDashboard = () => {
     const selectedFoodItemDetails = (selectedItem.isNew || selectedItem.isEdit)
       ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10))
       : selectedItem;
-
 
     if (!distributionData.total_beneficiaries || (isThr ? (!distributionData.fin_year || !distributionData.months?.length) : !distributionData.date)) {
       setDistributionError("कृपया सभी आवश्यक फ़ील्ड भरें।");
@@ -485,24 +303,6 @@ const AnganwadiDashboard = () => {
       if (duplicate) {
         const selectedMonthsLabel = formatMonths(distributionData.months);
         setDistributionError(`"${selectedFoodItemDetails.food_item}" के लिए ${distributionData.fin_year} - ${selectedMonthsLabel} का वितरण रिकॉर्ड पहले से मौजूद है।`);
-        setSubmitting(false);
-        return;
-      }
-    }
-
-    // Final validation check before submitting
-    if (beneficiaryCount !== null) {
-      const enteredBeneficiaries = parseInt(distributionData.total_beneficiaries, 10);
-      // Also check if registration is missing for the selected date
-      if (!isRegistrationAvailable) {
-        setDistributionError(`सबमिट नहीं किया जा सकता क्योंकि चयनित अवधि के लिए कोई लाभार्थी पंजीकरण नहीं मिला।`);
-        setSubmitting(false);
-        return;
-      }
-
-      // Also check for approval
-      if (!isRegistrationApproved) {
-        setDistributionError("सबमिट नहीं किया जा सकता क्योंकि लाभार्थी प्रविष्टि आपके संबंधित पर्यवेक्षक द्वारा अनुमोदित नहीं है।");
         setSubmitting(false);
         return;
       }
@@ -531,7 +331,6 @@ const AnganwadiDashboard = () => {
     if (isEdit) {
       payload.id = selectedItem.id;
     } else {
-      // For new entries, get food_item from dropdown selection
       payload.food_item = selectedFoodItemDetails.food_item;
     }
     payload.bene_category = selectedFoodItemDetails.bene_category;
@@ -545,7 +344,6 @@ const AnganwadiDashboard = () => {
       await api[method](url, payload);
       alert(`Distribution ${isEdit ? 'updated' : 'recorded'} successfully!`);
       handleCloseDistributionModal();
-      // Refresh the table data
       handleCardClick(activeScheme);
     } catch (err) {
       setDistributionError(`वितरण ${isEdit ? 'अपडेट' : 'रिकॉर्ड'} करने में विफल। कृपया पुन: प्रयास करें।`);
@@ -561,7 +359,6 @@ const AnganwadiDashboard = () => {
       try {
         await api.delete(url, { data: { id: record.id } });
         alert('Distribution record deleted successfully!');
-        // Refresh the table data
         handleCardClick(activeScheme);
       } catch (err) {
         alert('Failed to delete distribution record.');
@@ -577,11 +374,8 @@ const AnganwadiDashboard = () => {
   const calculatedQuantity = selectedFoodItemForCalc
     ? (parseFloat(selectedFoodItemForCalc.qty_per_ben) * (parseInt(distributionData.total_beneficiaries, 10) || 0)).toFixed(2)
     : '0.00';
-  
-// No quarter-only selection is required for THR; months are selected explicitly.
 
   return (
-  
     <div className="dashboard-container">
       <AnganwadiLeftNav
         sidebarOpen={sidebarOpen}
@@ -598,7 +392,6 @@ const AnganwadiDashboard = () => {
             <h3 className="mb-4 fw-bold">
               Anganwadi Dashboard
             </h3>
-            
           </div>
           <Row>
             <Col lg={6} md={6} xs={12} className="mb-4">
@@ -759,13 +552,7 @@ const AnganwadiDashboard = () => {
                       value={distributionData.food_item_id || ''}
                       onChange={(e) => {
                         const newFoodItemId = e.target.value;
-                        const newDistributionData = { ...distributionData, food_item_id: newFoodItemId, total_beneficiaries: '' };
-                        setDistributionData(newDistributionData);
-                        if (activeScheme === 'hcm' && distributionData.date) {
-                          handleDateChange(newDistributionData.date, newFoodItemId);
-                        } else if (activeScheme === 'thr' && newDistributionData.fin_year && newDistributionData.months?.length) {
-                          handleThrPeriodChange(newDistributionData.fin_year, newDistributionData.months, newFoodItemId, selectedItem.isEdit);
-                        }
+                        setDistributionData(prev => ({ ...prev, food_item_id: newFoodItemId, total_beneficiaries: '' }));
                       }}
                     >
                       <option value="">Select a food item...</option>
@@ -799,12 +586,9 @@ const AnganwadiDashboard = () => {
                       required
                       disabled={
                         (activeScheme === 'thr' && (!distributionData.months || distributionData.months.length === 0)) ||
-                        (activeScheme === 'hcm' && !distributionData.date) ||
-                        beneficiaryCount === 0 ||
-                        !isRegistrationAvailable
+                        (activeScheme === 'hcm' && !distributionData.date)
                       }
                     />
-                    {beneficiaryCount === 0 && <Form.Text className="text-danger">लाभार्थी दर्ज नहीं कर सकते क्योंकि इस अवधि और श्रेणी के लिए कोई भी पंजीकृत नहीं है।</Form.Text>}
                   </Form.Group>
                   {activeScheme === 'hcm' ? (
                     <Form.Group className="mb-3">
@@ -813,14 +597,10 @@ const AnganwadiDashboard = () => {
                         type="date" 
                         value={distributionData.date || ''}
                         onChange={(e) => {
-                          const newDate = e.target.value;
-                          // Pass both the new date and the current food item ID to the handler
-                          handleDateChange(newDate, distributionData.food_item_id);
+                          setDistributionData({ ...distributionData, date: e.target.value });
                         }}
                         required
                       />
-                      {beneficiaryCountLoading && <Spinner animation="border" size="sm" className="mt-2" />}
-                      {beneficiaryCount !== null && !beneficiaryCountLoading && <Form.Text className={beneficiaryCount > 0 ? "text-success" : "text-danger"}>पंजीकृत लाभार्थी: {beneficiaryCount}</Form.Text>}
                     </Form.Group>
                   ) : (
                     <>
@@ -830,10 +610,6 @@ const AnganwadiDashboard = () => {
                           type="text" 
                           placeholder="e.g., 2025-26" 
                           value={distributionData.fin_year} disabled
-                          onChange={(e) => {
-                            const newFinYear = e.target.value;
-                            handleThrPeriodChange(newFinYear, distributionData.months, distributionData.food_item_id, selectedItem.isEdit);
-                          }} 
                           required 
                         />
                       </Form.Group>
@@ -855,16 +631,11 @@ const AnganwadiDashboard = () => {
                                     ? [...new Set([...(distributionData.months || []), month.value])]
                                     : (distributionData.months || []).filter((m) => m !== month.value);
                                   setDistributionData({ ...distributionData, months: nextMonths });
-                                  if (distributionData.fin_year && distributionData.food_item_id) {
-                                    handleThrPeriodChange(distributionData.fin_year, nextMonths, distributionData.food_item_id, selectedItem.isEdit);
-                                  }
                                 }}
                               />
                             );
                           })}
                         </div>
-                        {beneficiaryCountLoading && <Spinner animation="border" size="sm" className="mt-2" />}
-                        {beneficiaryCount !== null && !beneficiaryCountLoading && <Form.Text className={beneficiaryCount > 0 ? "text-success" : "text-danger"}>चयनित महीनों के लिए पंजीकृत लाभार्थी: {beneficiaryCount}</Form.Text>}
                       </Form.Group>
                     </>
                   )}
@@ -910,7 +681,7 @@ const AnganwadiDashboard = () => {
                     <Button 
                       variant="primary" 
                       type="submit" 
-                      disabled={submitting || !isRegistrationAvailable || !isRegistrationApproved || beneficiaryCount === 0}
+                      disabled={submitting}
                     >
                       {submitting ? <Spinner as="span" animation="border" size="sm" /> : (selectedItem.isEdit ? 'Update' : 'Submit')}
                     </Button>
@@ -968,14 +739,9 @@ const AnganwadiDashboard = () => {
               </Modal.Footer>
             </Modal>
           )}
-          </Container>
-
-         
+        </Container>
       </div>
-
-   
-    
-     </div>
+    </div>
   );
 };
 
