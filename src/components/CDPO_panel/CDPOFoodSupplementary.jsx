@@ -216,6 +216,23 @@ function CDPOFoodSupplementary() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("क्या आप वाकई इस रिकॉर्ड को हटाना चाहते हैं?")) return;
+
+    setLoading(true);
+    try {
+      await api.delete(`${API_BASE_URL}/supplementary-nutrition-with-food/`, {
+        data: { ids: [id] }
+      });
+      setSuccess("रिकॉर्ड सफलतापूर्वक हटा दिया गया है!");
+      fetchRecords();
+    } catch (err) {
+      setError(err.response?.data?.detail || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ============ BULK EXCEL UPLOAD ============
   const handleExcelUpload = async (e) => {
     const file = e.target.files[0];
@@ -533,7 +550,10 @@ function CDPOFoodSupplementary() {
                           <td>{rec.created_at?.substring(0, 16)}</td>
                           <td>{rec.updated_at?.substring(0, 16)}</td>
                           <td>
-                            <Button variant="warning" size="sm" onClick={() => handleEdit(rec)}>Edit</Button>
+                            <div className="d-flex gap-1">
+                              <Button variant="warning" size="sm" onClick={() => handleEdit(rec)}>Edit</Button>
+                              <Button variant="danger" size="sm" onClick={() => handleDelete(rec.id)} disabled={loading}>Delete</Button>
+                            </div>
                           </td>
                         </tr>
                       ))
