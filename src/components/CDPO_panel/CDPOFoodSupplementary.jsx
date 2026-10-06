@@ -471,6 +471,7 @@ function CDPOFoodSupplementary() {
                  <Tab eventKey="hcm" title="एचसीएम (HCM)">HCM</Tab>
                </Tabs>
 
+
                <Table striped bordered hover responsive className="record-table">
                   <thead>
                     <tr>
