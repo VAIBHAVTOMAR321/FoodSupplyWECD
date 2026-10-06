@@ -348,6 +348,14 @@ const AnganwadiDashboard = () => {
       return;
     }
 
+    // ✅ Prevent selecting months for which receiving is not done
+    const unreceivedMonths = distributionData.months.filter(m => !receivedMonths.includes(m));
+    if (unreceivedMonths.length > 0) {
+      setDistributionError(`त्रुटि: ${formatMonths(unreceivedMonths)} के लिए रिसीविंग (Receiving) पंजीकृत नहीं है। कृपया पहले रिसीविंग दर्ज करें।`);
+      setSubmitting(false);
+      return;
+    }
+
     // Prevent duplicate entries for both HCM and THR
     const duplicate = distributionRecords.find(rec => {
       if (selectedItem.isEdit && rec.id === selectedItem.id) {
@@ -456,9 +464,6 @@ const AnganwadiDashboard = () => {
   const calculatedQuantity = selectedFoodItemForCalc
     ? (parseFloat(selectedFoodItemForCalc.qty_per_ben) * (parseInt(distributionData.total_beneficiaries, 10) || 0)).toFixed(2)
     : '0.00';
-
-  // Filter month options to only show months that exist in receivedMonths
-  const availableMonthsForDistribution = monthOptions.filter(m => receivedMonths.includes(m.value));
 
   return (
     <div className="dashboard-container">
@@ -708,46 +713,56 @@ const AnganwadiDashboard = () => {
 
                   <Form.Group className="mb-3">
                     <Form.Label>Months</Form.Label>
-                    {availableMonthsForDistribution.length === 0 ? (
+                    <div className="month-checkbox-group d-flex flex-wrap gap-2">
+                      {monthOptions.map((month) => {
+                        const checked = distributionData.months?.includes(month.value) || false;
+                        const isReceived = receivedMonths.includes(month.value);
+                        
+                        return (
+                          <Form.Check
+                            key={month.value}
+                            inline
+                            type="checkbox"
+                            id={`month-${month.value}`}
+                            label={month.label}
+                            checked={checked}
+                            // ✅ If user selects an unreceived month, show error and prevent checking
+                            onChange={(e) => {
+                              if (e.target.checked && !isReceived) {
+                                setDistributionError(`त्रुटि: ${month.label} महीने के लिए रिसीविंग (Receiving) पंजीकृत नहीं है। कृपया पहले रिसीविंग दर्ज करें।`);
+                                return; // Prevent checking
+                              }
+                              
+                              // Clear error if they uncheck or check a valid month
+                              if (distributionError) setDistributionError('');
+
+                              const nextMonths = e.target.checked
+                                ? [...new Set([...(distributionData.months || []), month.value])]
+                                : (distributionData.months || []).filter((m) => m !== month.value);
+
+                              const selectedFoodItem = foodItems.find(
+                                fi => fi.id === parseInt(distributionData.food_item_id, 10)
+                              );
+                              const autoTotalBene = computeAutoTotalBeneficiaries(
+                                selectedFoodItem,
+                                distributionData.fin_year,
+                                nextMonths
+                              );
+
+                              setDistributionData({
+                                ...distributionData,
+                                months: nextMonths,
+                                total_beneficiaries: autoTotalBene || distributionData.total_beneficiaries,
+                              });
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                    {receivedMonths.length === 0 && (
                       <Alert variant="warning" className="p-2 mt-2">
                         No months available for distribution. Please add receiving records for a month first.
                       </Alert>
-                    ) : (
-                      <div className="month-checkbox-group d-flex flex-wrap gap-2">
-                        {availableMonthsForDistribution.map((month) => {
-                          const checked = distributionData.months?.includes(month.value) || false;
-                          return (
-                            <Form.Check
-                              key={month.value}
-                              inline
-                              type="checkbox"
-                              id={`month-${month.value}`}
-                              label={month.label}
-                              checked={checked}
-                              onChange={(e) => {
-                                const nextMonths = e.target.checked
-                                  ? [...new Set([...(distributionData.months || []), month.value])]
-                                  : (distributionData.months || []).filter((m) => m !== month.value);
-
-                                const selectedFoodItem = foodItems.find(
-                                  fi => fi.id === parseInt(distributionData.food_item_id, 10)
-                                );
-                                const autoTotalBene = computeAutoTotalBeneficiaries(
-                                  selectedFoodItem,
-                                  distributionData.fin_year,
-                                  nextMonths
-                                );
-
-                                setDistributionData({
-                                  ...distributionData,
-                                  months: nextMonths,
-                                  total_beneficiaries: autoTotalBene || distributionData.total_beneficiaries,
-                                });
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
                     )}
                   </Form.Group>
 
