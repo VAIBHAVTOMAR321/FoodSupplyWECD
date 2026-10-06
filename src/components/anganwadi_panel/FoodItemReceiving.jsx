@@ -85,6 +85,18 @@ const FoodItemReceiving = () => {
     thr: { fin_year: [], months: [] },
   });
 
+  const availableMonthsFromSupp = useMemo(() => {
+    const months = new Set();
+    suppNutritionData.forEach(rec => {
+      if (rec.month) {
+        const monthLower = rec.month.toLowerCase();
+        const match = monthOptions.find(m => m.value === monthLower || m.label.toLowerCase() === monthLower);
+        if (match) months.add(match.value);
+      }
+    });
+    return Array.from(months);
+  }, [suppNutritionData]);
+
   const fetchData = async () => {
     setLoading(true);
     setError("");
@@ -205,9 +217,20 @@ const FoodItemReceiving = () => {
       let autoUnit = 'Packets';
       let autoQuantity = '';
       let autoFieldName = '';
+      let autoBeneCategory = '';
+
+      // Beneficiary category mapping based on food items
+      const beneCategoryMap = {
+        'पौष्टिक सत्तू मिक्स': 'Pregnant Women & Lactating Mothers',
+        'पंजीरी': 'Children (6m-3y)',
+        'सत्तू': 'Children (6m-3y)',
+        'मूंग दाल खिचड़ी मिक्स': 'Children (3-6y)',
+        'मल्टीग्रेन आटा': 'Children (3-6y)',
+      };
 
       if (selectedItem) {
         autoFieldName = selectedItem.field_name || '';
+        autoBeneCategory = beneCategoryMap[value] || selectedItem.bene_category || selectedItem.category || '';
 
         // Find matching record in supplementary data to auto-fill quantity
         if (suppNutritionData.length > 0 && autoFieldName) {
@@ -230,7 +253,8 @@ const FoodItemReceiving = () => {
         food_item: value,
         field_name: autoFieldName,
         unit: autoUnit,
-        quantity: autoQuantity
+        quantity: autoQuantity,
+        bene_category: autoBeneCategory
       }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
@@ -703,23 +727,31 @@ const FoodItemReceiving = () => {
                     <Form.Group className="mb-3">
                       <Form.Label>Months</Form.Label>
                       <div className="month-checkbox-group d-flex flex-wrap gap-2">
-                        {monthOptions.map((month) => (
-                          <Form.Check
-                            key={month.value}
-                            inline
-                            type="checkbox"
-                            id={`month-${month.value}`}
-                            label={month.label}
-                            checked={(formData.months || []).includes(month.value)}
-                            onChange={(e) => {
-                              const nextMonths = e.target.checked
-                                ? [...new Set([...(formData.months || []), month.value])]
-                                : (formData.months || []).filter((m) => m !== month.value);
-                              setFormData(prev => ({ ...prev, months: nextMonths }));
-                            }}
-                          />
-                        ))}
+                        {monthOptions.map((month) => {
+                          const isAvailable = availableMonthsFromSupp.includes(month.value);
+                          return (
+                            <Form.Check
+                              key={month.value}
+                              inline
+                              type="checkbox"
+                              id={`month-${month.value}`}
+                              label={month.label}
+                              checked={(formData.months || []).includes(month.value)}
+                              onChange={(e) => {
+                                if (!isAvailable) return;
+                                const nextMonths = e.target.checked
+                                  ? [...new Set([...(formData.months || []), month.value])]
+                                  : (formData.months || []).filter((m) => m !== month.value);
+                                setFormData(prev => ({ ...prev, months: nextMonths }));
+                              }}
+                              disabled={!isAvailable}
+                            />
+                          );
+                        })}
                       </div>
+                      {!availableMonthsFromSupp.length && (
+                        <small className="text-muted">No months available in Supplementary Nutrition data</small>
+                      )}
                     </Form.Group>
                   </Col>
                 </>

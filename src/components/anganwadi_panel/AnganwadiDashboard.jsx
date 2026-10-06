@@ -456,7 +456,9 @@ const AnganwadiDashboard = () => {
                       <tr>
                         <th>#</th>
                         <th>Food Item</th>
-                        {activeScheme === 'hcm' ? <th>Date</th> : <><th>Fin. Year</th><th>Months</th></>}<th>Total Beneficiaries</th>
+                        <th>Month</th>
+                        <th>Year</th>
+                        <th>Total Beneficiaries</th>
                         {activeScheme === 'hcm' && <th>Beneficiary Category</th>}
                         {activeScheme === 'hcm' && <th>Days Allotted</th>}
                         <th>Quantity</th>
@@ -468,7 +470,18 @@ const AnganwadiDashboard = () => {
                       {distributionRecords.map((record, index) => (
                         <tr key={record.id}>
                           <td>{index + 1}</td>
-                          <td>{record.food_item}</td>{activeScheme === 'hcm' ? <td>{new Date(record.date).toLocaleDateString()}</td> : <><td>{record.fin_year}</td><td>{formatMonths(record.months || record.quarter)}</td></>}
+                          <td>{record.food_item}</td>
+                          {activeScheme === 'hcm' ? (
+                            <>
+                              <td>{new Date(record.date).toLocaleString('default', { month: 'long' })}</td>
+                              <td>{new Date(record.date).getFullYear()}</td>
+                            </>
+                          ) : (
+                            <>
+                              <td>{formatMonths(record.months || record.quarter)}</td>
+                              <td>{record.fin_year}</td>
+                            </>
+                          )}
                           <td>{record.total_beneficiaries}</td>
                           {activeScheme === 'hcm' && <td>{record.bene_category}</td>}
                           {activeScheme === 'hcm' && <td>{record.days_allotted}</td>}
@@ -609,7 +622,8 @@ const AnganwadiDashboard = () => {
                         <Form.Control 
                           type="text" 
                           placeholder="e.g., 2025-26" 
-                          value={distributionData.fin_year} disabled
+                          value={distributionData.fin_year} 
+                          readOnly // Changed to readOnly so the auto-filled value submits properly
                           required 
                         />
                       </Form.Group>
