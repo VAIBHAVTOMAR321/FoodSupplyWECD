@@ -172,9 +172,20 @@ const FoodItemReceiving = () => {
   });
 
   const availableMonthsFromSupp = useMemo(() => {
-    // Return all months always - supp nutrition data is used only for auto-filling,
-    // not for restricting which months can be selected for receiving
-    return monthOptions.map(m => m.value);
+    // Get unique months from supplementary nutrition data
+    const monthsFromData = new Set();
+    suppNutritionData.forEach(rec => {
+      if (rec._monthKeys) {
+        monthsFromData.add(rec._monthKeys);
+      } else if (rec.month) {
+        const normalized = normalizeSuppMonth(rec.month);
+        if (normalized) monthsFromData.add(normalized);
+      }
+    });
+    // Return sorted months based on monthOptions order
+    return monthOptions
+      .filter(m => monthsFromData.has(m.value))
+      .map(m => m.value);
   }, [suppNutritionData]);
 
   const fetchData = async () => {
@@ -313,7 +324,8 @@ const FoodItemReceiving = () => {
 
       if (selectedItem) {
         autoFieldName = selectedItem.field_name || '';
-        autoBeneCategory = FOOD_BENE_CATEGORY_MAP[value] || selectedItem.bene_category || selectedItem.category || '';
+        // Use API's beneficiary_category directly, fallback to mapping for backward compatibility
+        autoBeneCategory = selectedItem.beneficiary_category || FOOD_BENE_CATEGORY_MAP[value] || selectedItem.bene_category || selectedItem.category || '';
       }
 
       // Use functional updater to get the absolute latest state for auto-filling logic
@@ -789,7 +801,7 @@ if (suppNutritionData.length > 0 && autoFieldName) {
                           {item.food_item}
                         </option>,
                         <option key={`${index}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>
-                          &nbsp;&nbsp;↳ Category: {FOOD_BENE_CATEGORY_MAP[item.food_item] || 'N/A'}
+                          &nbsp;&nbsp;↳ Category: {item.beneficiary_category || FOOD_BENE_CATEGORY_MAP[item.food_item] || 'N/A'}
                         </option>
                       ])}
                     </Form.Select>
@@ -831,6 +843,7 @@ if (suppNutritionData.length > 0 && autoFieldName) {
                       onChange={handleFormChange}
                       placeholder="Enter Beneficiary Category"
                       required
+                      disabled
                     />
                   </Form.Group>
                 </Col>
@@ -962,6 +975,7 @@ if (suppNutritionData.length > 0 && autoFieldName) {
             </Modal.Footer>
           </Modal>
         )}
+        
       </div>
     </div>
   );
