@@ -89,6 +89,13 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
         active: true,
       },
 
+       {
+        icon: <FaBook />,
+        label: "Stock Allocation",
+        path: "/StockAllocation",
+        active: true,
+      },
+
 {
          icon: <FaBuilding />,
          label: "Sector Profile",
