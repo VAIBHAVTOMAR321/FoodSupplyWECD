@@ -695,7 +695,7 @@ const AnganwadiDashboard = () => {
                       onChange={(e) => {
                         setDistributionData({ ...distributionData, total_beneficiaries: e.target.value });
                       }}
-                      placeholder="Auto-filled from Supplementary Nutrition"
+                      placeholder="पूरक पोषण से स्वतः दर्ज होगा"
                       required
                       disabled={!distributionData.months || distributionData.months.length === 0}
                     />
@@ -762,7 +762,7 @@ const AnganwadiDashboard = () => {
                     </div>
                     {receivedMonths.length === 0 && (
                       <Alert variant="warning" className="p-2 mt-2">
-                        No months available for distribution. Please add receiving records for a month first.
+                       वितरण हेतु कोई माह उपलब्ध नहीं है। कृपया पहले प्राप्ति रिकॉर्ड दर्ज करें।
                       </Alert>
                     )}
                   </Form.Group>
