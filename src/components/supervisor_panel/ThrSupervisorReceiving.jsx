@@ -22,6 +22,11 @@ import "jspdf-autotable";
 import * as XLSX from "xlsx";
 import SupervisorLeftNav from "./SupervisorLeftNav";
 import SupervisorHeader from "./SupervisorHeader";
+import {
+  getAllocationComparisonStyle,
+  getFoodItemOptions,
+  getStockAllocationComparison,
+} from "./stockAllocationComparison";
 
 const monthLabels = {
   apr: 'April',
@@ -46,8 +51,11 @@ const ThrSupervisorReceiving = () => {
 
   const { api } = useAuth();
   const [receivings, setReceivings] = useState([]);
+  const [allocations, setAllocations] = useState([]);
+  const [foodItemOptions, setFoodItemOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [allocationError, setAllocationError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [actionError, setActionError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -96,15 +104,41 @@ const ThrSupervisorReceiving = () => {
   const fetchReceivings = useCallback(async () => {
     setLoading(true);
     setError("");
-    try {
-      const response = await api.get("/supervisor/thr-receiving/");
-      setReceivings(response.data.data || []);
-    } catch (err) {
+    setAllocationError("");
+    const [receivingResult, allocationResult, foodItemResult] = await Promise.allSettled([
+      api.get("/supervisor/thr-receiving/"),
+      api.get("/supplementary-nutrition-supervisor/"),
+      api.get("/categoryandfooditem/"),
+    ]);
+
+    if (receivingResult.status === "fulfilled") {
+      setReceivings(receivingResult.value.data.data || []);
+    } else {
       setError("Failed to fetch THR receiving data.");
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error("Failed to fetch THR receiving data:", receivingResult.reason);
     }
+
+    if (allocationResult.status === "fulfilled") {
+      const payload = allocationResult.value.data;
+      const allocationRows = Array.isArray(payload) ? payload : payload?.data;
+      if (Array.isArray(allocationRows) && payload?.success !== false) {
+        setAllocations(allocationRows);
+      } else {
+        setAllocations([]);
+        setAllocationError("Stock allocation data is unavailable; receiving rows cannot be compared.");
+      }
+    } else {
+      setAllocations([]);
+      setAllocationError("Failed to fetch stock allocation data; receiving rows cannot be compared.");
+      console.error("Failed to fetch stock allocation data:", allocationResult.reason);
+    }
+    if (foodItemResult.status === "fulfilled") {
+      setFoodItemOptions(getFoodItemOptions(foodItemResult.value.data));
+    } else {
+      setFoodItemOptions([]);
+      console.error("Failed to fetch food item allocation mappings:", foodItemResult.reason);
+    }
+    setLoading(false);
   }, [api]);
 
   useEffect(() => {
@@ -452,6 +486,7 @@ const ThrSupervisorReceiving = () => {
           </h3>
           {successMsg && <Alert variant="success">{successMsg}</Alert>}
           {error && <Alert variant="danger">{error}</Alert>}
+          {allocationError && <Alert variant="warning">{allocationError}</Alert>}
           {actionError && <Alert variant="danger">{actionError}</Alert>}
           <Row className="mb-3 g-2 align-items-center justify-content-between">
             <Col md>
@@ -547,12 +582,15 @@ const ThrSupervisorReceiving = () => {
                 </thead>
                 <tbody>
                   {currentItems.length > 0 ? (
-                    currentItems.map((item, index) => (
+                    currentItems.map((item, index) => {
+                      const comparison = getStockAllocationComparison(item, allocations, foodItemOptions);
+                      const comparisonStyle = getAllocationComparisonStyle(comparison);
+                      return (
                       <tr key={item.id}>
                         {visibleColumns.filter(col => !isPrinting || (col.dataField !== 'select' && col.dataField !== 'actions')).map((col) => {
                           let cellContent;
                           if (col.dataField === 'select') {
-                            return <td key="select"><Form.Check type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => handleSelectOne(item.id)} /></td>;
+                            return <td key="select" style={comparisonStyle}><Form.Check type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => handleSelectOne(item.id)} /></td>;
                           }
 
                           switch (col.dataField) {
@@ -573,17 +611,18 @@ const ThrSupervisorReceiving = () => {
                               }
                               break;
                             case "actions":
-                              return (<td key="actions" className="d-flex gap-1">
+                              return (<td key="actions" className="d-flex gap-1" style={comparisonStyle}>
                                 <Button variant="outline-success" size="sm" disabled={item.sector_status === 'approved'} onClick={() => { setBulkAction("approved"); setSelectedIds([item.id]); setShowBulkActionModal(true); }}>Approve</Button>
                                 <Button variant="outline-danger" size="sm" disabled={item.sector_status === 'rejected'} onClick={() => { setBulkAction("rejected"); setSelectedIds([item.id]); setShowBulkActionModal(true); }}>Reject</Button>
                               </td>);
                             default:
                               cellContent = item[col.dataField];
                           }
-                          return <td key={col.dataField}>{cellContent}</td>;
+                          return <td key={col.dataField} style={comparisonStyle}>{cellContent}</td>;
                         })}
                       </tr>
-                    ))
+                      );
+                    })
                   ) : (
                     <tr>
                       <td colSpan={visibleColumns.length} className="text-center">
