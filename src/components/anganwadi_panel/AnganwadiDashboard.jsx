@@ -42,25 +42,25 @@ const getCurrentFinancialYear = () => {
 };
 
 const monthOptions = [
-  { value: 'apr', label: 'April' },
-  { value: 'may', label: 'May' },
-  { value: 'jun', label: 'June' },
-  { value: 'jul', label: 'July' },
-  { value: 'aug', label: 'August' },
-  { value: 'sep', label: 'September' },
-  { value: 'oct', label: 'October' },
-  { value: 'nov', label: 'November' },
-  { value: 'dec', label: 'December' },
-  { value: 'jan', label: 'January' },
-  { value: 'feb', label: 'February' },
-  { value: 'mar', label: 'March' },
+ { value: 'April', label: 'April' },
+  { value: 'May', label: 'May' },
+  { value: 'June', label: 'June' },
+  { value: 'July', label: 'July' },
+  { value: 'August', label: 'August' },
+  { value: 'September', label: 'September' },
+  { value: 'October', label: 'October' },
+  { value: 'November', label: 'November' },
+  { value: 'December', label: 'December' },
+  { value: 'January', label: 'January' },
+  { value: 'February', label: 'February' },
+  { value: 'March', label: 'March' },
 ];
 
 const quarterToMonths = {
-  'apr-may-jun': ['apr', 'may', 'jun'],
-  'jul-aug-sep': ['jul', 'aug', 'sep'],
-  'oct-nov-dec': ['oct', 'nov', 'dec'],
-  'jan-feb-mar': ['jan', 'feb', 'mar'],
+  'April-May-June': ['April', 'May', 'June'],
+  'July-August-September': ['July', 'August', 'September'],
+  'October-November-December': ['October', 'November', 'December'],
+  'January-February-March': ['January', 'February', 'March'],
 };
 
 const monthLabels = {
@@ -235,7 +235,7 @@ const AnganwadiDashboard = () => {
           id: index + 1,
           food_item: data.food_item,
           field_name: data.field_name,
-          bene_category: config?.bene_category || 'N/A',
+          bene_category: data.beneficiary_category || config?.bene_category || 'N/A',
           unit: config?.unit || 'Packets',
           qty_per_ben: config?.qty_per_ben || 1,
           days_allotted: config?.days_allotted || 75,
