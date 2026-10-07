@@ -133,9 +133,15 @@ const ThrSupervisorReceiving = () => {
       console.error("Failed to fetch stock allocation data:", allocationResult.reason);
     }
     if (foodItemResult.status === "fulfilled") {
-      setFoodItemOptions(getFoodItemOptions(foodItemResult.value.data));
+      const payload = foodItemResult.value.data;
+      const options = getFoodItemOptions(payload);
+      setFoodItemOptions(options);
+      if (payload?.success === false || options.length === 0) {
+        setAllocationError("Food item mappings are unavailable; receiving rows cannot be compared.");
+      }
     } else {
       setFoodItemOptions([]);
+      setAllocationError("Failed to fetch food item mappings; receiving rows cannot be compared.");
       console.error("Failed to fetch food item allocation mappings:", foodItemResult.reason);
     }
     setLoading(false);
@@ -583,7 +589,12 @@ const ThrSupervisorReceiving = () => {
                 <tbody>
                   {currentItems.length > 0 ? (
                     currentItems.map((item, index) => {
-                      const comparison = getStockAllocationComparison(item, allocations, foodItemOptions);
+                      const comparison = getStockAllocationComparison(
+                        item,
+                        allocations,
+                        foodItemOptions,
+                        "THR"
+                      );
                       const comparisonStyle = getAllocationComparisonStyle(comparison);
                       return (
                       <tr key={item.id}>

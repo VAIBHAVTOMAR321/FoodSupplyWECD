@@ -1,59 +1,8 @@
-const allocationCategories = [
-  {
-    field: "thr_25_days_frs_hcm_beneficiaries_3y_6y",
-    matches: (foodItem) =>
-      foodItem.includes("frs") || foodItem.includes("fortifiedrationsupplement"),
-  },
-  {
-    field: "hcm_beneficiaries_3y_6y",
-    matches: (foodItem, beneCategory) =>
-      foodItem.includes("hcm") &&
-      (beneCategory.includes("3y6y") ||
-        beneCategory.includes("36y") ||
-        beneCategory.includes("36years") ||
-        !beneCategory),
-  },
-  {
-    field: "quarterly_packets_mung_dal_khichdi",
-    matches: (foodItem) =>
-      (foodItem.includes("mung") || foodItem.includes("moong")) &&
-      foodItem.includes("dal") &&
-      foodItem.includes("khichdi"),
-  },
-  {
-    field: "quarterly_packets_poushik_sattu_mix",
-    matches: (foodItem) => foodItem.includes("poushik") && foodItem.includes("sattu"),
-  },
-  {
-    field: "panjeeri_75_days_2625gm_quarterly_packets",
-    matches: (foodItem) => foodItem.includes("panjeeri") && foodItem.includes("2625"),
-  },
-  {
-    field: "panjeeri_75_days_4625gm_quarterly_packets",
-    matches: (foodItem) => foodItem.includes("panjeeri") && foodItem.includes("4625"),
-  },
-  {
-    field: "quarterly_packets_sattu_2250gm",
-    matches: (foodItem) =>
-      foodItem.includes("sattu") && foodItem.includes("2250") && !foodItem.includes("poushik"),
-  },
-  {
-    field: "quarterly_packets_mix_1000gm",
-    matches: (foodItem) =>
-      foodItem.includes("mix") && foodItem.includes("1000") && !foodItem.includes("poushik"),
-  },
-  {
-    field: "quarterly_packets_multi_grain_aata_1250gm",
-    matches: (foodItem) =>
-      (foodItem.includes("multigrain") || foodItem.includes("multigrainaata")) &&
-      (foodItem.includes("aata") || foodItem.includes("atta")),
-  },
-];
-
 const normalize = (value) =>
   String(value ?? "")
+    .normalize("NFKC")
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
+    .replace(/[\s\p{P}\p{S}]/gu, "");
 
 const months = [
   "january",
@@ -130,39 +79,35 @@ export const getFoodItemOptions = (responseData) => {
   return Array.isArray(responseData) ? responseData : [];
 };
 
-export const getStockAllocationComparison = (receiving, allocations, foodItemOptions = []) => {
+export const getStockAllocationComparison = (
+  receiving,
+  allocations,
+  foodItemOptions = [],
+  receivingType
+) => {
   if (normalize(receiving.sector_status) === "approved") return null;
 
   const foodItem = normalize(receiving.food_item);
   const beneCategory = normalize(receiving.bene_category);
   const foodItemOption = foodItemOptions.find(
-    (item) => normalize(item.food_item) === foodItem
+    (item) =>
+      normalize(item.food_item) === foodItem &&
+      normalize(item.beneficiary_category) === beneCategory &&
+      (!receivingType || normalize(item.category) === normalize(receivingType))
   );
-  const mappedField = normalize(foodItemOption?.field_name);
-  const category =
-    allocationCategories.find((item) => normalize(item.field) === mappedField) ??
-    allocationCategories.find((item) =>
-      item.matches(foodItem, beneCategory)
-    );
-  if (!category) {
-    console.log("No category found for:", { foodItem, beneCategory, mappedField });
-    return null;
-  }
+  const allocationField = foodItemOption?.field_name;
+  if (!allocationField) return null;
 
   const allocation = allocations.find(
     (item) =>
-      category.field in item &&
+      allocationField in item &&
       matchesAwc(item, receiving) &&
       matchesPeriod(item, receiving)
   );
-  if (!allocation) {
-    console.log("No matching allocation found for:", { category: category.field, receiving: { awc_name: receiving.awc_name, awc_code: receiving.awc_code, date: receiving.date, fin_year: receiving.fin_year, months: receiving.months } });
-    return null;
-  }
+  if (!allocation) return null;
 
-  const allocated = Number(allocation[category.field]);
+  const allocated = Number(allocation[allocationField]);
   const received = Number(receiving.quantity);
-  console.log("Comparison:", { foodItem: receiving.food_item, allocated, received, status: received > allocated ? "over" : received < allocated ? "under" : "exact" });
   if (!Number.isFinite(allocated) || !Number.isFinite(received)) return null;
 
   return {
