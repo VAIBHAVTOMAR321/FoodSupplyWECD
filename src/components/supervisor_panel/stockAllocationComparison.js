@@ -27,9 +27,21 @@ const normalizeMonth = (value) => {
   );
 };
 
+const getMonthValues = (value) => {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  return String(value)
+    .toLowerCase()
+    .split(/[\s,/-]+/)
+    .filter(Boolean);
+};
+
 const getReceivingMonths = (receiving) => {
-  const value = receiving.months ?? receiving.month;
-  const values = Array.isArray(value) ? value : value ? [value] : [];
+  const monthValue =
+    Array.isArray(receiving.months) && receiving.months.length
+      ? receiving.months
+      : receiving.month ?? receiving.quarter ?? receiving.months;
+  const values = getMonthValues(monthValue);
   if (values.length) return values.map(normalizeMonth).filter(Boolean);
   if (!receiving.date) return [];
   const monthNumber = Number(String(receiving.date).slice(5, 7));
@@ -114,6 +126,94 @@ export const getStockAllocationComparison = (
     status: received > allocated ? "over" : received < allocated ? "under" : "exact",
     allocated,
     received,
+  };
+};
+
+const beneficiaryAllocationFields = {
+  quarterly_packets_mung_dal_khichdi: ["hcm_beneficiaries_3y_6y"],
+  quarterly_packets_multi_grain_aata_1250gm: ["hcm_beneficiaries_3y_6y"],
+  quarterly_packets_poushik_sattu_mix: ["pregnant_women_lactating_mothers"],
+  panjeeri_75_days_2625gm_quarterly_packets: ["children_6m_3y_beneficiaries"],
+  panjeeri_75_days_4625gm_quarterly_packets: [
+    "sam_children_6m_6y",
+    "suw_children_6m_6y",
+  ],
+  quarterly_packets_sattu_2250gm: ["sam_children_3y_6y", "suw_children_3y_6y"],
+};
+
+export const getStockAllocationDistributionComparison = (
+  distribution,
+  allocations,
+  foodItemOptions = [],
+  distributionType
+) => {
+  if (normalize(distribution.sector_status) === "approved") return null;
+
+  const foodItem = normalize(distribution.food_item);
+  const beneCategory = normalize(distribution.bene_category);
+  const mapping = foodItemOptions.find(
+    (item) =>
+      normalize(item.food_item) === foodItem &&
+      normalize(item.beneficiary_category) === beneCategory &&
+      normalize(item.category) === normalize(distributionType)
+  );
+  if (!mapping?.field_name) return null;
+
+  const allocation = allocations.find(
+    (item) =>
+      mapping.field_name in item &&
+      matchesAwc(item, distribution) &&
+      matchesPeriod(item, distribution)
+  );
+  if (!allocation) return null;
+
+  const beneficiaryFields = beneficiaryAllocationFields[mapping.field_name];
+  if (
+    !beneficiaryFields ||
+    beneficiaryFields.some((field) => !(field in allocation))
+  ) {
+    return null;
+  }
+
+  const expectedQuantity = Number(allocation[mapping.field_name]);
+  const actualQuantity = Number(distribution.quantity);
+  const expectedBeneficiaries = beneficiaryFields.reduce(
+    (total, field) => total + (Number(allocation[field]) || 0),
+    0
+  );
+  const actualBeneficiaries = Number(distribution.total_beneficiaries);
+  if (
+    !Number.isFinite(expectedQuantity) ||
+    !Number.isFinite(actualQuantity) ||
+    !Number.isFinite(actualBeneficiaries)
+  ) {
+    return null;
+  }
+
+  const quantityStatus =
+    actualQuantity > expectedQuantity
+      ? "over"
+      : actualQuantity < expectedQuantity
+        ? "under"
+        : "exact";
+  const beneficiaryStatus =
+    actualBeneficiaries > expectedBeneficiaries
+      ? "over"
+      : actualBeneficiaries < expectedBeneficiaries
+        ? "under"
+        : "exact";
+  const statuses = [quantityStatus, beneficiaryStatus];
+
+  return {
+    status: statuses.includes("over")
+      ? "over"
+      : statuses.includes("under")
+        ? "under"
+        : "exact",
+    expectedQuantity,
+    actualQuantity,
+    expectedBeneficiaries,
+    actualBeneficiaries,
   };
 };
 
