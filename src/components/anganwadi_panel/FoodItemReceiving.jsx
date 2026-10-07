@@ -324,7 +324,8 @@ const FoodItemReceiving = () => {
 
       if (selectedItem) {
         autoFieldName = selectedItem.field_name || '';
-        autoBeneCategory = FOOD_BENE_CATEGORY_MAP[value] || selectedItem.bene_category || selectedItem.category || '';
+        // Use API's beneficiary_category directly, fallback to mapping for backward compatibility
+        autoBeneCategory = selectedItem.beneficiary_category || FOOD_BENE_CATEGORY_MAP[value] || selectedItem.bene_category || selectedItem.category || '';
       }
 
       // Use functional updater to get the absolute latest state for auto-filling logic
@@ -800,7 +801,7 @@ if (suppNutritionData.length > 0 && autoFieldName) {
                           {item.food_item}
                         </option>,
                         <option key={`${index}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>
-                          &nbsp;&nbsp;↳ Category: {FOOD_BENE_CATEGORY_MAP[item.food_item] || 'N/A'}
+                          &nbsp;&nbsp;↳ Category: {item.beneficiary_category || FOOD_BENE_CATEGORY_MAP[item.food_item] || 'N/A'}
                         </option>
                       ])}
                     </Form.Select>
