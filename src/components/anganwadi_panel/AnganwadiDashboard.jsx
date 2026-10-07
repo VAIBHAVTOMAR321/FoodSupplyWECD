@@ -357,20 +357,30 @@ const AnganwadiDashboard = () => {
       return;
     }
 
-    // Prevent duplicate entries for both HCM and THR
+    // Prevent duplicate entries for both HCM and THR when a month is already allotted
     const duplicate = distributionRecords.find(rec => {
       if (selectedItem.isEdit && rec.id === selectedItem.id) {
         return false;
       }
-      const recMonths = Array.isArray(rec.quarter) ? rec.quarter : quarterToMonths[rec.quarter] || [];
-      return rec.food_item === selectedFoodItemDetails.food_item &&
-             rec.fin_year === distributionData.fin_year &&
-             areSameMonthSets(recMonths, distributionData.months);
+      // Normalize record months: handle both months array and quarter string/array
+      let recMonths = [];
+      if (Array.isArray(rec.months)) {
+        recMonths = rec.months;
+      } else if (Array.isArray(rec.quarter)) {
+        recMonths = rec.quarter;
+      } else if (typeof rec.quarter === 'string') {
+        recMonths = quarterToMonths[rec.quarter] || rec.quarter.split(',').map(m => m.trim());
+      }
+      if (rec.food_item !== selectedFoodItemDetails.food_item ||
+          rec.fin_year !== distributionData.fin_year) {
+        return false;
+      }
+      // Check if any selected month is already allotted for this food item
+      return distributionData.months.some(m => recMonths.includes(m));
     });
 
     if (duplicate) {
-      const selectedMonthsLabel = formatMonths(distributionData.months);
-      setDistributionError(`"${selectedFoodItemDetails.food_item}" के लिए ${distributionData.fin_year} - ${selectedMonthsLabel} का वितरण रिकॉर्ड पहले से मौजूद है।`);
+      setDistributionError("इस माह का स्टॉक पहले ही आवंटित किया जा चुका है। कृपया इस माह के लिए दोबारा वितरण न करें।");
       setSubmitting(false);
       return;
     }

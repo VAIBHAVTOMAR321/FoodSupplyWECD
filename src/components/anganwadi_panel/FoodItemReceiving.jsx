@@ -293,7 +293,7 @@ const FoodItemReceiving = () => {
     // Safely parse and calculate payload values
     const parsedQuantity = parseFloat(formData.quantity) || 0;
     const selectedMonths = Array.isArray(formData.months) ? formData.months : [];
-    
+
     // Calculate Quarter string from selected months
     let quarterString = formData.quarter || '';
     if (selectedMonths.length > 0) {
@@ -306,6 +306,26 @@ const FoodItemReceiving = () => {
       } else {
         quarterString = selectedMonths.join(',');
       }
+    }
+
+    // Prevent duplicate receiving: same food_item + fin_year + overlapping months
+    const existingRecords = isThr ? thrReceivings : hcmReceivings;
+    const duplicate = existingRecords.find(rec => {
+      if (editingItem && rec.id === editingItem.id) {
+        return false;
+      }
+      const recMonths = getMonthsArray(rec);
+      if (rec.food_item !== formData.food_item ||
+          rec.fin_year !== (formData.fin_year || getCurrentFinancialYear())) {
+        return false;
+      }
+      return selectedMonths.some(m => recMonths.includes(m));
+    });
+
+    if (duplicate) {
+      setFormError("इस माह का प्राप्ति रिकॉर्ड पहले ही दर्ज है।");
+      setSubmitting(false);
+      return;
     }
 
     // Construct a clean payload explicitly to avoid backend schema rejection
