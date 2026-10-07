@@ -1,6 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Container, Spinner, Table } from "react-bootstrap";
-import { FaBoxes } from "react-icons/fa";
+import {
+  Alert,
+  Container,
+  Spinner,
+  Table,
+  Row,
+  Col,
+  Form,
+  Dropdown,
+  Button,
+  InputGroup,
+} from "react-bootstrap";
+import { FaBoxes, FaSearch } from "react-icons/fa";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dashboard.css";
 import SupervisorLeftNav from "./SupervisorLeftNav";
@@ -23,6 +34,12 @@ const StockAllocation = () => {
   const [allocations, setAllocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [filters, setFilters] = useState({
+    awc_name: [],
+    awc_code: [],
+    month: [],
+  });
 
   const fetchStockAllocation = useCallback(async () => {
     if (!api) return;
@@ -63,15 +80,63 @@ const StockAllocation = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const uniqueValues = useMemo(() => {
+    const values = {
+      awc_name: [...new Set(allocations.map((item) => item.awc_name).filter(Boolean))].sort(),
+      awc_code: [...new Set(allocations.map((item) => item.awc_code).filter(Boolean))].sort(),
+      month: [...new Set(allocations.map((item) => item.month).filter(Boolean))].sort(),
+    };
+    return values;
+  }, [allocations]);
+
+  const handleMultiSelectChange = (filterName, value) => {
+    setFilters((prevFilters) => {
+      const currentValues = prevFilters[filterName];
+      if (currentValues.includes(value)) {
+        return { ...prevFilters, [filterName]: currentValues.filter((v) => v !== value) };
+      } else {
+        return { ...prevFilters, [filterName]: [...currentValues, value] };
+      }
+    });
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchText(e.target.value);
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      awc_name: [],
+      awc_code: [],
+      month: [],
+    });
+    setSearchText("");
+  };
+
+  const filteredAllocations = useMemo(() => {
+    return allocations.filter((item) => {
+      const searchMatch =
+        !searchText ||
+        (item.awc_name && String(item.awc_name).toLowerCase().includes(searchText.toLowerCase())) ||
+        (item.awc_code && String(item.awc_code).toLowerCase().includes(searchText.toLowerCase()));
+
+      const awcNameMatch = filters.awc_name.length === 0 || filters.awc_name.includes(String(item.awc_name));
+      const awcCodeMatch = filters.awc_code.length === 0 || filters.awc_code.includes(String(item.awc_code));
+      const monthMatch = filters.month.length === 0 || filters.month.includes(String(item.month));
+
+      return searchMatch && awcNameMatch && awcCodeMatch && monthMatch;
+    });
+  }, [allocations, filters, searchText]);
+
   const columns = useMemo(() => {
     const fields = new Set();
-    allocations.forEach((item) => {
+    filteredAllocations.forEach((item) => {
       Object.keys(item).forEach((field) => {
         if (!excludedFields.has(field)) fields.add(field);
       });
     });
     return [...fields];
-  }, [allocations]);
+  }, [filteredAllocations]);
 
   const formatHeader = (field) =>
     field
@@ -95,6 +160,83 @@ const StockAllocation = () => {
             <FaBoxes className="me-2" /> Stock Allocation
           </h3>
           {error && <Alert variant="danger">{error}</Alert>}
+
+          <Row className="mb-3 g-2 align-items-center">
+            <Col md={3}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                  {filters.awc_name.length ? `${filters.awc_name.length} selected` : "All AWC Names"}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
+                  {uniqueValues.awc_name.map((v) => (
+                    <Dropdown.Item key={v} as="div">
+                      <Form.Check
+                        type="checkbox"
+                        label={v}
+                        checked={filters.awc_name.includes(v)}
+                        onChange={() => handleMultiSelectChange("awc_name", v)}
+                      />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={3}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                  {filters.awc_code.length ? `${filters.awc_code.length} selected` : "All AWC Codes"}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
+                  {uniqueValues.awc_code.map((v) => (
+                    <Dropdown.Item key={v} as="div">
+                      <Form.Check
+                        type="checkbox"
+                        label={v}
+                        checked={filters.awc_code.includes(v)}
+                        onChange={() => handleMultiSelectChange("awc_code", v)}
+                      />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={3}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">
+                  {filters.month.length ? `${filters.month.length} selected` : "All Months"}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
+                  {uniqueValues.month.map((v) => (
+                    <Dropdown.Item key={v} as="div">
+                      <Form.Check
+                        type="checkbox"
+                        label={v}
+                        checked={filters.month.includes(v)}
+                        onChange={() => handleMultiSelectChange("month", v)}
+                      />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={3}>
+              <InputGroup>
+                <InputGroup.Text><FaSearch /></InputGroup.Text>
+                <Form.Control
+                  type="text"
+                  placeholder="Search by AWC Name or Code"
+                  value={searchText}
+                  onChange={handleSearchChange}
+                />
+              </InputGroup>
+            </Col>
+            <Col xs="auto">
+              <Button variant="secondary" onClick={resetFilters}>
+                Reset Filters
+              </Button>
+            </Col>
+          </Row>
+
           {loading ? (
             <div className="text-center p-4"><Spinner animation="border" role="status" /></div>
           ) : (
@@ -104,7 +246,7 @@ const StockAllocation = () => {
                   <tr>{columns.map((field) => <th key={field}>{formatHeader(field)}</th>)}</tr>
                 </thead>
                 <tbody>
-                  {allocations.length ? allocations.map((allocation, index) => {
+                  {filteredAllocations.length ? filteredAllocations.map((allocation, index) => {
                     return (
                       <tr key={`${allocation.awc_code || allocation.awc_name || "allocation"}-${allocation.month || ""}-${index}`}>
                         {columns.map((field) => (
