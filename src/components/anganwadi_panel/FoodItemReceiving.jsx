@@ -46,9 +46,62 @@ const quarterToMonths = {
 };
 
 const monthLabels = monthOptions.reduce((acc, month) => {
-  acc[month.value] = month.label;
-  return acc;
-}, {});
+    acc[month.value] = month.label;
+    return acc;
+  }, {});
+
+// Build a reverse lookup: label (lowercase) -> value, plus numeric/month-name fallbacks
+const monthLabelToValue = {};
+monthOptions.forEach(m => {
+    monthLabelToValue[m.label.toLowerCase()] = m.value;
+    monthLabelToValue[m.value.toLowerCase()] = m.value;
+});
+// Add common Hindi/other month name mappings if needed
+const normalizeMonthKey = (raw) => {
+    if (raw === undefined || raw === null) return null;
+    const str = String(raw).trim().toLowerCase();
+    if (!str) return null;
+    // Direct value match (apr, may, etc.)
+    if (monthLabelToValue[str]) return monthLabelToValue[str];
+    // Try matching against labels (april, may, etc.)
+    if (monthLabelToValue[str]) return monthLabelToValue[str];
+    // Try partial match (e.g., "month:4" or "4")
+    const found = monthOptions.find(m =>
+      m.value === str || m.label.toLowerCase() === str ||
+      m.label.toLowerCase().startsWith(str) || str.startsWith(m.label.toLowerCase())
+    );
+    return found ? found.value : null;
+};
+
+// Helper to safely parse months regardless of backend format
+const getMonthsArray = (item) => {
+    if (!item) return [];
+    // Direct months array
+    if (Array.isArray(item.months)) {
+      return item.months.map(m => normalizeMonthKey(m)).filter(Boolean);
+    }
+    // months as string (JSON or comma-separated)
+    if (typeof item.months === 'string' && item.months) {
+      try {
+        const parsed = JSON.parse(item.months);
+        if (Array.isArray(parsed)) return parsed.map(m => normalizeMonthKey(m)).filter(Boolean);
+      } catch (e) {
+        /* ignore, fall through */
+      }
+      return item.months.split(',').map(m => normalizeMonthKey(m)).filter(Boolean);
+    }
+    // quarter as array
+    if (Array.isArray(item.quarter)) {
+      return item.quarter.map(m => normalizeMonthKey(m)).filter(Boolean);
+    }
+    // quarter as string - map via quarterToMonths
+    if (typeof item.quarter === 'string' && item.quarter) {
+      if (quarterToMonths[item.quarter]) return quarterToMonths[item.quarter];
+      // Could be comma-separated month keys
+      return item.quarter.split(',').map(m => normalizeMonthKey(m)).filter(Boolean);
+    }
+    return [];
+};
 
 // ✅ Shared mapping for Beneficiary Categories
 const FOOD_BENE_CATEGORY_MAP = {
@@ -64,21 +117,28 @@ const formatMonths = (months = []) => {
   return months.map((month) => monthLabels[month] || month).join(', ');
 };
 
-// Helper to safely parse months regardless of backend format
-const getMonthsArray = (item) => {
-  if (Array.isArray(item.months)) return item.months;
-  if (typeof item.months === 'string' && item.months) {
-    try {
-      const parsed = JSON.parse(item.months);
-      if (Array.isArray(parsed)) return parsed;
-      return item.months.split(',').map(m => m.trim());
-    } catch (e) {
-      return item.months.split(',').map(m => m.trim());
-    }
+// Normalize a supp nutrition record's month field into a single month key
+const normalizeSuppMonth = (rawMonth) => {
+  if (!rawMonth) return '';
+  // Handle numeric month (1-12)
+  if (typeof rawMonth === 'number' && rawMonth >= 1 && rawMonth <= 12) {
+    return monthOptions[rawMonth - 1].value;
   }
-  if (Array.isArray(item.quarter)) return item.quarter;
-  if (typeof item.quarter === 'string' && quarterToMonths[item.quarter]) return quarterToMonths[item.quarter];
-  return [];
+  // Handle string month
+  const str = String(rawMonth).trim();
+  if (!str) return '';
+  // Try direct value match
+  const direct = monthOptions.find(m => m.value === str.toLowerCase());
+  if (direct) return direct.value;
+  // Try label match (case-insensitive)
+  const byLabel = monthOptions.find(m => m.label.toLowerCase() === str.toLowerCase());
+  if (byLabel) return byLabel.value;
+  // Try partial match
+  const partial = monthOptions.find(m =>
+    m.value.toLowerCase().includes(str.toLowerCase()) ||
+    m.label.toLowerCase().includes(str.toLowerCase())
+  );
+  return partial ? partial.value : str.toLowerCase();
 };
 
 const FoodItemReceiving = () => {
@@ -112,15 +172,9 @@ const FoodItemReceiving = () => {
   });
 
   const availableMonthsFromSupp = useMemo(() => {
-    const months = new Set();
-    suppNutritionData.forEach(rec => {
-      if (rec.month) {
-        const monthLower = rec.month.toLowerCase();
-        const match = monthOptions.find(m => m.value === monthLower || m.label.toLowerCase() === monthLower);
-        if (match) months.add(match.value);
-      }
-    });
-    return Array.from(months);
+    // Return all months always - supp nutrition data is used only for auto-filling,
+    // not for restricting which months can be selected for receiving
+    return monthOptions.map(m => m.value);
   }, [suppNutritionData]);
 
   const fetchData = async () => {
@@ -144,7 +198,16 @@ const FoodItemReceiving = () => {
 
       setHcmReceivings(hcmData);
       setThrReceivings(thrData);
-      setSuppNutritionData(suppData);
+      // Normalize supp nutrition data: handle different response shapes
+      const normalizedSupp = Array.isArray(suppData)
+        ? suppData
+        : (suppData.food_data || suppResp.data?.results || []);
+      // Normalize month field on each record for consistent downstream usage
+      const normalizedSuppWithMonths = normalizedSupp.map(rec => ({
+        ...rec,
+        _monthKeys: normalizeSuppMonth(rec.month),
+      }));
+      setSuppNutritionData(normalizedSuppWithMonths);
       setFoodItemOptions(foodData);
 
       setUniqueFilterOptions({
@@ -255,19 +318,23 @@ const FoodItemReceiving = () => {
 
       // Use functional updater to get the absolute latest state for auto-filling logic
       setFormData(prev => {
-        if (suppNutritionData.length > 0 && autoFieldName) {
-          const matchingRecord = suppNutritionData.find(rec => {
-            const matchesYear = prev.fin_year ? rec.financial_year === prev.fin_year : true;
-            const matchesMonth = prev.months && prev.months.length > 0
-              ? prev.months.some(m => rec.month && rec.month.toLowerCase().includes(m))
-              : true;
-            return matchesYear && matchesMonth;
-          }) || suppNutritionData[0];
+if (suppNutritionData.length > 0 && autoFieldName) {
+            const matchingRecord = suppNutritionData.find(rec => {
+              const matchesYear = prev.fin_year ? rec.financial_year === prev.fin_year : true;
+              const matchesMonth = prev.months && prev.months.length > 0
+                ? prev.months.some(m => {
+                    if (!m) return false;
+                    const recMonthKey = rec._monthKeys || (rec.month ? normalizeMonthKey(rec.month) : '');
+                    return recMonthKey === m || (rec.month && String(rec.month).toLowerCase().includes(String(m).toLowerCase()));
+                  })
+                : true;
+              return matchesYear && matchesMonth;
+            }) || suppNutritionData[0];
 
-          if (matchingRecord) {
-            autoQuantity = matchingRecord[autoFieldName] || '';
+            if (matchingRecord) {
+              autoQuantity = matchingRecord[autoFieldName] || '';
+            }
           }
-        }
 
         return {
           ...prev,
@@ -838,9 +905,9 @@ const FoodItemReceiving = () => {
                           );
                         })}
                       </div>
-                      {!availableMonthsFromSupp.length && (
-                        <small className="text-muted">No months available in Supplementary Nutrition data</small>
-                      )}
+{availableMonthsFromSupp.length === 0 && (
+                      <small className="text-muted">No months available in Supplementary Nutrition data</small>
+                    )}
                     </Form.Group>
                   </Col>
                 </>
