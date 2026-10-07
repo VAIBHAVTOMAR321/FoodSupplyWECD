@@ -322,7 +322,7 @@ const FoodItemReceiving = () => {
     return foodItemOptions.filter(item => item.category === tabCategory);
   }, [foodItemOptions, activeTab]);
 
-  const handleFormChange = (e) => {
+const handleFormChange = (e) => {
     const { name, value } = e.target;
 
     if (name === 'food_item') {
@@ -331,6 +331,7 @@ const FoodItemReceiving = () => {
       let autoQuantity = '';
       let autoFieldName = '';
       let autoBeneCategory = '';
+      let autoMonths = [];
 
       if (selectedItem) {
         autoFieldName = selectedItem.field_name || '';
@@ -340,23 +341,30 @@ const FoodItemReceiving = () => {
 
       // Use functional updater to get the absolute latest state for auto-filling logic
       setFormData(prev => {
-if (suppNutritionData.length > 0 && autoFieldName) {
-            const matchingRecord = suppNutritionData.find(rec => {
-              const matchesYear = prev.fin_year ? rec.financial_year === prev.fin_year : true;
-              const matchesMonth = prev.months && prev.months.length > 0
-                ? prev.months.some(m => {
-                    if (!m) return false;
-                    const recMonthKey = rec._monthKeys || (rec.month ? normalizeMonthKey(rec.month) : '');
-                    return recMonthKey === m || (rec.month && String(rec.month).toLowerCase().includes(String(m).toLowerCase()));
-                  })
-                : true;
-              return matchesYear && matchesMonth;
-            }) || suppNutritionData[0];
+        if (suppNutritionData.length > 0 && autoFieldName) {
+          const matchingRecord = suppNutritionData.find(rec => {
+            const matchesYear = prev.fin_year ? rec.financial_year === prev.fin_year : true;
+            const matchesMonth = prev.months && prev.months.length > 0
+              ? prev.months.some(m => {
+                  if (!m) return false;
+                  const recMonthKey = rec._monthKeys || (rec.month ? normalizeMonthKey(rec.month) : '');
+                  return recMonthKey === m || (rec.month && String(rec.month).toLowerCase().includes(String(m).toLowerCase()));
+                })
+              : true;
+            return matchesYear && matchesMonth;
+          }) || suppNutritionData[0];
 
-            if (matchingRecord) {
-              autoQuantity = matchingRecord[autoFieldName] || '';
+          if (matchingRecord) {
+            autoQuantity = matchingRecord[autoFieldName] || '';
+            // Auto-select months from the matching supplementary nutrition record
+            if (matchingRecord._monthKeys) {
+              autoMonths = [matchingRecord._monthKeys];
+            } else if (matchingRecord.month) {
+              const normalized = normalizeSuppMonth(matchingRecord.month);
+              if (normalized) autoMonths = [normalized];
             }
           }
+        }
 
         return {
           ...prev,
@@ -364,7 +372,9 @@ if (suppNutritionData.length > 0 && autoFieldName) {
           field_name: autoFieldName,
           unit: autoUnit,
           quantity: autoQuantity,
-          bene_category: autoBeneCategory
+          bene_category: autoBeneCategory,
+          months: autoMonths,
+          quarter: autoMonths.length > 0 ? (quarterToMonths[Object.keys(quarterToMonths).find(q => quarterToMonths[q].includes(autoMonths[0]))] || autoMonths.join(',')) : ''
         };
       });
     } else {
