@@ -172,20 +172,9 @@ const FoodItemReceiving = () => {
   });
 
   const availableMonthsFromSupp = useMemo(() => {
-    // Get unique months from supplementary nutrition data
-    const monthsFromData = new Set();
-    suppNutritionData.forEach(rec => {
-      if (rec._monthKeys) {
-        monthsFromData.add(rec._monthKeys);
-      } else if (rec.month) {
-        const normalized = normalizeSuppMonth(rec.month);
-        if (normalized) monthsFromData.add(normalized);
-      }
-    });
-    // Return sorted months based on monthOptions order
-    return monthOptions
-      .filter(m => monthsFromData.has(m.value))
-      .map(m => m.value);
+    // Return all months always - supp nutrition data is used only for auto-filling,
+    // not for restricting which months can be selected for receiving
+    return monthOptions.map(m => m.value);
   }, [suppNutritionData]);
 
   const fetchData = async () => {
@@ -842,7 +831,6 @@ if (suppNutritionData.length > 0 && autoFieldName) {
                       onChange={handleFormChange}
                       placeholder="Enter Beneficiary Category"
                       required
-                      disabled
                     />
                   </Form.Group>
                 </Col>
@@ -974,7 +962,6 @@ if (suppNutritionData.length > 0 && autoFieldName) {
             </Modal.Footer>
           </Modal>
         )}
-        
       </div>
     </div>
   );
