@@ -10,23 +10,24 @@ import "../../assets/css/dashboard.css";
 import { FaUtensils, FaBoxOpen, FaChevronDown, FaChevronUp, FaDolly, FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUsers, FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes, FaProjectDiagram, FaInfoCircle, FaClock } from "react-icons/fa";
 import "../../assets/css/AnganwadiDashboard.css";
 
-// ✅ Same API URLs as used in FoodReceiving (supplementary-nutrition-anganwadi/ included)
+//  Same API URLs as used in FoodReceiving (supplementary-nutrition-anganwadi/ included)
 const API_URLS = {
   categoryandfooditem: "/categoryandfooditem/",
   hcm_distribution: "/hcm-anganwadi-distribution/",
   thr_distribution: "/thr-anganwadi-distribution/",
   hcm_receiving: "/hcm-anganwadi-receiving/",
   thr_receiving: "/thr-anganwadi-receiving/",
-  supp_nutrition: "/supplementary-nutrition-anganwadi/",   // ✅ added for auto-fill
+  supp_nutrition: "/supplementary-nutrition-anganwadi/",   // added for auto-fill
 };
 
 // Configuration to map API field_name to required properties
+// Updated to English names to exactly match FoodItemReceiving
 const supplementaryFoodConfig = [
-  { key: 'quarterly_packets_mung_dal_khichdi', bene_category: "6 माह से 3 वर्ष के सामान्य बच्चे", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
-  { key: 'quarterly_packets_poushik_sattu_mix', bene_category: "6 माह से 3 वर्ष के सामान्य बच्चे", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
-  { key: 'panjeeri_75_days_4625gm_quarterly_packets', bene_category: "3 वर्ष से 5 वर्ष के अतिकुपोषित बच्चे (अतिरिक्त THR हेतु)", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
-  { key: 'quarterly_packets_sattu_2250gm', bene_category: "3 वर्ष से 6 वर्ष के गंभीर कम वजन वाले बच्चे (अतिरिक्त THR हेतु)", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
-  { key: 'quarterly_packets_multi_grain_aata_1250gm', bene_category: "गर्भवती एवं धात्री महिलायें", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
+  { key: 'quarterly_packets_mung_dal_khichdi', bene_category: "Children (3-6y)", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
+  { key: 'quarterly_packets_poushik_sattu_mix', bene_category: "Pregnant Women & Lactating Mothers", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
+  { key: 'panjeeri_75_days_4625gm_quarterly_packets', bene_category: "Children (6m-3y)", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
+  { key: 'quarterly_packets_sattu_2250gm', bene_category: "Children (6m-3y)", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
+  { key: 'quarterly_packets_multi_grain_aata_1250gm', bene_category: "Children (3-6y)", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
 ];
 
 const getCurrentFinancialYear = () => {
@@ -97,7 +98,7 @@ const AnganwadiDashboard = () => {
   const [foodItems, setFoodItems] = useState([]);
   const [distributionRecords, setDistributionRecords] = useState([]);
   const [receivedMonths, setReceivedMonths] = useState([]);
-  // ✅ Supplementary nutrition data (used for auto-filling Total Beneficiaries)
+  //  Supplementary nutrition data (used for auto-filling Total Beneficiaries)
   const [suppNutritionData, setSuppNutritionData] = useState([]);
 
   const [showDistributionModal, setShowDistributionModal] = useState(false);
@@ -107,7 +108,7 @@ const AnganwadiDashboard = () => {
     fin_year: '', 
     months: [], 
     food_item_id: '',
-    date: new Date().toISOString().split('T')[0] // ✅ Added Date to state
+    date: new Date().toISOString().split('T')[0] //  Added Date to state
   });
   const [distributionError, setDistributionError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -162,7 +163,7 @@ const AnganwadiDashboard = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  // ✅ Helper: compute auto Total Beneficiaries from supplementary nutrition data
+  //  Helper: compute auto Total Beneficiaries from supplementary nutrition data
   const computeAutoTotalBeneficiaries = (foodItemObj, finYear, months) => {
     if (!foodItemObj || !suppNutritionData || suppNutritionData.length === 0) return '';
 
@@ -303,7 +304,7 @@ const AnganwadiDashboard = () => {
         fin_year: getCurrentFinancialYear(),
         months: [],
         food_item_id: '',
-        date: new Date().toISOString().split('T')[0], // ✅ Include Date
+        date: new Date().toISOString().split('T')[0], //  Include Date
       });
     }
 
@@ -348,7 +349,7 @@ const AnganwadiDashboard = () => {
       return;
     }
 
-    // ✅ Prevent selecting months for which receiving is not done
+    //  Prevent selecting months for which receiving is not done
     const unreceivedMonths = distributionData.months.filter(m => !receivedMonths.includes(m));
     if (unreceivedMonths.length > 0) {
       setDistributionError(`त्रुटि: ${formatMonths(unreceivedMonths)} के लिए रिसीविंग (Receiving) पंजीकृत नहीं है। कृपया पहले रिसीविंग दर्ज करें।`);
@@ -377,7 +378,7 @@ const AnganwadiDashboard = () => {
     const isEdit = selectedItem.isEdit;
     const calculatedQuantity = parseFloat(selectedFoodItemDetails.qty_per_ben) * parseInt(distributionData.total_beneficiaries, 10);
 
-    // ✅ Calculate Quarter string properly to avoid Bad Request
+    //  Calculate Quarter string properly to avoid Bad Request
     const selectedMonths = Array.isArray(distributionData.months) ? distributionData.months : [];
     let quarterString = '';
     if (selectedMonths.length > 0) {
@@ -392,7 +393,7 @@ const AnganwadiDashboard = () => {
       }
     }
 
-    // ✅ Construct a clean payload with 'date' included
+    //  Construct a clean payload with 'date' included
     let payload = {
       food_item: selectedFoodItemDetails.food_item,
       total_beneficiaries: parseInt(distributionData.total_beneficiaries, 10),
@@ -421,7 +422,7 @@ const AnganwadiDashboard = () => {
     } catch (err) {
       console.error("API Error:", err.response?.data || err);
       
-      // ✅ Extract and display exact backend validation errors
+      // Extract and display exact backend validation errors
       let errorMessage = `वितरण ${isEdit ? 'अपडेट' : 'रिकॉर्ड'} करने में विफल। कृपया पुन: प्रयास करें।`;
       if (err.response && err.response.data) {
         const errorData = err.response.data;
@@ -726,7 +727,7 @@ const AnganwadiDashboard = () => {
                             id={`month-${month.value}`}
                             label={month.label}
                             checked={checked}
-                            // ✅ If user selects an unreceived month, show error and prevent checking
+                            //  If user selects an unreceived month, show error and prevent checking
                             onChange={(e) => {
                               if (e.target.checked && !isReceived) {
                                 setDistributionError(`त्रुटि: ${month.label} महीने के लिए रिसीविंग (Receiving) पंजीकृत नहीं है। कृपया पहले रिसीविंग दर्ज करें।`);

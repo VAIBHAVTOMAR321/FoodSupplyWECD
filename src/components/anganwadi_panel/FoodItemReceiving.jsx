@@ -50,6 +50,15 @@ const monthLabels = monthOptions.reduce((acc, month) => {
   return acc;
 }, {});
 
+// ✅ Shared mapping for Beneficiary Categories
+const FOOD_BENE_CATEGORY_MAP = {
+  'पौष्टिक सत्तू मिक्स': 'Pregnant Women & Lactating Mothers',
+  'पंजीरी': 'Children (6m-3y)',
+  'सत्तू': 'Children (6m-3y)',
+  'मूंग दाल खिचड़ी मिक्स': 'Children (3-6y)',
+  'मल्टीग्रेन आटा': 'Children (3-6y)',
+};
+
 const formatMonths = (months = []) => {
   if (!Array.isArray(months)) return '';
   return months.map((month) => monthLabels[month] || month).join(', ');
@@ -239,17 +248,9 @@ const FoodItemReceiving = () => {
       let autoFieldName = '';
       let autoBeneCategory = '';
 
-      const beneCategoryMap = {
-        'पौष्टिक सत्तू मिक्स': 'Pregnant Women & Lactating Mothers',
-        'पंजीरी': 'Children (6m-3y)',
-        'सत्तू': 'Children (6m-3y)',
-        'मूंग दाल खिचड़ी मिक्स': 'Children (3-6y)',
-        'मल्टीग्रेन आटा': 'Children (3-6y)',
-      };
-
       if (selectedItem) {
         autoFieldName = selectedItem.field_name || '';
-        autoBeneCategory = beneCategoryMap[value] || selectedItem.bene_category || selectedItem.category || '';
+        autoBeneCategory = FOOD_BENE_CATEGORY_MAP[value] || selectedItem.bene_category || selectedItem.category || '';
       }
 
       // Use functional updater to get the absolute latest state for auto-filling logic
@@ -695,11 +696,15 @@ const FoodItemReceiving = () => {
                       required
                     >
                       <option value="">Select Quarterly Packets Distribution</option>
-                      {availableFoodItems.map((item, index) => (
-                        <option key={index} value={item.food_item}>
+                      {/* ✅ Updated Dropdown UI to match AnganwadiDashboard modal style */}
+                      {availableFoodItems.map((item, index) => [
+                        <option key={index} value={item.food_item} style={{ fontWeight: 'bold' }}>
                           {item.food_item}
+                        </option>,
+                        <option key={`${index}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>
+                          &nbsp;&nbsp;↳ Category: {FOOD_BENE_CATEGORY_MAP[item.food_item] || 'N/A'}
                         </option>
-                      ))}
+                      ])}
                     </Form.Select>
                   </Form.Group>
                 </Col>
