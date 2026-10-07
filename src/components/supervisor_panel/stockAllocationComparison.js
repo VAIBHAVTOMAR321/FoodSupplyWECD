@@ -144,7 +144,10 @@ export const getStockAllocationComparison = (receiving, allocations, foodItemOpt
     allocationCategories.find((item) =>
       item.matches(foodItem, beneCategory)
     );
-  if (!category) return null;
+  if (!category) {
+    console.log("No category found for:", { foodItem, beneCategory, mappedField });
+    return null;
+  }
 
   const allocation = allocations.find(
     (item) =>
@@ -152,10 +155,14 @@ export const getStockAllocationComparison = (receiving, allocations, foodItemOpt
       matchesAwc(item, receiving) &&
       matchesPeriod(item, receiving)
   );
-  if (!allocation) return null;
+  if (!allocation) {
+    console.log("No matching allocation found for:", { category: category.field, receiving: { awc_name: receiving.awc_name, awc_code: receiving.awc_code, date: receiving.date, fin_year: receiving.fin_year, months: receiving.months } });
+    return null;
+  }
 
   const allocated = Number(allocation[category.field]);
   const received = Number(receiving.quantity);
+  console.log("Comparison:", { foodItem: receiving.food_item, allocated, received, status: received > allocated ? "over" : received < allocated ? "under" : "exact" });
   if (!Number.isFinite(allocated) || !Number.isFinite(received)) return null;
 
   return {
