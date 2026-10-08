@@ -68,6 +68,25 @@ const monthLabels = {
   oct: 'October', nov: 'November', dec: 'December', jan: 'January', feb: 'February', mar: 'March',
 };
 
+// Normalize a supp nutrition record's month field into a single month key
+const normalizeSuppMonth = (rawMonth) => {
+  if (!rawMonth) return '';
+  if (typeof rawMonth === 'number' && rawMonth >= 1 && rawMonth <= 12) {
+    return monthOptions[rawMonth - 1].value;
+  }
+  const str = String(rawMonth).trim();
+  if (!str) return '';
+  const direct = monthOptions.find(m => m.value === str.toLowerCase());
+  if (direct) return direct.value;
+  const byLabel = monthOptions.find(m => m.label.toLowerCase() === str.toLowerCase());
+  if (byLabel) return byLabel.value;
+  const partial = monthOptions.find(m =>
+    m.value.toLowerCase().includes(str.toLowerCase()) ||
+    m.label.toLowerCase().includes(str.toLowerCase())
+  );
+  return partial ? partial.value : str.toLowerCase();
+};
+
 const formatMonths = (monthsOrQuarter) => {
   if (Array.isArray(monthsOrQuarter)) {
     return monthsOrQuarter.map((m) => monthLabels[m] || m).join(', ');
@@ -273,7 +292,12 @@ const AnganwadiDashboard = () => {
 
       const suppData = suppResponse.data || [];
       const normalizedSupp = Array.isArray(suppData) ? suppData : (suppData.food_data || []);
-      setSuppNutritionData(normalizedSupp);
+      // Normalize month field on each record for consistent downstream usage
+      const normalizedSuppWithMonths = normalizedSupp.map(rec => ({
+        ...rec,
+        _monthKeys: normalizeSuppMonth(rec.month),
+      }));
+      setSuppNutritionData(normalizedSuppWithMonths);
 
       setFoodItems(mappedFoodItems);
       setDistributionRecords(distributionsResponse.data);
@@ -291,7 +315,7 @@ const AnganwadiDashboard = () => {
       modalItem = { scheme, isNew: true };
     } else if (existingRecord) {
       const fullFoodItem = foodItems.find(fi => fi.food_item === existingRecord.food_item);
-      modalItem = { ...fullFoodItem, ...existingRecord, scheme, isEdit: true };
+      modalItem = { ...fullFoodItem, ...existingRecord, scheme, isEdit: true, recordId: existingRecord.id };
     } else {
       modalItem = { ...item, scheme };
     }
@@ -376,7 +400,7 @@ const AnganwadiDashboard = () => {
 
     // Prevent duplicate entries for both HCM and THR when a month is already allotted
     const duplicate = distributionRecords.find(rec => {
-      if (selectedItem.isEdit && rec.id === selectedItem.id) {
+      if (selectedItem.isEdit && rec.id === selectedItem.recordId) {
         return false;
       }
       // Normalize record months: handle both months array and quarter string/array
@@ -388,13 +412,26 @@ const AnganwadiDashboard = () => {
       } else if (typeof rec.quarter === 'string') {
         recMonths = quarterToMonths[rec.quarter] || rec.quarter.split(',').map(m => m.trim());
       }
-      if (rec.food_item !== selectedFoodItemDetails.food_item ||
-          rec.fin_year !== distributionData.fin_year ||
-          rec.bene_category !== selectedFoodItemDetails.bene_category) {
+      // Compare with case-insensitive trim for safety
+      const recFoodItem = (rec.food_item || '').trim().toLowerCase();
+      const selFoodItem = (selectedFoodItemDetails.food_item || '').trim().toLowerCase();
+      const recFinYear = (rec.fin_year || '').trim();
+      const selFinYear = (distributionData.fin_year || '').trim();
+      const recBeneCat = (rec.bene_category || '').trim().toLowerCase();
+      const selBeneCat = (selectedFoodItemDetails.bene_category || '').trim().toLowerCase();
+      
+      if (recFoodItem !== selFoodItem ||
+          recFinYear !== selFinYear ||
+          recBeneCat !== selBeneCat) {
         return false;
       }
+      // Normalize months for comparison
+      const normalizeMonth = (m) => (m || '').trim().toLowerCase();
+      const normRecMonths = recMonths.map(normalizeMonth);
+      const normSelMonths = (distributionData.months || []).map(normalizeMonth);
+      
       // Check if any selected month is already allotted for this food item + beneficiary category
-      return distributionData.months.some(m => recMonths.includes(m));
+      return normSelMonths.some(m => normRecMonths.includes(m));
     });
 
     if (duplicate) {
@@ -436,7 +473,7 @@ const AnganwadiDashboard = () => {
     };
 
     if (isEdit) {
-      payload.id = selectedItem.id;
+      payload.id = selectedItem.recordId;
     }
 
     const url = activeScheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution;
@@ -575,6 +612,7 @@ const AnganwadiDashboard = () => {
                       <tr>
                         <th>#</th>
                         <th>Food Item</th>
+                        <th>Beneficiary Category</th>
                         <th>Date</th>
                         <th>Month</th>
                         <th>Year</th>
@@ -589,6 +627,7 @@ const AnganwadiDashboard = () => {
                         <tr key={record.id}>
                           <td>{index + 1}</td>
                           <td>{record.food_item}</td>
+                          <td>{record.bene_category || '-'}</td>
                           <td>{record.date ? new Date(record.date).toLocaleDateString() : '-'}</td>
                           <td>{formatMonths(record.months || record.quarter)}</td>
                           <td>{record.fin_year}</td>
