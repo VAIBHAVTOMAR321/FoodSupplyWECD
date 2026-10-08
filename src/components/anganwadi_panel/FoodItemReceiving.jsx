@@ -285,15 +285,26 @@ const FoodItemReceiving = () => {
     setEditingItem(item);
     if (item) {
       const parsedMonths = getMonthsArray(item);
+      // Match the exact food item entry: the same food item name can exist
+      // for multiple beneficiary categories
+      const optionMatch = foodItemOptions.find(opt =>
+        opt.food_item === item.food_item &&
+        String(opt.beneficiary_category || FOOD_BENE_CATEGORY_MAP[opt.food_item] || '') ===
+        String(item.bene_category || '')
+      );
+      const foodItemValue = (optionMatch && item.bene_category)
+        ? `${item.food_item}|||${item.bene_category}`
+        : item.food_item;
       setFormData({
         ...item,
         date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
         months: parsedMonths,
-        quarter: item.quarter || ''
+        quarter: item.quarter || '',
+        food_item_value: foodItemValue,
       });
     } else {
       setFormData({
-        food_item: '', quantity: '', bene_category: '', unit: '',
+        food_item: '', food_item_value: '', quantity: '', bene_category: '', unit: '',
         date: new Date().toISOString().split('T')[0],
         fin_year: getCurrentFinancialYear(), months: [], quarter: ''
       });
@@ -326,7 +337,15 @@ const handleFormChange = (e) => {
     const { name, value } = e.target;
 
     if (name === 'food_item') {
-      const selectedItem = foodItemOptions.find(item => item.food_item === value);
+      // Value may be "food_item|||beneficiary_category" so the same food item
+      // can be received for a different beneficiary category in the same month
+      const [selectedFoodItem, selectedBeneCategory] = value.split('|||');
+      const selectedItem = foodItemOptions.find(item =>
+        item.food_item === selectedFoodItem &&
+        (selectedBeneCategory
+          ? String(item.beneficiary_category || FOOD_BENE_CATEGORY_MAP[item.food_item] || '') === selectedBeneCategory
+          : true)
+      );
       let autoUnit = 'Packets';
       let autoQuantity = '';
       let autoFieldName = '';
@@ -336,7 +355,7 @@ const handleFormChange = (e) => {
       if (selectedItem) {
         autoFieldName = selectedItem.field_name || '';
         // Use API's beneficiary_category directly, fallback to mapping for backward compatibility
-        autoBeneCategory = selectedItem.beneficiary_category || FOOD_BENE_CATEGORY_MAP[value] || selectedItem.bene_category || selectedItem.category || '';
+        autoBeneCategory = selectedItem.beneficiary_category || FOOD_BENE_CATEGORY_MAP[selectedFoodItem] || selectedItem.bene_category || selectedItem.category || '';
       }
 
       // Use functional updater to get the absolute latest state for auto-filling logic
@@ -368,7 +387,8 @@ const handleFormChange = (e) => {
 
         return {
           ...prev,
-          food_item: value,
+          food_item: selectedFoodItem,
+          food_item_value: value,
           field_name: autoFieldName,
           unit: autoUnit,
           quantity: autoQuantity,
@@ -407,7 +427,8 @@ const handleFormChange = (e) => {
       }
     }
 
-    // Prevent duplicate receiving: same food_item + fin_year + overlapping months
+    // Prevent duplicate receiving: same food_item + bene_category + fin_year + overlapping months.
+    // The same month CAN be received for a different beneficiary category.
     const existingRecords = isThr ? thrReceivings : hcmReceivings;
     const duplicate = existingRecords.find(rec => {
       if (editingItem && rec.id === editingItem.id) {
@@ -418,11 +439,17 @@ const handleFormChange = (e) => {
           rec.fin_year !== (formData.fin_year || getCurrentFinancialYear())) {
         return false;
       }
+      // Only block when the beneficiary category also matches, so the same
+      // month can be received for a different category
+      if (formData.bene_category && rec.bene_category &&
+          formData.bene_category !== rec.bene_category) {
+        return false;
+      }
       return selectedMonths.some(m => recMonths.includes(m));
     });
 
     if (duplicate) {
-      setFormError("इस माह का प्राप्ति रिकॉर्ड पहले ही दर्ज है।");
+      setFormError("इस माह का प्राप्ति रिकॉर्ड इसी श्रेणी (category) के लिए पहले ही दर्ज है।");
       setSubmitting(false);
       return;
     }
@@ -454,7 +481,23 @@ const handleFormChange = (e) => {
       handleCloseModal();
       fetchData();
     } catch (err) {
-      setFormError(`Failed to ${editingItem ? 'update' : 'create'} record. Please try again.`);
+      const errData = err.response?.data;
+      let backendMessage = '';
+      if (errData) {
+        if (typeof errData === 'string') {
+          backendMessage = errData;
+        } else if (errData.error || errData.detail) {
+          backendMessage = errData.error || errData.detail;
+        } else {
+          const firstField = Object.keys(errData)[0];
+          if (firstField) {
+            backendMessage = Array.isArray(errData[firstField])
+              ? errData[firstField].join(' ')
+              : String(errData[firstField]);
+          }
+        }
+      }
+      setFormError(`Failed to ${editingItem ? 'update' : 'create'} record. ${backendMessage || 'Please try again.'}`);
       console.error("API Error:", err.response?.data || err);
     } finally {
       setSubmitting(false);
@@ -810,20 +853,27 @@ const handleFormChange = (e) => {
                     <Form.Label>Quarterly Packets Distribution</Form.Label>
                     <Form.Select
                       name="food_item"
-                      value={formData.food_item || ''}
+                      value={formData.food_item_value || ''}
                       onChange={handleFormChange}
                       required
                     >
                       <option value="">Select Quarterly Packets Distribution</option>
-                      {/* ✅ Updated Dropdown UI to match AnganwadiDashboard modal style */}
-                      {availableFoodItems.map((item, index) => [
-                        <option key={index} value={item.food_item} style={{ fontWeight: 'bold' }}>
-                          {item.food_item}
-                        </option>,
-                        <option key={`${index}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>
-                          &nbsp;&nbsp;↳ Category: {item.beneficiary_category || FOOD_BENE_CATEGORY_MAP[item.food_item] || 'N/A'}
-                        </option>
-                      ])}
+                      {/* ✅ Value is "food_item|||beneficiary_category" so the same
+                          food item can be received for a different category */}
+                      {availableFoodItems.map((item, index) => {
+                        const itemCategory = item.beneficiary_category || FOOD_BENE_CATEGORY_MAP[item.food_item] || '';
+                        const itemValue = itemCategory
+                          ? `${item.food_item}|||${itemCategory}`
+                          : item.food_item;
+                        return [
+                          <option key={index} value={itemValue} style={{ fontWeight: 'bold' }}>
+                            {item.food_item}
+                          </option>,
+                          <option key={`${index}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>
+                            &nbsp;&nbsp;↳ Category: {itemCategory || 'N/A'}
+                          </option>
+                        ];
+                      })}
                     </Form.Select>
                   </Form.Group>
                 </Col>

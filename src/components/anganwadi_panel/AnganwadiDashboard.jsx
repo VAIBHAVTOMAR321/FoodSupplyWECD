@@ -177,22 +177,39 @@ const AnganwadiDashboard = () => {
 
     if (!matchingRecord) return '';
 
-    const fieldName = foodItemObj?.field_name;
+    // Category-specific beneficiary count, consistent with FoodItemReceiving's
+    // FOOD_BENE_CATEGORY_MAP and the /categoryandfooditem/ beneficiary_category:
+    // Children (6m-3y) -> children_6m_3y_beneficiaries
+    // Children (3-6y)  -> hcm_beneficiaries_3y_6y
+    // PW & LM          -> pregnant_women_lactating_mothers
+    const beneCategory = foodItemObj?.bene_category || '';
+    const categoryCountMap = {
+      'Children (6m-3y)': matchingRecord.children_6m_3y_beneficiaries,
+      'Children (3-6y)': matchingRecord.hcm_beneficiaries_3y_6y,
+      'Pregnant Women & Lactating Mothers': matchingRecord.pregnant_women_lactating_mothers,
+    };
 
-    if (matchingRecord.total_beneficiaries) {
-      return matchingRecord.total_beneficiaries;
+    if (beneCategory && categoryCountMap[beneCategory] !== undefined) {
+      return categoryCountMap[beneCategory];
     }
 
+    // Fallback: map by the food item's supplementary nutrition field_name
+    const fieldName = foodItemObj?.field_name;
     const beneMap = {
-      'quarterly_packets_mung_dal_khichdi': matchingRecord.children_6m_3y_beneficiaries,
-      'quarterly_packets_poushik_sattu_mix': matchingRecord.children_6m_3y_beneficiaries,
+      'quarterly_packets_mung_dal_khichdi': matchingRecord.hcm_beneficiaries_3y_6y,
+      'quarterly_packets_poushik_sattu_mix': matchingRecord.pregnant_women_lactating_mothers,
+      'panjeeri_75_days_2625gm_quarterly_packets': matchingRecord.children_6m_3y_beneficiaries,
       'panjeeri_75_days_4625gm_quarterly_packets': matchingRecord.children_6m_3y_beneficiaries,
-      'quarterly_packets_sattu_2250gm': matchingRecord.hcm_beneficiaries_3y_6y,
-      'quarterly_packets_multi_grain_aata_1250gm': matchingRecord.pregnant_women_lactating_mothers,
+      'quarterly_packets_sattu_2250gm': matchingRecord.children_6m_3y_beneficiaries,
+      'quarterly_packets_multi_grain_aata_1250gm': matchingRecord.hcm_beneficiaries_3y_6y,
     };
 
     if (fieldName && beneMap[fieldName] !== undefined) {
-      return beneMap[fieldName] || '';
+      return beneMap[fieldName];
+    }
+
+    if (matchingRecord.total_beneficiaries) {
+      return matchingRecord.total_beneficiaries;
     }
 
     return '';
@@ -372,10 +389,11 @@ const AnganwadiDashboard = () => {
         recMonths = quarterToMonths[rec.quarter] || rec.quarter.split(',').map(m => m.trim());
       }
       if (rec.food_item !== selectedFoodItemDetails.food_item ||
-          rec.fin_year !== distributionData.fin_year) {
+          rec.fin_year !== distributionData.fin_year ||
+          rec.bene_category !== selectedFoodItemDetails.bene_category) {
         return false;
       }
-      // Check if any selected month is already allotted for this food item
+      // Check if any selected month is already allotted for this food item + beneficiary category
       return distributionData.months.some(m => recMonths.includes(m));
     });
 
