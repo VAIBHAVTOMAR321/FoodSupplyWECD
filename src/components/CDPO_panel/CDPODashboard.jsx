@@ -123,7 +123,7 @@ const CDPODashboard = () => {
 
   // Fetch reconciliation data for HCM and THR
   const fetchReconciliationData = useCallback(async (type) => {
-    if (type === "hcm") {
+    if (type === "hcm") { 
       setHcmReconciliationLoading(true);
       setHcmReconciliationError("");
     } else {
