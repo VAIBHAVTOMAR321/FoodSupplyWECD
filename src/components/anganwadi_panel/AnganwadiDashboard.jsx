@@ -769,11 +769,37 @@ const AnganwadiDashboard = () => {
                         Please select month(s) first to enable this field.
                       </Form.Text>
                     )}
+                    {distributionData.total_beneficiaries_error && (
+                      <Form.Text className="text-danger d-block mb-2">
+                        {distributionData.total_beneficiaries_error}
+                      </Form.Text>
+                    )}
                     <Form.Control
                       type="text"
                       value={distributionData.total_beneficiaries}
                       onChange={(e) => {
-                        setDistributionData({ ...distributionData, total_beneficiaries: e.target.value });
+                        const value = e.target.value;
+                        const enteredBeneficiaries = parseInt(value, 10) || 0;
+                        
+                        // Live validation against available beneficiaries
+                        let error = '';
+                        if (value && distributionData.months?.length > 0 && distributionData.food_item_id) {
+                          const selectedFoodItem = foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10));
+                          const maxAvailable = computeAutoTotalBeneficiaries(
+                            selectedFoodItem,
+                            distributionData.fin_year,
+                            distributionData.months
+                          );
+                          if (maxAvailable && enteredBeneficiaries > maxAvailable) {
+                            error = `कुल लाभार्थी (${enteredBeneficiaries}) उपलब्ध लाभार्थियों (${maxAvailable}) से अधिक नहीं हो सकते।`;
+                          }
+                        }
+                        
+                        setDistributionData({ 
+                          ...distributionData, 
+                          total_beneficiaries: value,
+                          total_beneficiaries_error: error
+                        });
                       }}
                       placeholder="पूरक पोषण से स्वतः दर्ज होगा"
                       required
