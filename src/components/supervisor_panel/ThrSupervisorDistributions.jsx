@@ -4,6 +4,11 @@ import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/supervisorleftnav.css";
 import SupervisorHeader from "./SupervisorHeader";
 import SupervisorLeftNav from "./SupervisorLeftNav";
+import {
+  getAllocationComparisonStyle,
+  getFoodItemOptions,
+  getStockAllocationDistributionComparison,
+} from "./stockAllocationComparison";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -48,8 +53,11 @@ const ThrSupervisorDistributions = () => {
   
   const { api } = useAuth();
   const [distributions, setDistributions] = useState([]);
+  const [allocations, setAllocations] = useState([]);
+  const [foodItemOptions, setFoodItemOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [comparisonError, setComparisonError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [actionError, setActionError] = useState("");
   const [loadingAction, setLoadingAction] = useState({});
@@ -206,17 +214,51 @@ const ThrSupervisorDistributions = () => {
   const fetchDistributions = async () => {
     setLoading(true);
     setError("");
-    try {
-      const response = await api.get("/thr-supervisor-distributions/");
+    setComparisonError("");
+    const [distributionResult, allocationResult, foodItemResult] = await Promise.allSettled([
+      api.get("/thr-supervisor-distributions/"),
+      api.get("/supplementary-nutrition-supervisor/"),
+      api.get("/categoryandfooditem/"),
+    ]);
+
+    if (distributionResult.status === "fulfilled") {
+      const response = distributionResult.value;
       const raw = response.data?.data || response.data || [];
       const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
       setDistributions(items);
-    } catch (err) {
+    } else {
       setError("Failed to fetch THR distributions.");
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error("Failed to fetch THR distributions:", distributionResult.reason);
     }
+
+    if (allocationResult.status === "fulfilled") {
+      const payload = allocationResult.value.data;
+      const rows = Array.isArray(payload) ? payload : payload?.data;
+      if (Array.isArray(rows) && payload?.success !== false) {
+        setAllocations(rows);
+      } else {
+        setAllocations([]);
+        setComparisonError("Stock allocation data is unavailable; distributions cannot be compared.");
+      }
+    } else {
+      setAllocations([]);
+      setComparisonError("Failed to fetch stock allocation data; distributions cannot be compared.");
+      console.error("Failed to fetch stock allocation data:", allocationResult.reason);
+    }
+
+    if (foodItemResult.status === "fulfilled") {
+      const payload = foodItemResult.value.data;
+      const mappings = getFoodItemOptions(payload);
+      setFoodItemOptions(mappings);
+      if (payload?.success === false || mappings.length === 0) {
+        setComparisonError("Food item mappings are unavailable; distributions cannot be compared.");
+      }
+    } else {
+      setFoodItemOptions([]);
+      setComparisonError("Failed to fetch food item mappings; distributions cannot be compared.");
+      console.error("Failed to fetch food item mappings:", foodItemResult.reason);
+    }
+    setLoading(false);
   };
 
   const fetchBeneficiaryCategories = async () => {
@@ -645,6 +687,7 @@ const ThrSupervisorDistributions = () => {
 
           {!isPrinting && successMsg && <Alert variant="success" className="mb-3">{successMsg}</Alert>}
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
+          {comparisonError && <Alert variant="warning" className="mb-3">{comparisonError}</Alert>}
           {actionError && <Alert variant="danger" className="mb-3">{actionError}</Alert>}
 
           <Card className="shadow-sm">
@@ -681,11 +724,19 @@ const ThrSupervisorDistributions = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {currentItems.length > 0 ? currentItems.map((row, index) => (
+                        {currentItems.length > 0 ? currentItems.map((row, index) => {
+                          const comparison = getStockAllocationDistributionComparison(
+                            row,
+                            allocations,
+                            foodItemOptions,
+                            "THR"
+                          );
+                          const comparisonStyle = getAllocationComparisonStyle(comparison);
+                          return (
                           <React.Fragment key={row.id}>
-                            <tr>
+                            <tr title={comparison ? `Packets: ${comparison.actualQuantity}/${comparison.expectedQuantity}; beneficiaries: ${comparison.actualBeneficiaries}/${comparison.expectedBeneficiaries}` : undefined}>
                                 {!isPrinting && (
-                                  <td>
+                                  <td style={comparisonStyle}>
                                     <Form.Check
                                       type="checkbox"
                                       checked={selectedIds.includes(row.id)}
@@ -745,7 +796,7 @@ const ThrSupervisorDistributions = () => {
                                     default:
                                       cellContent = row[col.dataField];
                                   }
-                                  return <td key={col.dataField}>{cellContent}</td>;
+                                  return <td key={col.dataField} style={comparisonStyle}>{cellContent}</td>;
                                 })}
                             </tr>
                             {openRemarkId === row.id && (
@@ -787,7 +838,8 @@ const ThrSupervisorDistributions = () => {
                               </tr>
                             )}
                           </React.Fragment>
-                        )) : (
+                        );
+                        }) : (
                           <tr>
                             <td colSpan={visibleColumns.length + (isPrinting ? 0 : 1)} className="text-center">No data available</td>
                           </tr>
