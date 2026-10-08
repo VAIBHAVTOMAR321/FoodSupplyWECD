@@ -347,6 +347,11 @@ useEffect(() => {
      */
 
     const records = Array.isArray(data?.data) ? data.data : [];
+    const filterRecords = [
+      ...records,
+      ...(Array.isArray(data?.month_summary) ? data.month_summary : []),
+      ...(Array.isArray(data?.sector_summary) ? data.sector_summary : [])
+    ];
 
     // The API currently returns month and financial_year directly
     // inside every object of results.data.
@@ -374,7 +379,7 @@ useEffect(() => {
 
     const uniqueMonths = [
       ...new Set(
-        records
+        filterRecords
           .map(getMonthValue)
           .filter(Boolean)
       )
@@ -396,7 +401,7 @@ useEffect(() => {
     // Unique financial years from results.data.
     const uniqueFYs = [
       ...new Set(
-        records
+        filterRecords
           .map(getFYValue)
           .filter(Boolean)
       )
@@ -478,14 +483,6 @@ useEffect(() => {
       return <Alert variant="danger">{error}</Alert>;
     }
 
-    if (records.length === 0) {
-      return (
-        <div className="text-center p-4 text-muted">
-          No reconciliation data found.
-        </div>
-      );
-    }
-
     const toggleMonth = (month) => {
       setSelectedMonths((prev) =>
         prev.includes(month)
@@ -562,21 +559,25 @@ useEffect(() => {
                     />
                   </Dropdown.Item>
 
-                  {uniqueMonths.map((month) => (
-                    <Dropdown.Item
-                      as="div"
-                      key={month}
-                      onClick={(e) => e.stopPropagation()}
-                      className="reconciliation-dropdown-item"
-                    >
-                      <Form.Check
-                        type="checkbox"
-                        label={month}
-                        checked={selectedMonths.includes(month)}
-                        onChange={() => toggleMonth(month)}
-                      />
-                    </Dropdown.Item>
-                  ))}
+                  {uniqueMonths.length === 0 ? (
+                    <Dropdown.Item disabled>No months available</Dropdown.Item>
+                  ) : (
+                    uniqueMonths.map((month) => (
+                      <Dropdown.Item
+                        as="div"
+                        key={month}
+                        onClick={(e) => e.stopPropagation()}
+                        className="reconciliation-dropdown-item"
+                      >
+                        <Form.Check
+                          type="checkbox"
+                          label={month}
+                          checked={selectedMonths.includes(month)}
+                          onChange={() => toggleMonth(month)}
+                        />
+                      </Dropdown.Item>
+                    ))
+                  )}
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
@@ -625,21 +626,25 @@ useEffect(() => {
                     />
                   </Dropdown.Item>
 
-                  {uniqueFYs.map((fy) => (
-                    <Dropdown.Item
-                      as="div"
-                      key={fy}
-                      onClick={(e) => e.stopPropagation()}
-                      className="reconciliation-dropdown-item"
-                    >
-                      <Form.Check
-                        type="checkbox"
-                        label={fy}
-                        checked={selectedFYs.includes(fy)}
-                        onChange={() => toggleFY(fy)}
-                      />
-                    </Dropdown.Item>
-                  ))}
+                  {uniqueFYs.length === 0 ? (
+                    <Dropdown.Item disabled>No financial years available</Dropdown.Item>
+                  ) : (
+                    uniqueFYs.map((fy) => (
+                      <Dropdown.Item
+                        as="div"
+                        key={fy}
+                        onClick={(e) => e.stopPropagation()}
+                        className="reconciliation-dropdown-item"
+                      >
+                        <Form.Check
+                          type="checkbox"
+                          label={fy}
+                          checked={selectedFYs.includes(fy)}
+                          onChange={() => toggleFY(fy)}
+                        />
+                      </Dropdown.Item>
+                    ))
+                  )}
                 </Dropdown.Menu>
               </Dropdown>
             </Col>

@@ -292,9 +292,11 @@ const FoodSupplementary = () => {
 
   // Supplies Dynamic States
   const [suppliesTab, setSuppliesTab] = useState("thr");
-  const [suppliesData, setSuppliesData] = useState([]);
+  const [suppliesRecords, setSuppliesRecords] = useState([]);
   const [suppliesLoading, setSuppliesLoading] = useState(true);
   const [suppliesError, setSuppliesError] = useState("");
+  const [selectedSupplyMonths, setSelectedSupplyMonths] = useState([]);
+  const [selectedSupplyFYs, setSelectedSupplyFYs] = useState([]);
 
   // Race condition prevention for API calls
   const suppliesReqId = useRef(0);
@@ -337,36 +339,17 @@ const FoodSupplementary = () => {
       if (!reconciliation?.success) {
         throw new Error(reconciliation?.message || "The reconciliation API returned an unsuccessful response.");
       }
-      if (!Array.isArray(reconciliation.sector_summary)) {
-        throw new Error("The reconciliation response does not contain a sector summary.");
+      if (!Array.isArray(reconciliation.data)) {
+        throw new Error("The reconciliation response does not contain detail records.");
       }
 
-      const sectors = new Map();
-      reconciliation.sector_summary.forEach((item) => {
-        if (!sectors.has(item.sector)) {
-          sectors.set(item.sector, new Map());
-        }
-
-        const foodItems = sectors.get(item.sector);
-        const quantities = foodItems.get(item.food_item) || { received: 0, distributed: 0, balance: 0 };
-        quantities.received += Number(item.received_quantity) || 0;
-        quantities.distributed += Number(item.distributed_quantity) || 0;
-        quantities.balance += Number(item.balance_quantity) || 0;
-        foodItems.set(item.food_item, quantities);
-      });
-
-      const sectorData = Array.from(sectors, ([sector, foodItems]) => ({
-        sector,
-        foodData: Array.from(foodItems, ([food_item, quantities]) => ({ food_item, ...quantities })),
-      }));
-
       if (reqId === suppliesReqId.current) {
-        setSuppliesData(sectorData);
+        setSuppliesRecords(reconciliation.data);
       }
     } catch (err) {
       if (reqId === suppliesReqId.current) {
         console.error(`Failed to fetch ${type.toUpperCase()} supplies data:`, err);
-        setSuppliesData([]);
+        setSuppliesRecords([]);
         setSuppliesError(`Failed to fetch ${type.toUpperCase()} supplies data.`);
       }
     } finally {
@@ -384,14 +367,50 @@ const FoodSupplementary = () => {
     fetchSuppliesData(suppliesTab);
   }, [fetchSuppliesData, suppliesTab]);
 
-  // Extract unique food items dynamically from suppliesData
-  const suppliesFoodItems = useMemo(() => {
-    const items = new Set();
-    suppliesData.forEach((row) => {
-      row.foodData.forEach((f) => items.add(f.food_item));
+  const suppliesMonths = useMemo(
+    () => [...new Set(suppliesRecords.map((record) => record.month).filter(Boolean))]
+      .sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b)),
+    [suppliesRecords]
+  );
+  const suppliesFinancialYears = useMemo(
+    () => [...new Set(suppliesRecords.map((record) => record.financial_year).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    [suppliesRecords]
+  );
+
+  const filteredSuppliesRecords = useMemo(
+    () => suppliesRecords.filter((record) =>
+      (selectedSupplyMonths.length === 0 || selectedSupplyMonths.includes(record.month)) &&
+      (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(record.financial_year))
+    ),
+    [suppliesRecords, selectedSupplyMonths, selectedSupplyFYs]
+  );
+
+  const suppliesData = useMemo(() => {
+    const sectors = new Map();
+    filteredSuppliesRecords.forEach((record) => {
+      if (!sectors.has(record.sector)) {
+        sectors.set(record.sector, new Map());
+      }
+
+      const foodItems = sectors.get(record.sector);
+      const quantities = foodItems.get(record.food_item) || { received: 0, distributed: 0, balance: 0 };
+      quantities.received += Number(record.received_quantity) || 0;
+      quantities.distributed += Number(record.distributed_quantity) || 0;
+      quantities.balance += Number(record.balance_quantity) || 0;
+      foodItems.set(record.food_item, quantities);
     });
-    return Array.from(items);
-  }, [suppliesData]);
+
+    return Array.from(sectors, ([sector, foodItems]) => ({
+      sector,
+      foodData: Array.from(foodItems, ([food_item, quantities]) => ({ food_item, ...quantities })),
+    }));
+  }, [filteredSuppliesRecords]);
+
+  // Keep food columns stable while period filters change.
+  const suppliesFoodItems = useMemo(() => {
+    return [...new Set(suppliesRecords.map((record) => record.food_item).filter(Boolean))];
+  }, [suppliesRecords]);
 
   // Calculate Totals for dynamic supplies table
   const suppliesTotals = useMemo(() => {
@@ -785,8 +804,6 @@ const FoodSupplementary = () => {
           <Form.Select name={name} value={formData[name] ?? ""} onChange={handleInputChange} className={formErrors[name] ? "is-invalid" : ""}>
             {monthNames.map((m) => (<option key={m} value={m}>{m}</option>))}
           </Form.Select>
-        ) : suppliesError ? (
-          <Alert variant="danger" className="m-3">{suppliesError}</Alert>
         ) : (
           <Form.Control type={type} name={name} value={formData[name] ?? ""} onChange={handleInputChange} placeholder={placeholder} className={formErrors[name] ? "is-invalid" : ""} />
         )}
@@ -1034,16 +1051,41 @@ const FoodSupplementary = () => {
 
                   {/* ─── Supplies Received & Distributed Table (Dynamic) ─── */}
                   <div className="dashboard-section mt-3">
-                    <Card className="fs-table-card shadow-sm">
+                    <Card className="fs-table-card fs-supplies-card shadow-sm">
                       <Card.Header className="fs-table-card-header">
                         <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
                           <h5 className="fs-section-title mb-0">
                             <FaWarehouse className="me-2" /> Supplies Received & Distributed Summary
                           </h5>
-                          <div className="d-flex align-items-center gap-3 flex-wrap">
+                          <div className="d-flex align-items-end gap-3 flex-wrap">
+                            <MultiSelectDropdown
+                              label="Month"
+                              options={suppliesMonths}
+                              selected={selectedSupplyMonths}
+                              onChange={setSelectedSupplyMonths}
+                            />
+                            <MultiSelectDropdown
+                              label="Financial Year"
+                              options={suppliesFinancialYears}
+                              selected={selectedSupplyFYs}
+                              onChange={setSelectedSupplyFYs}
+                            />
+                            {(selectedSupplyMonths.length > 0 || selectedSupplyFYs.length > 0) && (
+                              <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                className="fs-filter-reset"
+                                onClick={() => {
+                                  setSelectedSupplyMonths([]);
+                                  setSelectedSupplyFYs([]);
+                                }}
+                              >
+                                Reset
+                              </Button>
+                            )}
                             <ButtonGroup className="fs-toggle-group">
-                              <Button className={`fs-toggle-btn ${suppliesTab === "thr" ? "active" : ""}`} onClick={() => setSuppliesTab("thr")}>THR</Button>
-                              <Button className={`fs-toggle-btn ${suppliesTab === "hcm" ? "active" : ""}`} onClick={() => setSuppliesTab("hcm")}>HCM</Button>
+                              <Button className={`fs-toggle-btn ${suppliesTab === "thr" ? "active" : ""}`} onClick={() => { setSuppliesTab("thr"); setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}>THR</Button>
+                              <Button className={`fs-toggle-btn ${suppliesTab === "hcm" ? "active" : ""}`} onClick={() => { setSuppliesTab("hcm"); setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}>HCM</Button>
                             </ButtonGroup>
                             <div className="fs-export-btns">
                               <Button variant="light" size="sm" className="fs-export-btn" onClick={exportSuppliesToExcel}>
@@ -1060,6 +1102,8 @@ const FoodSupplementary = () => {
                         <div className="fs-table-wrapper">
                           {suppliesLoading ? (
                             <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div>
+                          ) : suppliesError ? (
+                            <Alert variant="danger" className="m-3">{suppliesError}</Alert>
                           ) : (
                             <Table hover className="fs-data-table mb-0">
                               <thead>

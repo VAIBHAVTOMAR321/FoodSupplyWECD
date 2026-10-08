@@ -173,6 +173,9 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
   background: #fff;
 }
+.fs-supplies-card {
+  overflow: visible;
+}
 .fs-table-card-header {
   background: #fff;
   border-bottom: 1px solid #e2e8f0;

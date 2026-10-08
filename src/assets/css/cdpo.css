@@ -2140,7 +2140,7 @@ img {
 
 .reconciliation-table-container {
     border-radius: 8px;
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid #e9ecef;
 }
 
