@@ -138,9 +138,12 @@ const DPODashboard = () => {
 
   // Supplies Dynamic States
   const [suppliesTab, setSuppliesTab] = useState("thr");
-  const [suppliesData, setSuppliesData] = useState([]);
+  const [suppliesViewMode, setSuppliesViewMode] = useState("project"); // 'project' | 'sector' | 'awc'
+  const [suppliesRecords, setSuppliesRecords] = useState([]);
+  const [suppliesDetailRecords, setSuppliesDetailRecords] = useState([]);
   const [suppliesLoading, setSuppliesLoading] = useState(true);
-  const [suppliesGroupBy, setSuppliesGroupBy] = useState(['Project', 'Sector']);
+  const [selectedSupplyMonths, setSelectedSupplyMonths] = useState([]);
+  const [selectedSupplyFYs, setSelectedSupplyFYs] = useState([]);
 
   // Race condition prevention for API calls
   const suppliesReqId = useRef(0);
@@ -170,40 +173,37 @@ const DPODashboard = () => {
     }
   };
 
-  // Dynamic Supplies Data Fetching (DPO Level - Project & Sector)
+  // Dynamic Supplies Data Fetching (DPO Level - Project, Sector, AWC)
   const fetchSuppliesData = async (type) => {
-    const reqId = ++suppliesReqId.current; // Increment and get unique ID for this request
+    const reqId = ++suppliesReqId.current;
     setSuppliesLoading(true);
     
     try {
       const response = await api.get(`/dpo/${type}-food-reconciliation/`);
       
-      // If this is not the latest request, ignore the response to prevent overwriting newer data
       if (reqId !== suppliesReqId.current) return;
 
-      const flatData = [];
-      if (response.data.success && response.data.project_data) {
-        response.data.project_data.forEach(p => {
-          if (p.sector_data) {
-            p.sector_data.forEach(s => {
-              flatData.push({
-                project: p.project,
-                sector: s.sector,
-                foodData: s.food_data || []
-              });
-            });
-          }
-        });
+      const result = response.data?.results;
+      if (!result?.success) {
+        throw new Error(result?.message || "The reconciliation API returned an unsuccessful response.");
       }
-      
-      // Double check it's still the latest request before setting state
+      if (!Array.isArray(result.data)) {
+        throw new Error("The reconciliation response does not contain detail records.");
+      }
+
+      // Use summary arrays directly from API (similar to CDPO approach)
+      const projectMonthSummary = result.project_month_summary || [];
+      const sectorMonthSummary = result.sector_month_summary || [];
+
       if (reqId === suppliesReqId.current) {
-        setSuppliesData(flatData);
+        setSuppliesRecords({ projectMonthSummary, sectorMonthSummary });
+        setSuppliesDetailRecords(result.data || []);
       }
     } catch (err) {
       if (reqId === suppliesReqId.current) {
         console.error(`Failed to fetch ${type.toUpperCase()} supplies data:`, err);
-        setSuppliesData([]);
+        setSuppliesRecords({ projectMonthSummary: [], sectorMonthSummary: [] });
+        setSuppliesDetailRecords([]);
       }
     } finally {
       if (reqId === suppliesReqId.current) {
@@ -220,50 +220,124 @@ const DPODashboard = () => {
     fetchSuppliesData(suppliesTab);
   }, [suppliesTab]);
 
-  // Extract unique food items dynamically from suppliesData
+  // Unique months and financial years from detail records for filtering
+  const suppliesMonths = useMemo(
+    () => [...new Set(suppliesDetailRecords.map((record) => record.month).filter(Boolean))]
+      .sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b)),
+    [suppliesDetailRecords]
+  );
+  const suppliesFinancialYears = useMemo(
+    () => [...new Set(suppliesDetailRecords.map((record) => record.financial_year).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    [suppliesDetailRecords]
+  );
+
+  // Filtered detail records based on month/year filters
+  const filteredDetailRecords = useMemo(() => {
+    return suppliesDetailRecords.filter((record) =>
+      (selectedSupplyMonths.length === 0 || selectedSupplyMonths.includes(record.month)) &&
+      (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(record.financial_year))
+    );
+  }, [suppliesDetailRecords, selectedSupplyMonths, selectedSupplyFYs]);
+
+  // Extract unique food items dynamically from suppliesRecords
   const suppliesFoodItems = useMemo(() => {
     const items = new Set();
-    suppliesData.forEach(row => {
-      row.foodData.forEach(f => items.add(f.food_item));
-    });
+    // Collect from both project and sector summaries
+    if (suppliesRecords.projectMonthSummary) {
+      suppliesRecords.projectMonthSummary.forEach(row => items.add(row.food_item));
+    }
+    if (suppliesRecords.sectorMonthSummary) {
+      suppliesRecords.sectorMonthSummary.forEach(row => items.add(row.food_item));
+    }
     return Array.from(items);
-  }, [suppliesData]);
+  }, [suppliesRecords]);
 
-  // Get active group keys based on selection (restricted to Project & Sector)
-  const activeGroupKeys = useMemo(() => {
-    return suppliesGroupBy.length > 0 ? suppliesGroupBy.map(g => g.toLowerCase()) : ['project', 'sector'];
-  }, [suppliesGroupBy]);
-
-  // Group and aggregate Supplies Data dynamically
-  const groupedSuppliesData = useMemo(() => {
-    const groups = {};
-    suppliesData.forEach(item => {
-      const keyVals = activeGroupKeys.map(gk => item[gk]);
-      const groupKey = keyVals.join('||');
-      
-      if (!groups[groupKey]) {
-        groups[groupKey] = { keyVals, foodData: {} };
+  // Project-wise aggregation from project_month_summary
+  const projectSuppliesData = useMemo(() => {
+    const projects = {};
+    if (!suppliesRecords.projectMonthSummary) return [];
+    suppliesRecords.projectMonthSummary.forEach(item => {
+      const key = item.project;
+      if (!projects[key]) {
+        projects[key] = { project: key, foodData: {} };
         suppliesFoodItems.forEach(fi => {
-          groups[groupKey].foodData[fi] = { received: 0, distributed: 0, balance: 0 };
+          projects[key].foodData[fi] = { received: 0, distributed: 0, balance: 0 };
         });
       }
-      
-      item.foodData.forEach(fd => {
-        if (groups[groupKey].foodData[fd.food_item]) {
-          groups[groupKey].foodData[fd.food_item].received += fd.received || 0;
-          groups[groupKey].foodData[fd.food_item].distributed += fd.distributed || 0;
-          groups[groupKey].foodData[fd.food_item].balance += fd.balance || 0;
-        }
-      });
+      if (projects[key].foodData[item.food_item]) {
+        projects[key].foodData[item.food_item].received += Number(item.received_quantity) || 0;
+        projects[key].foodData[item.food_item].distributed += Number(item.distributed_quantity) || 0;
+        projects[key].foodData[item.food_item].balance += Number(item.balance_quantity) || 0;
+      }
+    });
+    return Object.values(projects).map(p => ({
+      ...p,
+      foodData: Object.entries(p.foodData).map(([food_item, vals]) => ({ food_item, ...vals }))
+    })).sort((a, b) => a.project.localeCompare(b.project));
+  }, [suppliesRecords, suppliesFoodItems]);
+
+  // Sector-wise aggregation from sector_month_summary
+  const sectorSuppliesData = useMemo(() => {
+    const sectors = {};
+    if (!suppliesRecords.sectorMonthSummary) return [];
+    suppliesRecords.sectorMonthSummary.forEach(item => {
+      const key = item.sector;
+      if (!sectors[key]) {
+        sectors[key] = { sector: key, foodData: {} };
+        suppliesFoodItems.forEach(fi => {
+          sectors[key].foodData[fi] = { received: 0, distributed: 0, balance: 0 };
+        });
+      }
+      if (sectors[key].foodData[item.food_item]) {
+        sectors[key].foodData[item.food_item].received += Number(item.received_quantity) || 0;
+        sectors[key].foodData[item.food_item].distributed += Number(item.distributed_quantity) || 0;
+        sectors[key].foodData[item.food_item].balance += Number(item.balance_quantity) || 0;
+      }
+    });
+    return Object.values(sectors).map(s => ({
+      ...s,
+      foodData: Object.entries(s.foodData).map(([food_item, vals]) => ({ food_item, ...vals }))
+    })).sort((a, b) => a.sector.localeCompare(b.sector));
+  }, [suppliesRecords, suppliesFoodItems]);
+
+  // AWC-wise aggregation from detail records
+  const awcSuppliesData = useMemo(() => {
+    const awcs = new Map();
+    filteredDetailRecords.forEach((record) => {
+      const awcKey = `${record.awc_code}|${record.awc_name}|${record.project}|${record.sector}`;
+      if (!awcs.has(awcKey)) {
+        awcs.set(awcKey, { 
+          awc_code: record.awc_code, 
+          awc_name: record.awc_name, 
+          project: record.project, 
+          sector: record.sector, 
+          foodData: new Map() 
+        });
+      }
+      const awc = awcs.get(awcKey);
+      const quantities = awc.foodData.get(record.food_item) || { received: 0, distributed: 0, balance: 0 };
+      quantities.received += Number(record.received_quantity) || 0;
+      quantities.distributed += Number(record.distributed_quantity) || 0;
+      quantities.balance += Number(record.balance_quantity) || 0;
+      awc.foodData.set(record.food_item, quantities);
     });
 
-    return Object.values(groups).map(g => {
-      const row = {};
-      activeGroupKeys.forEach((gk, i) => row[gk] = g.keyVals[i]);
-      row.foodData = Object.entries(g.foodData).map(([food_item, vals]) => ({ food_item, ...vals }));
-      return row;
-    });
-  }, [suppliesData, activeGroupKeys, suppliesFoodItems]);
+    return Array.from(awcs.values()).map(awc => ({
+      ...awc,
+      foodData: Array.from(awc.foodData, ([food_item, quantities]) => ({ food_item, ...quantities })),
+    })).sort((a, b) => a.project.localeCompare(b.project) || a.sector.localeCompare(b.sector) || a.awc_name.localeCompare(b.awc_name));
+  }, [filteredDetailRecords]);
+
+  // Get the current data based on view mode
+  const currentSuppliesData = useMemo(() => {
+    switch (suppliesViewMode) {
+      case 'project': return projectSuppliesData;
+      case 'sector': return sectorSuppliesData;
+      case 'awc': return awcSuppliesData;
+      default: return projectSuppliesData;
+    }
+  }, [suppliesViewMode, projectSuppliesData, sectorSuppliesData, awcSuppliesData]);
 
   // Calculate Totals for dynamic supplies table
   const suppliesTotals = useMemo(() => {
@@ -271,7 +345,7 @@ const DPODashboard = () => {
     suppliesFoodItems.forEach(fi => {
       totals[fi] = { received: 0, distributed: 0, balance: 0 };
     });
-    groupedSuppliesData.forEach(row => {
+    currentSuppliesData.forEach(row => {
       row.foodData.forEach(fd => {
         if (totals[fd.food_item]) {
           totals[fd.food_item].received += fd.received || 0;
@@ -281,7 +355,7 @@ const DPODashboard = () => {
       });
     });
     return totals;
-  }, [groupedSuppliesData, suppliesFoodItems]);
+  }, [currentSuppliesData, suppliesFoodItems]);
 
   const uniqueMonths = useMemo(() => [...new Set(records.map(r => r.month).filter(Boolean))].sort(), [records]);
   const uniqueFYs = useMemo(() => [...new Set(records.map(r => r.financial_year).filter(Boolean))].sort(), [records]);
@@ -392,11 +466,18 @@ const DPODashboard = () => {
 
   /* --- Export Functions --- */
   const exportSuppliesToExcel = () => {
-    const data = groupedSuppliesData.map((r, i) => {
+    const data = currentSuppliesData.map((r, i) => {
       const row = { "S. No.": i + 1 };
-      activeGroupKeys.forEach(gk => {
-        row[gk.charAt(0).toUpperCase() + gk.slice(1)] = r[gk];
-      });
+      if (suppliesViewMode === 'project') {
+        row.Project = r.project;
+      } else if (suppliesViewMode === 'sector') {
+        row.Sector = r.sector;
+      } else {
+        row.Project = r.project;
+        row.Sector = r.sector;
+        row["AWC Name"] = r.awc_name;
+        row["AWC Code"] = r.awc_code;
+      }
       suppliesFoodItems.forEach(fi => {
         const fd = r.foodData.find(f => f.food_item === fi);
         row[`${fi} - Received`] = fd ? fd.received : 0;
@@ -407,9 +488,16 @@ const DPODashboard = () => {
     });
     
     const totalRow = { "S. No.": "" };
-    activeGroupKeys.forEach((gk, idx) => {
-      totalRow[gk.charAt(0).toUpperCase() + gk.slice(1)] = idx === 0 ? "Total" : "";
-    });
+    if (suppliesViewMode === 'project') {
+      totalRow.Project = "Total";
+    } else if (suppliesViewMode === 'sector') {
+      totalRow.Sector = "Total";
+    } else {
+      totalRow.Project = "Total";
+      totalRow.Sector = "";
+      totalRow["AWC Name"] = "";
+      totalRow["AWC Code"] = "";
+    }
     suppliesFoodItems.forEach(fi => {
       const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
       totalRow[`${fi} - Received`] = t.received.toLocaleString();
@@ -421,29 +509,41 @@ const DPODashboard = () => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Supplies Summary");
-    XLSX.writeFile(wb, `Supplies_${suppliesTab.toUpperCase()}_Summary.xlsx`);
+    XLSX.writeFile(wb, `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode.charAt(0).toUpperCase() + suppliesViewMode.slice(1)}_Summary.xlsx`);
   };
 
   const exportSuppliesToPDF = () => {
+    const groupHeaders = suppliesViewMode === 'project' 
+      ? [{ content: 'Project', rowSpan: 2 }]
+      : suppliesViewMode === 'sector'
+      ? [{ content: 'Sector', rowSpan: 2 }]
+      : [
+          { content: 'Project', rowSpan: 2 },
+          { content: 'Sector', rowSpan: 2 },
+          { content: 'AWC Name', rowSpan: 2 },
+          { content: 'AWC Code', rowSpan: 2 }
+        ];
+
     const head = [[
       { content: 'S. No.', rowSpan: 2 },
-      ...activeGroupKeys.map(gk => ({ content: gk.charAt(0).toUpperCase() + gk.slice(1), rowSpan: 2 })),
+      ...groupHeaders,
       ...suppliesFoodItems.map(fi => ({ content: fi, colSpan: 3 }))
     ], [
       ...suppliesFoodItems.flatMap(() => ['Rec.', 'Dist.', 'Rem.'])
     ]];
     
-    const body = groupedSuppliesData.map((r, i) => [
+    const body = currentSuppliesData.map((r, i) => [
       i + 1,
-      ...activeGroupKeys.map(gk => r[gk]),
+      ...(suppliesViewMode === 'project' ? [r.project] : suppliesViewMode === 'sector' ? [r.sector] : [r.project, r.sector, r.awc_name, r.awc_code]),
       ...suppliesFoodItems.flatMap(fi => {
         const fd = r.foodData.find(f => f.food_item === fi);
         return fd ? [fd.received, fd.distributed, fd.balance] : [0, 0, 0];
       })
     ]);
 
+    const groupColSpan = suppliesViewMode === 'awc' ? 4 : 1;
     const foot = [[
-      { content: 'Total', colSpan: 1 + activeGroupKeys.length },
+      { content: 'Total', colSpan: 1 + groupColSpan },
       ...suppliesFoodItems.flatMap(fi => {
         const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
         return [t.received.toLocaleString(), t.distributed.toLocaleString(), t.balance.toLocaleString()];
@@ -451,14 +551,15 @@ const DPODashboard = () => {
     ]];
 
     const doc = new jsPDF("l", "pt", "a3");
-    doc.text(`Supplies ${suppliesTab.toUpperCase()} Summary`, 40, 40);
+    const viewModeLabel = suppliesViewMode === 'project' ? 'Project-wise' : suppliesViewMode === 'sector' ? 'Sector-wise' : 'AWC-wise';
+    doc.text(`Supplies ${suppliesTab.toUpperCase()} ${viewModeLabel} Summary`, 40, 40);
     autoTable(doc, {
       head, body, foot, startY: 50,
       styles: { fontSize: 7, cellPadding: 2 },
       headStyles: { fillColor: [111, 66, 193] }, 
       footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" }
     });
-    doc.save(`Supplies_${suppliesTab.toUpperCase()}_Summary.pdf`);
+    doc.save(`Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode.charAt(0).toUpperCase() + suppliesViewMode.slice(1)}_Summary.pdf`);
   };
 
   const exportAggToExcel = () => {
@@ -574,7 +675,7 @@ const DPODashboard = () => {
             </div>
           )}
 
-          {/* Supplies Received & Distributed Table (Dynamic with Tabs & GroupBy) */}
+          {/* Supplies Received & Distributed Table (Dynamic with View Mode) */}
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
@@ -582,12 +683,36 @@ const DPODashboard = () => {
               </h5>
               <div className="d-flex align-items-center gap-3 flex-wrap">
                 <ButtonGroup className="dpo-toggle-group">
-                  <Button className={`dpo-toggle-btn ${suppliesTab === 'thr' ? 'active' : ''}`} onClick={() => setSuppliesTab('thr')}>THR</Button>
-                  <Button className={`dpo-toggle-btn ${suppliesTab === 'hcm' ? 'active' : ''}`} onClick={() => setSuppliesTab('hcm')}>HCM</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesTab === 'thr' ? 'active' : ''}`} onClick={() => { setSuppliesTab('thr'); setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}>THR</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesTab === 'hcm' ? 'active' : ''}`} onClick={() => { setSuppliesTab('hcm'); setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}>HCM</Button>
                 </ButtonGroup>
-                <div style={{ minWidth: '180px' }}>
-                  <MultiSelectDropdown label="Group By" options={['Project', 'Sector']} selected={suppliesGroupBy} onChange={setSuppliesGroupBy} />
-                </div>
+                <ButtonGroup className="dpo-toggle-group" style={{ marginLeft: '8px', marginRight: '8px' }}>
+                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'project' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('project')} title="Project-wise">Project</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'sector' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('sector')} title="Sector-wise">Sector</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'awc' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('awc')} title="AWC-wise">AWC</Button>
+                </ButtonGroup>
+                <MultiSelectDropdown
+                  label="Month"
+                  options={suppliesMonths}
+                  selected={selectedSupplyMonths}
+                  onChange={setSelectedSupplyMonths}
+                />
+                <MultiSelectDropdown
+                  label="Financial Year"
+                  options={suppliesFinancialYears}
+                  selected={selectedSupplyFYs}
+                  onChange={setSelectedSupplyFYs}
+                />
+                {(selectedSupplyMonths.length > 0 || selectedSupplyFYs.length > 0) && (
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    className="dpo-filter-reset"
+                    onClick={() => { setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}
+                  >
+                    Reset
+                  </Button>
+                )}
                 <div className="dpo-export-btns">
                   <Button className="dpo-export-btn" onClick={exportSuppliesToExcel}><FaFileExcel className="text-success" /> Excel</Button>
                   <Button className="dpo-export-btn" onClick={exportSuppliesToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
@@ -603,9 +728,18 @@ const DPODashboard = () => {
                     <thead>
                       <tr>
                         <th rowSpan="2">S. No.</th>
-                        {activeGroupKeys.map(gk => (
-                          <th key={gk} rowSpan="2" style={{textTransform: 'capitalize'}}>{gk}</th>
-                        ))}
+                        {suppliesViewMode === 'project' ? (
+                          <th rowSpan="2">Project</th>
+                        ) : suppliesViewMode === 'sector' ? (
+                          <th rowSpan="2">Sector</th>
+                        ) : (
+                          <>
+                            <th rowSpan="2">Project</th>
+                            <th rowSpan="2">Sector</th>
+                            <th rowSpan="2">AWC Name</th>
+                            <th rowSpan="2">AWC Code</th>
+                          </>
+                        )}
                         {suppliesFoodItems.map((fi, idx) => (
                           <th key={`fi-${idx}`} colSpan="3" className="text-center" style={{ borderLeft: '1px solid #e9d5ff' }}>
                             {fi}
@@ -623,14 +757,27 @@ const DPODashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {groupedSuppliesData.length === 0 ? (
-                        <tr><td colSpan={1 + activeGroupKeys.length + (suppliesFoodItems.length * 3)} className="text-center p-4 text-muted">No data available</td></tr>
-                      ) : groupedSuppliesData.map((row, i) => (
+                      {currentSuppliesData.length === 0 ? (
+                        <tr>
+                          <td colSpan={suppliesViewMode === 'awc' ? 5 + suppliesFoodItems.length * 3 : 2 + suppliesFoodItems.length * 3} className="text-center p-4 text-muted">
+                            No data available
+                          </td>
+                        </tr>
+                      ) : currentSuppliesData.map((row, i) => (
                         <tr key={i}>
                           <td>{i + 1}</td>
-                          {activeGroupKeys.map(gk => (
-                            <td key={gk}>{gk === 'project' ? <strong>{row[gk]}</strong> : row[gk]}</td>
-                          ))}
+                          {suppliesViewMode === 'project' ? (
+                            <td><strong>{row.project}</strong></td>
+                          ) : suppliesViewMode === 'sector' ? (
+                            <td><strong>{row.sector}</strong></td>
+                          ) : (
+                            <>
+                              <td>{row.project}</td>
+                              <td>{row.sector}</td>
+                              <td><strong>{row.awc_name}</strong></td>
+                              <td>{row.awc_code}</td>
+                            </>
+                          )}
                           {suppliesFoodItems.map((fi, idx) => {
                             const fd = row.foodData.find(f => f.food_item === fi);
                             return (
@@ -644,13 +791,22 @@ const DPODashboard = () => {
                         </tr>
                       ))}
                     </tbody>
-                    {groupedSuppliesData.length > 0 && (
+                    {currentSuppliesData.length > 0 && (
                       <tfoot>
                         <tr>
                           <th></th>
-                          {activeGroupKeys.map((gk, idx) => (
-                            <th key={gk}>{idx === 0 ? "Total" : ""}</th>
-                          ))}
+                          {suppliesViewMode === 'project' ? (
+                            <th>Total</th>
+                          ) : suppliesViewMode === 'sector' ? (
+                            <th>Total</th>
+                          ) : (
+                            <>
+                              <th>Total</th>
+                              <th></th>
+                              <th></th>
+                              <th></th>
+                            </>
+                          )}
                           {suppliesFoodItems.map((fi, idx) => {
                             const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
                             return (

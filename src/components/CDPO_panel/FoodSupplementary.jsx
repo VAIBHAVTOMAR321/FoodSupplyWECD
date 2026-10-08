@@ -292,7 +292,9 @@ const FoodSupplementary = () => {
 
   // Supplies Dynamic States
   const [suppliesTab, setSuppliesTab] = useState("thr");
+  const [suppliesViewMode, setSuppliesViewMode] = useState("sector");
   const [suppliesRecords, setSuppliesRecords] = useState([]);
+  const [suppliesDetailRecords, setSuppliesDetailRecords] = useState([]);
   const [suppliesLoading, setSuppliesLoading] = useState(true);
   const [suppliesError, setSuppliesError] = useState("");
   const [selectedSupplyMonths, setSelectedSupplyMonths] = useState([]);
@@ -344,12 +346,14 @@ const FoodSupplementary = () => {
       }
 
       if (reqId === suppliesReqId.current) {
-        setSuppliesRecords(reconciliation.data);
+        setSuppliesRecords(reconciliation.sector_month_summary || []);
+        setSuppliesDetailRecords(reconciliation.data || []);
       }
     } catch (err) {
       if (reqId === suppliesReqId.current) {
         console.error(`Failed to fetch ${type.toUpperCase()} supplies data:`, err);
         setSuppliesRecords([]);
+        setSuppliesDetailRecords([]);
         setSuppliesError(`Failed to fetch ${type.toUpperCase()} supplies data.`);
       }
     } finally {
@@ -386,9 +390,18 @@ const FoodSupplementary = () => {
     [suppliesRecords, selectedSupplyMonths, selectedSupplyFYs]
   );
 
+  // Filtered detail records for AWC-wise view
+  const filteredDetailRecords = useMemo(() => {
+    return suppliesDetailRecords.filter((record) =>
+      (selectedSupplyMonths.length === 0 || selectedSupplyMonths.includes(record.month)) &&
+      (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(record.financial_year))
+    );
+  }, [suppliesDetailRecords, selectedSupplyMonths, selectedSupplyFYs]);
+
+  // Sector-wise aggregation (existing logic)
   const suppliesData = useMemo(() => {
     const sectors = new Map();
-    filteredSuppliesRecords.forEach((record) => {
+    suppliesRecords.forEach((record) => {
       if (!sectors.has(record.sector)) {
         sectors.set(record.sector, new Map());
       }
@@ -405,7 +418,29 @@ const FoodSupplementary = () => {
       sector,
       foodData: Array.from(foodItems, ([food_item, quantities]) => ({ food_item, ...quantities })),
     }));
-  }, [filteredSuppliesRecords]);
+  }, [suppliesRecords]);
+
+  // AWC-wise aggregation
+  const awcSuppliesData = useMemo(() => {
+    const awcs = new Map();
+    filteredDetailRecords.forEach((record) => {
+      const awcKey = `${record.awc_code}|${record.awc_name}|${record.sector}`;
+      if (!awcs.has(awcKey)) {
+        awcs.set(awcKey, { awc_code: record.awc_code, awc_name: record.awc_name, sector: record.sector, foodData: new Map() });
+      }
+      const awc = awcs.get(awcKey);
+      const quantities = awc.foodData.get(record.food_item) || { received: 0, distributed: 0, balance: 0 };
+      quantities.received += Number(record.received_quantity) || 0;
+      quantities.distributed += Number(record.distributed_quantity) || 0;
+      quantities.balance += Number(record.balance_quantity) || 0;
+      awc.foodData.set(record.food_item, quantities);
+    });
+
+    return Array.from(awcs.values()).map((awc) => ({
+      ...awc,
+      foodData: Array.from(awc.foodData, ([food_item, quantities]) => ({ food_item, ...quantities })),
+    })).sort((a, b) => a.sector.localeCompare(b.sector) || a.awc_name.localeCompare(b.awc_name));
+  }, [filteredDetailRecords]);
 
   // Keep food columns stable while period filters change.
   const suppliesFoodItems = useMemo(() => {
@@ -418,7 +453,8 @@ const FoodSupplementary = () => {
     suppliesFoodItems.forEach((fi) => {
       totals[fi] = { received: 0, distributed: 0, balance: 0 };
     });
-    suppliesData.forEach((row) => {
+    const data = suppliesViewMode === "sector" ? suppliesData : awcSuppliesData;
+    data.forEach((row) => {
       row.foodData.forEach((fd) => {
         if (totals[fd.food_item]) {
           totals[fd.food_item].received += fd.received || 0;
@@ -428,7 +464,7 @@ const FoodSupplementary = () => {
       });
     });
     return totals;
-  }, [suppliesData, suppliesFoodItems]);
+  }, [suppliesData, awcSuppliesData, suppliesFoodItems, suppliesViewMode]);
 
   const uniqueMonths = useMemo(() => [...new Set(records.map((r) => r.month).filter(Boolean))].sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b)), [records]);
   const uniqueFYs = useMemo(() => [...new Set(records.map((r) => r.financial_year).filter(Boolean))].sort(), [records]);
@@ -820,8 +856,15 @@ const FoodSupplementary = () => {
 
   /* ─── Dynamic Export Handlers (Excel & PDF) ─── */
   const exportSuppliesToExcel = () => {
-    const data = suppliesData.map((r, i) => {
-      const row = { "S. No.": i + 1, Sector: r.sector };
+    const data = (suppliesViewMode === "sector" ? suppliesData : awcSuppliesData).map((r, i) => {
+      const row = { "S. No.": i + 1 };
+      if (suppliesViewMode === "sector") {
+        row.Sector = r.sector;
+      } else {
+        row.Sector = r.sector;
+        row["AWC Name"] = r.awc_name;
+        row["AWC Code"] = r.awc_code;
+      }
       suppliesFoodItems.forEach((fi) => {
         const fd = r.foodData.find((f) => f.food_item === fi);
         row[`${fi} - Received`] = fd ? fd.received : 0;
@@ -831,7 +874,14 @@ const FoodSupplementary = () => {
       return row;
     });
 
-    const totalRow = { "S. No.": "", Sector: "Total" };
+    const totalRow = { "S. No.": "" };
+    if (suppliesViewMode === "sector") {
+      totalRow.Sector = "Total";
+    } else {
+      totalRow.Sector = "Total";
+      totalRow["AWC Name"] = "";
+      totalRow["AWC Code"] = "";
+    }
     suppliesFoodItems.forEach((fi) => {
       const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
       totalRow[`${fi} - Received`] = t.received.toLocaleString();
@@ -843,21 +893,29 @@ const FoodSupplementary = () => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Supplies Summary");
-    XLSX.writeFile(wb, `Supplies_${suppliesTab.toUpperCase()}_Summary.xlsx`);
+    XLSX.writeFile(wb, `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode === "sector" ? "Sector" : "AWC"}_Summary.xlsx`);
   };
 
   const exportSuppliesToPDF = () => {
     const head = [
       [
         { content: "S. No.", rowSpan: 2 },
-        { content: "Sector", rowSpan: 2 },
+        ...(suppliesViewMode === "sector" 
+          ? [{ content: "Sector", rowSpan: 2 }]
+          : [
+              { content: "Sector", rowSpan: 2 },
+              { content: "AWC Name", rowSpan: 2 },
+              { content: "AWC Code", rowSpan: 2 }
+            ]
+        ),
         ...suppliesFoodItems.map((fi) => ({ content: fi, colSpan: 3 })),
       ],
-      [...suppliesFoodItems.flatMap(() => ["Rec.", "Dist.", "Rem."])],
+      [...(suppliesViewMode === "sector" ? [] : ["", ""]).flatMap(() => []), ...suppliesFoodItems.flatMap(() => ["Rec.", "Dist.", "Rem."])],
     ];
 
-    const body = suppliesData.map((r, i) => [
-      i + 1, r.sector,
+    const body = (suppliesViewMode === "sector" ? suppliesData : awcSuppliesData).map((r, i) => [
+      i + 1,
+      ...(suppliesViewMode === "sector" ? [r.sector] : [r.sector, r.awc_name, r.awc_code]),
       ...suppliesFoodItems.flatMap((fi) => {
         const fd = r.foodData.find((f) => f.food_item === fi);
         return fd ? [fd.received, fd.distributed, fd.balance] : [0, 0, 0];
@@ -866,7 +924,7 @@ const FoodSupplementary = () => {
 
     const foot = [
       [
-        { content: "Total", colSpan: 2 },
+        { content: "Total", colSpan: suppliesViewMode === "sector" ? 2 : 4 },
         ...suppliesFoodItems.flatMap((fi) => {
           const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
           return [t.received.toLocaleString(), t.distributed.toLocaleString(), t.balance.toLocaleString()];
@@ -875,14 +933,14 @@ const FoodSupplementary = () => {
     ];
 
     const doc = new jsPDF("l", "pt", "a3");
-    doc.text(`Supplies ${suppliesTab.toUpperCase()} Summary`, 40, 40);
+    doc.text(`Supplies ${suppliesTab.toUpperCase()} ${suppliesViewMode === "sector" ? "Sector-wise" : "AWC-wise"} Summary`, 40, 40);
     autoTable(doc, {
       head, body, foot, startY: 50,
       styles: { fontSize: 7, cellPadding: 2 },
       headStyles: { fillColor: [79, 70, 229] },
       footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" },
     });
-    doc.save(`Supplies_${suppliesTab.toUpperCase()}_Summary.pdf`);
+    doc.save(`Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode === "sector" ? "Sector" : "AWC"}_Summary.pdf`);
   };
 
   const exportAggToExcel = () => {
@@ -1083,9 +1141,17 @@ const FoodSupplementary = () => {
                                 Reset
                               </Button>
                             )}
-                            <ButtonGroup className="fs-toggle-group">
+                            <ButtonGroup className="fs-toggle-group" style={{ marginRight: "8px" }}>
                               <Button className={`fs-toggle-btn ${suppliesTab === "thr" ? "active" : ""}`} onClick={() => { setSuppliesTab("thr"); setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}>THR</Button>
                               <Button className={`fs-toggle-btn ${suppliesTab === "hcm" ? "active" : ""}`} onClick={() => { setSuppliesTab("hcm"); setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}>HCM</Button>
+                            </ButtonGroup>
+                            <ButtonGroup className="fs-toggle-group" style={{ marginRight: "8px" }}>
+                              <Button className={`fs-toggle-btn ${suppliesViewMode === "sector" ? "active" : ""}`} onClick={() => setSuppliesViewMode("sector")} title="Sector-wise">
+                                <FaLayerGroup className="me-1" /> Sector
+                              </Button>
+                              <Button className={`fs-toggle-btn ${suppliesViewMode === "awc" ? "active" : ""}`} onClick={() => setSuppliesViewMode("awc")} title="AWC-wise">
+                                <FaWarehouse className="me-1" /> AWC
+                              </Button>
                             </ButtonGroup>
                             <div className="fs-export-btns">
                               <Button variant="light" size="sm" className="fs-export-btn" onClick={exportSuppliesToExcel}>
@@ -1105,72 +1171,149 @@ const FoodSupplementary = () => {
                           ) : suppliesError ? (
                             <Alert variant="danger" className="m-3">{suppliesError}</Alert>
                           ) : (
-                            <Table hover className="fs-data-table mb-0">
-                              <thead>
-                                <tr>
-                                  <th rowSpan="2">S. No.</th>
-                                  <th rowSpan="2">Sector</th>
-                                  {suppliesFoodItems.map((fi, idx) => (
-                                    <th key={`fi-${idx}`} colSpan="3" className="text-center" style={{ borderLeft: "1px solid #e9d5ff" }}>
-                                      {fi}
-                                    </th>
-                                  ))}
-                                </tr>
-                                <tr>
-                                  {suppliesFoodItems.map((fi, idx) => (
-                                    <React.Fragment key={`sub-${idx}`}>
-                                      <th className="text-end">Rec.</th>
-                                      <th className="text-end">Dist.</th>
-                                      <th className="text-end">Rem.</th>
-                                    </React.Fragment>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {suppliesData.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={2 + suppliesFoodItems.length * 3} className="text-center p-4 text-muted">
-                                      No data available
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  suppliesData.map((row, i) => (
-                                    <tr key={i}>
-                                      <td>{i + 1}</td>
-                                      <td><strong>{row.sector}</strong></td>
-                                      {suppliesFoodItems.map((fi, idx) => {
-                                        const fd = row.foodData.find((f) => f.food_item === fi);
-                                        return (
-                                          <React.Fragment key={`data-${idx}`}>
-                                            <td className="text-end">{fd ? fd.received.toLocaleString() : 0}</td>
-                                            <td className="text-end">{fd ? fd.distributed.toLocaleString() : 0}</td>
-                                            <td className="text-end text-primary"><strong>{fd ? fd.balance.toLocaleString() : 0}</strong></td>
-                                          </React.Fragment>
-                                        );
-                                      })}
+                            <>
+                              {suppliesViewMode === "sector" ? (
+                                <Table hover className="fs-data-table mb-0">
+                                  <thead>
+                                    <tr>
+                                      <th rowSpan="2">S. No.</th>
+                                      <th rowSpan="2">Sector</th>
+                                      {suppliesFoodItems.map((fi, idx) => (
+                                        <th key={`fi-${idx}`} colSpan="3" className="text-center" style={{ borderLeft: "1px solid #e9d5ff" }}>
+                                          {fi}
+                                        </th>
+                                      ))}
                                     </tr>
-                                  ))
-                                )}
-                              </tbody>
-                              {suppliesData.length > 0 && (
-                                <tfoot>
-                                  <tr>
-                                    <th></th>
-                                    <th>Total</th>
-                                    {suppliesFoodItems.map((fi, idx) => {
-                                      const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
-                                      return (
-                                        <React.Fragment key={`foot-${idx}`}>
-                                          <th className="text-end">{t.received.toLocaleString()}</th>
-                                          <th className="text-end">{t.distributed.toLocaleString()}</th>
-                                          <th className="text-end">{t.balance.toLocaleString()}</th>
+                                    <tr>
+                                      {suppliesFoodItems.map((fi, idx) => (
+                                        <React.Fragment key={`sub-${idx}`}>
+                                          <th className="text-end">Rec.</th>
+                                          <th className="text-end">Dist.</th>
+                                          <th className="text-end">Rem.</th>
                                         </React.Fragment>
-                                      );
-                                    })}
-                                  </tr>
-                                </tfoot>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {suppliesData.length === 0 ? (
+                                      <tr>
+                                        <td colSpan={2 + suppliesFoodItems.length * 3} className="text-center p-4 text-muted">
+                                          No data available
+                                        </td>
+                                      </tr>
+                                    ) : (
+                                      suppliesData.map((row, i) => (
+                                        <tr key={i}>
+                                          <td>{i + 1}</td>
+                                          <td><strong>{row.sector}</strong></td>
+                                          {suppliesFoodItems.map((fi, idx) => {
+                                            const fd = row.foodData.find((f) => f.food_item === fi);
+                                            return (
+                                              <React.Fragment key={`data-${idx}`}>
+                                                <td className="text-end">{fd ? fd.received.toLocaleString() : 0}</td>
+                                                <td className="text-end">{fd ? fd.distributed.toLocaleString() : 0}</td>
+                                                <td className="text-end text-primary"><strong>{fd ? fd.balance.toLocaleString() : 0}</strong></td>
+                                              </React.Fragment>
+                                            );
+                                          })}
+                                        </tr>
+                                      ))
+                                    )}
+                                  </tbody>
+                                  {suppliesData.length > 0 && (
+                                    <tfoot>
+                                      <tr>
+                                        <th></th>
+                                        <th>Total</th>
+                                        {suppliesFoodItems.map((fi, idx) => {
+                                          const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
+                                          return (
+                                            <React.Fragment key={`foot-${idx}`}>
+                                              <th className="text-end">{t.received.toLocaleString()}</th>
+                                              <th className="text-end">{t.distributed.toLocaleString()}</th>
+                                              <th className="text-end">{t.balance.toLocaleString()}</th>
+                                            </React.Fragment>
+                                          );
+                                        })}
+                                      </tr>
+                                    </tfoot>
+                                  )}
+                                </Table>
+                              ) : (
+                                <Table hover className="fs-data-table mb-0">
+                                  <thead>
+                                    <tr>
+                                      <th rowSpan="2">S. No.</th>
+                                      <th rowSpan="2">Sector</th>
+                                      <th rowSpan="2">AWC Name</th>
+                                      <th rowSpan="2">AWC Code</th>
+                                      {suppliesFoodItems.map((fi, idx) => (
+                                        <th key={`fi-awc-${idx}`} colSpan="3" className="text-center" style={{ borderLeft: "1px solid #e9d5ff" }}>
+                                          {fi}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                    <tr>
+                                      {suppliesFoodItems.map((fi, idx) => (
+                                        <React.Fragment key={`sub-awc-${idx}`}>
+                                          <th className="text-end">Rec.</th>
+                                          <th className="text-end">Dist.</th>
+                                          <th className="text-end">Rem.</th>
+                                        </React.Fragment>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {awcSuppliesData.length === 0 ? (
+                                      <tr>
+                                        <td colSpan={4 + suppliesFoodItems.length * 3} className="text-center p-4 text-muted">
+                                          No data available
+                                        </td>
+                                      </tr>
+                                    ) : (
+                                      awcSuppliesData.map((row, i) => (
+                                        <tr key={i}>
+                                          <td>{i + 1}</td>
+                                          <td>{row.sector}</td>
+                                          <td><strong>{row.awc_name}</strong></td>
+                                          <td>{row.awc_code}</td>
+                                          {suppliesFoodItems.map((fi, idx) => {
+                                            const fd = row.foodData.find((f) => f.food_item === fi);
+                                            return (
+                                              <React.Fragment key={`data-awc-${idx}`}>
+                                                <td className="text-end">{fd ? fd.received.toLocaleString() : 0}</td>
+                                                <td className="text-end">{fd ? fd.distributed.toLocaleString() : 0}</td>
+                                                <td className="text-end text-primary"><strong>{fd ? fd.balance.toLocaleString() : 0}</strong></td>
+                                              </React.Fragment>
+                                            );
+                                          })}
+                                        </tr>
+                                      ))
+                                    )}
+                                  </tbody>
+                                  {awcSuppliesData.length > 0 && (
+                                    <tfoot>
+                                      <tr>
+                                        <th></th>
+                                        <th>Total</th>
+                                        <th></th>
+                                        <th></th>
+                                        {suppliesFoodItems.map((fi, idx) => {
+                                          const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
+                                          return (
+                                            <React.Fragment key={`foot-awc-${idx}`}>
+                                              <th className="text-end">{t.received.toLocaleString()}</th>
+                                              <th className="text-end">{t.distributed.toLocaleString()}</th>
+                                              <th className="text-end">{t.balance.toLocaleString()}</th>
+                                            </React.Fragment>
+                                          );
+                                        })}
+                                      </tr>
+                                    </tfoot>
+                                  )}
+                                </Table>
                               )}
-                            </Table>
+                            </>
                           )}
                         </div>
                       </Card.Body>
