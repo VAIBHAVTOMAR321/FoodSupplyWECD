@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table } from "react-bootstrap";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table, Form, Dropdown, Button, ButtonGroup } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
-import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
+import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading, FaFilter, FaTimes, FaSearch, FaWarehouse } from "react-icons/fa";
 
 const CDPODashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -23,6 +23,19 @@ const CDPODashboard = () => {
   const [awcCount, setAwcCount] = useState(0);
   const [sectorCount, setSectorCount] = useState(0);
   const [expanded, setExpanded] = useState(null);
+
+  // Reconciliation data states
+  const [hcmReconciliation, setHcmReconciliation] = useState(null);
+  const [thrReconciliation, setThrReconciliation] = useState(null);
+  const [hcmReconciliationLoading, setHcmReconciliationLoading] = useState(false);
+  const [thrReconciliationLoading, setThrReconciliationLoading] = useState(false);
+  const [hcmReconciliationError, setHcmReconciliationError] = useState("");
+  const [thrReconciliationError, setThrReconciliationError] = useState("");
+  
+  // Filter states
+  const [selectedMonths, setSelectedMonths] = useState([]);
+  const [selectedFYs, setSelectedFYs] = useState([]);
+  const [reconciliationTab, setReconciliationTab] = useState("hcm");
 
   useEffect(() => {
     const handleResize = () => {
@@ -108,12 +121,68 @@ const CDPODashboard = () => {
     }
   };
 
-  useEffect(() => {
+  // Fetch reconciliation data for HCM and THR
+  const fetchReconciliationData = useCallback(async (type) => {
+    if (type === "hcm") {
+      setHcmReconciliationLoading(true);
+      setHcmReconciliationError("");
+    } else {
+      setThrReconciliationLoading(true);
+      setThrReconciliationError("");
+    }
+    
+    try {
+      const response = await api.get(`/cdpo/${type}-awc-food-reconciliation/`);
+      const apiResponse = response.data;
+      
+      // API returns: { count, next, previous, results: { success, project, data: [...] } }
+      const results = apiResponse.results;
+      
+      if (results && results.success && results.data) {
+        if (type === "hcm") {
+          setHcmReconciliation(results);
+        } else {
+          setThrReconciliation(results);
+        }
+      } else {
+        if (type === "hcm") {
+          setHcmReconciliation(null);
+        } else {
+          setThrReconciliation(null);
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to fetch ${type.toUpperCase()} reconciliation data:`, err);
+      const errorMsg = `Failed to fetch ${type.toUpperCase()} reconciliation data.`;
+      if (type === "hcm") {
+        setHcmReconciliationError(errorMsg);
+        setHcmReconciliation(null);
+      } else {
+        setThrReconciliationError(errorMsg);
+        setThrReconciliation(null);
+      }
+    } finally {
+      if (type === "hcm") {
+        setHcmReconciliationLoading(false);
+      } else {
+        setThrReconciliationLoading(false);
+      }
+    }
+  }, [api]);
+
+useEffect(() => {
     if (api) {
       fetchAllData();
     }
   }, [api]);
- 
+
+  // Fetch reconciliation data when tab changes
+  useEffect(() => {
+    if (api) {
+      fetchReconciliationData(reconciliationTab);
+    }
+  }, [api, reconciliationTab, fetchReconciliationData]);
+  
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
@@ -259,6 +328,275 @@ const CDPODashboard = () => {
             ))}
           </tbody>
         </Table>
+      </div>
+    );
+  };
+
+  // Reconciliation Table Component
+  const ReconciliationTable = ({ data, type, isLoading, error }) => {
+    // Show loading state first
+    if (isLoading) return <div className="text-center p-4"><Spinner animation="border" /></div>;
+    if (error) return <Alert variant="danger">{error}</Alert>;
+    
+    // Then check for data
+    if (!data || !data.data || data.data.length === 0) {
+      return <div className="text-center p-4 text-muted">No reconciliation data found.</div>;
+    }
+
+    // Extract unique months and financial years from data for filter dropdowns
+    const uniqueMonths = useMemo(() => {
+      const months = [...new Set(data.data.map(r => r.month).filter(Boolean))];
+      return months.sort((a, b) => {
+        const monthOrder = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        return (monthOrder.indexOf(a) || 0) - (monthOrder.indexOf(b) || 0);
+      });
+    }, [data]);
+
+    const uniqueFYs = useMemo(() => {
+      return [...new Set(data.data.map(r => r.financial_year).filter(Boolean))].sort();
+    }, [data]);
+
+    // Filter data based on selected months and financial years
+    const filteredData = useMemo(() => {
+      return data.data.filter(r => {
+        const m = selectedMonths.length === 0 ? true : selectedMonths.includes(r.month);
+        const y = selectedFYs.length === 0 ? true : selectedFYs.includes(r.financial_year);
+        return m && y;
+      });
+    }, [data.data, selectedMonths, selectedFYs]);
+
+    // Calculate totals
+    const totals = useMemo(() => {
+      return filteredData.reduce((acc, r) => {
+        acc.allocated_beneficiaries += parseInt(r.allocated_beneficiaries) || 0;
+        acc.received_beneficiaries += parseInt(r.received_beneficiaries) || 0;
+        acc.distributed_beneficiaries += parseInt(r.distributed_beneficiaries) || 0;
+        acc.allocated_quantity += parseFloat(r.allocated_quantity) || 0;
+        acc.received_quantity += parseFloat(r.received_quantity) || 0;
+        acc.distributed_quantity += parseFloat(r.distributed_quantity) || 0;
+        acc.balance_quantity += parseFloat(r.balance_quantity) || 0;
+        return acc;
+      }, {
+        allocated_beneficiaries: 0,
+        received_beneficiaries: 0,
+        distributed_beneficiaries: 0,
+        allocated_quantity: 0,
+        received_quantity: 0,
+        distributed_quantity: 0,
+        balance_quantity: 0
+      });
+    }, [filteredData]);
+
+    return (
+      <div className="reconciliation-table-container">
+        {/* Filter Bar */}
+        <div className="reconciliation-filter-bar mb-3 p-3 bg-light rounded">
+          <Row className="g-3 align-items-end">
+            <Col md={4}>
+              <Form.Label className="fw-bold">Month</Form.Label>
+              <Dropdown autoClose="outside">
+                <Dropdown.Toggle 
+                  variant="outline-secondary" 
+                  className="w-100"
+                  style={{ justifyContent: "space-between" }}
+                >
+                  <span>
+                    {selectedMonths.length === 0 
+                      ? "All Months" 
+                      : selectedMonths.length === 1 
+                        ? selectedMonths[0] 
+                        : `${selectedMonths.length} Months Selected`}
+                  </span>
+                  <FaChevronDown />
+                </Dropdown.Toggle>
+                <Dropdown.Menu className="reconciliation-dropdown-menu">
+                  {uniqueMonths.length === 0 ? (
+                    <Dropdown.Item disabled>No months available</Dropdown.Item>
+                  ) : (
+                    uniqueMonths.map((month) => (
+                      <div key={month} className="reconciliation-dropdown-item" 
+                        onClick={(e) => { e.stopPropagation(); }}>
+                        <Form.Check 
+                          type="checkbox" 
+                          checked={selectedMonths.includes(month)} 
+                          onChange={() => {
+                            if (selectedMonths.includes(month)) {
+                              setSelectedMonths(selectedMonths.filter(m => m !== month));
+                            } else {
+                              setSelectedMonths([...selectedMonths, month]);
+                            }
+                          }} 
+                          label={month} 
+                        />
+                      </div>
+                    ))
+                  )}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={4}>
+              <Form.Label className="fw-bold">Financial Year</Form.Label>
+              <Dropdown autoClose="outside">
+                <Dropdown.Toggle 
+                  variant="outline-secondary" 
+                  className="w-100"
+                  style={{ justifyContent: "space-between" }}
+                >
+                  <span>
+                    {selectedFYs.length === 0 
+                      ? "All Years" 
+                      : selectedFYs.length === 1 
+                        ? selectedFYs[0] 
+                        : `${selectedFYs.length} Years Selected`}
+                  </span>
+                  <FaChevronDown />
+                </Dropdown.Toggle>
+                <Dropdown.Menu className="reconciliation-dropdown-menu">
+                  {uniqueFYs.length === 0 ? (
+                    <Dropdown.Item disabled>No years available</Dropdown.Item>
+                  ) : (
+                    uniqueFYs.map((fy) => (
+                      <div key={fy} className="reconciliation-dropdown-item" 
+                        onClick={(e) => { e.stopPropagation(); }}>
+                        <Form.Check 
+                          type="checkbox" 
+                          checked={selectedFYs.includes(fy)} 
+                          onChange={() => {
+                            if (selectedFYs.includes(fy)) {
+                              setSelectedFYs(selectedFYs.filter(y => y !== fy));
+                            } else {
+                              setSelectedFYs([...selectedFYs, fy]);
+                            }
+                          }} 
+                          label={fy} 
+                        />
+                      </div>
+                    ))
+                  )}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={4} className="d-flex justify-content-md-end">
+              {(selectedMonths.length > 0 || selectedFYs.length > 0) && (
+                <Button 
+                  variant="outline-danger" 
+                  size="sm" 
+                  onClick={() => { setSelectedMonths([]); setSelectedFYs([]); }}
+                  className="d-flex align-items-center"
+                >
+                  <FaTimes className="me-1" /> Clear Filters
+                </Button>
+              )}
+            </Col>
+          </Row>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="reconciliation-summary-cards mb-3">
+          <Row className="g-2">
+            <Col xs={6} md={3}>
+              <Card className="bg-primary text-white">
+                <Card.Body className="py-2">
+                  <small>Allocated Beneficiaries</small>
+                  <div className="fw-bold fs-5">{totals.allocated_beneficiaries.toLocaleString()}</div>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6} md={3}>
+              <Card className="bg-info text-white">
+                <Card.Body className="py-2">
+                  <small>Received Beneficiaries</small>
+                  <div className="fw-bold fs-5">{totals.received_beneficiaries.toLocaleString()}</div>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6} md={3}>
+              <Card className="bg-success text-white">
+                <Card.Body className="py-2">
+                  <small>Distributed Beneficiaries</small>
+                  <div className="fw-bold fs-5">{totals.distributed_beneficiaries.toLocaleString()}</div>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6} md={3}>
+              <Card className="bg-warning text-dark">
+                <Card.Body className="py-2">
+                  <small>Balance Quantity</small>
+                  <div className="fw-bold fs-5">{totals.balance_quantity.toLocaleString()}</div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </div>
+
+        {/* Data Table */}
+        <div className="table-responsive">
+          <Table striped bordered hover responsive className="mb-0 reconciliation-table">
+            <thead className="table-light sticky-top">
+              <tr>
+                <th>#</th>
+                <th>District</th>
+                <th>Project</th>
+                <th>Sector</th>
+                <th>AWC Code</th>
+                <th>AWC Name</th>
+                <th>Month</th>
+                <th>Fin. Year</th>
+                <th>Food Item</th>
+                <th>Beneficiary Category</th>
+                <th>Allocated Bene.</th>
+                <th>Received Bene.</th>
+                <th>Distributed Bene.</th>
+                <th>Allocated Qty</th>
+                <th>Received Qty</th>
+                <th>Distributed Qty</th>
+                <th>Balance Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredData.length === 0 ? (
+                <tr>
+                  <td colSpan="17" className="text-center p-4 text-muted">No data found for selected filters.</td>
+                </tr>
+              ) : (
+                filteredData.map((item, index) => (
+                  <tr key={item.id || index}>
+                    <td>{index + 1}</td>
+                    <td>{item.district}</td>
+                    <td>{item.project}</td>
+                    <td>{item.sector}</td>
+                    <td>{item.awc_code}</td>
+                    <td>{item.awc_name}</td>
+                    <td><Badge bg="secondary">{item.month}</Badge></td>
+                    <td>{item.financial_year}</td>
+                    <td>{item.food_item}</td>
+                    <td>{item.bene_category}</td>
+                    <td className="text-end">{item.allocated_beneficiaries ?? 0}</td>
+                    <td className="text-end">{item.received_beneficiaries ?? 0}</td>
+                    <td className="text-end">{item.distributed_beneficiaries ?? 0}</td>
+                    <td className="text-end">{parseFloat(item.allocated_quantity).toFixed(2)}</td>
+                    <td className="text-end">{parseFloat(item.received_quantity).toFixed(2)}</td>
+                    <td className="text-end">{parseFloat(item.distributed_quantity).toFixed(2)}</td>
+                    <td className="text-end fw-bold text-primary">{parseFloat(item.balance_quantity).toFixed(2)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="table-active fw-bold">
+                <th></th>
+                <th colSpan="9" className="text-end">Totals:</th>
+                <th className="text-end">{totals.allocated_beneficiaries.toLocaleString()}</th>
+                <th className="text-end">{totals.received_beneficiaries.toLocaleString()}</th>
+                <th className="text-end">{totals.distributed_beneficiaries.toLocaleString()}</th>
+                <th className="text-end">{totals.allocated_quantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</th>
+                <th className="text-end">{totals.received_quantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</th>
+                <th className="text-end">{totals.distributed_quantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</th>
+                <th className="text-end text-primary">{totals.balance_quantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</th>
+              </tr>
+            </tfoot>
+          </Table>
+        </div>
       </div>
     );
   };
@@ -501,6 +839,52 @@ const CDPODashboard = () => {
                 </Card>
               </Col>
             </Row>
+          </div>
+
+          {/* Supplies Received & Distributed Summary - Reconciliation */}
+          <div className="dashboard-section">
+            <h4 className="section-title">
+              <FaWarehouse className="me-2" /> Supplies Received & Distributed Summary
+            </h4>
+            <Card className="shadow-sm">
+              <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div className="d-flex align-items-center gap-3">
+                  <ButtonGroup className="reconciliation-tab-group" role="group">
+                    <Button 
+                      variant={reconciliationTab === "hcm" ? "primary" : "outline-primary"} 
+                      size="sm"
+                      onClick={() => { setReconciliationTab("hcm"); setSelectedMonths([]); setSelectedFYs([]); }}
+                    >
+                      <FaBox className="me-1" /> HCM
+                    </Button>
+                    <Button 
+                      variant={reconciliationTab === "thr" ? "warning" : "outline-warning"} 
+                      size="sm"
+                      onClick={() => { setReconciliationTab("thr"); setSelectedMonths([]); setSelectedFYs([]); }}
+                    >
+                      <FaTruckLoading className="me-1" /> THR
+                    </Button>
+                  </ButtonGroup>
+                </div>
+              </Card.Header>
+              <Card.Body className="p-3">
+                {reconciliationTab === "hcm" ? (
+                  <ReconciliationTable 
+                    data={hcmReconciliation} 
+                    type="hcm" 
+                    isLoading={hcmReconciliationLoading}
+                    error={hcmReconciliationError}
+                  />
+                ) : (
+                  <ReconciliationTable 
+                    data={thrReconciliation} 
+                    type="thr" 
+                    isLoading={thrReconciliationLoading}
+                    error={thrReconciliationError}
+                  />
+                )}
+              </Card.Body>
+            </Card>
           </div>
         </Container>
       </div>
