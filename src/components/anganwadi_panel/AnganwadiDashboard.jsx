@@ -440,6 +440,19 @@ const AnganwadiDashboard = () => {
       return;
     }
 
+    //  Validate total beneficiaries against available beneficiaries from supplementary nutrition data
+    const maxAvailableBeneficiaries = computeAutoTotalBeneficiaries(
+      selectedFoodItemDetails,
+      distributionData.fin_year,
+      distributionData.months
+    );
+    const enteredBeneficiaries = parseInt(distributionData.total_beneficiaries, 10);
+    if (maxAvailableBeneficiaries && enteredBeneficiaries > maxAvailableBeneficiaries) {
+      setDistributionError(`त्रुटि: कुल लाभार्थी (${enteredBeneficiaries}) उपलब्ध लाभार्थियों (${maxAvailableBeneficiaries}) से अधिक नहीं हो सकते।`);
+      setSubmitting(false);
+      return;
+    }
+
     const isEdit = selectedItem.isEdit;
     const calculatedQuantity = parseFloat(selectedFoodItemDetails.qty_per_ben) * parseInt(distributionData.total_beneficiaries, 10);
 
