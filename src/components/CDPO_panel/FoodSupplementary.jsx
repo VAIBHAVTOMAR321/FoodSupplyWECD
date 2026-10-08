@@ -56,8 +56,7 @@ import {
   FaUtensils,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import html2pdf from "html2pdf.js";
 
 const monthNames = [
   "January",
@@ -897,50 +896,103 @@ const FoodSupplementary = () => {
   };
 
   const exportSuppliesToPDF = () => {
-    const head = [
-      [
-        { content: "S. No.", rowSpan: 2 },
-        ...(suppliesViewMode === "sector" 
-          ? [{ content: "Sector", rowSpan: 2 }]
-          : [
-              { content: "Sector", rowSpan: 2 },
-              { content: "AWC Name", rowSpan: 2 },
-              { content: "AWC Code", rowSpan: 2 }
-            ]
-        ),
-        ...suppliesFoodItems.map((fi) => ({ content: fi, colSpan: 3 })),
-      ],
-      [...(suppliesViewMode === "sector" ? [] : ["", ""]).flatMap(() => []), ...suppliesFoodItems.flatMap(() => ["Rec.", "Dist.", "Rem."])],
-    ];
+    const data = suppliesViewMode === "sector" ? suppliesData : awcSuppliesData;
+    
+    let html = `
+      <html>
+        <head>
+          <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+        </head>
+        <body style="margin:0; padding:0;">
+          <div style="font-family: 'Noto Sans Devanagari', 'Noto Sans', Arial, sans-serif; padding: 20px;">
+            <h3 style="text-align:center; margin-bottom:20px; color:#1e3a5f;">
+              Supplies ${suppliesTab.toUpperCase()} ${suppliesViewMode === "sector" ? "Sector-wise" : "AWC-wise"} Summary
+            </h3>
+            <table style="width:100%; border-collapse:collapse; font-size:10px;">
+              <thead>
+                <tr style="background-color:#4f46e5; color:white;">
+                  <th style="border:1px solid #ddd; padding:6px 4px;">S. No.</th>
+                  <th style="border:1px solid #ddd; padding:6px 4px;">Sector</th>
+                  ${suppliesViewMode === "awc" ? `
+                    <th style="border:1px solid #ddd; padding:6px 4px;">AWC Name</th>
+                    <th style="border:1px solid #ddd; padding:6px 4px;">AWC Code</th>
+                  ` : ""}
+                  ${suppliesFoodItems.map(fi => `
+                    <th style="border:1px solid #ddd; padding:6px 4px; colspan:3; text-align:center;">${fi}</th>
+                  `).join("")}
+                </tr>
+                <tr style="background-color:#e0e7ff;">
+                  <th style="border:1px solid #ddd; padding:4px;">S. No.</th>
+                  <th style="border:1px solid #ddd; padding:4px;">Sector</th>
+                  ${suppliesViewMode === "awc" ? `
+                    <th style="border:1px solid #ddd; padding:4px;">AWC Name</th>
+                    <th style="border:1px solid #ddd; padding:4px;">AWC Code</th>
+                  ` : ""}
+                  ${suppliesFoodItems.flatMap(() => [
+                    `<th style="border:1px solid #ddd; padding:4px; text-align:right;">Rec.</th>`,
+                    `<th style="border:1px solid #ddd; padding:4px; text-align:right;">Dist.</th>`,
+                    `<th style="border:1px solid #ddd; padding:4px; text-align:right;">Rem.</th>`
+                  ]).join("")}
+                </tr>
+              </thead>
+              <tbody>
+                ${data.map((r, i) => `
+                  <tr>
+                    <td style="border:1px solid #ddd; padding:4px; text-align:center;">${i + 1}</td>
+                    <td style="border:1px solid #ddd; padding:4px;"><strong>${r.sector}</strong></td>
+                    ${suppliesViewMode === "awc" ? `
+                      <td style="border:1px solid #ddd; padding:4px;">${r.awc_name}</td>
+                      <td style="border:1px solid #ddd; padding:4px;">${r.awc_code}</td>
+                    ` : ""}
+                    ${suppliesFoodItems.map(fi => {
+                      const fd = r.foodData.find(f => f.food_item === fi);
+                      return `
+                        <td style="border:1px solid #ddd; padding:4px; text-align:right;">${fd ? fd.received.toLocaleString() : 0}</td>
+                        <td style="border:1px solid #ddd; padding:4px; text-align:right;">${fd ? fd.distributed.toLocaleString() : 0}</td>
+                        <td style="border:1px solid #ddd; padding:4px; text-align:right; color:#2563eb; font-weight:bold;">${fd ? fd.balance.toLocaleString() : 0}</td>
+                      `;
+                    }).join("")}
+                  </tr>
+                `).join("")}
+              </tbody>
+              <tfoot>
+                <tr style="background-color:#f1f5f9; font-weight:bold;">
+                  <td style="border:1px solid #ddd; padding:4px;"></td>
+                  <td style="border:1px solid #ddd; padding:4px;">Total</td>
+                  ${suppliesViewMode === "awc" ? `
+                    <td style="border:1px solid #ddd; padding:4px;"></td>
+                    <td style="border:1px solid #ddd; padding:4px;"></td>
+                  ` : ""}
+                  ${suppliesFoodItems.map(fi => {
+                    const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
+                    return `
+                      <td style="border:1px solid #ddd; padding:4px; text-align:right;">${t.received.toLocaleString()}</td>
+                      <td style="border:1px solid #ddd; padding:4px; text-align:right;">${t.distributed.toLocaleString()}</td>
+                      <td style="border:1px solid #ddd; padding:4px; text-align:right; color:#2563eb;">${t.balance.toLocaleString()}</td>
+                    `;
+                  }).join("")}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </body>
+      </html>
+    `;
 
-    const body = (suppliesViewMode === "sector" ? suppliesData : awcSuppliesData).map((r, i) => [
-      i + 1,
-      ...(suppliesViewMode === "sector" ? [r.sector] : [r.sector, r.awc_name, r.awc_code]),
-      ...suppliesFoodItems.flatMap((fi) => {
-        const fd = r.foodData.find((f) => f.food_item === fi);
-        return fd ? [fd.received, fd.distributed, fd.balance] : [0, 0, 0];
-      }),
-    ]);
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode === "sector" ? "Sector" : "AWC"}_Summary.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      },
+      jsPDF: { unit: "mm", format: "a3", orientation: "landscape" }
+    };
 
-    const foot = [
-      [
-        { content: "Total", colSpan: suppliesViewMode === "sector" ? 2 : 4 },
-        ...suppliesFoodItems.flatMap((fi) => {
-          const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
-          return [t.received.toLocaleString(), t.distributed.toLocaleString(), t.balance.toLocaleString()];
-        }),
-      ],
-    ];
-
-    const doc = new jsPDF("l", "pt", "a3");
-    doc.text(`Supplies ${suppliesTab.toUpperCase()} ${suppliesViewMode === "sector" ? "Sector-wise" : "AWC-wise"} Summary`, 40, 40);
-    autoTable(doc, {
-      head, body, foot, startY: 50,
-      styles: { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: [79, 70, 229] },
-      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" },
-    });
-    doc.save(`Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode === "sector" ? "Sector" : "AWC"}_Summary.pdf`);
+    html2pdf().set(opt).from(html).save();
   };
 
   const exportAggToExcel = () => {
@@ -960,19 +1012,68 @@ const FoodSupplementary = () => {
   };
 
   const exportAggToPDF = () => {
-    const head = [["S. No.", "Sector", "Months", "Fin. Years", ...NUMERIC_AGG_FIELDS.map((f) => f.label)]];
-    const body = aggregatedData.map((row, i) => [i + 1, row.groupKey, row.months, row.fys, ...NUMERIC_AGG_FIELDS.map((f) => row[f.key]?.toLocaleString() || 0)]);
+    let html = `
+      <html>
+        <head>
+          <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+        </head>
+        <body style="margin:0; padding:0;">
+          <div style="font-family: 'Noto Sans Devanagari', 'Noto Sans', Arial, sans-serif; padding: 20px;">
+            <h3 style="text-align:center; margin-bottom:20px; color:#1e3a5f;">Sector-wise Aggregated Summary</h3>
+            <table style="width:100%; border-collapse:collapse; font-size:9px;">
+              <thead>
+                <tr style="background-color:#4f46e5; color:white;">
+                  <th style="border:1px solid #ddd; padding:6px 4px;">S. No.</th>
+                  <th style="border:1px solid #ddd; padding:6px 4px;">Sector</th>
+                  <th style="border:1px solid #ddd; padding:6px 4px;">Months</th>
+                  <th style="border:1px solid #ddd; padding:6px 4px;">Fin. Years</th>
+                  ${NUMERIC_AGG_FIELDS.map(f => `<th style="border:1px solid #ddd; padding:6px 4px; text-align:right;">${f.label}</th>`).join("")}
+                </tr>
+              </thead>
+              <tbody>
+                ${aggregatedData.map((row, i) => `
+                  <tr>
+                    <td style="border:1px solid #ddd; padding:4px; text-align:center;">${i + 1}</td>
+                    <td style="border:1px solid #ddd; padding:4px;"><strong>${row.groupKey}</strong></td>
+                    <td style="border:1px solid #ddd; padding:4px;">${row.months}</td>
+                    <td style="border:1px solid #ddd; padding:4px;">${row.fys}</td>
+                    ${NUMERIC_AGG_FIELDS.map(f => `
+                      <td style="border:1px solid #ddd; padding:4px; text-align:right;">${row[f.key] ? Number(row[f.key]).toLocaleString() : 0}</td>
+                    `).join("")}
+                  </tr>
+                `).join("")}
+              </tbody>
+              <tfoot>
+                <tr style="background-color:#f1f5f9; font-weight:bold;">
+                  <td style="border:1px solid #ddd; padding:4px;"></td>
+                  <td style="border:1px solid #ddd; padding:4px;">Total</td>
+                  <td style="border:1px solid #ddd; padding:4px;"></td>
+                  <td style="border:1px solid #ddd; padding:4px;"></td>
+                  ${NUMERIC_AGG_FIELDS.map(f => `
+                    <td style="border:1px solid #ddd; padding:4px; text-align:right;">${totalAggregated[f.key]?.toLocaleString() || 0}</td>
+                  `).join("")}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </body>
+      </html>
+    `;
 
-    const doc = new jsPDF("l", "pt", "a3");
-    doc.text("Sector-wise Aggregated Summary", 40, 40);
-    autoTable(doc, {
-      head, body, startY: 50,
-      styles: { fontSize: 6, cellPadding: 2 },
-      headStyles: { fillColor: [79, 70, 229] },
-      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" },
-      foot: [["", "Total", "", "", ...NUMERIC_AGG_FIELDS.map((f) => totalAggregated[f.key]?.toLocaleString() || 0)]],
-    });
-    doc.save("Sector_Summary.pdf");
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: "Sector_Summary.pdf",
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      },
+      jsPDF: { unit: "mm", format: "a3", orientation: "landscape" }
+    };
+
+    html2pdf().set(opt).from(html).save();
   };
 
   const exportDetailsToExcel = () => {
@@ -998,29 +1099,63 @@ const FoodSupplementary = () => {
 
   const exportDetailsToPDF = () => {
     const cols = TABLE_COLUMNS.filter((c) => c.key !== "_index" && c.key !== "_actions");
-    const head = [["S. No.", ...cols.map((c) => c.label)]];
-    const body = searchedRecords.map((row, i) => [
-      i + 1,
-      ...cols.map((c) => {
-        const val = row[c.key];
-        if (c.num || c.strong) return val ? Number(val).toLocaleString() : "0";
-        return val || "—";
-      }),
-    ]);
+    
+    let html = `
+      <div style="font-family: 'Noto Sans Devanagari', 'Noto Sans', Arial, sans-serif; padding: 20px;">
+        <h3 style="text-align:center; margin-bottom:20px; color:#1e3a5f;">Supplementary Nutrition Records</h3>
+        <table style="width:100%; border-collapse:collapse; font-size:8px;">
+          <thead>
+            <tr style="background-color:#4f46e5; color:white;">
+              <th style="border:1px solid #ddd; padding:5px 3px;">S. No.</th>
+              ${cols.map(c => `<th style="border:1px solid #ddd; padding:5px 3px; text-align:${c.num || c.strong ? 'right' : 'center'};">${c.label}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${searchedRecords.map((row, i) => `
+              <tr>
+                <td style="border:1px solid #ddd; padding:3px; text-align:center;">${i + 1}</td>
+                ${cols.map(c => {
+                  const val = row[c.key];
+                  if (c.num || c.strong) {
+                    return `<td style="border:1px solid #ddd; padding:3px; text-align:right;">${val ? Number(val).toLocaleString() : "0"}</td>`;
+                  }
+                  return `<td style="border:1px solid #ddd; padding:3px;">${val || "—"}</td>`;
+                }).join("")}
+              </tr>
+            `).join("")}
+          </tbody>
+          <tfoot>
+            <tr style="background-color:#f1f5f9; font-weight:bold;">
+              <td style="border:1px solid #ddd; padding:3px;"></td>
+              ${cols.map(c => {
+                if (c.num || c.strong) {
+                  return `<td style="border:1px solid #ddd; padding:3px; text-align:right;">${totalDetailed[c.key]?.toLocaleString() || 0}</td>`;
+                }
+                if (c === cols[1]) {
+                  return `<td style="border:1px solid #ddd; padding:3px;">Total</td>`;
+                }
+                return `<td style="border:1px solid #ddd; padding:3px;"></td>`;
+              }).join("")}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
 
-    const totalRow = ["", ...cols.map((c) => { if (c.num || c.strong) return totalDetailed[c.key]?.toLocaleString() || 0; return ""; })];
-    totalRow[1] = "Total";
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: "Supplementary_Records.pdf",
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      },
+      jsPDF: { unit: "mm", format: "a3", orientation: "landscape" }
+    };
 
-    const doc = new jsPDF("l", "pt", "a3");
-    doc.text("Supplementary Nutrition Records", 40, 40);
-    autoTable(doc, {
-      head, body, startY: 50,
-      styles: { fontSize: 5, cellPadding: 1.5 },
-      headStyles: { fillColor: [79, 70, 229] },
-      foot: [totalRow],
-      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" },
-    });
-    doc.save("Supplementary_Records.pdf");
+    html2pdf().set(opt).from(html).save();
   };
 
   return (
