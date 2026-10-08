@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table, Form, Dropdown, Button, ButtonGroup } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table, Form, Dropdown, Button, ButtonGroup, Badge } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/cdpo.css";
@@ -334,49 +334,128 @@ useEffect(() => {
 
   // Reconciliation Table Component
   const ReconciliationTable = ({ data, type, isLoading, error }) => {
-    // Show loading state first
-    if (isLoading) return <div className="text-center p-4"><Spinner animation="border" /></div>;
-    if (error) return <Alert variant="danger">{error}</Alert>;
-    
-    // Then check for data
-    if (!data || !data.data || data.data.length === 0) {
-      return <div className="text-center p-4 text-muted">No reconciliation data found.</div>;
-    }
+    /*
+     * IMPORTANT:
+     * Do not return before calculating the data below.
+     * The API is asynchronous, so returning before hooks/derived values
+     * can cause React hook-order/render problems.
+     *
+     * API structure:
+     * response.data.results.data = [
+     *   { month: "August", financial_year: "2026-27", ... }
+     * ]
+     */
 
-    // Extract unique months and financial years from data for filter dropdowns
-    const uniqueMonths = useMemo(() => {
-      const months = [...new Set(data.data.map(r => r.month).filter(Boolean))];
-      return months.sort((a, b) => {
-        const monthOrder = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-        return (monthOrder.indexOf(a) || 0) - (monthOrder.indexOf(b) || 0);
-      });
-    }, [data]);
+    const records = Array.isArray(data?.data) ? data.data : [];
 
-    const uniqueFYs = useMemo(() => {
-      return [...new Set(data.data.map(r => r.financial_year).filter(Boolean))].sort();
-    }, [data]);
+    // The API currently returns month and financial_year directly
+    // inside every object of results.data.
+    const getMonthValue = (row) =>
+      String(row?.month ?? "").trim();
 
-    // Filter data based on selected months and financial years
-    const filteredData = useMemo(() => {
-      return data.data.filter(r => {
-        const m = selectedMonths.length === 0 ? true : selectedMonths.includes(r.month);
-        const y = selectedFYs.length === 0 ? true : selectedFYs.includes(r.financial_year);
-        return m && y;
-      });
-    }, [data.data, selectedMonths, selectedFYs]);
+    const getFYValue = (row) =>
+      String(row?.financial_year ?? "").trim();
 
-    // Calculate totals
-    const totals = useMemo(() => {
-      return filteredData.reduce((acc, r) => {
-        acc.allocated_beneficiaries += parseInt(r.allocated_beneficiaries) || 0;
-        acc.received_beneficiaries += parseInt(r.received_beneficiaries) || 0;
-        acc.distributed_beneficiaries += parseInt(r.distributed_beneficiaries) || 0;
-        acc.allocated_quantity += parseFloat(r.allocated_quantity) || 0;
-        acc.received_quantity += parseFloat(r.received_quantity) || 0;
-        acc.distributed_quantity += parseFloat(r.distributed_quantity) || 0;
-        acc.balance_quantity += parseFloat(r.balance_quantity) || 0;
+    // Unique months from results.data, sorted chronologically.
+    const monthOrder = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December"
+    ];
+
+    const uniqueMonths = [
+      ...new Set(
+        records
+          .map(getMonthValue)
+          .filter(Boolean)
+      )
+    ].sort((a, b) => {
+      const aIndex = monthOrder.findIndex(
+        (month) => month.toLowerCase() === a.toLowerCase()
+      );
+      const bIndex = monthOrder.findIndex(
+        (month) => month.toLowerCase() === b.toLowerCase()
+      );
+
+      if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+
+      return aIndex - bIndex;
+    });
+
+    // Unique financial years from results.data.
+    const uniqueFYs = [
+      ...new Set(
+        records
+          .map(getFYValue)
+          .filter(Boolean)
+      )
+    ].sort((a, b) => {
+      const aYear = parseInt(a.split("-")[0], 10);
+      const bYear = parseInt(b.split("-")[0], 10);
+
+      if (!Number.isNaN(aYear) && !Number.isNaN(bYear)) {
+        return aYear - bYear;
+      }
+
+      return a.localeCompare(b);
+    });
+
+    // Empty selection means ALL records.
+    // Therefore initially:
+    // selectedMonths = [] => all months
+    // selectedFYs = [] => all financial years
+    const filteredData = records.filter((row) => {
+      const rowMonth = getMonthValue(row);
+      const rowFY = getFYValue(row);
+
+      const monthMatches =
+        selectedMonths.length === 0 ||
+        selectedMonths.includes(rowMonth);
+
+      const fyMatches =
+        selectedFYs.length === 0 ||
+        selectedFYs.includes(rowFY);
+
+      return monthMatches && fyMatches;
+    });
+
+    const totals = filteredData.reduce(
+      (acc, r) => {
+        acc.allocated_beneficiaries +=
+          parseInt(r.allocated_beneficiaries) || 0;
+
+        acc.received_beneficiaries +=
+          parseInt(r.received_beneficiaries) || 0;
+
+        acc.distributed_beneficiaries +=
+          parseInt(r.distributed_beneficiaries) || 0;
+
+        acc.allocated_quantity +=
+          parseFloat(r.allocated_quantity) || 0;
+
+        acc.received_quantity +=
+          parseFloat(r.received_quantity) || 0;
+
+        acc.distributed_quantity +=
+          parseFloat(r.distributed_quantity) || 0;
+
+        acc.balance_quantity +=
+          parseFloat(r.balance_quantity) || 0;
+
         return acc;
-      }, {
+      },
+      {
         allocated_beneficiaries: 0,
         received_beneficiaries: 0,
         distributed_beneficiaries: 0,
@@ -384,154 +463,294 @@ useEffect(() => {
         received_quantity: 0,
         distributed_quantity: 0,
         balance_quantity: 0
-      });
-    }, [filteredData]);
+      }
+    );
+
+    if (isLoading) {
+      return (
+        <div className="text-center p-4">
+          <Spinner animation="border" />
+        </div>
+      );
+    }
+
+    if (error) {
+      return <Alert variant="danger">{error}</Alert>;
+    }
+
+    if (records.length === 0) {
+      return (
+        <div className="text-center p-4 text-muted">
+          No reconciliation data found.
+        </div>
+      );
+    }
+
+    const toggleMonth = (month) => {
+      setSelectedMonths((prev) =>
+        prev.includes(month)
+          ? prev.filter((item) => item !== month)
+          : [...prev, month]
+      );
+    };
+
+    const toggleFY = (fy) => {
+      setSelectedFYs((prev) =>
+        prev.includes(fy)
+          ? prev.filter((item) => item !== fy)
+          : [...prev, fy]
+      );
+    };
+
+    const selectAllMonths = () => {
+      setSelectedMonths([]);
+    };
+
+    const selectAllFYs = () => {
+      setSelectedFYs([]);
+    };
 
     return (
       <div className="reconciliation-table-container">
-        {/* Filter Bar */}
-        <div className="reconciliation-filter-bar mb-3 p-3 bg-light rounded">
+        {/* FILTER BAR - always displayed directly above the table */}
+        <div
+          className="reconciliation-filter-bar mb-3 p-3 bg-light rounded"
+          style={{ display: "block", width: "100%" }}
+        >
           <Row className="g-3 align-items-end">
-            <Col md={4}>
-              <Form.Label className="fw-bold">Month</Form.Label>
-              <Dropdown autoClose="outside">
-                <Dropdown.Toggle 
-                  variant="outline-secondary" 
-                  className="w-100"
-                  style={{ justifyContent: "space-between" }}
+            {/* MONTH FILTER */}
+            <Col md={5} sm={6} xs={12}>
+              <Form.Label className="fw-bold mb-2">
+                Month
+              </Form.Label>
+
+              <Dropdown autoClose="outside" className="w-100">
+                <Dropdown.Toggle
+                  variant="outline-secondary"
+                  className="w-100 d-flex align-items-center justify-content-between"
                 >
                   <span>
-                    {selectedMonths.length === 0 
-                      ? "All Months" 
-                      : selectedMonths.length === 1 
-                        ? selectedMonths[0] 
-                        : `${selectedMonths.length} Months Selected`}
+                    {selectedMonths.length === 0
+                      ? "All Months"
+                      : selectedMonths.length === 1
+                      ? selectedMonths[0]
+                      : `${selectedMonths.length} Months Selected`}
                   </span>
+
                   <FaChevronDown />
                 </Dropdown.Toggle>
-                <Dropdown.Menu className="reconciliation-dropdown-menu">
-                  {uniqueMonths.length === 0 ? (
-                    <Dropdown.Item disabled>No months available</Dropdown.Item>
-                  ) : (
-                    uniqueMonths.map((month) => (
-                      <div key={month} className="reconciliation-dropdown-item" 
-                        onClick={(e) => { e.stopPropagation(); }}>
-                        <Form.Check 
-                          type="checkbox" 
-                          checked={selectedMonths.includes(month)} 
-                          onChange={() => {
-                            if (selectedMonths.includes(month)) {
-                              setSelectedMonths(selectedMonths.filter(m => m !== month));
-                            } else {
-                              setSelectedMonths([...selectedMonths, month]);
-                            }
-                          }} 
-                          label={month} 
-                        />
-                      </div>
-                    ))
-                  )}
+
+                <Dropdown.Menu
+                  className="reconciliation-dropdown-menu p-2"
+                  style={{
+                    width: "100%",
+                    minWidth: "100%",
+                    maxHeight: "300px",
+                    overflowY: "auto"
+                  }}
+                >
+                  <Dropdown.Item
+                    as="div"
+                    onClick={(e) => e.stopPropagation()}
+                    className="reconciliation-dropdown-item"
+                  >
+                    <Form.Check
+                      type="checkbox"
+                      label="All Months"
+                      checked={selectedMonths.length === 0}
+                      onChange={selectAllMonths}
+                    />
+                  </Dropdown.Item>
+
+                  {uniqueMonths.map((month) => (
+                    <Dropdown.Item
+                      as="div"
+                      key={month}
+                      onClick={(e) => e.stopPropagation()}
+                      className="reconciliation-dropdown-item"
+                    >
+                      <Form.Check
+                        type="checkbox"
+                        label={month}
+                        checked={selectedMonths.includes(month)}
+                        onChange={() => toggleMonth(month)}
+                      />
+                    </Dropdown.Item>
+                  ))}
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
-            <Col md={4}>
-              <Form.Label className="fw-bold">Financial Year</Form.Label>
-              <Dropdown autoClose="outside">
-                <Dropdown.Toggle 
-                  variant="outline-secondary" 
-                  className="w-100"
-                  style={{ justifyContent: "space-between" }}
+
+            {/* FINANCIAL YEAR FILTER */}
+            <Col md={5} sm={6} xs={12}>
+              <Form.Label className="fw-bold mb-2">
+                Financial Year
+              </Form.Label>
+
+              <Dropdown autoClose="outside" className="w-100">
+                <Dropdown.Toggle
+                  variant="outline-secondary"
+                  className="w-100 d-flex align-items-center justify-content-between"
                 >
                   <span>
-                    {selectedFYs.length === 0 
-                      ? "All Years" 
-                      : selectedFYs.length === 1 
-                        ? selectedFYs[0] 
-                        : `${selectedFYs.length} Years Selected`}
+                    {selectedFYs.length === 0
+                      ? "All Financial Years"
+                      : selectedFYs.length === 1
+                      ? selectedFYs[0]
+                      : `${selectedFYs.length} Years Selected`}
                   </span>
+
                   <FaChevronDown />
                 </Dropdown.Toggle>
-                <Dropdown.Menu className="reconciliation-dropdown-menu">
-                  {uniqueFYs.length === 0 ? (
-                    <Dropdown.Item disabled>No years available</Dropdown.Item>
-                  ) : (
-                    uniqueFYs.map((fy) => (
-                      <div key={fy} className="reconciliation-dropdown-item" 
-                        onClick={(e) => { e.stopPropagation(); }}>
-                        <Form.Check 
-                          type="checkbox" 
-                          checked={selectedFYs.includes(fy)} 
-                          onChange={() => {
-                            if (selectedFYs.includes(fy)) {
-                              setSelectedFYs(selectedFYs.filter(y => y !== fy));
-                            } else {
-                              setSelectedFYs([...selectedFYs, fy]);
-                            }
-                          }} 
-                          label={fy} 
-                        />
-                      </div>
-                    ))
-                  )}
+
+                <Dropdown.Menu
+                  className="reconciliation-dropdown-menu p-2"
+                  style={{
+                    width: "100%",
+                    minWidth: "100%",
+                    maxHeight: "300px",
+                    overflowY: "auto"
+                  }}
+                >
+                  <Dropdown.Item
+                    as="div"
+                    onClick={(e) => e.stopPropagation()}
+                    className="reconciliation-dropdown-item"
+                  >
+                    <Form.Check
+                      type="checkbox"
+                      label="All Financial Years"
+                      checked={selectedFYs.length === 0}
+                      onChange={selectAllFYs}
+                    />
+                  </Dropdown.Item>
+
+                  {uniqueFYs.map((fy) => (
+                    <Dropdown.Item
+                      as="div"
+                      key={fy}
+                      onClick={(e) => e.stopPropagation()}
+                      className="reconciliation-dropdown-item"
+                    >
+                      <Form.Check
+                        type="checkbox"
+                        label={fy}
+                        checked={selectedFYs.includes(fy)}
+                        onChange={() => toggleFY(fy)}
+                      />
+                    </Dropdown.Item>
+                  ))}
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
-            <Col md={4} className="d-flex justify-content-md-end">
-              {(selectedMonths.length > 0 || selectedFYs.length > 0) && (
-                <Button 
-                  variant="outline-danger" 
-                  size="sm" 
-                  onClick={() => { setSelectedMonths([]); setSelectedFYs([]); }}
+
+            {/* CLEAR FILTERS */}
+            <Col
+              md={2}
+              sm={12}
+              xs={12}
+              className="d-flex align-items-end justify-content-md-end"
+            >
+              {(selectedMonths.length > 0 ||
+                selectedFYs.length > 0) && (
+                <Button
+                  variant="outline-danger"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedMonths([]);
+                    setSelectedFYs([]);
+                  }}
                   className="d-flex align-items-center"
                 >
-                  <FaTimes className="me-1" /> Clear Filters
+                  <FaTimes className="me-1" />
+                  Clear Filters
                 </Button>
               )}
             </Col>
           </Row>
         </div>
 
-        {/* Summary Cards */}
+        {/* FILTER RESULT INFO */}
+        <div className="mb-3">
+          <small className="text-muted">
+            Showing{" "}
+            <strong>{filteredData.length}</strong>{" "}
+            of{" "}
+            <strong>{records.length}</strong>{" "}
+            records
+            {selectedMonths.length > 0 && (
+              <>
+                {" "} | Months:{" "}
+                <strong>{selectedMonths.join(", ")}</strong>
+              </>
+            )}
+            {selectedFYs.length > 0 && (
+              <>
+                {" "} | Financial Years:{" "}
+                <strong>{selectedFYs.join(", ")}</strong>
+              </>
+            )}
+          </small>
+        </div>
+
+        {/* SUMMARY CARDS */}
         <div className="reconciliation-summary-cards mb-3">
           <Row className="g-2">
             <Col xs={6} md={3}>
               <Card className="bg-primary text-white">
                 <Card.Body className="py-2">
                   <small>Allocated Beneficiaries</small>
-                  <div className="fw-bold fs-5">{totals.allocated_beneficiaries.toLocaleString()}</div>
+                  <div className="fw-bold fs-5">
+                    {totals.allocated_beneficiaries.toLocaleString()}
+                  </div>
                 </Card.Body>
               </Card>
             </Col>
+
             <Col xs={6} md={3}>
               <Card className="bg-info text-white">
                 <Card.Body className="py-2">
                   <small>Received Beneficiaries</small>
-                  <div className="fw-bold fs-5">{totals.received_beneficiaries.toLocaleString()}</div>
+                  <div className="fw-bold fs-5">
+                    {totals.received_beneficiaries.toLocaleString()}
+                  </div>
                 </Card.Body>
               </Card>
             </Col>
+
             <Col xs={6} md={3}>
               <Card className="bg-success text-white">
                 <Card.Body className="py-2">
                   <small>Distributed Beneficiaries</small>
-                  <div className="fw-bold fs-5">{totals.distributed_beneficiaries.toLocaleString()}</div>
+                  <div className="fw-bold fs-5">
+                    {totals.distributed_beneficiaries.toLocaleString()}
+                  </div>
                 </Card.Body>
               </Card>
             </Col>
+
             <Col xs={6} md={3}>
               <Card className="bg-warning text-dark">
                 <Card.Body className="py-2">
                   <small>Balance Quantity</small>
-                  <div className="fw-bold fs-5">{totals.balance_quantity.toLocaleString()}</div>
+                  <div className="fw-bold fs-5">
+                    {totals.balance_quantity.toLocaleString()}
+                  </div>
                 </Card.Body>
               </Card>
             </Col>
           </Row>
         </div>
 
-        {/* Data Table */}
+        {/* DATA TABLE */}
         <div className="table-responsive">
-          <Table striped bordered hover responsive className="mb-0 reconciliation-table">
+          <Table
+            striped
+            bordered
+            hover
+            responsive
+            className="mb-0 reconciliation-table"
+          >
             <thead className="table-light sticky-top">
               <tr>
                 <th>#</th>
@@ -553,10 +772,16 @@ useEffect(() => {
                 <th>Balance Qty</th>
               </tr>
             </thead>
+
             <tbody>
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan="17" className="text-center p-4 text-muted">No data found for selected filters.</td>
+                  <td
+                    colSpan="17"
+                    className="text-center p-4 text-muted"
+                  >
+                    No data found for selected filters.
+                  </td>
                 </tr>
               ) : (
                 filteredData.map((item, index) => (
@@ -567,32 +792,91 @@ useEffect(() => {
                     <td>{item.sector}</td>
                     <td>{item.awc_code}</td>
                     <td>{item.awc_name}</td>
-                    <td><Badge bg="secondary">{item.month}</Badge></td>
+                    <td>
+                      <Badge bg="secondary">
+                        {item.month}
+                      </Badge>
+                    </td>
                     <td>{item.financial_year}</td>
                     <td>{item.food_item}</td>
                     <td>{item.bene_category}</td>
-                    <td className="text-end">{item.allocated_beneficiaries ?? 0}</td>
-                    <td className="text-end">{item.received_beneficiaries ?? 0}</td>
-                    <td className="text-end">{item.distributed_beneficiaries ?? 0}</td>
-                    <td className="text-end">{parseFloat(item.allocated_quantity).toFixed(2)}</td>
-                    <td className="text-end">{parseFloat(item.received_quantity).toFixed(2)}</td>
-                    <td className="text-end">{parseFloat(item.distributed_quantity).toFixed(2)}</td>
-                    <td className="text-end fw-bold text-primary">{parseFloat(item.balance_quantity).toFixed(2)}</td>
+                    <td className="text-end">
+                      {item.allocated_beneficiaries ?? 0}
+                    </td>
+                    <td className="text-end">
+                      {item.received_beneficiaries ?? 0}
+                    </td>
+                    <td className="text-end">
+                      {item.distributed_beneficiaries ?? 0}
+                    </td>
+                    <td className="text-end">
+                      {parseFloat(item.allocated_quantity || 0).toFixed(2)}
+                    </td>
+                    <td className="text-end">
+                      {parseFloat(item.received_quantity || 0).toFixed(2)}
+                    </td>
+                    <td className="text-end">
+                      {parseFloat(item.distributed_quantity || 0).toFixed(2)}
+                    </td>
+                    <td className="text-end fw-bold text-primary">
+                      {parseFloat(item.balance_quantity || 0).toFixed(2)}
+                    </td>
                   </tr>
                 ))
               )}
             </tbody>
+
             <tfoot>
               <tr className="table-active fw-bold">
                 <th></th>
-                <th colSpan="9" className="text-end">Totals:</th>
-                <th className="text-end">{totals.allocated_beneficiaries.toLocaleString()}</th>
-                <th className="text-end">{totals.received_beneficiaries.toLocaleString()}</th>
-                <th className="text-end">{totals.distributed_beneficiaries.toLocaleString()}</th>
-                <th className="text-end">{totals.allocated_quantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</th>
-                <th className="text-end">{totals.received_quantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</th>
-                <th className="text-end">{totals.distributed_quantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</th>
-                <th className="text-end text-primary">{totals.balance_quantity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</th>
+                <th colSpan="9" className="text-end">
+                  Totals:
+                </th>
+                <th className="text-end">
+                  {totals.allocated_beneficiaries.toLocaleString()}
+                </th>
+                <th className="text-end">
+                  {totals.received_beneficiaries.toLocaleString()}
+                </th>
+                <th className="text-end">
+                  {totals.distributed_beneficiaries.toLocaleString()}
+                </th>
+                <th className="text-end">
+                  {totals.allocated_quantity.toLocaleString(
+                    undefined,
+                    {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    }
+                  )}
+                </th>
+                <th className="text-end">
+                  {totals.received_quantity.toLocaleString(
+                    undefined,
+                    {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    }
+                  )}
+                </th>
+                <th className="text-end">
+                  {totals.distributed_quantity.toLocaleString(
+                    undefined,
+                    {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    }
+                  )}
+                </th>
+                <th className="text-end text-primary">
+                  {totals.balance_quantity.toLocaleString(
+                    undefined,
+                    {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    }
+                  )}
+                </th>
               </tr>
             </tfoot>
           </Table>
