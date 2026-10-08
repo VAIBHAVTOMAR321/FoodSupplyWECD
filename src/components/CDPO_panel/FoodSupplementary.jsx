@@ -294,6 +294,7 @@ const FoodSupplementary = () => {
   const [suppliesTab, setSuppliesTab] = useState("thr");
   const [suppliesData, setSuppliesData] = useState([]);
   const [suppliesLoading, setSuppliesLoading] = useState(true);
+  const [suppliesError, setSuppliesError] = useState("");
 
   // Race condition prevention for API calls
   const suppliesReqId = useRef(0);
@@ -324,22 +325,40 @@ const FoodSupplementary = () => {
   }, [api]);
 
   // Dynamic Supplies Data Fetching (THR & HCM for CDPO)
-  const fetchSuppliesData = async (type) => {
+  const fetchSuppliesData = useCallback(async (type) => {
     const reqId = ++suppliesReqId.current;
     setSuppliesLoading(true);
+    setSuppliesError("");
     try {
       const response = await api.get(`/cdpo/${type}-awc-food-reconciliation/`);
       if (reqId !== suppliesReqId.current) return;
 
-      const sectorData = [];
-      if (response.data.success && response.data.sector_data) {
-        response.data.sector_data.forEach((s) => {
-          sectorData.push({
-            sector: s.sector,
-            foodData: s.food_data || [],
-          });
-        });
+      const reconciliation = response.data?.results;
+      if (!reconciliation?.success) {
+        throw new Error(reconciliation?.message || "The reconciliation API returned an unsuccessful response.");
       }
+      if (!Array.isArray(reconciliation.sector_summary)) {
+        throw new Error("The reconciliation response does not contain a sector summary.");
+      }
+
+      const sectors = new Map();
+      reconciliation.sector_summary.forEach((item) => {
+        if (!sectors.has(item.sector)) {
+          sectors.set(item.sector, new Map());
+        }
+
+        const foodItems = sectors.get(item.sector);
+        const quantities = foodItems.get(item.food_item) || { received: 0, distributed: 0, balance: 0 };
+        quantities.received += Number(item.received_quantity) || 0;
+        quantities.distributed += Number(item.distributed_quantity) || 0;
+        quantities.balance += Number(item.balance_quantity) || 0;
+        foodItems.set(item.food_item, quantities);
+      });
+
+      const sectorData = Array.from(sectors, ([sector, foodItems]) => ({
+        sector,
+        foodData: Array.from(foodItems, ([food_item, quantities]) => ({ food_item, ...quantities })),
+      }));
 
       if (reqId === suppliesReqId.current) {
         setSuppliesData(sectorData);
@@ -348,22 +367,22 @@ const FoodSupplementary = () => {
       if (reqId === suppliesReqId.current) {
         console.error(`Failed to fetch ${type.toUpperCase()} supplies data:`, err);
         setSuppliesData([]);
+        setSuppliesError(`Failed to fetch ${type.toUpperCase()} supplies data.`);
       }
     } finally {
       if (reqId === suppliesReqId.current) {
         setSuppliesLoading(false);
       }
     }
-  };
+  }, [api]);
 
   useEffect(() => {
     fetchData();
-    fetchSuppliesData("thr");
   }, [fetchData]);
 
   useEffect(() => {
     fetchSuppliesData(suppliesTab);
-  }, [suppliesTab]);
+  }, [fetchSuppliesData, suppliesTab]);
 
   // Extract unique food items dynamically from suppliesData
   const suppliesFoodItems = useMemo(() => {
@@ -766,6 +785,8 @@ const FoodSupplementary = () => {
           <Form.Select name={name} value={formData[name] ?? ""} onChange={handleInputChange} className={formErrors[name] ? "is-invalid" : ""}>
             {monthNames.map((m) => (<option key={m} value={m}>{m}</option>))}
           </Form.Select>
+        ) : suppliesError ? (
+          <Alert variant="danger" className="m-3">{suppliesError}</Alert>
         ) : (
           <Form.Control type={type} name={name} value={formData[name] ?? ""} onChange={handleInputChange} placeholder={placeholder} className={formErrors[name] ? "is-invalid" : ""} />
         )}
