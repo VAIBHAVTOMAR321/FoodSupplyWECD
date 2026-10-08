@@ -88,19 +88,19 @@ const downloadPDF = async ({ title, filename, headers, rows, footer, fontSize })
     element.textContent = value.text == null ? "" : String(value.text);
     if (value.colSpan) element.colSpan = value.colSpan;
     if (value.rowSpan) element.rowSpan = value.rowSpan;
-    element.style.cssText = "border:1px solid #cbd5e1;padding:4px;text-align:left;vertical-align:middle;overflow-wrap:anywhere;";
+    element.style.cssText = "border:1px solid #cbd5e1;padding:4px;text-align:left;vertical-align:middle;overflow-wrap:anywhere;word-break:normal;";
     return element;
   };
 
   const thead = document.createElement("thead");
-  headers.forEach((headerRow) => {
+  headers.forEach((headerRow, rowIndex) => {
     const row = document.createElement("tr");
     headerRow.forEach((cell) => {
       const header = createCell("th", cell);
-      header.style.backgroundColor = "#6f42c1";
-      header.style.color = "#fff";
+      header.style.cssText += `;background-color:${rowIndex === 0 ? "#4f46e5" : "#e0e7ff"};color:${rowIndex === 0 ? "#fff" : "#312e81"};border-color:${rowIndex === 0 ? "#4338ca" : "#a5b4fc"};padding:6px 4px;text-align:center;font-weight:700;font-size:${Math.max(fontSize, 8)}px;line-height:1.25;white-space:normal;`;
       row.appendChild(header);
     });
+    row.style.pageBreakInside = "avoid";
     thead.appendChild(row);
   });
   table.appendChild(thead);

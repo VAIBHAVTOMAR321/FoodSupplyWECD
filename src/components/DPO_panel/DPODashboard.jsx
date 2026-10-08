@@ -8,8 +8,7 @@ import { FaUsers, FaUserFriends, FaBaby, FaChartBar, FaLayerGroup, FaFileExcel, 
 import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
 import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import html2pdf from "html2pdf.js";
 
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -41,6 +40,111 @@ const TABLE_COLUMNS = [
 ];
 
 const NUMERIC_AGG_FIELDS = TABLE_COLUMNS.filter(c => c.num || c.strong);
+
+let hindiPdfFontPromise;
+
+const loadHindiPdfFont = async () => {
+  if (!hindiPdfFontPromise) {
+    hindiPdfFontPromise = new Promise((resolve) => {
+      const fontLink = document.createElement("link");
+      fontLink.rel = "stylesheet";
+      fontLink.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap";
+      fontLink.onload = () => resolve(true);
+      fontLink.onerror = () => {
+        console.warn("Noto Sans Devanagari could not be loaded; using the system Hindi font.");
+        resolve(false);
+      };
+      document.head.appendChild(fontLink);
+    });
+  }
+
+  if (await hindiPdfFontPromise) {
+    try {
+      await document.fonts.load('400 12px "Noto Sans Devanagari"', "हिंदी");
+    } catch (error) {
+      console.warn("Noto Sans Devanagari could not be prepared; using the system Hindi font.", error);
+    }
+  }
+};
+
+const downloadPDF = async ({ title, filename, headers, rows, footer, fontSize }) => {
+  const content = document.createElement("div");
+  content.style.cssText = "box-sizing:border-box;width:100%;padding:12px;background:#fff;color:#1e293b;font-family:'Noto Sans Devanagari','Noto Sans','Nirmala UI',sans-serif;";
+
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  heading.style.cssText = "margin:0 0 14px;text-align:center;color:#1e3a5f;font-size:16px;font-weight:700;";
+  content.appendChild(heading);
+
+  const table = document.createElement("table");
+  table.style.cssText = `width:100%;border-collapse:collapse;table-layout:fixed;font-size:${fontSize}px;line-height:1.35;`;
+
+  const createCell = (tagName, cell) => {
+    const element = document.createElement(tagName);
+    const value = typeof cell === "object" && cell !== null ? cell : { text: cell };
+    element.textContent = value.text == null ? "" : String(value.text);
+    if (value.colSpan) element.colSpan = value.colSpan;
+    if (value.rowSpan) element.rowSpan = value.rowSpan;
+    element.style.cssText = "border:1px solid #cbd5e1;padding:4px;text-align:left;vertical-align:middle;overflow-wrap:anywhere;word-break:normal;";
+    return element;
+  };
+
+  const thead = document.createElement("thead");
+  headers.forEach((headerRow, rowIndex) => {
+    const row = document.createElement("tr");
+    headerRow.forEach((cell) => {
+      const header = createCell("th", cell);
+      header.style.cssText += `;background-color:${rowIndex === 0 ? "#4f46e5" : "#e0e7ff"};color:${rowIndex === 0 ? "#fff" : "#312e81"};border-color:${rowIndex === 0 ? "#4338ca" : "#a5b4fc"};padding:6px 4px;text-align:center;font-weight:700;font-size:${Math.max(fontSize, 8)}px;line-height:1.25;white-space:normal;`;
+      row.appendChild(header);
+    });
+    row.style.pageBreakInside = "avoid";
+    thead.appendChild(row);
+  });
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  rows.forEach((values) => {
+    const row = document.createElement("tr");
+    values.forEach((value) => row.appendChild(createCell("td", value)));
+    tbody.appendChild(row);
+  });
+  table.appendChild(tbody);
+
+  if (footer?.length) {
+    const tfoot = document.createElement("tfoot");
+    footer.forEach((footerRow) => {
+      const row = document.createElement("tr");
+      footerRow.forEach((cell) => {
+        const footerCell = createCell("td", cell);
+        footerCell.style.backgroundColor = "#f1f5f9";
+        footerCell.style.fontWeight = "700";
+        row.appendChild(footerCell);
+      });
+      tfoot.appendChild(row);
+    });
+    table.appendChild(tfoot);
+  }
+
+  content.appendChild(table);
+  document.body.appendChild(content);
+
+  try {
+    await loadHindiPdfFont();
+    await html2pdf()
+      .set({
+        margin: [10, 10, 10, 10],
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
+        jsPDF: { unit: "mm", format: "a3", orientation: "landscape" },
+        pagebreak: { mode: ["css", "legacy"] }
+      })
+      .from(content)
+      .save();
+  } finally {
+    content.remove();
+  }
+};
 
 const SUMMARY_PILLS = [
   { key: "total_beneficiaries", label: "Total", icon: <FaUsers size={10} /> },
@@ -512,27 +616,36 @@ const DPODashboard = () => {
     XLSX.writeFile(wb, `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode.charAt(0).toUpperCase() + suppliesViewMode.slice(1)}_Summary.xlsx`);
   };
 
+  const handlePDFExport = async (options) => {
+    try {
+      await downloadPDF(options);
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      setError("Failed to generate PDF. Please try again.");
+    }
+  };
+
   const exportSuppliesToPDF = () => {
     const groupHeaders = suppliesViewMode === 'project' 
-      ? [{ content: 'Project', rowSpan: 2 }]
+      ? [{ text: 'Project', rowSpan: 2 }]
       : suppliesViewMode === 'sector'
-      ? [{ content: 'Sector', rowSpan: 2 }]
+      ? [{ text: 'Sector', rowSpan: 2 }]
       : [
-          { content: 'Project', rowSpan: 2 },
-          { content: 'Sector', rowSpan: 2 },
-          { content: 'AWC Name', rowSpan: 2 },
-          { content: 'AWC Code', rowSpan: 2 }
+          { text: 'Project', rowSpan: 2 },
+          { text: 'Sector', rowSpan: 2 },
+          { text: 'AWC Name', rowSpan: 2 },
+          { text: 'AWC Code', rowSpan: 2 }
         ];
 
-    const head = [[
-      { content: 'S. No.', rowSpan: 2 },
+    const headers = [[
+      { text: 'S. No.', rowSpan: 2 },
       ...groupHeaders,
-      ...suppliesFoodItems.map(fi => ({ content: fi, colSpan: 3 }))
+      ...suppliesFoodItems.map(fi => ({ text: fi, colSpan: 3 }))
     ], [
       ...suppliesFoodItems.flatMap(() => ['Rec.', 'Dist.', 'Rem.'])
     ]];
     
-    const body = currentSuppliesData.map((r, i) => [
+    const rows = currentSuppliesData.map((r, i) => [
       i + 1,
       ...(suppliesViewMode === 'project' ? [r.project] : suppliesViewMode === 'sector' ? [r.sector] : [r.project, r.sector, r.awc_name, r.awc_code]),
       ...suppliesFoodItems.flatMap(fi => {
@@ -542,24 +655,27 @@ const DPODashboard = () => {
     ]);
 
     const groupColSpan = suppliesViewMode === 'awc' ? 4 : 1;
-    const foot = [[
-      { content: 'Total', colSpan: 1 + groupColSpan },
+    const footer = [[
+      { text: 'Total', colSpan: 1 + groupColSpan },
       ...suppliesFoodItems.flatMap(fi => {
         const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
-        return [t.received.toLocaleString(), t.distributed.toLocaleString(), t.balance.toLocaleString()];
+        return [
+          { text: t.received.toLocaleString() },
+          { text: t.distributed.toLocaleString() },
+          { text: t.balance.toLocaleString() }
+        ];
       })
     ]];
 
-    const doc = new jsPDF("l", "pt", "a3");
     const viewModeLabel = suppliesViewMode === 'project' ? 'Project-wise' : suppliesViewMode === 'sector' ? 'Sector-wise' : 'AWC-wise';
-    doc.text(`Supplies ${suppliesTab.toUpperCase()} ${viewModeLabel} Summary`, 40, 40);
-    autoTable(doc, {
-      head, body, foot, startY: 50,
-      styles: { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: [111, 66, 193] }, 
-      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" }
+    return handlePDFExport({
+      title: `Supplies ${suppliesTab.toUpperCase()} ${viewModeLabel} Summary`,
+      filename: `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode.charAt(0).toUpperCase() + suppliesViewMode.slice(1)}_Summary.pdf`,
+      headers,
+      rows,
+      footer,
+      fontSize: 9
     });
-    doc.save(`Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode.charAt(0).toUpperCase() + suppliesViewMode.slice(1)}_Summary.pdf`);
   };
 
   const exportAggToExcel = () => {
@@ -572,18 +688,17 @@ const DPODashboard = () => {
   };
 
   const exportAggToPDF = () => {
-    const head = [["S. No.", aggregateView, "Months", "Fin. Years", ...NUMERIC_AGG_FIELDS.map(f => f.label)]];
-    const body = aggregatedData.map((r, i) => [i + 1, r.groupKey, r.months, r.fys, ...NUMERIC_AGG_FIELDS.map(f => r[f.key])]);
-    const doc = new jsPDF("l", "pt", "a3");
-    doc.text(`${aggregateView}-wise Aggregated Summary`, 40, 40);
-    autoTable(doc, {
-      head, body, startY: 50,
-      styles: { fontSize: 6, cellPadding: 2 },
-      headStyles: { fillColor: [111, 66, 193] }, 
-      foot: [["", "Total", "", "", ...NUMERIC_AGG_FIELDS.map(f => totalAggregated[f.key])]],
-      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" }
+    const headers = [["S. No.", aggregateView, "Months", "Fin. Years", ...NUMERIC_AGG_FIELDS.map(f => f.label)]];
+    const rows = aggregatedData.map((r, i) => [i + 1, r.groupKey, r.months, r.fys, ...NUMERIC_AGG_FIELDS.map(f => r[f.key])]);
+    const footer = [["", "Total", "", "", ...NUMERIC_AGG_FIELDS.map(f => totalAggregated[f.key])]];
+    return handlePDFExport({
+      title: `${aggregateView}-wise Aggregated Summary`,
+      filename: `${aggregateView}_Summary.pdf`,
+      headers,
+      rows,
+      footer,
+      fontSize: 8
     });
-    doc.save(`${aggregateView}_Summary.pdf`);
   };
 
   const exportDetailsToExcel = () => {
@@ -596,19 +711,17 @@ const DPODashboard = () => {
   };
 
   const exportDetailsToPDF = () => {
-    const head = [["S. No.", ...TABLE_COLUMNS.map(c => c.label)]];
-    const body = searchedRecords.map((r, i) => [i + 1, ...TABLE_COLUMNS.map(c => r[c.key] || "—")]);
-    const totalRow = ["", ...TABLE_COLUMNS.map(c => (c.num || c.strong) ? totalDetailed[c.key] : (c.key === "district" ? "Total" : ""))];
-    const doc = new jsPDF("l", "pt", "a3");
-    doc.text("Supplementary Nutrition Records", 40, 40);
-    autoTable(doc, {
-      head, body, startY: 50,
-      styles: { fontSize: 5, cellPadding: 1.5 },
-      headStyles: { fillColor: [111, 66, 193] }, 
-      foot: [totalRow],
-      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: "bold" }
+    const headers = [["S. No.", ...TABLE_COLUMNS.map(c => c.label)]];
+    const rows = searchedRecords.map((r, i) => [i + 1, ...TABLE_COLUMNS.map(c => r[c.key] || "—")]);
+    const footer = [["", ...TABLE_COLUMNS.map(c => (c.num || c.strong) ? totalDetailed[c.key] : (c.key === "district" ? "Total" : ""))]];
+    return handlePDFExport({
+      title: "Supplementary Nutrition Records",
+      filename: "Supplementary_Records.pdf",
+      headers,
+      rows,
+      footer,
+      fontSize: 7
     });
-    doc.save("Supplementary_Records.pdf");
   };
 
   return (
