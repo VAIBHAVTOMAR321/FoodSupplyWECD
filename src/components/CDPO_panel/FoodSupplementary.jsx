@@ -73,132 +73,80 @@ const monthNames = [
   "December",
 ];
 
-/* ── Excel Column Definitions ── */
-const EXCEL_COLUMNS = [
-  { header: "District", key: "district", send: false, type: "string", category: "Location Info" },
-  { header: "Project", key: "project", send: false, type: "string", category: "Location Info" },
-  { header: "Sector", key: "sector", send: false, type: "string", category: "Location Info" },
-  { header: "AWC Name", key: "awc_name", send: false, type: "string", category: "Location Info" },
-  { header: "AWC Code", key: "awc_code", send: true, type: "string", category: "Location Info" },
-  { header: "Month", key: "month", send: true, type: "string", category: "Period" },
-  { header: "Financial Year", key: "financial_year", send: true, type: "string", category: "Period" },
-  { header: "Active Beneficiaries", key: "active_beneficiaries", send: true, type: "number", category: "Beneficiary Summary" },
-  { header: "Total Beneficiaries", key: "total_beneficiaries", send: true, type: "number", category: "Beneficiary Summary" },
-  { header: "Pregnant/Lactating Mothers", key: "pregnant_women_lactating_mothers", send: true, type: "number", category: "Beneficiaries by Category" },
-  { header: "Children 6m-3y", key: "children_6m_3y_beneficiaries", send: true, type: "number", category: "Beneficiaries by Category" },
-  { header: "THR 25 Days FRS/HCM (3y-6y)", key: "thr_25_days_frs_hcm_beneficiaries_3y_6y", send: true, type: "number", category: "Beneficiaries by Category" },
-  { header: "HCM Beneficiaries (3y-6y)", key: "hcm_beneficiaries_3y_6y", send: true, type: "number", category: "Beneficiaries by Category" },
-  { header: "SAM Children 6m-6y", key: "sam_children_6m_6y", send: true, type: "number", category: "Beneficiaries by Category" },
-  { header: "SUW Children 6m-6y", key: "suw_children_6m_6y", send: true, type: "number", category: "Beneficiaries by Category" },
-  { header: "SAM Children 3y-6y", key: "sam_children_3y_6y", send: true, type: "number", category: "Beneficiaries by Category" },
-  { header: "SUW Children 3y-6y", key: "suw_children_3y_6y", send: true, type: "number", category: "Beneficiaries by Category" },
-  { header: "Mung Dal Khichdi Packets", key: "quarterly_packets_mung_dal_khichdi", send: true, type: "number", category: "Packets Distribution" },
-  { header: "Poushik Sattu Mix Packets", key: "quarterly_packets_poushik_sattu_mix", send: true, type: "number", category: "Packets Distribution" },
-  { header: "Poushik Sattu Mix (75d, gm)", key: "poushik_sattu_mix_75_days_packet_size_gm", send: true, type: "number", category: "Packets Distribution" },
-  { header: "Panjeeri 75d 2625gm Packets", key: "panjeeri_75_days_2625gm_quarterly_packets", send: true, type: "number", category: "Packets Distribution" },
-  { header: "Panjeeri 75d 4625gm Packets", key: "panjeeri_75_days_4625gm_quarterly_packets", send: true, type: "number", category: "Packets Distribution" },
-  { header: "Sattu 2250gm Packets", key: "quarterly_packets_sattu_2250gm", send: true, type: "number", category: "Packets Distribution" },
-  { header: "Mix 1000gm Packets", key: "quarterly_packets_mix_1000gm", send: true, type: "number", category: "Packets Distribution" },
-  { header: "Multi Grain Aata 1250gm Packets", key: "quarterly_packets_multi_grain_aata_1250gm", send: true, type: "number", category: "Packets Distribution" },
+/* ── Grant-wise Excel / API schema ── */
+const GRANT_IDS = [15, 30, 31];
+const GRANT_CATEGORIES = [
+  { title: "Pregnant Woman and Lactating Mother", countKey: "pregnant_woman_lactating_mother", grantKey: "pregnant_woman_lactating_mother_grant" },
+  { title: "Children 6m-3y", countKey: "children_6m_3y", grantKey: "children_6m_3y_grant" },
+  { title: "SAM 6M-5Y / SUW 6M-6Y", countKey: "sam_children_6m_5y_suw_children_6m_6y", grantKey: "sam_children_6m_5y_suw_children_6m_6y_grant" },
+  { title: "SAM 3Y-5Y / SUW 3Y-6Y", countKey: "sam_children_3y_5y_suw_children_3y_6y", grantKey: "sam_children_3y_5y_suw_children_3y_6y_grant" },
+  { title: "HCM Beneficiaries 3Y-6Y (Normal Children)", countKey: "hcm_beneficiaries_3y_6y", grantKey: "hcm_beneficiaries_3y_6y_grant" },
 ];
-
-/* ── Detailed Table column definitions ── */
+const FOOD_FIELDS = [
+  { header: "Poushik Sattu - Pregnant/Lactating Mother", key: "poushik_sattu_preg_lat" },
+  { header: "Panjeeri - Children 6m-3y", key: "panjeeri_6m_3y" },
+  { header: "Panjeeri - SAM 6M-5Y / SUW 6M-6Y", key: "panjeeri_sam_6m_5y_suw_6m_6y" },
+  { header: "Sattu - SAM 3Y-5Y / SUW 3Y-6Y", key: "sattu_sam_3y_5y_suw_3y_6y" },
+  { header: "Mung Dal Khichdi - HCM 3Y-6Y", key: "mung_dal_khichdi_3y_6y" },
+  { header: "Multi Grain Aata - HCM 3Y-6Y", key: "multi_grain_aata_3y_6y" },
+];
+const EXCEL_META_COLUMNS = [
+  { header: "DISTRICT", key: "district" },
+  { header: "PROJECT", key: "project" },
+  { header: "SECTOR", key: "sector" },
+  { header: "AWC NAME", key: "awc_name" },
+  { header: "AWC CODE", key: "awc_code" },
+  { header: "MONTH", key: "month" },
+  { header: "FINANCIAL YEAR", key: "financial_year" },
+];
 const TABLE_COLUMNS = [
   { label: "S. No.", key: "_index" },
   { label: "District", key: "district" },
   { label: "Project", key: "project" },
   { label: "Sector", key: "sector" },
+  { label: "AWC Name", key: "awc_name" },
   { label: "AWC Code", key: "awc_code" },
   { label: "Month", key: "month", badge: true },
   { label: "Fin. Year", key: "financial_year" },
-  { label: "Active Bene.", key: "active_beneficiaries", num: true },
-  { label: "Total Bene.", key: "total_beneficiaries", strong: true },
-  { label: "Pregnant/Lactating", key: "pregnant_women_lactating_mothers", num: true },
-  { label: "Children 6m-3y", key: "children_6m_3y_beneficiaries", num: true },
-  { label: "THR 25d (3-6y)", key: "thr_25_days_frs_hcm_beneficiaries_3y_6y", num: true },
-  { label: "HCM (3-6y)", key: "hcm_beneficiaries_3y_6y", num: true },
-  { label: "SAM 6m-6y", key: "sam_children_6m_6y", num: true },
-  { label: "SUW 6m-6y", key: "suw_children_6m_6y", num: true },
-  { label: "SAM 3y-6y", key: "sam_children_3y_6y", num: true },
-  { label: "SUW 3y-6y", key: "suw_children_3y_6y", num: true },
-  { label: "Mung Dal", key: "quarterly_packets_mung_dal_khichdi", num: true },
-  { label: "Poushik Sattu", key: "quarterly_packets_poushik_sattu_mix", num: true },
-  { label: "Sattu Mix (gm)", key: "poushik_sattu_mix_75_days_packet_size_gm", num: true },
-  { label: "Panjeeri 2625gm", key: "panjeeri_75_days_2625gm_quarterly_packets", num: true },
-  { label: "Panjeeri 4625gm", key: "panjeeri_75_days_4625gm_quarterly_packets", num: true },
-  { label: "Sattu 2250gm", key: "quarterly_packets_sattu_2250gm", num: true },
-  { label: "Mix 1000gm", key: "quarterly_packets_mix_1000gm", num: true },
-  { label: "Multi Grain Aata", key: "quarterly_packets_multi_grain_aata_1250gm", num: true },
+  { label: "Pregnant/Lactating", key: "pregnant_woman_lactating_mother", num: true },
+  { label: "Children 6m-3y", key: "children_6m_3y", num: true },
+  { label: "SAM 6m-5y / SUW 6m-6y", key: "sam_children_6m_5y_suw_children_6m_6y", num: true },
+  { label: "SAM 3y-5y / SUW 3y-6y", key: "sam_children_3y_5y_suw_children_3y_6y", num: true },
+  { label: "HCM 3y-6y", key: "hcm_beneficiaries_3y_6y", num: true },
+  { label: "Poushik Sattu Preg/Lact", key: "poushik_sattu_preg_lat", num: true },
+  { label: "Panjeeri 6m-3y", key: "panjeeri_6m_3y", num: true },
+  { label: "Panjeeri SAM/SUW", key: "panjeeri_sam_6m_5y_suw_6m_6y", num: true },
+  { label: "Sattu SAM/SUW", key: "sattu_sam_3y_5y_suw_3y_6y", num: true },
+  { label: "Mung Dal Khichdi", key: "mung_dal_khichdi_3y_6y", num: true },
+  { label: "Multi Grain Aata", key: "multi_grain_aata_3y_6y", num: true },
   { label: "Actions", key: "_actions" },
 ];
-
-/* ── Numeric columns for aggregation ── */
-const NUMERIC_AGG_FIELDS = [
-  { label: "Active Bene.", key: "active_beneficiaries" },
-  { label: "Total Bene.", key: "total_beneficiaries" },
-  { label: "Pregnant/Lactating", key: "pregnant_women_lactating_mothers" },
-  { label: "Children 6m-3y", key: "children_6m_3y_beneficiaries" },
-  { label: "THR 25d (3-6y)", key: "thr_25_days_frs_hcm_beneficiaries_3y_6y" },
-  { label: "HCM (3-6y)", key: "hcm_beneficiaries_3y_6y" },
-  { label: "SAM 6m-6y", key: "sam_children_6m_6y" },
-  { label: "SUW 6m-6y", key: "suw_children_6m_6y" },
-  { label: "SAM 3y-6y", key: "sam_children_3y_6y" },
-  { label: "SUW 3y-6y", key: "suw_children_3y_6y" },
-  { label: "Mung Dal", key: "quarterly_packets_mung_dal_khichdi" },
-  { label: "Poushik Sattu", key: "quarterly_packets_poushik_sattu_mix" },
-  { label: "Sattu Mix (gm)", key: "poushik_sattu_mix_75_days_packet_size_gm" },
-  { label: "Panjeeri 2625gm", key: "panjeeri_75_days_2625gm_quarterly_packets" },
-  { label: "Panjeeri 4625gm", key: "panjeeri_75_days_4625gm_quarterly_packets" },
-  { label: "Sattu 2250gm", key: "quarterly_packets_sattu_2250gm" },
-  { label: "Mix 1000gm", key: "quarterly_packets_mix_1000gm" },
-  { label: "Multi Grain Aata", key: "quarterly_packets_multi_grain_aata_1250gm" },
-];
-
-/* ── Compact Pill Definitions for Summary ── */
+const NUMERIC_AGG_FIELDS = TABLE_COLUMNS.filter((c) => c.num).map((c) => ({ label: c.label, key: c.key }));
 const SUMMARY_PILLS = [
-  { key: "total_beneficiaries", label: "Total", icon: <FaUsers size={10} /> },
-  { key: "active_beneficiaries", label: "Active", icon: <FaUserFriends size={10} /> },
-  { key: "pregnant_women_lactating_mothers", label: "Preg/Lact", icon: <FaBaby size={10} /> },
-  { key: "children_6m_3y_beneficiaries", label: "6m-3y", icon: <FaBaby size={10} /> },
-  { key: "thr_25_days_frs_hcm_beneficiaries_3y_6y", label: "THR 25d", icon: <FaUsers size={10} /> },
-  { key: "hcm_beneficiaries_3y_6y", label: "HCM 3-6y", icon: <FaUsers size={10} /> },
-  { key: "sam_children_6m_6y", label: "SAM 6m-6y", icon: <FaBaby size={10} /> },
-  { key: "suw_children_6m_6y", label: "SUW 6m-6y", icon: <FaBaby size={10} /> },
-  { key: "sam_children_3y_6y", label: "SAM 3-6y", icon: <FaBaby size={10} /> },
-  { key: "suw_children_3y_6y", label: "SUW 3-6y", icon: <FaBaby size={10} /> },
-  { key: "quarterly_packets_mung_dal_khichdi", label: "Mung Dal", icon: <FaBox size={10} /> },
-  { key: "quarterly_packets_poushik_sattu_mix", label: "P. Sattu", icon: <FaBox size={10} /> },
-  { key: "poushik_sattu_mix_75_days_packet_size_gm", label: "Sattu(gm)", icon: <FaBox size={10} /> },
-  { key: "panjeeri_75_days_2625gm_quarterly_packets", label: "Panj 2625", icon: <FaBox size={10} /> },
-  { key: "panjeeri_75_days_4625gm_quarterly_packets", label: "Panj 4625", icon: <FaBox size={10} /> },
-  { key: "quarterly_packets_sattu_2250gm", label: "Sattu 2250", icon: <FaBox size={10} /> },
-  { key: "quarterly_packets_mix_1000gm", label: "Mix 1000", icon: <FaBox size={10} /> },
-  { key: "quarterly_packets_multi_grain_aata_1250gm", label: "Multi Aata", icon: <FaBox size={10} /> },
+  { key: "pregnant_woman_lactating_mother", label: "Preg/Lact", icon: <FaBaby size={10} /> },
+  { key: "children_6m_3y", label: "Children 6m-3y", icon: <FaBaby size={10} /> },
+  { key: "sam_children_6m_5y_suw_children_6m_6y", label: "SAM/SUW 6m-6y", icon: <FaBaby size={10} /> },
+  { key: "sam_children_3y_5y_suw_children_3y_6y", label: "SAM/SUW 3y-6y", icon: <FaBaby size={10} /> },
+  { key: "hcm_beneficiaries_3y_6y", label: "HCM 3y-6y", icon: <FaUsers size={10} /> },
+  { key: "poushik_sattu_preg_lat", label: "Poushik Sattu", icon: <FaBox size={10} /> },
+  { key: "panjeeri_6m_3y", label: "Panjeeri 6m-3y", icon: <FaBox size={10} /> },
+  { key: "panjeeri_sam_6m_5y_suw_6m_6y", label: "Panjeeri SAM/SUW", icon: <FaBox size={10} /> },
+  { key: "sattu_sam_3y_5y_suw_3y_6y", label: "Sattu SAM/SUW", icon: <FaBox size={10} /> },
+  { key: "mung_dal_khichdi_3y_6y", label: "Mung Dal", icon: <FaBox size={10} /> },
+  { key: "multi_grain_aata_3y_6y", label: "Multi Grain Aata", icon: <FaBox size={10} /> },
 ];
-
 const initialFormData = {
-  id: null,
-  awc_code: "",
-  month: "July",
-  financial_year: "2026-27",
-  active_beneficiaries: "",
-  total_beneficiaries: "",
-  thr_25_days_frs_hcm_beneficiaries_3y_6y: "",
-  hcm_beneficiaries_3y_6y: "",
-  quarterly_packets_mung_dal_khichdi: "",
-  pregnant_women_lactating_mothers: "",
-  poushik_sattu_mix_75_days_packet_size_gm: "",
-  quarterly_packets_poushik_sattu_mix: "",
-  children_6m_3y_beneficiaries: "",
-  panjeeri_75_days_2625gm_quarterly_packets: "",
-  sam_children_6m_6y: "",
-  suw_children_6m_6y: "",
-  panjeeri_75_days_4625gm_quarterly_packets: "",
-  sam_children_3y_6y: "",
-  quarterly_packets_sattu_2250gm: "",
-  suw_children_3y_6y: "",
-  quarterly_packets_mix_1000gm: "",
-  quarterly_packets_multi_grain_aata_1250gm: "",
+  id: null, awc_code: "", month: "September", financial_year: "2026-2027",
+  pregnant_woman_lactating_mother: 0, poushik_sattu_preg_lat: 0,
+  children_6m_3y: 0, panjeeri_6m_3y: 0,
+  sam_children_6m_5y_suw_children_6m_6y: 0, panjeeri_sam_6m_5y_suw_6m_6y: 0,
+  sam_children_3y_5y_suw_children_3y_6y: 0, sattu_sam_3y_5y_suw_3y_6y: 0,
+  hcm_beneficiaries_3y_6y: 0, mung_dal_khichdi_3y_6y: 0, multi_grain_aata_3y_6y: 0,
+  pregnant_woman_lactating_mother_grant: [...GRANT_IDS],
+  children_6m_3y_grant: [...GRANT_IDS],
+  sam_children_6m_5y_suw_children_6m_6y_grant: [...GRANT_IDS],
+  sam_children_3y_5y_suw_children_3y_6y_grant: [...GRANT_IDS],
+  hcm_beneficiaries_3y_6y_grant: [...GRANT_IDS],
 };
 
 // --- Custom Multi-Select Dropdown Component ---
@@ -481,31 +429,12 @@ const FoodSupplementary = () => {
   }, [records, selectedMonths, selectedFYs, selectedProjects, selectedSectors]);
 
   useEffect(() => {
-    if (filteredRecords.length > 0) {
-      const totals = filteredRecords.reduce((acc, r) => ({
-        total_beneficiaries: (acc.total_beneficiaries || 0) + (parseInt(r.total_beneficiaries) || 0),
-        active_beneficiaries: (acc.active_beneficiaries || 0) + (parseInt(r.active_beneficiaries) || 0),
-        pregnant_women_lactating_mothers: (acc.pregnant_women_lactating_mothers || 0) + (parseInt(r.pregnant_women_lactating_mothers) || 0),
-        quarterly_packets_mung_dal_khichdi: (acc.quarterly_packets_mung_dal_khichdi || 0) + (parseInt(r.quarterly_packets_mung_dal_khichdi) || 0),
-        quarterly_packets_poushik_sattu_mix: (acc.quarterly_packets_poushik_sattu_mix || 0) + (parseInt(r.quarterly_packets_poushik_sattu_mix) || 0),
-        poushik_sattu_mix_75_days_packet_size_gm: (acc.poushik_sattu_mix_75_days_packet_size_gm || 0) + (parseInt(r.poushik_sattu_mix_75_days_packet_size_gm) || 0),
-        quarterly_packets_sattu_2250gm: (acc.quarterly_packets_sattu_2250gm || 0) + (parseInt(r.quarterly_packets_sattu_2250gm) || 0),
-        quarterly_packets_mix_1000gm: (acc.quarterly_packets_mix_1000gm || 0) + (parseInt(r.quarterly_packets_mix_1000gm) || 0),
-        quarterly_packets_multi_grain_aata_1250gm: (acc.quarterly_packets_multi_grain_aata_1250gm || 0) + (parseInt(r.quarterly_packets_multi_grain_aata_1250gm) || 0),
-        panjeeri_75_days_2625gm_quarterly_packets: (acc.panjeeri_75_days_2625gm_quarterly_packets || 0) + (parseInt(r.panjeeri_75_days_2625gm_quarterly_packets) || 0),
-        panjeeri_75_days_4625gm_quarterly_packets: (acc.panjeeri_75_days_4625gm_quarterly_packets || 0) + (parseInt(r.panjeeri_75_days_4625gm_quarterly_packets) || 0),
-        suw_children_3y_6y: (acc.suw_children_3y_6y || 0) + (parseInt(r.suw_children_3y_6y) || 0),
-        sam_children_6m_6y: (acc.sam_children_6m_6y || 0) + (parseInt(r.sam_children_6m_6y) || 0),
-        suw_children_6m_6y: (acc.suw_children_6m_6y || 0) + (parseInt(r.suw_children_6m_6y) || 0),
-        sam_children_3y_6y: (acc.sam_children_3y_6y || 0) + (parseInt(r.sam_children_3y_6y) || 0),
-        children_6m_3y_beneficiaries: (acc.children_6m_3y_beneficiaries || 0) + (parseInt(r.children_6m_3y_beneficiaries) || 0),
-        thr_25_days_frs_hcm_beneficiaries_3y_6y: (acc.thr_25_days_frs_hcm_beneficiaries_3y_6y || 0) + (parseInt(r.thr_25_days_frs_hcm_beneficiaries_3y_6y) || 0),
-        hcm_beneficiaries_3y_6y: (acc.hcm_beneficiaries_3y_6y || 0) + (parseInt(r.hcm_beneficiaries_3y_6y) || 0),
-      }), {});
-      setSummary(totals);
-    } else {
-      setSummary(null);
-    }
+    if (!filteredRecords.length) { setSummary(null); return; }
+    const totals = NUMERIC_AGG_FIELDS.reduce((acc, field) => {
+      acc[field.key] = filteredRecords.reduce((sum, row) => sum + (Number(row[field.key]) || 0), 0);
+      return acc;
+    }, {});
+    setSummary(totals);
   }, [filteredRecords]);
 
   const searchedRecords = useMemo(() => {
@@ -577,39 +506,30 @@ const FoodSupplementary = () => {
 
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
 
-  /* ─── Excel Template Download ─── */
+  /* ─── Grant Wise Master Excel Template Download ─── */
   const handleDownloadTemplate = () => {
     const wb = XLSX.utils.book_new();
-    const categoryRow = EXCEL_COLUMNS.map((c) => c.category);
-    const headerRow = EXCEL_COLUMNS.map((c) => c.header);
-    const sampleRow = EXCEL_COLUMNS.map((c) => {
-      if (c.key === "district") return "Almora";
-      if (c.key === "project") return "Bhaisiachana";
-      if (c.key === "sector") return "Barechhina";
-      if (c.key === "awc_name") return "Aali-01";
-      if (c.key === "awc_code") return "5064010101";
-      if (c.key === "month") return "July";
-      if (c.key === "financial_year") return "2026-27";
-      if (!c.send) return "";
-      return 0;
-    });
-    const emptyRow = EXCEL_COLUMNS.map(() => "");
-    const aoa = [categoryRow, headerRow, sampleRow, emptyRow, emptyRow, emptyRow, emptyRow, emptyRow, emptyRow];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-
+    const categoryRow = [...EXCEL_META_COLUMNS.map(() => ""), ...GRANT_CATEGORIES.flatMap((c) => [c.title, "", "", ""]), ...FOOD_FIELDS.map(() => "Supplementary Nutrition Details")];
+    const headerRow = [
+      ...EXCEL_META_COLUMNS.map((c) => c.header),
+      ...GRANT_CATEGORIES.flatMap(() => ["Grant 15", "Grant 30", "Grant 31", "TOTAL"]),
+      ...FOOD_FIELDS.map((f) => f.header),
+    ];
+    const sampleRow = ["Almora", "Bhaisiyachana [0506401]", "SERAGHAT [02]", "HATOLA-02", "5064010220", "September", "2026-2027"];
+    GRANT_CATEGORIES.forEach((c, idx) => sampleRow.push(15, 30, 31, [25, 30, 10, 8, 40][idx]));
+    sampleRow.push(25, 30, 10, 0, 40, 40);
+    const ws = XLSX.utils.aoa_to_sheet([categoryRow, headerRow, sampleRow, Array(headerRow.length).fill("")]);
     const merges = [];
-    let startIdx = 0;
-    for (let i = 1; i <= categoryRow.length; i++) {
-      if (i === categoryRow.length || categoryRow[i] !== categoryRow[startIdx]) {
-        if (i - 1 > startIdx) merges.push({ s: { r: 0, c: startIdx }, e: { r: 0, c: i - 1 } });
-        startIdx = i;
-      }
-    }
+    GRANT_CATEGORIES.forEach((_, idx) => {
+      const col = EXCEL_META_COLUMNS.length + idx * 4;
+      merges.push({ s: { r: 0, c: col }, e: { r: 0, c: col + 3 } });
+    });
+    const foodStart = EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4;
+    if (FOOD_FIELDS.length > 1) merges.push({ s: { r: 0, c: foodStart }, e: { r: 0, c: foodStart + FOOD_FIELDS.length - 1 } });
     ws["!merges"] = merges;
-    ws["!cols"] = EXCEL_COLUMNS.map((c) => ({ wch: Math.max(c.header.length + 4, 16) }));
-
-    XLSX.utils.book_append_sheet(wb, ws, "Supplementary Nutrition");
-    XLSX.writeFile(wb, "Supplementary_Nutrition_Template.xlsx");
+    ws["!cols"] = headerRow.map((h) => ({ wch: Math.max(String(h || "").length + 4, 16) }));
+    XLSX.utils.book_append_sheet(wb, ws, "Grant Wise Master");
+    XLSX.writeFile(wb, "Grant_Wise_Master_Template.xlsx");
   };
 
   /* ─── Excel Upload Handler ─── */
@@ -630,101 +550,81 @@ const FoodSupplementary = () => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, { type: "array" });
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-
-        const json_aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-        let headerRowIdx = -1;
-        for (let i = 0; i < Math.min(8, json_aoa.length); i++) {
-          if (json_aoa[i] && json_aoa[i].some((h) => normalizeHeader(h) === normalizeHeader("AWC Code"))) {
-            headerRowIdx = i;
-            break;
-          }
-        }
-        if (headerRowIdx === -1) {
-          setError("Could not find the header row containing 'AWC Code'. Please use the downloaded template.");
-          return;
-        }
-
-        const parsedData = XLSX.utils.sheet_to_json(ws, { range: headerRowIdx, defval: "" });
-        const parsedRecords = parsedData
-          .map((rowObj, rowIdx) => {
-            const record = {};
-            EXCEL_COLUMNS.forEach((col) => {
-              const objKey = Object.keys(rowObj).find((k) => normalizeHeader(k) === normalizeHeader(col.header));
-              if (objKey !== undefined) {
-                const rawVal = rowObj[objKey];
-                if (col.type === "string") {
-                  record[col.key] = rawVal !== "" && rawVal !== null && rawVal !== undefined ? String(rawVal).trim() : "";
-                } else {
-                  if (typeof rawVal === "number") record[col.key] = rawVal;
-                  else if (rawVal === "" || rawVal === null || rawVal === undefined) record[col.key] = 0;
-                  else {
-                    const cleaned = String(rawVal).replace(/[^0-9.-]/g, "");
-                    const num = parseFloat(cleaned);
-                    record[col.key] = isNaN(num) ? 0 : num;
-                  }
-                }
-              } else {
-                record[col.key] = col.type === "string" ? "" : 0;
-              }
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
+        const headerIdx = rows.findIndex((row) => row.some((cell) => normalizeHeader(cell) === normalizeHeader("AWC CODE")));
+        if (headerIdx < 0) throw new Error("Could not find the AWC CODE header. Please use the downloaded Grant Wise Master template.");
+        const header = rows[headerIdx].map((v) => String(v || "").trim());
+        const idxOf = (label) => header.findIndex((h) => normalizeHeader(h) === normalizeHeader(label));
+        const metaIndexes = EXCEL_META_COLUMNS.map((c) => idxOf(c.header));
+        // Some workbooks have a grant subheader row (e.g. "Grant 15"), while
+        // the downloaded template may place sample/data rows immediately after
+        // the main header. Skip that row only when it is actually a subheader.
+        const possibleSubheader = rows[headerIdx + 1] || [];
+        const hasSubheader = possibleSubheader.some((cell) => {
+          const normalized = normalizeHeader(cell);
+          return normalized === normalizeHeader("Grant 15") ||
+            normalized === normalizeHeader("No. of Beneficiaries");
+        });
+        const dataStartIdx = headerIdx + (hasSubheader ? 2 : 1);
+        const dataRows = rows
+          .slice(dataStartIdx)
+          .filter((row) => row.some((v) => v !== "" && v !== null && v !== undefined));
+        const parsedRecords = dataRows.map((row, i) => {
+          const record = { _rowNum: dataStartIdx + i + 1 };
+          EXCEL_META_COLUMNS.forEach((col, j) => { record[col.key] = String(row[metaIndexes[j]] ?? "").trim(); });
+          GRANT_CATEGORIES.forEach((cat, catIdx) => {
+            const base = EXCEL_META_COLUMNS.length + catIdx * 4;
+            const grantValues = GRANT_IDS.filter((grantId, grantIdx) => {
+              const cell = row[base + grantIdx];
+              return cell !== "" && cell !== null && cell !== undefined && cell !== 0 && String(cell).trim() !== "0";
             });
-            return { _rowNum: headerRowIdx + rowIdx + 2, ...record };
-          })
-          .filter((r) => r.awc_code !== "" || r.month !== "" || r.financial_year !== "");
-
-        if (parsedRecords.length === 0) {
-          setError("No data rows found in the Excel file.");
-          return;
-        }
+            record[cat.countKey] = Number(row[base + 3]) || 0;
+            record[cat.grantKey] = grantValues.length ? grantValues : [...GRANT_IDS];
+          });
+          const foodStart = EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4;
+          FOOD_FIELDS.forEach((food, i) => { record[food.key] = Number(row[foodStart + i]) || 0; });
+          return record;
+        }).filter((r) => r.awc_code || r.month || r.financial_year);
+        if (!parsedRecords.length) throw new Error("No data rows found in the Excel file.");
 
         setShowUploadModal(true);
-        setUploadProgress({
-          total: parsedRecords.length, uploaded: 0, failed: 0, errors: [], currentRow: 0,
-          isUploading: true, isComplete: false, fileName: file.name,
-        });
-
+        setUploadProgress({ total: parsedRecords.length, uploaded: 0, failed: 0, errors: [], currentRow: 0, isUploading: true, isComplete: false, fileName: file.name });
         let uploadedCount = 0, failedCount = 0;
         const errorsList = [];
-
         for (let i = 0; i < parsedRecords.length; i++) {
           const rec = parsedRecords[i];
           setUploadProgress((prev) => ({ ...prev, currentRow: i + 1 }));
-
-          const payload = {};
-          EXCEL_COLUMNS.filter((c) => c.send).forEach((col) => {
-            if (rec[col.key] !== undefined && rec[col.key] !== "") payload[col.key] = rec[col.key];
-          });
-
-          if (payload.awc_code === "" || payload.awc_code === undefined || payload.month === "" || payload.month === undefined || payload.financial_year === "" || payload.financial_year === undefined) {
+          if (!rec.awc_code || !rec.month || !rec.financial_year) {
             failedCount++;
-            errorsList.push({
-              row: rec._rowNum, awcCode: rec.awc_code || rec.awc_name || "—",
-              error: "Missing required field (AWC Code / Month / Financial Year)",
-            });
+            errorsList.push({ row: rec._rowNum, awcCode: rec.awc_code || "—", error: "AWC CODE, MONTH and FINANCIAL YEAR are required." });
             setUploadProgress((prev) => ({ ...prev, uploaded: uploadedCount, failed: failedCount, errors: [...errorsList] }));
             continue;
           }
-
+          const payload = { awc_code: rec.awc_code, month: rec.month, financial_year: rec.financial_year };
+          GRANT_CATEGORIES.forEach((cat) => {
+            payload[cat.countKey] = Number(rec[cat.countKey]) || 0;
+            payload[cat.grantKey] = rec[cat.grantKey];
+          });
+          FOOD_FIELDS.forEach((food) => { payload[food.key] = Number(rec[food.key]) || 0; });
           try {
-            await api.post("/supplementary-nutrition-details/", payload);
-            uploadedCount++;
+            const response = await api.post("/supplementary-nutrition-details/", payload);
+            // API returns a record object; count successful 2xx responses as uploaded.
+            if (response.status >= 200 && response.status < 300) uploadedCount++;
           } catch (err) {
             failedCount++;
-            const errMsg = err?.response?.data?.detail || err?.response?.data?.message || err?.response?.data?.error || (typeof err?.response?.data === "object" ? JSON.stringify(err.response.data) : err.message) || "Unknown error";
-            errorsList.push({ row: rec._rowNum, awcCode: rec.awc_code || rec.awc_name || "—", error: errMsg });
+            const body = err?.response?.data;
+            const errMsg = body?.detail || body?.message || body?.error || (body ? JSON.stringify(body) : err.message) || "Unknown error";
+            errorsList.push({ row: rec._rowNum, awcCode: rec.awc_code || "—", error: errMsg });
           }
-
           setUploadProgress((prev) => ({ ...prev, uploaded: uploadedCount, failed: failedCount, errors: [...errorsList] }));
-          if (i % 3 === 0) await new Promise((r) => setTimeout(r, 30));
         }
-
         setUploadProgress((prev) => ({ ...prev, isUploading: false, isComplete: true }));
-        if (uploadedCount > 0) setSuccess(`${uploadedCount} record(s) uploaded successfully.`);
-        fetchData();
+        if (uploadedCount) setSuccess(`${uploadedCount} record(s) uploaded successfully.`);
+        await fetchData();
       } catch (err) {
-        setError("Failed to parse Excel file: " + (err.message || "Unknown error"));
+        setError("Failed to process Excel file: " + (err.message || "Unknown error"));
         console.error(err);
       }
     };
@@ -803,7 +703,9 @@ const FoodSupplementary = () => {
     setFormLoading(true);
     try {
       if (isEditing) {
-        await api.put("/supplementary-nutrition-details/", formData);
+        const payload = { ...formData };
+        delete payload.district; delete payload.project; delete payload.sector; delete payload.awc_name; delete payload.created_at; delete payload.updated_at;
+        await api.put("/supplementary-nutrition-details/", payload);
         setSuccess("Record updated successfully.");
       }
       setView("list");
@@ -819,7 +721,7 @@ const FoodSupplementary = () => {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await api.delete("/supplementary-nutrition-details/", { data: { id: deleteTarget.id } });
+      await api.delete("/supplementary-nutrition-details/", { data: { ids: [deleteTarget.id] } });
       setSuccess("Record deleted successfully.");
       setShowDeleteModal(false);
       setDeleteTarget(null);
@@ -1558,55 +1460,70 @@ const FoodSupplementary = () => {
                       </Card.Header>
                       <Card.Body className="p-0">
                         <div className="fs-table-wrapper">
-                          <Table hover className="fs-data-table mb-0">
+                          <Table hover className="fs-data-table mb-0 fs-grant-master-table" style={{ minWidth: "2400px", borderCollapse: "separate", borderSpacing: 0 }}>
                             <thead>
                               <tr>
-                                {TABLE_COLUMNS.map((col, idx) => (
-                                  <th key={idx} className={col.key === "_actions" ? "text-center" : col.num || col.strong ? "text-end" : ""}>
-                                    {col.label}
-                                  </th>
+                                <th rowSpan={2} className="text-center align-middle">S. No.</th>
+                                {EXCEL_META_COLUMNS.map((col) => (
+                                  <th key={col.key} rowSpan={2} className="text-center align-middle">{col.header}</th>
+                                ))}
+                                {GRANT_CATEGORIES.map((cat) => (
+                                  <th key={cat.countKey} colSpan={4} className="text-center align-middle fs-grant-group-header">{cat.title}</th>
+                                ))}
+                                <th colSpan={FOOD_FIELDS.length} className="text-center align-middle fs-food-group-header">SUPPLEMENTARY NUTRITION DETAILS</th>
+                                <th rowSpan={2} className="text-center align-middle">Actions</th>
+                              </tr>
+                              <tr>
+                                {GRANT_CATEGORIES.flatMap((cat) => [15, 30, 31].map((grantId) => (
+                                  <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
+                                )).concat([
+                                  <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>
+                                ]))}
+                                {FOOD_FIELDS.map((food) => (
+                                  <th key={food.key} className="text-center fs-food-subheader">{food.header}</th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody>
                               {paginatedRecords.length === 0 ? (
                                 <tr>
-                                  <td colSpan={TABLE_COLUMNS.length} className="text-center py-5 text-muted">
+                                  <td colSpan={1 + EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4 + FOOD_FIELDS.length + 1} className="text-center py-5 text-muted">
                                     No records found. Click <strong>Upload Excel</strong> to add records.
                                   </td>
                                 </tr>
                               ) : (
                                 paginatedRecords.map((record, index) => (
                                   <tr key={record.id || index}>
-                                    {TABLE_COLUMNS.map((col, cIdx) => {
-                                      if (col.key === "_index")
-                                        return (
-                                          <td key={cIdx} className="text-muted">
-                                            {(currentPage - 1) * itemsPerPage + index + 1}
-                                          </td>
-                                        );
-                                      if (col.key === "_actions")
-                                        return (
-                                          <td key={cIdx} className="text-center">
-                                            <div className="fs-action-btns">
-                                              <Button variant="light" size="sm" className="fs-action-btn" style={{ color: "#0ea5e9", background: "#f0f9ff", borderColor: "#bae6fd" }} onClick={() => handleViewClick(record)} title="View">
-                                                <FaEye />
-                                              </Button>
-                                              <Button variant="light" size="sm" className="fs-action-btn fs-edit-btn" onClick={() => handleEdit(record)} title="Edit">
-                                                <FaEdit />
-                                              </Button>
-                                              <Button variant="light" size="sm" className="fs-action-btn fs-delete-btn" onClick={() => handleDeleteClick(record)} title="Delete">
-                                                <FaTrash />
-                                              </Button>
-                                            </div>
-                                          </td>
-                                        );
-                                      const val = record[col.key];
-                                      if (col.badge) return <td key={cIdx}><Badge className="fs-month-badge">{val}</Badge></td>;
-                                      if (col.strong) return <td key={cIdx} className="text-end"><strong className="text-primary">{val ? Number(val).toLocaleString() : 0}</strong></td>;
-                                      if (col.num) return <td key={cIdx} className="text-end">{val ? Number(val).toLocaleString() : 0}</td>;
-                                      return <td key={cIdx}>{val || "—"}</td>;
+                                    <td className="text-center text-muted">{(currentPage - 1) * itemsPerPage + index + 1}</td>
+                                    {EXCEL_META_COLUMNS.map((col) => (
+                                      <td key={col.key} className={col.key === "month" ? "text-center" : ""}>
+                                        {col.key === "month" && record[col.key]
+                                          ? <Badge className="fs-month-badge">{record[col.key]}</Badge>
+                                          : (record[col.key] || "—")}
+                                      </td>
+                                    ))}
+                                    {GRANT_CATEGORIES.flatMap((cat) => {
+                                      const grants = Array.isArray(record[cat.grantKey]) ? record[cat.grantKey].map(Number) : [];
+                                      return [15, 30, 31].map((grantId) => (
+                                        <td key={`${cat.countKey}-${grantId}`} className="text-center fs-grant-cell">
+                                          {grants.includes(grantId) ? grantId : "—"}
+                                        </td>
+                                      )).concat([
+                                        <td key={`${cat.countKey}-total`} className="text-end fw-semibold fs-total-cell">
+                                          {Number(record[cat.countKey] || 0).toLocaleString()}
+                                        </td>
+                                      ]);
                                     })}
+                                    {FOOD_FIELDS.map((food) => (
+                                      <td key={food.key} className="text-end">{Number(record[food.key] || 0).toLocaleString()}</td>
+                                    ))}
+                                    <td className="text-center">
+                                      <div className="fs-action-btns">
+                                        <Button variant="light" size="sm" className="fs-action-btn" style={{ color: "#0ea5e9", background: "#f0f9ff", borderColor: "#bae6fd" }} onClick={() => handleViewClick(record)} title="View"><FaEye /></Button>
+                                        <Button variant="light" size="sm" className="fs-action-btn fs-edit-btn" onClick={() => handleEdit(record)} title="Edit"><FaEdit /></Button>
+                                        <Button variant="light" size="sm" className="fs-action-btn fs-delete-btn" onClick={() => handleDeleteClick(record)} title="Delete"><FaTrash /></Button>
+                                      </div>
+                                    </td>
                                   </tr>
                                 ))
                               )}
@@ -1614,13 +1531,20 @@ const FoodSupplementary = () => {
                             {searchedRecords.length > 0 && (
                               <tfoot>
                                 <tr>
-                                  {TABLE_COLUMNS.map((col, cIdx) => {
-                                    if (col.key === "_index") return <th key={cIdx}></th>;
-                                    if (col.key === "_actions") return <th key={cIdx}></th>;
-                                    if (col.num || col.strong) return <th key={cIdx} className="text-end">{totalDetailed[col.key]?.toLocaleString() || 0}</th>;
-                                    if (cIdx === 1) return <th key={cIdx}>Total</th>;
-                                    return <th key={cIdx}></th>;
-                                  })}
+                                  <th></th>
+                                  {EXCEL_META_COLUMNS.map((col, idx) => (
+                                    <th key={col.key}>{idx === 0 ? "TOTAL" : ""}</th>
+                                  ))}
+                                  {GRANT_CATEGORIES.flatMap((cat) => [
+                                    <th key={`${cat.countKey}-g15`}></th>,
+                                    <th key={`${cat.countKey}-g30`}></th>,
+                                    <th key={`${cat.countKey}-g31`}></th>,
+                                    <th key={`${cat.countKey}-total`} className="text-end">{totalDetailed[cat.countKey]?.toLocaleString() || 0}</th>,
+                                  ])}
+                                  {FOOD_FIELDS.map((food) => (
+                                    <th key={food.key} className="text-end">{totalDetailed[food.key]?.toLocaleString() || 0}</th>
+                                  ))}
+                                  <th></th>
                                 </tr>
                               </tfoot>
                             )}
@@ -1672,42 +1596,21 @@ const FoodSupplementary = () => {
                     <div className="fs-form-section mb-4">
                       <h6 className="fs-section-subtitle">Basic Information</h6>
                       <Row>
-                        <Col md={6} lg={4}>{renderFormField("AWC Code", "awc_code", "text", "5064010101")}</Col>
+                        <Col md={6} lg={4}>{renderFormField("AWC Code", "awc_code", "text", "5064010220")}</Col>
                         <Col md={6} lg={4}>{renderFormField("Month", "month", "select")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Financial Year", "financial_year", "text", "2026-27")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Active Beneficiaries", "active_beneficiaries", "number", "0")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Total Beneficiaries", "total_beneficiaries", "number", "0")}</Col>
+                        <Col md={6} lg={4}>{renderFormField("Financial Year", "financial_year", "text", "2026-2027")}</Col>
                       </Row>
                     </div>
                     <div className="fs-form-section mb-4">
-                      <h6 className="fs-section-subtitle">Beneficiaries Details</h6>
+                      <h6 className="fs-section-subtitle">Beneficiary Counts</h6>
                       <Row>
-                        <Col md={6} lg={3}>{renderFormField("THR 25 Days FRS/HCM (3y-6y)", "thr_25_days_frs_hcm_beneficiaries_3y_6y", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("HCM Beneficiaries (3y-6y)", "hcm_beneficiaries_3y_6y", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("Children 6m-3y", "children_6m_3y_beneficiaries", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("Pregnant/Lactating Mothers", "pregnant_women_lactating_mothers", "number", "0")}</Col>
-                      </Row>
-                    </div>
-                    <div className="fs-form-section mb-4">
-                      <h6 className="fs-section-subtitle">Packets & Supplies Distribution</h6>
-                      <Row>
-                        <Col md={6} lg={3}>{renderFormField("Mung Dal Khichdi Packets", "quarterly_packets_mung_dal_khichdi", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("Poushik Sattu Mix Packets", "quarterly_packets_poushik_sattu_mix", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("Poushik Sattu Mix (75d, gm)", "poushik_sattu_mix_75_days_packet_size_gm", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("Sattu 2250gm Packets", "quarterly_packets_sattu_2250gm", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("Mix 1000gm Packets", "quarterly_packets_mix_1000gm", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("Multi Grain Aata 1250gm", "quarterly_packets_multi_grain_aata_1250gm", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("Panjeeri 75d 2625gm", "panjeeri_75_days_2625gm_quarterly_packets", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("Panjeeri 75d 4625gm", "panjeeri_75_days_4625gm_quarterly_packets", "number", "0")}</Col>
+                        {GRANT_CATEGORIES.map((cat) => <Col md={6} lg={4} key={cat.countKey}>{renderFormField(cat.title, cat.countKey, "number", "0")}</Col>)}
                       </Row>
                     </div>
                     <div className="fs-form-section">
-                      <h6 className="fs-section-subtitle">SAM & SUW Children</h6>
+                      <h6 className="fs-section-subtitle">Supplementary Nutrition Details</h6>
                       <Row>
-                        <Col md={6} lg={3}>{renderFormField("SAM Children 6m-6y", "sam_children_6m_6y", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("SUW Children 6m-6y", "suw_children_6m_6y", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("SAM Children 3y-6y", "sam_children_3y_6y", "number", "0")}</Col>
-                        <Col md={6} lg={3}>{renderFormField("SUW Children 3y-6y", "suw_children_3y_6y", "number", "0")}</Col>
+                        {FOOD_FIELDS.map((food) => <Col md={6} lg={4} key={food.key}>{renderFormField(food.header, food.key, "number", "0")}</Col>)}
                       </Row>
                     </div>
                   </Card.Body>
@@ -1810,7 +1713,7 @@ const FoodSupplementary = () => {
               <strong>AWC Code:</strong> {deleteTarget.awc_code} &nbsp;|&nbsp;
               <strong>Month:</strong> {deleteTarget.month} &nbsp;|&nbsp;
               <strong>Year:</strong> {deleteTarget.financial_year} &nbsp;|&nbsp;
-              <strong>Total Beneficiaries:</strong> {deleteTarget.total_beneficiaries}
+              <strong>Pregnant/Lactating Count:</strong> {deleteTarget.pregnant_woman_lactating_mother}
             </div>
           )}
         </Modal.Body>
@@ -1831,42 +1734,25 @@ const FoodSupplementary = () => {
               <div className="fs-form-section mb-3">
                 <h6 className="fs-section-subtitle">Basic Information</h6>
                 <Row>
+                  <Col md={6}><strong>District:</strong> {viewRecord.district || "—"}</Col>
+                  <Col md={6}><strong>Project:</strong> {viewRecord.project || "—"}</Col>
+                  <Col md={6}><strong>Sector:</strong> {viewRecord.sector || "—"}</Col>
+                  <Col md={6}><strong>AWC Name:</strong> {viewRecord.awc_name || "—"}</Col>
                   <Col md={6}><strong>AWC Code:</strong> {viewRecord.awc_code}</Col>
                   <Col md={6}><strong>Month:</strong> {viewRecord.month}</Col>
                   <Col md={6}><strong>Financial Year:</strong> {viewRecord.financial_year}</Col>
-                  <Col md={6}><strong>Active Beneficiaries:</strong> {viewRecord.active_beneficiaries?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>Total Beneficiaries:</strong> {viewRecord.total_beneficiaries?.toLocaleString() || 0}</Col>
                 </Row>
               </div>
               <div className="fs-form-section mb-3">
-                <h6 className="fs-section-subtitle">Beneficiaries Details</h6>
+                <h6 className="fs-section-subtitle">Beneficiary Counts and Grants</h6>
                 <Row>
-                  <Col md={6}><strong>THR 25 Days FRS/HCM (3y-6y):</strong> {viewRecord.thr_25_days_frs_hcm_beneficiaries_3y_6y?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>HCM Beneficiaries (3y-6y):</strong> {viewRecord.hcm_beneficiaries_3y_6y?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>Children 6m-3y:</strong> {viewRecord.children_6m_3y_beneficiaries?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>Pregnant/Lactating Mothers:</strong> {viewRecord.pregnant_women_lactating_mothers?.toLocaleString() || 0}</Col>
-                </Row>
-              </div>
-              <div className="fs-form-section mb-3">
-                <h6 className="fs-section-subtitle">SAM & SUW Children</h6>
-                <Row>
-                  <Col md={6}><strong>SAM Children 6m-6y:</strong> {viewRecord.sam_children_6m_6y?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>SUW Children 6m-6y:</strong> {viewRecord.suw_children_6m_6y?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>SAM Children 3y-6y:</strong> {viewRecord.sam_children_3y_6y?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>SUW Children 3y-6y:</strong> {viewRecord.suw_children_3y_6y?.toLocaleString() || 0}</Col>
+                  {GRANT_CATEGORIES.map((cat) => <Col md={6} key={cat.countKey} className="mb-2"><strong>{cat.title}:</strong> {Number(viewRecord[cat.countKey] || 0).toLocaleString()}<div className="small text-muted">Grants: {(viewRecord[cat.grantKey] || []).join(", ") || "—"}</div></Col>)}
                 </Row>
               </div>
               <div className="fs-form-section">
-                <h6 className="fs-section-subtitle">Packets & Supplies Distribution</h6>
+                <h6 className="fs-section-subtitle">Supplementary Nutrition Details</h6>
                 <Row>
-                  <Col md={6}><strong>Mung Dal Khichdi:</strong> {viewRecord.quarterly_packets_mung_dal_khichdi?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>Poushik Sattu Mix:</strong> {viewRecord.quarterly_packets_poushik_sattu_mix?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>Sattu Mix (gm):</strong> {viewRecord.poushik_sattu_mix_75_days_packet_size_gm?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>Sattu 2250gm:</strong> {viewRecord.quarterly_packets_sattu_2250gm?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>Mix 1000gm:</strong> {viewRecord.quarterly_packets_mix_1000gm?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>Multi Grain Aata:</strong> {viewRecord.quarterly_packets_multi_grain_aata_1250gm?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>Panjeeri 2625gm:</strong> {viewRecord.panjeeri_75_days_2625gm_quarterly_packets?.toLocaleString() || 0}</Col>
-                  <Col md={6}><strong>Panjeeri 4625gm:</strong> {viewRecord.panjeeri_75_days_4625gm_quarterly_packets?.toLocaleString() || 0}</Col>
+                  {FOOD_FIELDS.map((food) => <Col md={6} key={food.key} className="mb-2"><strong>{food.header}:</strong> {Number(viewRecord[food.key] || 0).toLocaleString()}</Col>)}
                 </Row>
               </div>
             </div>
