@@ -28,6 +28,13 @@ import {
   getStockAllocationComparison,
 } from "./stockAllocationComparison";
 
+// Helper to format months array to string
+const formatMonthsArray = (months) => {
+  if (!months) return "";
+  if (Array.isArray(months)) return months.join(", ");
+  return months;
+};
+
 const HcmSupervisorReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -61,6 +68,8 @@ const HcmSupervisorReceiving = () => {
     startDate: "",
     endDate: "",
   });
+
+  // Updated Columns state to include missing fields
   const [columns, setColumns] = useState([
     { dataField: "select", text: "Select", visible: true },
     { dataField: "#", text: "#", visible: true },
@@ -68,15 +77,22 @@ const HcmSupervisorReceiving = () => {
     { dataField: "sector", text: "Sector", visible: true },
     { dataField: "project", text: "Project", visible: true },
     { dataField: "awc_name", text: "AWC Name", visible: true },
+    { dataField: "awc_code", text: "AWC Code", visible: false }, // New
+    { dataField: "awc_type", text: "AWC Type", visible: false }, // New
     { dataField: "food_item", text: "Food Item", visible: true },
     { dataField: "quantity", text: "Quantity", visible: true },
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "bene_category", text: "Beneficiary Category", visible: true },
     { dataField: "date", text: "Date", visible: true },
+    { dataField: "fin_year", text: "Fin. Year", visible: false }, // New
+    { dataField: "months", text: "Months", visible: false }, // New
+    { dataField: "curr_month", text: "Current Month", visible: true }, // New
+    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true }, // New
     { dataField: "sector_status", text: "Sector Status", visible: true },
     { dataField: "sector_remark", text: "Sector Remark", visible: true },
     { dataField: "actions", text: "Actions", visible: true },
   ]);
+  
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [modalData, setModalData] = useState({ title: "", totals: {} });
@@ -151,10 +167,8 @@ const HcmSupervisorReceiving = () => {
   const handleSelectAll = (e) => {
     if (e.target.checked) {
       const pendingIds = pendingItemsOnPage.map((item) => item.id);
-      // Add only pending IDs to the selection, preserving other selections if any
       setSelectedIds(prev => [...new Set([...prev, ...pendingIds])]);
     } else {
-      // Deselect only the pending items shown on the current page
       setSelectedIds([]);
     }
   };
@@ -279,6 +293,7 @@ const HcmSupervisorReceiving = () => {
   const canReject = useMemo(() => {
     return selectedIds.some(id => receivings.find(r => r.id === id)?.sector_status !== 'rejected');
   }, [selectedIds, receivings]);
+
   const handleColumnToggle = (index) => {
     const newColumns = [...columns];
     newColumns[index].visible = !newColumns[index].visible;
@@ -313,7 +328,7 @@ const HcmSupervisorReceiving = () => {
       });
 
       setSuccessMsg(`Successfully ${bulkAction} ${selectedIds.length} items.`);
-      fetchReceivings(); // Refetch data
+      fetchReceivings(); 
       setSelectedIds([]);
       setShowBulkActionModal(false);
       setBulkRemark("");
@@ -339,7 +354,7 @@ const HcmSupervisorReceiving = () => {
 
   const exportToPDF = () => {
     setIsPrinting(true);
-    setTimeout(() => { // Timeout to allow UI to update before capturing
+    setTimeout(() => {
       const mainTable = tableRef.current;
       const totalsTableContainer = document.createElement('div');
       totalsTableContainer.innerHTML = `
@@ -412,7 +427,11 @@ const HcmSupervisorReceiving = () => {
           return;
         }
         if (col.dataField === 'date') {
-          row[col.text] = new Date(item.date).toLocaleDateString('en-CA'); // YYYY-MM-DD
+          row[col.text] = new Date(item.date).toLocaleDateString('en-CA');
+        } else if (col.dataField === 'max_expirydate') {
+          row[col.text] = item.max_expirydate ? new Date(item.max_expirydate).toLocaleDateString('en-CA') : '';
+        } else if (col.dataField === 'months') {
+          row[col.text] = formatMonthsArray(item.months);
         } else {
           row[col.text] = item[col.dataField];
         }
@@ -450,6 +469,7 @@ const HcmSupervisorReceiving = () => {
       </Modal.Footer>
     </Modal>
   );
+
   const renderPagination = () => {
     if (totalPages <= 1) return null;
     let items = [];
@@ -559,6 +579,12 @@ const HcmSupervisorReceiving = () => {
                             case "date":
                               cellContent = new Date(item.date).toLocaleDateString();
                               break;
+                            case "max_expirydate":
+                              cellContent = item.max_expirydate ? new Date(item.max_expirydate).toLocaleDateString() : '-';
+                              break;
+                            case "months":
+                              cellContent = formatMonthsArray(item.months);
+                              break;
                             case "sector_status":
                               if (isPrinting) {
                                 cellContent = <div>{item.sector_status || 'pending'}</div>;
@@ -589,7 +615,6 @@ const HcmSupervisorReceiving = () => {
                 </tbody>
                 <tfoot>
                   <tr className="fw-bold table-info">
-                    {/* Adjust colSpan to correctly position the 'View Totals' button */}
                     <td colSpan={visibleColumns.findIndex(c => c.dataField === 'quantity')}>Total</td>
                     {visibleColumns.slice(visibleColumns.findIndex(c => c.dataField === 'quantity')).map(col => {
                       if (col.dataField === 'quantity') {
@@ -599,7 +624,6 @@ const HcmSupervisorReceiving = () => {
                           </td>
                         );
                       }
-                      // Render empty cells for other columns in the footer
                       return <td key={col.dataField}></td>;
                     })}
                   </tr>

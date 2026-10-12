@@ -81,6 +81,7 @@ const DPOTHRReceiving = () => {
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
 
+  // Updated columns state to include 'curr_month' and 'max_expirydate'
   const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
     { dataField: "date", text: "Date", visible: true },
@@ -96,6 +97,8 @@ const DPOTHRReceiving = () => {
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
     { dataField: "months", text: "Months", visible: true },
+    { dataField: "curr_month", text: "Current Month", visible: true }, // New
+    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true }, // New
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQtyModal, setShowQtyModal] = useState(false);
@@ -304,7 +307,15 @@ const DPOTHRReceiving = () => {
     const dataToExport = filteredReports.map((row, index) => {
       const newRow = { "#": index + 1 };
       visCols.forEach((col) => {
-        newRow[col.text] = row[col.dataField];
+        if (col.dataField === 'months') {
+          newRow[col.text] = (Array.isArray(row.months) ? row.months : quarterToMonths[row.quarter] || []).map(m => monthLabels[m] || m).join(', ');
+        } else if (col.dataField === 'date') {
+          newRow[col.text] = row.date ? new Date(row.date).toLocaleDateString('en-CA') : '';
+        } else if (col.dataField === 'max_expirydate') {
+          newRow[col.text] = row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString('en-CA') : '';
+        } else {
+          newRow[col.text] = row[col.dataField];
+        }
       });
       return newRow;
     });
@@ -662,8 +673,12 @@ const DPOTHRReceiving = () => {
                                   <td key={col.dataField}>
                                     {col.dataField === "#"
                                       ? (currentPage - 1) * itemsPerPage + index + 1
-                                      : col.dataField === "months" ? (Array.isArray(report.months) ? report.months : quarterToMonths[report.quarter] || []).map(m => monthLabels[m] || m).join(', ')
-                                      : col.dataField === "date" ? new Date(report[col.dataField]).toLocaleDateString()
+                                      : col.dataField === "months" 
+                                      ? (Array.isArray(report.months) ? report.months : quarterToMonths[report.quarter] || []).map(m => monthLabels[m] || m).join(', ')
+                                      : col.dataField === "date" 
+                                      ? new Date(report[col.dataField]).toLocaleDateString()
+                                      : col.dataField === "max_expirydate" 
+                                      ? (report.max_expirydate ? new Date(report.max_expirydate).toLocaleDateString() : '-')
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
                                       ? new Date(report[col.dataField]).toLocaleString()
                                       : report[col.dataField]}

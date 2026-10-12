@@ -21,8 +21,8 @@ import * as XLSX from "xlsx";
 import html2pdf from "html2pdf.js";
 
 const API_URLS = {
-  hcm_receiving: "/hcm-anganwadi-receiving/",
-  thr_receiving: "/thr-anganwadi-receiving/",
+  hcm_receiving: "https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/hcm-anganwadi-receiving/",
+  thr_receiving: "https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/thr-anganwadi-receiving/",
   supp_nutrition: "/supplementary-nutrition-anganwadi/",
   category_food_item: "/categoryandfooditem/",
 };
@@ -65,6 +65,12 @@ const getCurrentFinancialYear = () => {
   return currentMonth >= 3
     ? `${currentYear}-${(currentYear + 1).toString().slice(-2)}`
     : `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
+};
+
+// Helper to get current month name
+const getCurrentMonth = () => {
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  return monthNames[new Date().getMonth()];
 };
 
 const monthOptions = [
@@ -319,20 +325,25 @@ const FoodItemReceiving = () => {
     thr: { fin_year: [], months: [] },
   });
 
-  const availableMonthsFromSupp = useMemo(() => {
+  // Dynamically calculate available months ONLY for the selected food item
+  const availableMonthsForSelectedFoodItem = useMemo(() => {
+    // If no food item selected, or no field_name mapped, no months are available yet.
+    if (!formData.field_name || suppNutritionData.length === 0) return [];
+
     const monthsFromData = new Set();
     suppNutritionData.forEach(rec => {
-      if (rec._monthKeys) {
-        monthsFromData.add(rec._monthKeys);
-      } else if (rec.month) {
-        const normalized = normalizeSuppMonth(rec.month);
+      // Check if the specific food item has a quantity > 0 in this record
+      const quantity = parseInt(rec[formData.field_name], 10) || 0;
+      if (quantity > 0) {
+        const normalized = rec._monthKeys || normalizeSuppMonth(rec.month);
         if (normalized) monthsFromData.add(normalized);
       }
     });
+
     return monthOptions
       .filter(m => monthsFromData.has(m.value))
       .map(m => m.value);
-  }, [suppNutritionData]);
+  }, [suppNutritionData, formData.field_name]);
 
   // Unique month/FY for supp tab filters
   const suppUniqueMonths = useMemo(() => {
@@ -464,6 +475,8 @@ const FoodItemReceiving = () => {
       setFormData({
         ...item,
         date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
+        max_expirydate: item.max_expirydate ? new Date(item.max_expirydate).toISOString().split('T')[0] : '',
+        curr_month: item.curr_month || getCurrentMonth(),
         months: parsedMonths,
         quarter: item.quarter || '',
         food_item_value: foodItemValue,
@@ -472,6 +485,8 @@ const FoodItemReceiving = () => {
       setFormData({
         food_item: '', food_item_value: '', quantity: '', bene_category: '', unit: '',
         date: new Date().toISOString().split('T')[0],
+        max_expirydate: '',
+        curr_month: getCurrentMonth(),
         fin_year: getCurrentFinancialYear(), months: [], quarter: ''
       });
     }
@@ -522,18 +537,13 @@ const FoodItemReceiving = () => {
       }
 
       setFormData(prev => {
+        // Ensure we have a matching record that actually contains the food item
         if (suppNutritionData.length > 0 && autoFieldName) {
           const matchingRecord = suppNutritionData.find(rec => {
+            const hasItem = parseInt(rec[autoFieldName], 10) > 0;
             const matchesYear = prev.fin_year ? rec.financial_year === prev.fin_year : true;
-            const matchesMonth = prev.months && prev.months.length > 0
-              ? prev.months.some(m => {
-                  if (!m) return false;
-                  const recMonthKey = rec._monthKeys || (rec.month ? normalizeMonthKey(rec.month) : '');
-                  return recMonthKey === m || (rec.month && String(rec.month).toLowerCase().includes(String(m).toLowerCase()));
-                })
-              : true;
-            return matchesYear && matchesMonth;
-          }) || suppNutritionData[0];
+            return hasItem && matchesYear;
+          });
 
           if (matchingRecord) {
             autoQuantity = matchingRecord[autoFieldName] || '';
@@ -609,11 +619,21 @@ const FoodItemReceiving = () => {
       fin_year: formData.fin_year || getCurrentFinancialYear(),
       months: selectedMonths,
       quarter: quarterString,
+      curr_month: formData.curr_month || getCurrentMonth(),
+      max_expirydate: formData.max_expirydate || null,
     };
 
     if (editingItem) {
       payload.id = editingItem.id;
+      // Include existing non-editable fields so they aren't wiped out on PUT
+      payload.awc_name = editingItem.awc_name;
+      payload.awc_code = editingItem.awc_code;
+      payload.awc_type = editingItem.awc_type;
+      payload.sector = editingItem.sector;
+      payload.project = editingItem.project;
+      payload.district = editingItem.district;
       if (editingItem.sector_status) payload.sector_status = editingItem.sector_status;
+      if (editingItem.sector_remark !== undefined) payload.sector_remark = editingItem.sector_remark;
     }
 
     const url = isThr ? API_URLS.thr_receiving : API_URLS.hcm_receiving;
@@ -744,6 +764,8 @@ const FoodItemReceiving = () => {
             <th>Packets</th>
             <th>Unit</th>
             <th>Fin. Year</th>
+            <th>Current Month</th>
+            <th>Max Expiry Date</th>
             <th>Months</th>
             <th>Sector Status</th>
             <th>Actions</th>
@@ -759,6 +781,8 @@ const FoodItemReceiving = () => {
               <td>{rec.quantity}</td>
               <td>{rec.unit}</td>
               <td>{rec.fin_year}</td>
+              <td>{rec.curr_month || '-'}</td>
+              <td>{rec.max_expirydate ? new Date(rec.max_expirydate).toLocaleDateString() : '-'}</td>
               <td>{formatMonths(getMonthsArray(rec))}</td>
               <td>
                 <Badge bg={getStatusVariant(rec.sector_status)}>{rec.sector_status || 'pending'}</Badge>
@@ -781,7 +805,7 @@ const FoodItemReceiving = () => {
               </td>
             </tr>
           )) : (
-            <tr><td colSpan="10" className="text-center">No records found.</td></tr>
+            <tr><td colSpan="12" className="text-center">No records found.</td></tr>
           )}
         </tbody>
         {records.length > 0 && (
@@ -789,7 +813,7 @@ const FoodItemReceiving = () => {
             <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
               <td colSpan="4" className="text-end">Total Quantity:</td>
               <td>{totalQuantity}</td>
-              <td colSpan="5"></td>
+              <td colSpan="7"></td>
             </tr>
           </tfoot>
         )}
@@ -1132,67 +1156,94 @@ const FoodItemReceiving = () => {
                     />
                   </Form.Group>
                 </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Financial Year</Form.Label>
+                    <Form.Control
+                      type="text"
+                      name="fin_year"
+                      value={formData.fin_year || ''}
+                      onChange={handleFormChange}
+                      placeholder="e.g., 2025-26"
+                      required disabled
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
 
-                <>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Financial Year</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="fin_year"
-                        value={formData.fin_year || ''}
-                        onChange={handleFormChange}
-                        placeholder="e.g., 2025-26"
-                        required disabled
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={12}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Months</Form.Label>
-                      <div className="month-checkbox-group d-flex flex-wrap gap-2">
-                        {monthOptions.map((month) => {
-                          const isAvailable = availableMonthsFromSupp.includes(month.value);
-                          return (
-                            <Form.Check
-                              key={month.value}
-                              inline
-                              type="checkbox"
-                              id={`month-${month.value}`}
-                              label={month.label}
-                              checked={(formData.months || []).includes(month.value)}
-                              onChange={(e) => {
-                                if (!isAvailable) return;
-                                setFormData(prev => {
-                                  const currentMonths = prev.months || [];
-                                  const nextMonths = e.target.checked
-                                    ? [...new Set([...currentMonths, month.value])]
-                                    : currentMonths.filter((m) => m !== month.value);
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Current Month (Auto-filled)</Form.Label>
+                    <Form.Control
+                      type="text"
+                      name="curr_month"
+                      value={formData.curr_month || ''}
+                      readOnly
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Max Expiry Date (Safe to distribute till)</Form.Label>
+                    <Form.Control
+                      type="date"
+                      name="max_expirydate"
+                      value={formData.max_expirydate || ''}
+                      onChange={handleFormChange}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
 
-                                  let quarterString = '';
-                                  if (nextMonths.length > 0) {
-                                    const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
-                                      const qMonths = quarterToMonths[qKey];
-                                      return nextMonths.length === qMonths.length && nextMonths.every(m => qMonths.includes(m));
-                                    });
-                                    if (matchedQuarter) quarterString = matchedQuarter;
-                                    else quarterString = nextMonths.join(',');
-                                  }
+              <Row>
+                <Col md={12}>
+                  <Form.Group className="mb-3">
+                    <h6 className="mt-2 mb-3">Select Months (Multi-Select)</h6>
+                    <div className="month-checkbox-group d-flex flex-wrap gap-2">
+                      {monthOptions.map((month) => {
+                        const isAvailable = availableMonthsForSelectedFoodItem.includes(month.value) || (formData.months || []).includes(month.value);
+                        return (
+                          <Form.Check
+                            key={month.value}
+                            inline
+                            type="checkbox"
+                            id={`month-${month.value}`}
+                            label={month.label}
+                            checked={(formData.months || []).includes(month.value)}
+                            onChange={(e) => {
+                              if (!isAvailable) return;
+                              setFormData(prev => {
+                                const currentMonths = prev.months || [];
+                                const nextMonths = e.target.checked
+                                  ? [...new Set([...currentMonths, month.value])]
+                                  : currentMonths.filter((m) => m !== month.value);
 
-                                  return { ...prev, months: nextMonths, quarter: quarterString };
-                                });
-                              }}
-                              disabled={!isAvailable}
-                            />
-                          );
-                        })}
-                      </div>
-                      {availableMonthsFromSupp.length === 0 && (
-                        <small className="text-muted">No months available in Supplementary Nutrition data</small>
-                      )}
-                    </Form.Group>
-                  </Col>
-                </>
+                                let quarterString = '';
+                                if (nextMonths.length > 0) {
+                                  const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
+                                    const qMonths = quarterToMonths[qKey];
+                                    return nextMonths.length === qMonths.length && nextMonths.every(m => qMonths.includes(m));
+                                  });
+                                  if (matchedQuarter) quarterString = matchedQuarter;
+                                  else quarterString = nextMonths.join(',');
+                                }
+
+                                return { ...prev, months: nextMonths, quarter: quarterString };
+                              });
+                            }}
+                            disabled={!isAvailable}
+                          />
+                        );
+                      })}
+                    </div>
+                    {!formData.field_name ? (
+                      <small className="text-muted">Please select a food item to view available months.</small>
+                    ) : availableMonthsForSelectedFoodItem.length === 0 && (formData.months || []).length === 0 ? (
+                      <small className="text-muted">No months available in Supplementary Nutrition data for this food item.</small>
+                    ) : null}
+                  </Form.Group>
+                </Col>
               </Row>
 
               <div className="d-flex justify-content-end">
@@ -1225,6 +1276,12 @@ const FoodItemReceiving = () => {
                     <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Financial Year:</strong> {viewItem.fin_year}</ListGroup.Item>
                     <ListGroup.Item><FaCubes className="view-modal-icon" /> <strong>Months:</strong> {formatMonths(getMonthsArray(viewItem))}</ListGroup.Item>
                   </>
+                )}
+                {viewItem.curr_month && (
+                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Current Month:</strong> {viewItem.curr_month}</ListGroup.Item>
+                )}
+                {viewItem.max_expirydate && (
+                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Max Expiry Date:</strong> {new Date(viewItem.max_expirydate).toLocaleDateString()}</ListGroup.Item>
                 )}
                 <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>Sector:</strong> {viewItem.sector}</ListGroup.Item>
                 <ListGroup.Item><FaProjectDiagram className="view-modal-icon" /> <strong>Project:</strong> {viewItem.project}</ListGroup.Item>

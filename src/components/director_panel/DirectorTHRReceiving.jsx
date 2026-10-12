@@ -81,6 +81,7 @@ const DirectorTHRReceiving = () => {
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
 
+  // Updated columns state to include 'curr_month' and 'max_expirydate'
   const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
     { dataField: "date", text: "Date", visible: true },
@@ -96,12 +97,13 @@ const DirectorTHRReceiving = () => {
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
     { dataField: "months", text: "Months", visible: true },
+    { dataField: "curr_month", text: "Current Month", visible: true }, // New
+    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true }, // New
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [modalData, setModalData] = useState({ title: "", totals: {} });
   const [isPrinting, setIsPrinting] = useState(false);
-
 
   useEffect(() => {
     const handleResize = () => {
@@ -305,6 +307,8 @@ const DirectorTHRReceiving = () => {
         }
         if (col.dataField === 'months') {
           newRow[col.text] = formatMonths(row.months || row.quarter);
+        } else if (col.dataField === 'max_expirydate') {
+          newRow[col.text] = row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString('en-CA') : '';
         } else {
           newRow[col.text] = row[col.dataField];
         }
@@ -434,7 +438,6 @@ const DirectorTHRReceiving = () => {
     setModalData({ title, totals });
     setShowQuantityModal(true);
   };
-
 
   return (
     <div className="dashboard-container">
@@ -721,8 +724,12 @@ const DirectorTHRReceiving = () => {
                                   <td key={col.dataField}>
                                     {col.dataField === "#"
                                       ? (currentPage - 1) * itemsPerPage + index + 1
-                                      : col.dataField === "months" ? formatMonths(report.months || report.quarter)
-                                      : col.dataField === "date" ? new Date(report[col.dataField]).toLocaleDateString()
+                                      : col.dataField === "months" 
+                                      ? formatMonths(report.months || report.quarter)
+                                      : col.dataField === "date" 
+                                      ? new Date(report[col.dataField]).toLocaleDateString()
+                                      : col.dataField === "max_expirydate" 
+                                      ? (report.max_expirydate ? new Date(report.max_expirydate).toLocaleDateString() : '-')
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
                                       ? new Date(report[col.dataField]).toLocaleString()
                                       : report[col.dataField]}
@@ -786,7 +793,7 @@ const DirectorTHRReceiving = () => {
                 </thead>
                 <tbody>
                   {Object.entries(modalData.totals).map(([unit, total]) => (
-                    <tr key={unit}><td>{unit}</td><td>{total.toFixed(2)}</td></tr>
+                    <tr key={unit}><td>{unit}</td><td>{parseFloat(total).toFixed(2)}</td></tr>
                   ))}
                 </tbody>
               </Table>

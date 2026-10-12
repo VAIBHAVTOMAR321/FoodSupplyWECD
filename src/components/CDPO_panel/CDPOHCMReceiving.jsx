@@ -62,6 +62,8 @@ const CDPOHCMReceiving = () => {
   const [filters, setFilters] = useState({ fin_year: [], months: [], sector: [], food_item: [], bene_category: [] });
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQtyModal, setShowQtyModal] = useState(false);
+  
+  // Updated columns state to include 'curr_month' and 'max_expirydate'
   const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
     { dataField: "awc_name", text: "AWC Name", visible: true },
@@ -73,6 +75,8 @@ const CDPOHCMReceiving = () => {
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
     { dataField: "months", text: "Months", visible: true },
+    { dataField: "curr_month", text: "Current Month", visible: true }, // New Field
+    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true }, // New Field
     { dataField: "date", text: "Date", visible: true },
   ]);
 
@@ -180,6 +184,8 @@ const CDPOHCMReceiving = () => {
       visCols.forEach((col) => {
         if (col.dataField === 'months') {
           r[col.text] = formatMonths(row.months || row.quarter);
+        } else if (col.dataField === 'max_expirydate') {
+          r[col.text] = row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString('en-CA') : '';
         } else {
           r[col.text] = row[col.dataField];
         }
@@ -406,9 +412,11 @@ const CDPOHCMReceiving = () => {
                                 {visibleColumns.map((col) => (
                                   <td key={col.dataField}>
                                     {col.dataField === "#"
-                                      ? (currentPage - 1) * itemsPerPage + index + 1 :
-                                      col.dataField === 'months'
+                                      ? (currentPage - 1) * itemsPerPage + index + 1 
+                                      : col.dataField === 'months'
                                       ? formatMonths(row.months || row.quarter)
+                                      : col.dataField === 'max_expirydate'
+                                      ? (row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString() : '-')
                                       : row[col.dataField]}
                                   </td>
                                 ))}
