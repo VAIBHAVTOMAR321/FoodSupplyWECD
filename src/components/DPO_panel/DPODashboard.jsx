@@ -1,45 +1,149 @@
-
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination, Modal, Badge, Tabs, Tab } from "react-bootstrap";
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Spinner,
+  Alert,
+  Table,
+  Form,
+  Button,
+  ButtonGroup,
+  InputGroup,
+  Dropdown,
+  Pagination,
+  Modal,
+  Badge,
+  Tabs,
+  Tab,
+} from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dpo.css";
 
-import { FaUsers, FaUserFriends, FaBaby, FaChartBar, FaLayerGroup, FaFileExcel, FaFilePdf, FaSyncAlt, FaSearch, FaBoxes, FaChevronDown, FaWarehouse, FaUtensils, FaTimes } from "react-icons/fa";
+import {
+  FaUsers,
+  FaUserFriends,
+  FaBaby,
+  FaChartBar,
+  FaLayerGroup,
+  FaFileExcel,
+  FaFilePdf,
+  FaSyncAlt,
+  FaSearch,
+  FaBoxes,
+  FaChevronDown,
+  FaWarehouse,
+  FaUtensils,
+  FaTimes,
+} from "react-icons/fa";
 import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
 import * as XLSX from "xlsx";
 import html2pdf from "html2pdf.js";
 
-const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const monthNames = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/* ── Grant-wise Table schema (mirrors FoodSupplementary) ── */
+const GRANT_IDS = [15, 30, 31];
+const GRANT_CATEGORIES = [
+  {
+    title: "Pregnant Woman and Lactating Mother",
+    countKey: "pregnant_woman_lactating_mother",
+    grantKey: "pregnant_woman_lactating_mother_grant",
+  },
+  {
+    title: "Children 6m-3y",
+    countKey: "children_6m_3y",
+    grantKey: "children_6m_3y_grant",
+  },
+  {
+    title: "SAM 6M-5Y / SUW 6M-6Y",
+    countKey: "sam_children_6m_5y_suw_children_6m_6y",
+    grantKey: "sam_children_6m_5y_suw_children_6m_6y_grant",
+  },
+  {
+    title: "SAM 3Y-5Y / SUW 3Y-6Y",
+    countKey: "sam_children_3y_5y_suw_children_3y_6y",
+    grantKey: "sam_children_3y_5y_suw_children_3y_6y_grant",
+  },
+  {
+    title: "HCM Beneficiaries 3Y-6Y (Normal Children)",
+    countKey: "hcm_beneficiaries_3y_6y",
+    grantKey: "hcm_beneficiaries_3y_6y_grant",
+  },
+];
+const FOOD_FIELDS = [
+  {
+    header: "Poushik Sattu - Pregnant/Lactating Mother",
+    key: "poushik_sattu_preg_lat",
+  },
+  { header: "Panjeeri - Children 6m-3y", key: "panjeeri_6m_3y" },
+  {
+    header: "Panjeeri - SAM 6M-5Y / SUW 6M-6Y",
+    key: "panjeeri_sam_6m_5y_suw_6m_6y",
+  },
+  { header: "Sattu - SAM 3Y-5Y / SUW 3Y-6Y", key: "sattu_sam_3y_5y_suw_3y_6y" },
+  { header: "Mung Dal Khichdi - HCM 3Y-6Y", key: "mung_dal_khichdi_3y_6y" },
+  { header: "Multi Grain Aata - HCM 3Y-6Y", key: "multi_grain_aata_3y_6y" },
+];
+const EXCEL_META_COLUMNS = [
+  { header: "DISTRICT", key: "district" },
+  { header: "PROJECT", key: "project" },
+  { header: "SECTOR", key: "sector" },
+  { header: "AWC NAME", key: "awc_name" },
+  { header: "AWC CODE", key: "awc_code" },
+  { header: "MONTH", key: "month" },
+  { header: "FINANCIAL YEAR", key: "financial_year" },
+];
 
 const TABLE_COLUMNS = [
   { label: "District", key: "district" },
   { label: "Project", key: "project" },
   { label: "Sector", key: "sector" },
   { label: "AWC Code", key: "awc_code" },
+  { label: "AWC Name", key: "awc_name" },
   { label: "Month", key: "month" },
   { label: "Fin. Year", key: "financial_year" },
-  { label: "Active Bene.", key: "active_beneficiaries", num: true },
-  { label: "Total Bene.", key: "total_beneficiaries", strong: true },
-  { label: "Pregnant/Lact", key: "pregnant_women_lactating_mothers", num: true },
-  { label: "6m-3y", key: "children_6m_3y_beneficiaries", num: true },
-  { label: "THR 25d", key: "thr_25_days_frs_hcm_beneficiaries_3y_6y", num: true },
-  { label: "HCM 3-6y", key: "hcm_beneficiaries_3y_6y", num: true },
-  { label: "SAM 6m-6y", key: "sam_children_6m_6y", num: true },
-  { label: "SUW 6m-6y", key: "suw_children_6m_6y", num: true },
-  { label: "SAM 3y-6y", key: "sam_children_3y_6y", num: true },
-  { label: "SUW 3y-6y", key: "suw_children_3y_6y", num: true },
-  { label: "Mung Dal", key: "quarterly_packets_mung_dal_khichdi", num: true },
-  { label: "P. Sattu", key: "quarterly_packets_poushik_sattu_mix", num: true },
-  { label: "Sattu(gm)", key: "poushik_sattu_mix_75_days_packet_size_gm", num: true },
-  { label: "Panj 2625", key: "panjeeri_75_days_2625gm_quarterly_packets", num: true },
-  { label: "Panj 4625", key: "panjeeri_75_days_4625gm_quarterly_packets", num: true },
-  { label: "Sattu 2250", key: "quarterly_packets_sattu_2250gm", num: true },
-  { label: "Mix 1000", key: "quarterly_packets_mix_1000gm", num: true },
-  { label: "Multi Aata", key: "quarterly_packets_multi_grain_aata_1250gm", num: true },
+  {
+    label: "Pregnant/Lactating",
+    key: "pregnant_woman_lactating_mother",
+    num: true,
+  },
+  { label: "Poushik Sattu", key: "poushik_sattu_preg_lat", num: true },
+  { label: "Children 6m-3y", key: "children_6m_3y", num: true },
+  { label: "Panjeeri 6m-3y", key: "panjeeri_6m_3y", num: true },
+  {
+    label: "SAM 6m-5y / SUW 6m-6y",
+    key: "sam_children_6m_5y_suw_children_6m_6y",
+    num: true,
+  },
+  { label: "Panjeeri SAM/SUW", key: "panjeeri_sam_6m_5y_suw_6m_6y", num: true },
+  {
+    label: "SAM 3y-5y / SUW 3y-6y",
+    key: "sam_children_3y_5y_suw_children_3y_6y",
+    num: true,
+  },
+  { label: "Sattu SAM/SUW", key: "sattu_sam_3y_5y_suw_3y_6y", num: true },
+  { label: "HCM 3y-6y", key: "hcm_beneficiaries_3y_6y", num: true },
+  { label: "Mung Dal Khichdi", key: "mung_dal_khichdi_3y_6y", num: true },
+  { label: "Multi Grain Aata", key: "multi_grain_aata_3y_6y", num: true },
 ];
 
-const NUMERIC_AGG_FIELDS = TABLE_COLUMNS.filter(c => c.num || c.strong);
+const NUMERIC_AGG_FIELDS = TABLE_COLUMNS.filter((c) => c.num || c.strong);
 
 let hindiPdfFontPromise;
 
@@ -48,10 +152,13 @@ const loadHindiPdfFont = async () => {
     hindiPdfFontPromise = new Promise((resolve) => {
       const fontLink = document.createElement("link");
       fontLink.rel = "stylesheet";
-      fontLink.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap";
+      fontLink.href =
+        "https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap";
       fontLink.onload = () => resolve(true);
       fontLink.onerror = () => {
-        console.warn("Noto Sans Devanagari could not be loaded; using the system Hindi font.");
+        console.warn(
+          "Noto Sans Devanagari could not be loaded; using the system Hindi font.",
+        );
         resolve(false);
       };
       document.head.appendChild(fontLink);
@@ -62,18 +169,30 @@ const loadHindiPdfFont = async () => {
     try {
       await document.fonts.load('400 12px "Noto Sans Devanagari"', "हिंदी");
     } catch (error) {
-      console.warn("Noto Sans Devanagari could not be prepared; using the system Hindi font.", error);
+      console.warn(
+        "Noto Sans Devanagari could not be prepared; using the system Hindi font.",
+        error,
+      );
     }
   }
 };
 
-const downloadPDF = async ({ title, filename, headers, rows, footer, fontSize }) => {
+const downloadPDF = async ({
+  title,
+  filename,
+  headers,
+  rows,
+  footer,
+  fontSize,
+}) => {
   const content = document.createElement("div");
-  content.style.cssText = "box-sizing:border-box;width:100%;padding:12px;background:#fff;color:#1e293b;font-family:'Noto Sans Devanagari','Noto Sans','Nirmala UI',sans-serif;";
+  content.style.cssText =
+    "box-sizing:border-box;width:100%;padding:12px;background:#fff;color:#1e293b;font-family:'Noto Sans Devanagari','Noto Sans','Nirmala UI',sans-serif;";
 
   const heading = document.createElement("h3");
   heading.textContent = title;
-  heading.style.cssText = "margin:0 0 14px;text-align:center;color:#1e3a5f;font-size:16px;font-weight:700;";
+  heading.style.cssText =
+    "margin:0 0 14px;text-align:center;color:#1e3a5f;font-size:16px;font-weight:700;";
   content.appendChild(heading);
 
   const table = document.createElement("table");
@@ -81,11 +200,13 @@ const downloadPDF = async ({ title, filename, headers, rows, footer, fontSize })
 
   const createCell = (tagName, cell) => {
     const element = document.createElement(tagName);
-    const value = typeof cell === "object" && cell !== null ? cell : { text: cell };
+    const value =
+      typeof cell === "object" && cell !== null ? cell : { text: cell };
     element.textContent = value.text == null ? "" : String(value.text);
     if (value.colSpan) element.colSpan = value.colSpan;
     if (value.rowSpan) element.rowSpan = value.rowSpan;
-    element.style.cssText = "border:1px solid #cbd5e1;padding:4px;text-align:left;vertical-align:middle;overflow-wrap:anywhere;word-break:normal;";
+    element.style.cssText =
+      "border:1px solid #cbd5e1;padding:4px;text-align:left;vertical-align:middle;overflow-wrap:anywhere;word-break:normal;";
     return element;
   };
 
@@ -135,9 +256,14 @@ const downloadPDF = async ({ title, filename, headers, rows, footer, fontSize })
         margin: [10, 10, 10, 10],
         filename,
         image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+        },
         jsPDF: { unit: "mm", format: "a3", orientation: "landscape" },
-        pagebreak: { mode: ["css", "legacy"] }
+        pagebreak: { mode: ["css", "legacy"] },
       })
       .from(content)
       .save();
@@ -147,24 +273,61 @@ const downloadPDF = async ({ title, filename, headers, rows, footer, fontSize })
 };
 
 const SUMMARY_PILLS = [
-  { key: "total_beneficiaries", label: "Total", icon: <FaUsers size={10} /> },
-  { key: "active_beneficiaries", label: "Active", icon: <FaUserFriends size={10} /> },
-  { key: "pregnant_women_lactating_mothers", label: "Preg/Lact", icon: <FaBaby size={10} /> },
-  { key: "children_6m_3y_beneficiaries", label: "6m-3y", icon: <FaBaby size={10} /> },
-  { key: "thr_25_days_frs_hcm_beneficiaries_3y_6y", label: "THR 25d", icon: <FaUsers size={10} /> },
-  { key: "hcm_beneficiaries_3y_6y", label: "HCM 3-6y", icon: <FaUsers size={10} /> },
-  { key: "sam_children_6m_6y", label: "SAM 6m-6y", icon: <FaBaby size={10} /> },
-  { key: "suw_children_6m_6y", label: "SUW 6m-6y", icon: <FaBaby size={10} /> },
-  { key: "sam_children_3y_6y", label: "SAM 3-6y", icon: <FaBaby size={10} /> },
-  { key: "suw_children_3y_6y", label: "SUW 3-6y", icon: <FaBaby size={10} /> },
-  { key: "quarterly_packets_mung_dal_khichdi", label: "Mung Dal", icon: <FaBoxes size={10} /> },
-  { key: "quarterly_packets_poushik_sattu_mix", label: "P. Sattu", icon: <FaBoxes size={10} /> },
-  { key: "poushik_sattu_mix_75_days_packet_size_gm", label: "Sattu(gm)", icon: <FaBoxes size={10} /> },
-  { key: "panjeeri_75_days_2625gm_quarterly_packets", label: "Panj 2625", icon: <FaBoxes size={10} /> },
-  { key: "panjeeri_75_days_4625gm_quarterly_packets", label: "Panj 4625", icon: <FaBoxes size={10} /> },
-  { key: "quarterly_packets_sattu_2250gm", label: "Sattu 2250", icon: <FaBoxes size={10} /> },
-  { key: "quarterly_packets_mix_1000gm", label: "Mix 1000", icon: <FaBoxes size={10} /> },
-  { key: "quarterly_packets_multi_grain_aata_1250gm", label: "Multi Aata", icon: <FaBoxes size={10} /> },
+  {
+    key: "pregnant_woman_lactating_mother",
+    label: "Preg/Lact",
+    icon: <FaBaby size={10} />,
+  },
+  {
+    key: "poushik_sattu_preg_lat",
+    label: "Poushik Sattu",
+    icon: <FaBoxes size={10} />,
+  },
+  {
+    key: "children_6m_3y",
+    label: "Children 6m-3y",
+    icon: <FaBaby size={10} />,
+  },
+  {
+    key: "panjeeri_6m_3y",
+    label: "Panjeeri 6m-3y",
+    icon: <FaBoxes size={10} />,
+  },
+  {
+    key: "sam_children_6m_5y_suw_children_6m_6y",
+    label: "SAM/SUW 6m-6y",
+    icon: <FaBaby size={10} />,
+  },
+  {
+    key: "panjeeri_sam_6m_5y_suw_6m_6y",
+    label: "Panjeeri SAM/SUW",
+    icon: <FaBoxes size={10} />,
+  },
+  {
+    key: "sam_children_3y_5y_suw_children_3y_6y",
+    label: "SAM/SUW 3y-6y",
+    icon: <FaBaby size={10} />,
+  },
+  {
+    key: "sattu_sam_3y_5y_suw_3y_6y",
+    label: "Sattu SAM/SUW",
+    icon: <FaBoxes size={10} />,
+  },
+  {
+    key: "hcm_beneficiaries_3y_6y",
+    label: "HCM 3y-6y",
+    icon: <FaUsers size={10} />,
+  },
+  {
+    key: "mung_dal_khichdi_3y_6y",
+    label: "Mung Dal",
+    icon: <FaBoxes size={10} />,
+  },
+  {
+    key: "multi_grain_aata_3y_6y",
+    label: "Multi Grain Aata",
+    icon: <FaBoxes size={10} />,
+  },
 ];
 
 // Custom Multi-Select Dropdown Component
@@ -184,11 +347,22 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
   };
 
   return (
-    <div className="dpo-filter-group" style={{ position: 'relative', zIndex: 20 }}>
+    <div
+      className="dpo-filter-group"
+      style={{ position: "relative", zIndex: 20 }}
+    >
       <Form.Label className="dpo-filter-label">{label}</Form.Label>
       <Dropdown autoClose="outside">
         <Dropdown.Toggle size="sm" variant="light" className="dpo-multi-toggle">
-          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getLabel()}</span>
+          <span
+            style={{
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {getLabel()}
+          </span>
           <FaChevronDown className="dpo-multi-caret" />
         </Dropdown.Toggle>
         <Dropdown.Menu className="dpo-multi-menu">
@@ -196,12 +370,19 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
             <Dropdown.Item disabled>No options</Dropdown.Item>
           ) : (
             options.map((opt) => (
-              <div key={opt} className="dpo-multi-item" onClick={(e) => { e.stopPropagation(); toggleOption(opt); }}>
-                <Form.Check 
-                  type="checkbox" 
-                  checked={selected.includes(opt)} 
-                  onChange={() => {}} 
-                  label={opt} 
+              <div
+                key={opt}
+                className="dpo-multi-item"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleOption(opt);
+                }}
+              >
+                <Form.Check
+                  type="checkbox"
+                  checked={selected.includes(opt)}
+                  onChange={() => {}}
+                  label={opt}
                 />
               </div>
             ))
@@ -222,13 +403,13 @@ const DPODashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Multi-Select States
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [selectedFYs, setSelectedFYs] = useState([]);
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [selectedSectors, setSelectedSectors] = useState([]);
-  
+
   const [aggregateView, setAggregateView] = useState("sector"); // 'sector' | 'project'
 
   // Pagination state (Fixed to 100 per page)
@@ -267,7 +448,9 @@ const DPODashboard = () => {
     setError("");
     try {
       const response = await api.get("/supplementary-nutrition-details/");
-      const data = Array.isArray(response.data) ? response.data : (response.data?.results || response.data?.data || []);
+      const data = Array.isArray(response.data)
+        ? response.data
+        : response.data?.results || response.data?.data || [];
       setRecords(data);
     } catch (err) {
       setError("Failed to fetch supplementary nutrition data.");
@@ -281,21 +464,25 @@ const DPODashboard = () => {
   const fetchSuppliesData = async (type) => {
     const reqId = ++suppliesReqId.current;
     setSuppliesLoading(true);
-    
+
     try {
       const response = await api.get(`/dpo/${type}-food-reconciliation/`);
-      
+
       if (reqId !== suppliesReqId.current) return;
 
       const result = response.data?.results;
       if (!result?.success) {
-        throw new Error(result?.message || "The reconciliation API returned an unsuccessful response.");
+        throw new Error(
+          result?.message ||
+            "The reconciliation API returned an unsuccessful response.",
+        );
       }
       if (!Array.isArray(result.data)) {
-        throw new Error("The reconciliation response does not contain detail records.");
+        throw new Error(
+          "The reconciliation response does not contain detail records.",
+        );
       }
 
-      // Use summary arrays directly from API (similar to CDPO approach)
       const projectMonthSummary = result.project_month_summary || [];
       const sectorMonthSummary = result.sector_month_summary || [];
 
@@ -305,7 +492,10 @@ const DPODashboard = () => {
       }
     } catch (err) {
       if (reqId === suppliesReqId.current) {
-        console.error(`Failed to fetch ${type.toUpperCase()} supplies data:`, err);
+        console.error(
+          `Failed to fetch ${type.toUpperCase()} supplies data:`,
+          err,
+        );
         setSuppliesRecords({ projectMonthSummary: [], sectorMonthSummary: [] });
         setSuppliesDetailRecords([]);
       }
@@ -316,8 +506,8 @@ const DPODashboard = () => {
     }
   };
 
-  useEffect(() => { 
-    fetchData(); 
+  useEffect(() => {
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -326,131 +516,187 @@ const DPODashboard = () => {
 
   // Unique months and financial years from detail records for filtering
   const suppliesMonths = useMemo(
-    () => [...new Set(suppliesDetailRecords.map((record) => record.month).filter(Boolean))]
-      .sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b)),
-    [suppliesDetailRecords]
+    () =>
+      [
+        ...new Set(
+          suppliesDetailRecords.map((record) => record.month).filter(Boolean),
+        ),
+      ].sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b)),
+    [suppliesDetailRecords],
   );
   const suppliesFinancialYears = useMemo(
-    () => [...new Set(suppliesDetailRecords.map((record) => record.financial_year).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
-    [suppliesDetailRecords]
+    () =>
+      [
+        ...new Set(
+          suppliesDetailRecords
+            .map((record) => record.financial_year)
+            .filter(Boolean),
+        ),
+      ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    [suppliesDetailRecords],
   );
 
-  // Filtered detail records based on month/year filters
   const filteredDetailRecords = useMemo(() => {
-    return suppliesDetailRecords.filter((record) =>
-      (selectedSupplyMonths.length === 0 || selectedSupplyMonths.includes(record.month)) &&
-      (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(record.financial_year))
+    return suppliesDetailRecords.filter(
+      (record) =>
+        (selectedSupplyMonths.length === 0 ||
+          selectedSupplyMonths.includes(record.month)) &&
+        (selectedSupplyFYs.length === 0 ||
+          selectedSupplyFYs.includes(record.financial_year)),
     );
   }, [suppliesDetailRecords, selectedSupplyMonths, selectedSupplyFYs]);
 
-  // Extract unique food items dynamically from suppliesRecords
   const suppliesFoodItems = useMemo(() => {
     const items = new Set();
-    // Collect from both project and sector summaries
     if (suppliesRecords.projectMonthSummary) {
-      suppliesRecords.projectMonthSummary.forEach(row => items.add(row.food_item));
+      suppliesRecords.projectMonthSummary.forEach((row) =>
+        items.add(row.food_item),
+      );
     }
     if (suppliesRecords.sectorMonthSummary) {
-      suppliesRecords.sectorMonthSummary.forEach(row => items.add(row.food_item));
+      suppliesRecords.sectorMonthSummary.forEach((row) =>
+        items.add(row.food_item),
+      );
     }
     return Array.from(items);
   }, [suppliesRecords]);
 
-  // Project-wise aggregation from project_month_summary
   const projectSuppliesData = useMemo(() => {
     const projects = {};
     if (!suppliesRecords.projectMonthSummary) return [];
-    suppliesRecords.projectMonthSummary.forEach(item => {
+    suppliesRecords.projectMonthSummary.forEach((item) => {
       const key = item.project;
       if (!projects[key]) {
         projects[key] = { project: key, foodData: {} };
-        suppliesFoodItems.forEach(fi => {
-          projects[key].foodData[fi] = { received: 0, distributed: 0, balance: 0 };
+        suppliesFoodItems.forEach((fi) => {
+          projects[key].foodData[fi] = {
+            received: 0,
+            distributed: 0,
+            balance: 0,
+          };
         });
       }
       if (projects[key].foodData[item.food_item]) {
-        projects[key].foodData[item.food_item].received += Number(item.received_quantity) || 0;
-        projects[key].foodData[item.food_item].distributed += Number(item.distributed_quantity) || 0;
-        projects[key].foodData[item.food_item].balance += Number(item.balance_quantity) || 0;
+        projects[key].foodData[item.food_item].received +=
+          Number(item.received_quantity) || 0;
+        projects[key].foodData[item.food_item].distributed +=
+          Number(item.distributed_quantity) || 0;
+        projects[key].foodData[item.food_item].balance +=
+          Number(item.balance_quantity) || 0;
       }
     });
-    return Object.values(projects).map(p => ({
-      ...p,
-      foodData: Object.entries(p.foodData).map(([food_item, vals]) => ({ food_item, ...vals }))
-    })).sort((a, b) => a.project.localeCompare(b.project));
+    return Object.values(projects)
+      .map((p) => ({
+        ...p,
+        foodData: Object.entries(p.foodData).map(([food_item, vals]) => ({
+          food_item,
+          ...vals,
+        })),
+      }))
+      .sort((a, b) => a.project.localeCompare(b.project));
   }, [suppliesRecords, suppliesFoodItems]);
 
-  // Sector-wise aggregation from sector_month_summary
   const sectorSuppliesData = useMemo(() => {
     const sectors = {};
     if (!suppliesRecords.sectorMonthSummary) return [];
-    suppliesRecords.sectorMonthSummary.forEach(item => {
+    suppliesRecords.sectorMonthSummary.forEach((item) => {
       const key = item.sector;
       if (!sectors[key]) {
         sectors[key] = { sector: key, foodData: {} };
-        suppliesFoodItems.forEach(fi => {
-          sectors[key].foodData[fi] = { received: 0, distributed: 0, balance: 0 };
+        suppliesFoodItems.forEach((fi) => {
+          sectors[key].foodData[fi] = {
+            received: 0,
+            distributed: 0,
+            balance: 0,
+          };
         });
       }
       if (sectors[key].foodData[item.food_item]) {
-        sectors[key].foodData[item.food_item].received += Number(item.received_quantity) || 0;
-        sectors[key].foodData[item.food_item].distributed += Number(item.distributed_quantity) || 0;
-        sectors[key].foodData[item.food_item].balance += Number(item.balance_quantity) || 0;
+        sectors[key].foodData[item.food_item].received +=
+          Number(item.received_quantity) || 0;
+        sectors[key].foodData[item.food_item].distributed +=
+          Number(item.distributed_quantity) || 0;
+        sectors[key].foodData[item.food_item].balance +=
+          Number(item.balance_quantity) || 0;
       }
     });
-    return Object.values(sectors).map(s => ({
-      ...s,
-      foodData: Object.entries(s.foodData).map(([food_item, vals]) => ({ food_item, ...vals }))
-    })).sort((a, b) => a.sector.localeCompare(b.sector));
+    return Object.values(sectors)
+      .map((s) => ({
+        ...s,
+        foodData: Object.entries(s.foodData).map(([food_item, vals]) => ({
+          food_item,
+          ...vals,
+        })),
+      }))
+      .sort((a, b) => a.sector.localeCompare(b.sector));
   }, [suppliesRecords, suppliesFoodItems]);
 
-  // AWC-wise aggregation from detail records
   const awcSuppliesData = useMemo(() => {
     const awcs = new Map();
     filteredDetailRecords.forEach((record) => {
       const awcKey = `${record.awc_code}|${record.awc_name}|${record.project}|${record.sector}`;
       if (!awcs.has(awcKey)) {
-        awcs.set(awcKey, { 
-          awc_code: record.awc_code, 
-          awc_name: record.awc_name, 
-          project: record.project, 
-          sector: record.sector, 
-          foodData: new Map() 
+        awcs.set(awcKey, {
+          awc_code: record.awc_code,
+          awc_name: record.awc_name,
+          project: record.project,
+          sector: record.sector,
+          foodData: new Map(),
         });
       }
       const awc = awcs.get(awcKey);
-      const quantities = awc.foodData.get(record.food_item) || { received: 0, distributed: 0, balance: 0 };
+      const quantities = awc.foodData.get(record.food_item) || {
+        received: 0,
+        distributed: 0,
+        balance: 0,
+      };
       quantities.received += Number(record.received_quantity) || 0;
       quantities.distributed += Number(record.distributed_quantity) || 0;
       quantities.balance += Number(record.balance_quantity) || 0;
       awc.foodData.set(record.food_item, quantities);
     });
 
-    return Array.from(awcs.values()).map(awc => ({
-      ...awc,
-      foodData: Array.from(awc.foodData, ([food_item, quantities]) => ({ food_item, ...quantities })),
-    })).sort((a, b) => a.project.localeCompare(b.project) || a.sector.localeCompare(b.sector) || a.awc_name.localeCompare(b.awc_name));
+    return Array.from(awcs.values())
+      .map((awc) => ({
+        ...awc,
+        foodData: Array.from(awc.foodData, ([food_item, quantities]) => ({
+          food_item,
+          ...quantities,
+        })),
+      }))
+      .sort(
+        (a, b) =>
+          a.project.localeCompare(b.project) ||
+          a.sector.localeCompare(b.sector) ||
+          a.awc_name.localeCompare(b.awc_name),
+      );
   }, [filteredDetailRecords]);
 
-  // Get the current data based on view mode
   const currentSuppliesData = useMemo(() => {
     switch (suppliesViewMode) {
-      case 'project': return projectSuppliesData;
-      case 'sector': return sectorSuppliesData;
-      case 'awc': return awcSuppliesData;
-      default: return projectSuppliesData;
+      case "project":
+        return projectSuppliesData;
+      case "sector":
+        return sectorSuppliesData;
+      case "awc":
+        return awcSuppliesData;
+      default:
+        return projectSuppliesData;
     }
-  }, [suppliesViewMode, projectSuppliesData, sectorSuppliesData, awcSuppliesData]);
+  }, [
+    suppliesViewMode,
+    projectSuppliesData,
+    sectorSuppliesData,
+    awcSuppliesData,
+  ]);
 
-  // Calculate Totals for dynamic supplies table
   const suppliesTotals = useMemo(() => {
     const totals = {};
-    suppliesFoodItems.forEach(fi => {
+    suppliesFoodItems.forEach((fi) => {
       totals[fi] = { received: 0, distributed: 0, balance: 0 };
     });
-    currentSuppliesData.forEach(row => {
-      row.foodData.forEach(fd => {
+    currentSuppliesData.forEach((row) => {
+      row.foodData.forEach((fd) => {
         if (totals[fd.food_item]) {
           totals[fd.food_item].received += fd.received || 0;
           totals[fd.food_item].distributed += fd.distributed || 0;
@@ -461,17 +707,40 @@ const DPODashboard = () => {
     return totals;
   }, [currentSuppliesData, suppliesFoodItems]);
 
-  const uniqueMonths = useMemo(() => [...new Set(records.map(r => r.month).filter(Boolean))].sort(), [records]);
-  const uniqueFYs = useMemo(() => [...new Set(records.map(r => r.financial_year).filter(Boolean))].sort(), [records]);
-  const uniqueProjects = useMemo(() => [...new Set(records.map(r => r.project).filter(Boolean))].sort(), [records]);
-  const uniqueSectors = useMemo(() => [...new Set(records.map(r => r.sector).filter(Boolean))].sort(), [records]);
+  const uniqueMonths = useMemo(
+    () => [...new Set(records.map((r) => r.month).filter(Boolean))].sort(),
+    [records],
+  );
+  const uniqueFYs = useMemo(
+    () =>
+      [...new Set(records.map((r) => r.financial_year).filter(Boolean))].sort(),
+    [records],
+  );
+  const uniqueProjects = useMemo(
+    () => [...new Set(records.map((r) => r.project).filter(Boolean))].sort(),
+    [records],
+  );
+  const uniqueSectors = useMemo(
+    () => [...new Set(records.map((r) => r.sector).filter(Boolean))].sort(),
+    [records],
+  );
 
   const filteredRecords = useMemo(() => {
-    return records.filter(r => {
-      const m = selectedMonths.length === 0 ? true : selectedMonths.includes(r.month);
-      const y = selectedFYs.length === 0 ? true : selectedFYs.includes(r.financial_year);
-      const p = selectedProjects.length === 0 ? true : selectedProjects.includes(r.project);
-      const s = selectedSectors.length === 0 ? true : selectedSectors.includes(r.sector);
+    return records.filter((r) => {
+      const m =
+        selectedMonths.length === 0 ? true : selectedMonths.includes(r.month);
+      const y =
+        selectedFYs.length === 0
+          ? true
+          : selectedFYs.includes(r.financial_year);
+      const p =
+        selectedProjects.length === 0
+          ? true
+          : selectedProjects.includes(r.project);
+      const s =
+        selectedSectors.length === 0
+          ? true
+          : selectedSectors.includes(r.sector);
       return m && y && p && s;
     });
   }, [records, selectedMonths, selectedFYs, selectedProjects, selectedSectors]);
@@ -479,13 +748,14 @@ const DPODashboard = () => {
   const searchedRecords = useMemo(() => {
     if (!searchTerm.trim()) return filteredRecords;
     const term = searchTerm.toLowerCase();
-    return filteredRecords.filter(r =>
-      (r.month || "").toLowerCase().includes(term) ||
-      (r.financial_year || "").toLowerCase().includes(term) ||
-      (r.district || "").toLowerCase().includes(term) ||
-      (r.project || "").toLowerCase().includes(term) ||
-      (r.sector || "").toLowerCase().includes(term) ||
-      (r.awc_code || "").toLowerCase().includes(term)
+    return filteredRecords.filter(
+      (r) =>
+        (r.month || "").toLowerCase().includes(term) ||
+        (r.financial_year || "").toLowerCase().includes(term) ||
+        (r.district || "").toLowerCase().includes(term) ||
+        (r.project || "").toLowerCase().includes(term) ||
+        (r.sector || "").toLowerCase().includes(term) ||
+        (r.awc_code || "").toLowerCase().includes(term),
     );
   }, [filteredRecords, searchTerm]);
 
@@ -501,17 +771,30 @@ const DPODashboard = () => {
   const aggregatedData = useMemo(() => {
     if (!filteredRecords.length) return [];
     const grouped = {};
-    filteredRecords.forEach(r => {
+    filteredRecords.forEach((r) => {
       const groupKey = r[aggregateView] || "—";
       if (!grouped[groupKey]) {
-        grouped[groupKey] = { groupKey, months: new Set(), fys: new Set(), totals: NUMERIC_AGG_FIELDS.reduce((a, { key }) => ({ ...a, [key]: 0 }), {}) };
+        grouped[groupKey] = {
+          groupKey,
+          months: new Set(),
+          fys: new Set(),
+          totals: NUMERIC_AGG_FIELDS.reduce(
+            (a, { key }) => ({ ...a, [key]: 0 }),
+            {},
+          ),
+        };
       }
       if (r.month) grouped[groupKey].months.add(r.month);
       if (r.financial_year) grouped[groupKey].fys.add(r.financial_year);
-      NUMERIC_AGG_FIELDS.forEach(({ key }) => { grouped[groupKey].totals[key] += parseInt(r[key]) || 0; });
+      NUMERIC_AGG_FIELDS.forEach(({ key }) => {
+        grouped[groupKey].totals[key] += parseInt(r[key]) || 0;
+      });
     });
-    return Object.values(grouped).map(g => ({
-      groupKey: g.groupKey, months: Array.from(g.months).join(", "), fys: Array.from(g.fys).join(", "), ...g.totals
+    return Object.values(grouped).map((g) => ({
+      groupKey: g.groupKey,
+      months: Array.from(g.months).join(", "),
+      fys: Array.from(g.fys).join(", "),
+      ...g.totals,
     }));
   }, [filteredRecords, aggregateView]);
 
@@ -524,7 +807,10 @@ const DPODashboard = () => {
 
   const totalDetailed = useMemo(() => {
     return NUMERIC_AGG_FIELDS.reduce((acc, { key }) => {
-      acc[key] = searchedRecords.reduce((sum, row) => sum + (parseInt(row[key]) || 0), 0);
+      acc[key] = searchedRecords.reduce(
+        (sum, row) => sum + (parseInt(row[key]) || 0),
+        0,
+      );
       return acc;
     }, {});
   }, [searchedRecords]);
@@ -541,17 +827,16 @@ const DPODashboard = () => {
     setCurrentPage(page);
   };
 
-  // Food Items Modal handler (fetching dynamically from /categoryandfooditem/)
   const handleOpenFoodItemModal = async () => {
     setLoadingFoodItems(true);
     setShowFoodItemModal(true);
     try {
       const response = await api.get("/categoryandfooditem/");
       const data = response.data?.food_data || [];
-      
-      const hcm = data.filter(item => item.category === "HCM");
-      const thr = data.filter(item => item.category === "THR");
-      
+
+      const hcm = data.filter((item) => item.category === "HCM");
+      const thr = data.filter((item) => item.category === "THR");
+
       setFoodItems({ hcm, thr });
     } catch (err) {
       console.error("Failed to fetch food items:", err);
@@ -572,9 +857,9 @@ const DPODashboard = () => {
   const exportSuppliesToExcel = () => {
     const data = currentSuppliesData.map((r, i) => {
       const row = { "S. No.": i + 1 };
-      if (suppliesViewMode === 'project') {
+      if (suppliesViewMode === "project") {
         row.Project = r.project;
-      } else if (suppliesViewMode === 'sector') {
+      } else if (suppliesViewMode === "sector") {
         row.Sector = r.sector;
       } else {
         row.Project = r.project;
@@ -582,19 +867,19 @@ const DPODashboard = () => {
         row["AWC Name"] = r.awc_name;
         row["AWC Code"] = r.awc_code;
       }
-      suppliesFoodItems.forEach(fi => {
-        const fd = r.foodData.find(f => f.food_item === fi);
+      suppliesFoodItems.forEach((fi) => {
+        const fd = r.foodData.find((f) => f.food_item === fi);
         row[`${fi} - Received`] = fd ? fd.received : 0;
         row[`${fi} - Distributed`] = fd ? fd.distributed : 0;
         row[`${fi} - Remaining`] = fd ? fd.balance : 0;
       });
       return row;
     });
-    
+
     const totalRow = { "S. No.": "" };
-    if (suppliesViewMode === 'project') {
+    if (suppliesViewMode === "project") {
       totalRow.Project = "Total";
-    } else if (suppliesViewMode === 'sector') {
+    } else if (suppliesViewMode === "sector") {
       totalRow.Sector = "Total";
     } else {
       totalRow.Project = "Total";
@@ -602,8 +887,12 @@ const DPODashboard = () => {
       totalRow["AWC Name"] = "";
       totalRow["AWC Code"] = "";
     }
-    suppliesFoodItems.forEach(fi => {
-      const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
+    suppliesFoodItems.forEach((fi) => {
+      const t = suppliesTotals[fi] || {
+        received: 0,
+        distributed: 0,
+        balance: 0,
+      };
       totalRow[`${fi} - Received`] = t.received.toLocaleString();
       totalRow[`${fi} - Distributed`] = t.distributed.toLocaleString();
       totalRow[`${fi} - Remaining`] = t.balance.toLocaleString();
@@ -613,7 +902,10 @@ const DPODashboard = () => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Supplies Summary");
-    XLSX.writeFile(wb, `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode.charAt(0).toUpperCase() + suppliesViewMode.slice(1)}_Summary.xlsx`);
+    XLSX.writeFile(
+      wb,
+      `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode.charAt(0).toUpperCase() + suppliesViewMode.slice(1)}_Summary.xlsx`,
+    );
   };
 
   const handlePDFExport = async (options) => {
@@ -626,61 +918,94 @@ const DPODashboard = () => {
   };
 
   const exportSuppliesToPDF = () => {
-    const groupHeaders = suppliesViewMode === 'project' 
-      ? [{ text: 'Project', rowSpan: 2 }]
-      : suppliesViewMode === 'sector'
-      ? [{ text: 'Sector', rowSpan: 2 }]
-      : [
-          { text: 'Project', rowSpan: 2 },
-          { text: 'Sector', rowSpan: 2 },
-          { text: 'AWC Name', rowSpan: 2 },
-          { text: 'AWC Code', rowSpan: 2 }
-        ];
+    const groupHeaders =
+      suppliesViewMode === "project"
+        ? [{ text: "Project", rowSpan: 2 }]
+        : suppliesViewMode === "sector"
+          ? [{ text: "Sector", rowSpan: 2 }]
+          : [
+              { text: "Project", rowSpan: 2 },
+              { text: "Sector", rowSpan: 2 },
+              { text: "AWC Name", rowSpan: 2 },
+              { text: "AWC Code", rowSpan: 2 },
+            ];
 
-    const headers = [[
-      { text: 'S. No.', rowSpan: 2 },
-      ...groupHeaders,
-      ...suppliesFoodItems.map(fi => ({ text: fi, colSpan: 3 }))
-    ], [
-      ...suppliesFoodItems.flatMap(() => ['Rec.', 'Dist.', 'Rem.'])
-    ]];
-    
+    const headers = [
+      [
+        { text: "S. No.", rowSpan: 2 },
+        ...groupHeaders,
+        ...suppliesFoodItems.map((fi) => ({ text: fi, colSpan: 3 })),
+      ],
+      [...suppliesFoodItems.flatMap(() => ["Rec.", "Dist.", "Rem."])],
+    ];
+
     const rows = currentSuppliesData.map((r, i) => [
       i + 1,
-      ...(suppliesViewMode === 'project' ? [r.project] : suppliesViewMode === 'sector' ? [r.sector] : [r.project, r.sector, r.awc_name, r.awc_code]),
-      ...suppliesFoodItems.flatMap(fi => {
-        const fd = r.foodData.find(f => f.food_item === fi);
+      ...(suppliesViewMode === "project"
+        ? [r.project]
+        : suppliesViewMode === "sector"
+          ? [r.sector]
+          : [r.project, r.sector, r.awc_name, r.awc_code]),
+      ...suppliesFoodItems.flatMap((fi) => {
+        const fd = r.foodData.find((f) => f.food_item === fi);
         return fd ? [fd.received, fd.distributed, fd.balance] : [0, 0, 0];
-      })
+      }),
     ]);
 
-    const groupColSpan = suppliesViewMode === 'awc' ? 4 : 1;
-    const footer = [[
-      { text: 'Total', colSpan: 1 + groupColSpan },
-      ...suppliesFoodItems.flatMap(fi => {
-        const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
-        return [
-          { text: t.received.toLocaleString() },
-          { text: t.distributed.toLocaleString() },
-          { text: t.balance.toLocaleString() }
-        ];
-      })
-    ]];
+    const groupColSpan = suppliesViewMode === "awc" ? 4 : 1;
+    const footer = [
+      [
+        { text: "Total", colSpan: 1 + groupColSpan },
+        ...suppliesFoodItems.flatMap((fi) => {
+          const t = suppliesTotals[fi] || {
+            received: 0,
+            distributed: 0,
+            balance: 0,
+          };
+          return [
+            { text: t.received.toLocaleString() },
+            { text: t.distributed.toLocaleString() },
+            { text: t.balance.toLocaleString() },
+          ];
+        }),
+      ],
+    ];
 
-    const viewModeLabel = suppliesViewMode === 'project' ? 'Project-wise' : suppliesViewMode === 'sector' ? 'Sector-wise' : 'AWC-wise';
+    const viewModeLabel =
+      suppliesViewMode === "project"
+        ? "Project-wise"
+        : suppliesViewMode === "sector"
+          ? "Sector-wise"
+          : "AWC-wise";
     return handlePDFExport({
       title: `Supplies ${suppliesTab.toUpperCase()} ${viewModeLabel} Summary`,
       filename: `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode.charAt(0).toUpperCase() + suppliesViewMode.slice(1)}_Summary.pdf`,
       headers,
       rows,
       footer,
-      fontSize: 9
+      fontSize: 9,
     });
   };
 
   const exportAggToExcel = () => {
-    const data = aggregatedData.map((r, i) => ({ "S. No.": i + 1, [aggregateView]: r.groupKey, Months: r.months, "Fin. Years": r.fys, ...NUMERIC_AGG_FIELDS.reduce((o, f) => ({ ...o, [f.label]: r[f.key] }), {}) }));
-    data.push({ "S. No.": "", [aggregateView]: "Total", ...NUMERIC_AGG_FIELDS.reduce((o, f) => ({ ...o, [f.label]: totalAggregated[f.key] }), {}) });
+    const data = aggregatedData.map((r, i) => ({
+      "S. No.": i + 1,
+      [aggregateView]: r.groupKey,
+      Months: r.months,
+      "Fin. Years": r.fys,
+      ...NUMERIC_AGG_FIELDS.reduce(
+        (o, f) => ({ ...o, [f.label]: r[f.key] }),
+        {},
+      ),
+    }));
+    data.push({
+      "S. No.": "",
+      [aggregateView]: "Total",
+      ...NUMERIC_AGG_FIELDS.reduce(
+        (o, f) => ({ ...o, [f.label]: totalAggregated[f.key] }),
+        {},
+      ),
+    });
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
@@ -688,65 +1013,145 @@ const DPODashboard = () => {
   };
 
   const exportAggToPDF = () => {
-    const headers = [["S. No.", aggregateView, "Months", "Fin. Years", ...NUMERIC_AGG_FIELDS.map(f => f.label)]];
-    const rows = aggregatedData.map((r, i) => [i + 1, r.groupKey, r.months, r.fys, ...NUMERIC_AGG_FIELDS.map(f => r[f.key])]);
-    const footer = [["", "Total", "", "", ...NUMERIC_AGG_FIELDS.map(f => totalAggregated[f.key])]];
+    const headers = [
+      [
+        "S. No.",
+        aggregateView,
+        "Months",
+        "Fin. Years",
+        ...NUMERIC_AGG_FIELDS.map((f) => f.label),
+      ],
+    ];
+    const rows = aggregatedData.map((r, i) => [
+      i + 1,
+      r.groupKey,
+      r.months,
+      r.fys,
+      ...NUMERIC_AGG_FIELDS.map((f) => r[f.key]),
+    ]);
+    const footer = [
+      [
+        "",
+        "Total",
+        "",
+        "",
+        ...NUMERIC_AGG_FIELDS.map((f) => totalAggregated[f.key]),
+      ],
+    ];
     return handlePDFExport({
       title: `${aggregateView}-wise Aggregated Summary`,
       filename: `${aggregateView}_Summary.pdf`,
       headers,
       rows,
       footer,
-      fontSize: 8
+      fontSize: 8,
     });
   };
 
+  /* ── Detailed Records Export (Grant-wise structure) ── */
   const exportDetailsToExcel = () => {
-    const data = searchedRecords.map((r, i) => ({ "S. No.": i + 1, ...TABLE_COLUMNS.reduce((o, c) => ({ ...o, [c.label]: r[c.key] || 0 }), {}) }));
-    data.push({ "S. No.": "", [TABLE_COLUMNS[0].label]: "Total", ...NUMERIC_AGG_FIELDS.reduce((o, f) => ({ ...o, [f.label]: totalDetailed[f.key] }), {}) });
-    const ws = XLSX.utils.json_to_sheet(data);
+    const cols = TABLE_COLUMNS.filter(
+      (c) => c.key !== "_index" && c.key !== "_actions",
+    );
+    const dataToExport = searchedRecords.map((row, i) => {
+      const obj = { "S. No.": i + 1 };
+      cols.forEach((c) => (obj[c.label] = row[c.key] || 0));
+      return obj;
+    });
+    const totalObj = { "S. No.": "" };
+    cols.forEach((c) => {
+      if (c.num || c.strong) totalObj[c.label] = totalDetailed[c.key];
+      else totalObj[c.label] = "";
+    });
+    totalObj[cols[0].label] = "Total";
+    dataToExport.push(totalObj);
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Records");
     XLSX.writeFile(wb, "Supplementary_Records.xlsx");
   };
 
   const exportDetailsToPDF = () => {
-    const headers = [["S. No.", ...TABLE_COLUMNS.map(c => c.label)]];
-    const rows = searchedRecords.map((r, i) => [i + 1, ...TABLE_COLUMNS.map(c => r[c.key] || "—")]);
-    const footer = [["", ...TABLE_COLUMNS.map(c => (c.num || c.strong) ? totalDetailed[c.key] : (c.key === "district" ? "Total" : ""))]];
+    const groupHeaders = [
+      { text: "S. No.", rowSpan: 2 },
+      ...EXCEL_META_COLUMNS.map((col) => ({ text: col.header, rowSpan: 2 })),
+      ...GRANT_CATEGORIES.map((cat) => ({ text: cat.title, colSpan: 4 })),
+      { text: "SUPPLEMENTARY NUTRITION DETAILS", colSpan: FOOD_FIELDS.length },
+    ];
+    const subHeaders = [
+      ...GRANT_CATEGORIES.flatMap(() => [
+        "Grant 15",
+        "Grant 30",
+        "Grant 31",
+        "TOTAL",
+      ]),
+      ...FOOD_FIELDS.map((f) => f.header),
+    ];
+    const headers = [groupHeaders, subHeaders];
+
+    const rows = searchedRecords.map((r, i) => {
+      const row = [i + 1];
+      EXCEL_META_COLUMNS.forEach((col) => row.push(r[col.key] || "—"));
+      GRANT_CATEGORIES.forEach((cat) => {
+        const grants = Array.isArray(r[cat.grantKey])
+          ? r[cat.grantKey].map(Number)
+          : [];
+        [15, 30, 31].forEach((gid) =>
+          row.push(grants.includes(gid) ? String(gid) : "—"),
+        );
+        row.push(Number(r[cat.countKey] || 0).toLocaleString());
+      });
+      FOOD_FIELDS.forEach((f) =>
+        row.push(Number(r[f.key] || 0).toLocaleString()),
+      );
+      return row;
+    });
+
+    const footer = [
+      [
+        { text: "", colSpan: 1 + EXCEL_META_COLUMNS.length },
+        ...GRANT_CATEGORIES.flatMap((cat) => [
+          { text: "" },
+          { text: "" },
+          { text: "" },
+          { text: totalDetailed[cat.countKey]?.toLocaleString() || 0 },
+        ]),
+        ...FOOD_FIELDS.map((f) => ({
+          text: totalDetailed[f.key]?.toLocaleString() || 0,
+        })),
+      ],
+    ];
+
     return handlePDFExport({
       title: "Supplementary Nutrition Records",
       filename: "Supplementary_Records.pdf",
       headers,
       rows,
       footer,
-      fontSize: 7
+      fontSize: 7,
     });
   };
 
   return (
     <div className="dashboard-container">
-      {/* CSS Override to fix dropdown overlapping issues inside cards */}
-      <style>{`
-        .dpo-table-card {
-          overflow: visible !important;
-        }
-        .dpo-table-header {
-          border-radius: 10px 10px 0 0;
-          position: relative;
-          z-index: 20;
-        }
-        .dpo-multi-menu {
-          z-index: 1060 !important;
-        }
-      `}</style>
+    
 
-      <DPOLeftNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} />
+      <DPOLeftNav
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        isMobile={isMobile}
+        isTablet={isTablet}
+      />
       <div className="main-content-dash">
         <DPOHeader toggleSidebar={toggleSidebar} />
-        
+
         <Container fluid className="mt-3">
-          {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
+          {error && (
+            <Alert variant="danger" className="mb-3">
+              {error}
+            </Alert>
+          )}
 
           {/* DPO Purple Header Section */}
           <div className="dashboard-header-section">
@@ -754,41 +1159,83 @@ const DPODashboard = () => {
               <h4 className="dashboard-main-title">
                 <FaBoxes /> Supplementary Nutrition Overview
               </h4>
-              
-              <p className="dashboard-subtitle">View aggregated and detailed supplementary nutrition data across sectors and projects.</p>
+              <p className="dashboard-subtitle">
+                View aggregated and detailed supplementary nutrition data across
+                sectors and projects.
+              </p>
             </div>
-            <Button className="dpo-btn-light" onClick={fetchData} disabled={loading}>
+            <Button
+              className="dpo-btn-light"
+              onClick={fetchData}
+              disabled={loading}
+            >
               <FaSyncAlt className={loading ? "fa-spin" : ""} /> Refresh Data
             </Button>
           </div>
 
           {/* Compact Multi-Select Filter Bar */}
           <div className="dpo-filter-bar">
-            <MultiSelectDropdown label="Month" options={uniqueMonths} selected={selectedMonths} onChange={setSelectedMonths} />
-            <MultiSelectDropdown label="Financial Year" options={uniqueFYs} selected={selectedFYs} onChange={setSelectedFYs} />
-            <MultiSelectDropdown label="Project" options={uniqueProjects} selected={selectedProjects} onChange={setSelectedProjects} />
-            <MultiSelectDropdown label="Sector" options={uniqueSectors} selected={selectedSectors} onChange={setSelectedSectors} />
-            <Button variant="outline-secondary" size="sm" className="dpo-filter-reset" onClick={() => { setSelectedMonths([]); setSelectedFYs([]); setSelectedProjects([]); setSelectedSectors([]); }}>
+            <MultiSelectDropdown
+              label="Month"
+              options={uniqueMonths}
+              selected={selectedMonths}
+              onChange={setSelectedMonths}
+            />
+            <MultiSelectDropdown
+              label="Financial Year"
+              options={uniqueFYs}
+              selected={selectedFYs}
+              onChange={setSelectedFYs}
+            />
+            <MultiSelectDropdown
+              label="Project"
+              options={uniqueProjects}
+              selected={selectedProjects}
+              onChange={setSelectedProjects}
+            />
+            <MultiSelectDropdown
+              label="Sector"
+              options={uniqueSectors}
+              selected={selectedSectors}
+              onChange={setSelectedSectors}
+            />
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              className="dpo-filter-reset"
+              onClick={() => {
+                setSelectedMonths([]);
+                setSelectedFYs([]);
+                setSelectedProjects([]);
+                setSelectedSectors([]);
+              }}
+            >
               Reset
             </Button>
-                              <Button className="dpo-export-btn" onClick={handleOpenFoodItemModal} title="View Food Items"><FaUtensils className="text-primary" /> Food Items</Button>
-
+            <Button
+              className="dpo-export-btn"
+              onClick={handleOpenFoodItemModal}
+              title="View Food Items"
+            >
+              <FaUtensils className="text-primary" /> Food Items
+            </Button>
           </div>
 
-          {/* Wrapped Summary Pills */}
           {summaryStats && (
             <div className="dpo-stat-strip">
-              {SUMMARY_PILLS.map(field => (
+              {SUMMARY_PILLS.map((field) => (
                 <div key={field.key} className="dpo-stat-pill">
                   <span className="dpo-stat-pill-icon">{field.icon}</span>
                   <span className="dpo-stat-pill-label">{field.label}</span>
-                  <span className="dpo-stat-pill-value">{summaryStats[field.key]?.toLocaleString() || 0}</span>
+                  <span className="dpo-stat-pill-value">
+                    {summaryStats[field.key]?.toLocaleString() || 0}
+                  </span>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Supplies Received & Distributed Table (Dynamic with View Mode) */}
+          {/* Supplies Received & Distributed Table */}
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
@@ -796,13 +1243,52 @@ const DPODashboard = () => {
               </h5>
               <div className="d-flex align-items-center gap-3 flex-wrap">
                 <ButtonGroup className="dpo-toggle-group">
-                  <Button className={`dpo-toggle-btn ${suppliesTab === 'thr' ? 'active' : ''}`} onClick={() => { setSuppliesTab('thr'); setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}>THR</Button>
-                  <Button className={`dpo-toggle-btn ${suppliesTab === 'hcm' ? 'active' : ''}`} onClick={() => { setSuppliesTab('hcm'); setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}>HCM</Button>
+                  <Button
+                    className={`dpo-toggle-btn ${suppliesTab === "thr" ? "active" : ""}`}
+                    onClick={() => {
+                      setSuppliesTab("thr");
+                      setSelectedSupplyMonths([]);
+                      setSelectedSupplyFYs([]);
+                    }}
+                  >
+                    THR
+                  </Button>
+                  <Button
+                    className={`dpo-toggle-btn ${suppliesTab === "hcm" ? "active" : ""}`}
+                    onClick={() => {
+                      setSuppliesTab("hcm");
+                      setSelectedSupplyMonths([]);
+                      setSelectedSupplyFYs([]);
+                    }}
+                  >
+                    HCM
+                  </Button>
                 </ButtonGroup>
-                <ButtonGroup className="dpo-toggle-group" style={{ marginLeft: '8px', marginRight: '8px' }}>
-                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'project' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('project')} title="Project-wise">Project</Button>
-                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'sector' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('sector')} title="Sector-wise">Sector</Button>
-                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'awc' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('awc')} title="AWC-wise">AWC</Button>
+                <ButtonGroup
+                  className="dpo-toggle-group"
+                  style={{ marginLeft: "8px", marginRight: "8px" }}
+                >
+                  <Button
+                    className={`dpo-toggle-btn ${suppliesViewMode === "project" ? "active" : ""}`}
+                    onClick={() => setSuppliesViewMode("project")}
+                    title="Project-wise"
+                  >
+                    Project
+                  </Button>
+                  <Button
+                    className={`dpo-toggle-btn ${suppliesViewMode === "sector" ? "active" : ""}`}
+                    onClick={() => setSuppliesViewMode("sector")}
+                    title="Sector-wise"
+                  >
+                    Sector
+                  </Button>
+                  <Button
+                    className={`dpo-toggle-btn ${suppliesViewMode === "awc" ? "active" : ""}`}
+                    onClick={() => setSuppliesViewMode("awc")}
+                    title="AWC-wise"
+                  >
+                    AWC
+                  </Button>
                 </ButtonGroup>
                 <MultiSelectDropdown
                   label="Month"
@@ -816,34 +1302,50 @@ const DPODashboard = () => {
                   selected={selectedSupplyFYs}
                   onChange={setSelectedSupplyFYs}
                 />
-                {(selectedSupplyMonths.length > 0 || selectedSupplyFYs.length > 0) && (
+                {(selectedSupplyMonths.length > 0 ||
+                  selectedSupplyFYs.length > 0) && (
                   <Button
                     variant="outline-secondary"
                     size="sm"
                     className="dpo-filter-reset"
-                    onClick={() => { setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}
+                    onClick={() => {
+                      setSelectedSupplyMonths([]);
+                      setSelectedSupplyFYs([]);
+                    }}
                   >
                     Reset
                   </Button>
                 )}
                 <div className="dpo-export-btns">
-                  <Button className="dpo-export-btn" onClick={exportSuppliesToExcel}><FaFileExcel className="text-success" /> Excel</Button>
-                  <Button className="dpo-export-btn" onClick={exportSuppliesToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
+                  <Button
+                    className="dpo-export-btn"
+                    onClick={exportSuppliesToExcel}
+                  >
+                    <FaFileExcel className="text-success" /> Excel
+                  </Button>
+                  <Button
+                    className="dpo-export-btn"
+                    onClick={exportSuppliesToPDF}
+                  >
+                    <FaFilePdf className="text-danger" /> PDF
+                  </Button>
                 </div>
               </div>
             </Card.Header>
             <Card.Body className="p-0">
               <div className="dpo-table-wrapper">
                 {suppliesLoading ? (
-                  <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div>
+                  <div className="text-center p-5">
+                    <Spinner animation="border" variant="primary" />
+                  </div>
                 ) : (
                   <Table hover className="dpo-data-table mb-0">
                     <thead>
                       <tr>
                         <th rowSpan="2">S. No.</th>
-                        {suppliesViewMode === 'project' ? (
+                        {suppliesViewMode === "project" ? (
                           <th rowSpan="2">Project</th>
-                        ) : suppliesViewMode === 'sector' ? (
+                        ) : suppliesViewMode === "sector" ? (
                           <th rowSpan="2">Sector</th>
                         ) : (
                           <>
@@ -854,7 +1356,12 @@ const DPODashboard = () => {
                           </>
                         )}
                         {suppliesFoodItems.map((fi, idx) => (
-                          <th key={`fi-${idx}`} colSpan="3" className="text-center" style={{ borderLeft: '1px solid #e9d5ff' }}>
+                          <th
+                            key={`fi-${idx}`}
+                            colSpan="3"
+                            className="text-center"
+                            style={{ borderLeft: "1px solid #e9d5ff" }}
+                          >
                             {fi}
                           </th>
                         ))}
@@ -872,45 +1379,70 @@ const DPODashboard = () => {
                     <tbody>
                       {currentSuppliesData.length === 0 ? (
                         <tr>
-                          <td colSpan={suppliesViewMode === 'awc' ? 5 + suppliesFoodItems.length * 3 : 2 + suppliesFoodItems.length * 3} className="text-center p-4 text-muted">
+                          <td
+                            colSpan={
+                              suppliesViewMode === "awc"
+                                ? 5 + suppliesFoodItems.length * 3
+                                : 2 + suppliesFoodItems.length * 3
+                            }
+                            className="text-center p-4 text-muted"
+                          >
                             No data available
                           </td>
                         </tr>
-                      ) : currentSuppliesData.map((row, i) => (
-                        <tr key={i}>
-                          <td>{i + 1}</td>
-                          {suppliesViewMode === 'project' ? (
-                            <td><strong>{row.project}</strong></td>
-                          ) : suppliesViewMode === 'sector' ? (
-                            <td><strong>{row.sector}</strong></td>
-                          ) : (
-                            <>
-                              <td>{row.project}</td>
-                              <td>{row.sector}</td>
-                              <td><strong>{row.awc_name}</strong></td>
-                              <td>{row.awc_code}</td>
-                            </>
-                          )}
-                          {suppliesFoodItems.map((fi, idx) => {
-                            const fd = row.foodData.find(f => f.food_item === fi);
-                            return (
-                              <React.Fragment key={`data-${idx}`}>
-                                <td className="text-end">{fd ? fd.received.toLocaleString() : 0}</td>
-                                <td className="text-end">{fd ? fd.distributed.toLocaleString() : 0}</td>
-                                <td className="text-end text-primary"><strong>{fd ? fd.balance.toLocaleString() : 0}</strong></td>
-                              </React.Fragment>
-                            );
-                          })}
-                        </tr>
-                      ))}
+                      ) : (
+                        currentSuppliesData.map((row, i) => (
+                          <tr key={i}>
+                            <td>{i + 1}</td>
+                            {suppliesViewMode === "project" ? (
+                              <td>
+                                <strong>{row.project}</strong>
+                              </td>
+                            ) : suppliesViewMode === "sector" ? (
+                              <td>
+                                <strong>{row.sector}</strong>
+                              </td>
+                            ) : (
+                              <>
+                                <td>{row.project}</td>
+                                <td>{row.sector}</td>
+                                <td>
+                                  <strong>{row.awc_name}</strong>
+                                </td>
+                                <td>{row.awc_code}</td>
+                              </>
+                            )}
+                            {suppliesFoodItems.map((fi, idx) => {
+                              const fd = row.foodData.find(
+                                (f) => f.food_item === fi,
+                              );
+                              return (
+                                <React.Fragment key={`data-${idx}`}>
+                                  <td className="text-end">
+                                    {fd ? fd.received.toLocaleString() : 0}
+                                  </td>
+                                  <td className="text-end">
+                                    {fd ? fd.distributed.toLocaleString() : 0}
+                                  </td>
+                                  <td className="text-end text-primary">
+                                    <strong>
+                                      {fd ? fd.balance.toLocaleString() : 0}
+                                    </strong>
+                                  </td>
+                                </React.Fragment>
+                              );
+                            })}
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                     {currentSuppliesData.length > 0 && (
                       <tfoot>
                         <tr>
                           <th></th>
-                          {suppliesViewMode === 'project' ? (
+                          {suppliesViewMode === "project" ? (
                             <th>Total</th>
-                          ) : suppliesViewMode === 'sector' ? (
+                          ) : suppliesViewMode === "sector" ? (
                             <th>Total</th>
                           ) : (
                             <>
@@ -921,12 +1453,22 @@ const DPODashboard = () => {
                             </>
                           )}
                           {suppliesFoodItems.map((fi, idx) => {
-                            const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
+                            const t = suppliesTotals[fi] || {
+                              received: 0,
+                              distributed: 0,
+                              balance: 0,
+                            };
                             return (
                               <React.Fragment key={`foot-${idx}`}>
-                                <th className="text-end">{t.received.toLocaleString()}</th>
-                                <th className="text-end">{t.distributed.toLocaleString()}</th>
-                                <th className="text-end">{t.balance.toLocaleString()}</th>
+                                <th className="text-end">
+                                  {t.received.toLocaleString()}
+                                </th>
+                                <th className="text-end">
+                                  {t.distributed.toLocaleString()}
+                                </th>
+                                <th className="text-end">
+                                  {t.balance.toLocaleString()}
+                                </th>
                               </React.Fragment>
                             );
                           })}
@@ -943,113 +1485,96 @@ const DPODashboard = () => {
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
-                <FaLayerGroup /> {aggregateView === "sector" ? "Sector-wise" : "Project-wise"} Aggregated Summary
+                <FaLayerGroup />{" "}
+                {aggregateView === "sector" ? "Sector-wise" : "Project-wise"}{" "}
+                Aggregated Summary
               </h5>
               <div className="d-flex align-items-center gap-3 flex-wrap">
                 <ButtonGroup className="dpo-toggle-group">
-                  <Button className={`dpo-toggle-btn ${aggregateView === 'project' ? 'active' : ''}`} onClick={() => setAggregateView('project')}>Project-wise</Button>
-                  <Button className={`dpo-toggle-btn ${aggregateView === 'sector' ? 'active' : ''}`} onClick={() => setAggregateView('sector')}>Sector-wise</Button>
+                  <Button
+                    className={`dpo-toggle-btn ${aggregateView === "project" ? "active" : ""}`}
+                    onClick={() => setAggregateView("project")}
+                  >
+                    Project-wise
+                  </Button>
+                  <Button
+                    className={`dpo-toggle-btn ${aggregateView === "sector" ? "active" : ""}`}
+                    onClick={() => setAggregateView("sector")}
+                  >
+                    Sector-wise
+                  </Button>
                 </ButtonGroup>
                 <div className="dpo-export-btns">
-                  <Button className="dpo-export-btn" onClick={exportAggToExcel}><FaFileExcel className="text-success" /> Excel</Button>
-                  <Button className="dpo-export-btn" onClick={exportAggToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
+                  <Button className="dpo-export-btn" onClick={exportAggToExcel}>
+                    <FaFileExcel className="text-success" /> Excel
+                  </Button>
+                  <Button className="dpo-export-btn" onClick={exportAggToPDF}>
+                    <FaFilePdf className="text-danger" /> PDF
+                  </Button>
                 </div>
               </div>
             </Card.Header>
             <Card.Body className="p-0">
               <div className="dpo-table-wrapper">
-                {loading ? <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div> : (
+                {loading ? (
+                  <div className="text-center p-5">
+                    <Spinner animation="border" variant="primary" />
+                  </div>
+                ) : (
                   <Table hover className="dpo-data-table mb-0">
                     <thead>
                       <tr>
                         <th>S. No.</th>
-                        <th style={{textTransform: 'capitalize'}}>{aggregateView}</th>
+                        <th style={{ textTransform: "capitalize" }}>
+                          {aggregateView}
+                        </th>
                         <th>Months</th>
                         <th>Fin. Years</th>
-                        {NUMERIC_AGG_FIELDS.map((col, i) => <th key={i} className="text-end">{col.label}</th>)}
+                        {NUMERIC_AGG_FIELDS.map((col, i) => (
+                          <th key={i} className="text-end">
+                            {col.label}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
                       {aggregatedData.length === 0 ? (
-                        <tr><td colSpan={NUMERIC_AGG_FIELDS.length + 4} className="text-center p-4 text-muted">No data available</td></tr>
-                      ) : aggregatedData.map((row, i) => (
-                        <tr key={i}>
-                          <td>{i + 1}</td>
-                          <td><strong>{row.groupKey}</strong></td>
-                          <td>{row.months}</td>
-                          <td>{row.fys}</td>
-                          {NUMERIC_AGG_FIELDS.map((col, c) => <td key={c} className="text-end">{row[col.key]?.toLocaleString() || 0}</td>)}
+                        <tr>
+                          <td
+                            colSpan={NUMERIC_AGG_FIELDS.length + 4}
+                            className="text-center p-4 text-muted"
+                          >
+                            No data available
+                          </td>
                         </tr>
-                      ))}
+                      ) : (
+                        aggregatedData.map((row, i) => (
+                          <tr key={i}>
+                            <td>{i + 1}</td>
+                            <td>
+                              <strong>{row.groupKey}</strong>
+                            </td>
+                            <td>{row.months}</td>
+                            <td>{row.fys}</td>
+                            {NUMERIC_AGG_FIELDS.map((col, c) => (
+                              <td key={c} className="text-end">
+                                {row[col.key]?.toLocaleString() || 0}
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                     {aggregatedData.length > 0 && (
                       <tfoot>
                         <tr>
                           <th></th>
-                          <th>Total</th><th></th><th></th>
-                          {NUMERIC_AGG_FIELDS.map((col, c) => <th key={c} className="text-end">{totalAggregated[col.key]?.toLocaleString() || 0}</th>)}
-                        </tr>
-                      </tfoot>
-                    )}
-                  </Table>
-                )}
-              </div>
-            </Card.Body>
-          </Card>
-
-          {/* Detailed Records Table */}
-          <Card className="dpo-table-card">
-            <Card.Header className="dpo-table-header">
-              <h5 className="dpo-section-title">
-                <FaChartBar /> Detailed Records
-              </h5>
-              <div className="d-flex align-items-center gap-3 flex-wrap">
-                <InputGroup style={{maxWidth: '300px'}}>
-                  <InputGroup.Text><FaSearch /></InputGroup.Text>
-                  <Form.Control 
-                    placeholder="Search AWC, District..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </InputGroup>
-                <div className="dpo-export-btns">
-                  <Button className="dpo-export-btn" onClick={exportDetailsToExcel}><FaFileExcel className="text-success" /> Excel</Button>
-                  <Button className="dpo-export-btn" onClick={exportDetailsToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
-                </div>
-              </div>
-            </Card.Header>
-            <Card.Body className="p-0">
-              <div className="dpo-table-wrapper">
-                {loading ? <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div> : (
-                  <Table hover className="dpo-data-table mb-0">
-                    <thead>
-                      <tr>
-                        <th>S. No.</th>
-                        {TABLE_COLUMNS.map((col, i) => <th key={i} className={col.num || col.strong ? "text-end" : ""}>{col.label}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedRecords.length === 0 ? (
-                        <tr><td colSpan={TABLE_COLUMNS.length + 1} className="text-center p-5 text-muted">No records found.</td></tr>
-                      ) : paginatedRecords.map((row, i) => (
-                        <tr key={i}>
-                          <td>{(currentPage - 1) * itemsPerPage + i + 1}</td>
-                          {TABLE_COLUMNS.map((col, c) => {
-                            const val = row[col.key];
-                            if (col.strong) return <td key={c} className="text-end"><strong className="text-primary">{val ? Number(val).toLocaleString() : 0}</strong></td>;
-                            if (col.num) return <td key={c} className="text-end">{val ? Number(val).toLocaleString() : 0}</td>;
-                            return <td key={c}>{val || "—"}</td>;
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                    {searchedRecords.length > 0 && (
-                      <tfoot>
-                        <tr>
+                          <th>Total</th>
                           <th></th>
-                          {TABLE_COLUMNS.map((col, c) => (
-                            <th key={c} className={col.num || col.strong ? "text-end" : ""}>
-                              {col.num || col.strong ? (totalDetailed[col.key]?.toLocaleString() || 0) : (c === 0 ? "Total" : "")}
+                          <th></th>
+                          {NUMERIC_AGG_FIELDS.map((col, c) => (
+                            <th key={c} className="text-end">
+                              {totalAggregated[col.key]?.toLocaleString() || 0}
                             </th>
                           ))}
                         </tr>
@@ -1059,47 +1584,284 @@ const DPODashboard = () => {
                 )}
               </div>
             </Card.Body>
-            {/* Pagination Controls (Removed Rows per page dropdown, default to 100) */}
+          </Card>
+
+          {/* ─── Detailed Records Table (Grant-wise Structure) ─── */}
+          <Card className="dpo-table-card">
+            <Card.Header className="dpo-table-header">
+              <h5 className="dpo-section-title">
+                <FaChartBar /> Detailed Records
+              </h5>
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                <InputGroup style={{ maxWidth: "300px" }}>
+                  <InputGroup.Text>
+                    <FaSearch />
+                  </InputGroup.Text>
+                  <Form.Control
+                    placeholder="Search AWC, District..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </InputGroup>
+                <div className="dpo-export-btns">
+                  <Button
+                    className="dpo-export-btn"
+                    onClick={exportDetailsToExcel}
+                  >
+                    <FaFileExcel className="text-success" /> Excel
+                  </Button>
+                  <Button
+                    className="dpo-export-btn"
+                    onClick={exportDetailsToPDF}
+                  >
+                    <FaFilePdf className="text-danger" /> PDF
+                  </Button>
+                </div>
+              </div>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <div className="dpo-table-wrapper" style={{ overflowX: "auto" }}>
+                {loading ? (
+                  <div className="text-center p-5">
+                    <Spinner animation="border" variant="primary" />
+                  </div>
+                ) : (
+                  <Table
+                    hover
+                    className="dpo-data-table mb-0 dpo-grant-master-table"
+                    style={{
+                      minWidth: "2400px",
+                      borderCollapse: "separate",
+                      borderSpacing: 0,
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        <th rowSpan={2} className="text-center align-middle">
+                          S. No.
+                        </th>
+                        {EXCEL_META_COLUMNS.map((col) => (
+                          <th
+                            key={col.key}
+                            rowSpan={2}
+                            className="text-center align-middle"
+                          >
+                            {col.header}
+                          </th>
+                        ))}
+                        {GRANT_CATEGORIES.map((cat) => (
+                          <th
+                            key={cat.countKey}
+                            colSpan={4}
+                            className="text-center align-middle dpo-grant-group-header"
+                          >
+                            {cat.title}
+                          </th>
+                        ))}
+                        <th
+                          colSpan={FOOD_FIELDS.length}
+                          className="text-center align-middle dpo-food-group-header"
+                        >
+                          SUPPLEMENTARY NUTRITION DETAILS
+                        </th>
+                      </tr>
+                      <tr>
+                        {GRANT_CATEGORIES.flatMap((cat) =>
+                          [15, 30, 31]
+                            .map((grantId) => (
+                              <th
+                                key={`${cat.countKey}-${grantId}`}
+                                className="text-center"
+                              >
+                                Grant {grantId}
+                              </th>
+                            ))
+                            .concat([
+                              <th
+                                key={`${cat.countKey}-total`}
+                                className="text-center"
+                              >
+                                TOTAL
+                              </th>,
+                            ]),
+                        )}
+                        {FOOD_FIELDS.map((food) => (
+                          <th key={food.key} className="text-center">
+                            {food.header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedRecords.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={
+                              1 +
+                              EXCEL_META_COLUMNS.length +
+                              GRANT_CATEGORIES.length * 4 +
+                              FOOD_FIELDS.length
+                            }
+                            className="text-center py-5 text-muted"
+                          >
+                            No records found.
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedRecords.map((record, index) => (
+                          <tr key={record.id || index}>
+                            <td className="text-center text-muted">
+                              {(currentPage - 1) * itemsPerPage + index + 1}
+                            </td>
+                            {EXCEL_META_COLUMNS.map((col) => (
+                              <td
+                                key={col.key}
+                                className={
+                                  col.key === "month" ? "text-center" : ""
+                                }
+                              >
+                                {col.key === "month" && record[col.key] ? (
+                                  <Badge className="dpo-month-badge">
+                                    {record[col.key]}
+                                  </Badge>
+                                ) : (
+                                  record[col.key] || "—"
+                                )}
+                              </td>
+                            ))}
+                            {GRANT_CATEGORIES.flatMap((cat) => {
+                              const grants = Array.isArray(record[cat.grantKey])
+                                ? record[cat.grantKey].map(Number)
+                                : [];
+                              return [15, 30, 31]
+                                .map((grantId) => (
+                                  <td
+                                    key={`${cat.countKey}-${grantId}`}
+                                    className="text-center dpo-grant-cell"
+                                  >
+                                    {grants.includes(grantId) ? grantId : "—"}
+                                  </td>
+                                ))
+                                .concat([
+                                  <td
+                                    key={`${cat.countKey}-total`}
+                                    className="text-end fw-semibold dpo-total-cell"
+                                  >
+                                    {Number(
+                                      record[cat.countKey] || 0,
+                                    ).toLocaleString()}
+                                  </td>,
+                                ]);
+                            })}
+                            {FOOD_FIELDS.map((food) => (
+                              <td key={food.key} className="text-end">
+                                {Number(record[food.key] || 0).toLocaleString()}
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {searchedRecords.length > 0 && (
+                      <tfoot>
+                        <tr>
+                          <th></th>
+                          {EXCEL_META_COLUMNS.map((col, idx) => (
+                            <th key={col.key}>{idx === 0 ? "TOTAL" : ""}</th>
+                          ))}
+                          {GRANT_CATEGORIES.flatMap((cat) => [
+                            <th key={`${cat.countKey}-g15`}></th>,
+                            <th key={`${cat.countKey}-g30`}></th>,
+                            <th key={`${cat.countKey}-g31`}></th>,
+                            <th
+                              key={`${cat.countKey}-total`}
+                              className="text-end"
+                            >
+                              {totalDetailed[cat.countKey]?.toLocaleString() ||
+                                0}
+                            </th>,
+                          ])}
+                          {FOOD_FIELDS.map((food) => (
+                            <th key={food.key} className="text-end">
+                              {totalDetailed[food.key]?.toLocaleString() || 0}
+                            </th>
+                          ))}
+                        </tr>
+                      </tfoot>
+                    )}
+                  </Table>
+                )}
+              </div>
+            </Card.Body>
             {totalRecords > 0 && (
               <Card.Footer className="d-flex justify-content-between align-items-center flex-wrap gap-2 py-3 px-4">
                 <span className="small text-muted">
-                  Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalRecords)} of {totalRecords} entries
+                  Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                  {Math.min(currentPage * itemsPerPage, totalRecords)} of{" "}
+                  {totalRecords} entries
                 </span>
                 <Pagination size="sm" className="mb-0">
-                  <Pagination.Prev disabled={currentPage === 1} onClick={() => handlePageChange(currentPage - 1)} />
+                  <Pagination.Prev
+                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange(currentPage - 1)}
+                  />
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let startPage = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+                    let startPage = Math.max(
+                      1,
+                      Math.min(currentPage - 2, totalPages - 4),
+                    );
                     const page = startPage + i;
                     if (page > totalPages) return null;
                     return (
-                      <Pagination.Item key={page} active={page === currentPage} onClick={() => handlePageChange(page)}>
+                      <Pagination.Item
+                        key={page}
+                        active={page === currentPage}
+                        onClick={() => handlePageChange(page)}
+                      >
                         {page}
                       </Pagination.Item>
                     );
                   })}
-                  <Pagination.Next disabled={currentPage === totalPages} onClick={() => handlePageChange(currentPage + 1)} />
+                  <Pagination.Next
+                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange(currentPage + 1)}
+                  />
                 </Pagination>
               </Card.Footer>
             )}
           </Card>
-
         </Container>
       </div>
 
-      {/* ─── Food Items Modal ─── */}
-      <Modal show={showFoodItemModal} onHide={handleCloseFoodItemModal} centered className="fs-modal" size="lg">
+      {/* Food Items Modal */}
+      <Modal
+        show={showFoodItemModal}
+        onHide={handleCloseFoodItemModal}
+        centered
+        className="fs-modal"
+        size="lg"
+      >
         <Modal.Header closeButton className="fs-modal-header">
-          <Modal.Title><FaUtensils className="me-2 text-primary" /> Food Items List</Modal.Title>
+          <Modal.Title>
+            <FaUtensils className="me-2 text-primary" /> Food Items List
+          </Modal.Title>
         </Modal.Header>
-        <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+        <Modal.Body style={{ maxHeight: "60vh", overflowY: "auto" }}>
           {loadingFoodItems ? (
             <div className="text-center py-5">
               <Spinner animation="border" variant="primary" />
               <p className="mt-3 text-muted">Loading food items...</p>
             </div>
           ) : (
-            <Tabs defaultActiveKey="hcm" id="food-items-modal-tabs" className="mb-3">
-              <Tab eventKey="hcm" title={`HCM Food Items (${foodItems.hcm?.length || 0})`}>
+            <Tabs
+              defaultActiveKey="hcm"
+              id="food-items-modal-tabs"
+              className="mb-3"
+            >
+              <Tab
+                eventKey="hcm"
+                title={`HCM Food Items (${foodItems.hcm?.length || 0})`}
+              >
                 <Table striped bordered hover size="sm">
                   <thead>
                     <tr>
@@ -1109,19 +1871,28 @@ const DPODashboard = () => {
                   </thead>
                   <tbody>
                     {foodItems.hcm?.length === 0 ? (
-                      <tr><td colSpan="3" className="text-center text-muted p-4">No HCM items found.</td></tr>
+                      <tr>
+                        <td colSpan="3" className="text-center text-muted p-4">
+                          No HCM items found.
+                        </td>
+                      </tr>
                     ) : (
                       foodItems.hcm?.map((item, idx) => (
                         <tr key={idx}>
                           <td>{idx + 1}</td>
-                          <td><strong>{item.food_item}</strong></td>
+                          <td>
+                            <strong>{item.food_item}</strong>
+                          </td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </Table>
               </Tab>
-              <Tab eventKey="thr" title={`THR Food Items (${foodItems.thr?.length || 0})`}>
+              <Tab
+                eventKey="thr"
+                title={`THR Food Items (${foodItems.thr?.length || 0})`}
+              >
                 <Table striped bordered hover size="sm">
                   <thead>
                     <tr>
@@ -1131,12 +1902,18 @@ const DPODashboard = () => {
                   </thead>
                   <tbody>
                     {foodItems.thr?.length === 0 ? (
-                      <tr><td colSpan="3" className="text-center text-muted p-4">No THR items found.</td></tr>
+                      <tr>
+                        <td colSpan="3" className="text-center text-muted p-4">
+                          No THR items found.
+                        </td>
+                      </tr>
                     ) : (
                       foodItems.thr?.map((item, idx) => (
                         <tr key={idx}>
                           <td>{idx + 1}</td>
-                          <td><strong>{item.food_item}</strong></td>
+                          <td>
+                            <strong>{item.food_item}</strong>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -1147,7 +1924,13 @@ const DPODashboard = () => {
           )}
         </Modal.Body>
         <Modal.Footer className="fs-modal-footer">
-          <Button variant="light" onClick={handleCloseFoodItemModal} className="dpo-btn-light px-4"><FaTimes className="me-1" /> Close</Button>
+          <Button
+            variant="light"
+            onClick={handleCloseFoodItemModal}
+            className="dpo-btn-light px-4"
+          >
+            <FaTimes className="me-1" /> Close
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>

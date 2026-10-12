@@ -651,3 +651,53 @@
   font-size: 0.82rem;
   color: #334155;
 }
+.dpo-table-card {
+          overflow: visible !important;
+        }
+        .dpo-table-header {
+          border-radius: 10px 10px 0 0;
+          position: relative;
+          z-index: 20;
+        }
+        .dpo-multi-menu {
+          z-index: 1060 !important;
+        }
+        .dpo-grant-master-table th,
+        .dpo-grant-master-table td {
+          font-size: 0.72rem;
+          padding: 4px 6px;
+          vertical-align: middle;
+        }
+        .dpo-grant-group-header {
+          background: #4f46e5 !important;
+          color: #fff !important;
+          text-align: center !important;
+          font-weight: 700;
+          font-size: 0.68rem !important;
+          letter-spacing: 0.2px;
+        }
+        .dpo-food-group-header {
+          background: #4f46e5 !important;
+          color: #fff !important;
+          text-align: center !important;
+          font-weight: 700;
+          font-size: 0.68rem !important;
+          letter-spacing: 0.2px;
+        }
+        .dpo-grant-cell {
+          background: #fafbff;
+          color: #4f46e5;
+          font-weight: 600;
+        }
+        .dpo-total-cell {
+          background: #ecfdf5;
+          color: #4f46e5;
+        }
+        .dpo-month-badge {
+          background: #e0e7ff;
+          color: #ffffff;
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 0.7rem;
+          font-weight: 600;
+        }

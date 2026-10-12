@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination, Badge } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/directorleftnav.css";
@@ -15,31 +14,52 @@ import DirectorHeader from "./DirectorHeader";
 
 const ITEMS_PER_PAGE = 100;
 
+/* ── Grant-wise Table schema (mirrors FoodSupplementary) ── */
+const GRANT_IDS = [15, 30, 31];
+const GRANT_CATEGORIES = [
+  { title: "Pregnant Woman and Lactating Mother", countKey: "pregnant_woman_lactating_mother", grantKey: "pregnant_woman_lactating_mother_grant" },
+  { title: "Children 6m-3y", countKey: "children_6m_3y", grantKey: "children_6m_3y_grant" },
+  { title: "SAM 6M-5Y / SUW 6M-6Y", countKey: "sam_children_6m_5y_suw_children_6m_6y", grantKey: "sam_children_6m_5y_suw_children_6m_6y_grant" },
+  { title: "SAM 3Y-5Y / SUW 3Y-6Y", countKey: "sam_children_3y_5y_suw_children_3y_6y", grantKey: "sam_children_3y_5y_suw_children_3y_6y_grant" },
+  { title: "HCM Beneficiaries 3Y-6Y (Normal Children)", countKey: "hcm_beneficiaries_3y_6y", grantKey: "hcm_beneficiaries_3y_6y_grant" },
+];
+const FOOD_FIELDS = [
+  { header: "Poushik Sattu - Pregnant/Lactating Mother", key: "poushik_sattu_preg_lat" },
+  { header: "Panjeeri - Children 6m-3y", key: "panjeeri_6m_3y" },
+  { header: "Panjeeri - SAM 6M-5Y / SUW 6M-6Y", key: "panjeeri_sam_6m_5y_suw_6m_6y" },
+  { header: "Sattu - SAM 3Y-5Y / SUW 3Y-6Y", key: "sattu_sam_3y_5y_suw_3y_6y" },
+  { header: "Mung Dal Khichdi - HCM 3Y-6Y", key: "mung_dal_khichdi_3y_6y" },
+  { header: "Multi Grain Aata - HCM 3Y-6Y", key: "multi_grain_aata_3y_6y" },
+];
+const EXCEL_META_COLUMNS = [
+  { header: "DISTRICT", key: "district" },
+  { header: "PROJECT", key: "project" },
+  { header: "SECTOR", key: "sector" },
+  { header: "AWC NAME", key: "awc_name" },
+  { header: "AWC CODE", key: "awc_code" },
+  { header: "MONTH", key: "month" },
+  { header: "FINANCIAL YEAR", key: "financial_year" },
+];
+
 const TABLE_COLUMNS = [
   { label: "District", key: "district" },
   { label: "Project", key: "project" },
   { label: "Sector", key: "sector" },
   { label: "AWC Code", key: "awc_code" },
+  { label: "AWC Name", key: "awc_name" },
   { label: "Month", key: "month" },
   { label: "Fin. Year", key: "financial_year" },
-  { label: "Active Bene.", key: "active_beneficiaries", num: true },
-  { label: "Total Bene.", key: "total_beneficiaries", strong: true },
-  { label: "Pregnant/Lact", key: "pregnant_women_lactating_mothers", num: true },
-  { label: "6m-3y", key: "children_6m_3y_beneficiaries", num: true },
-  { label: "THR 25d", key: "thr_25_days_frs_hcm_beneficiaries_3y_6y", num: true },
-  { label: "HCM 3-6y", key: "hcm_beneficiaries_3y_6y", num: true },
-  { label: "SAM 6m-6y", key: "sam_children_6m_6y", num: true },
-  { label: "SUW 6m-6y", key: "suw_children_6m_6y", num: true },
-  { label: "SAM 3-6y", key: "sam_children_3y_6y", num: true },
-  { label: "SUW 3-6y", key: "suw_children_3y_6y", num: true },
-  { label: "Mung Dal", key: "quarterly_packets_mung_dal_khichdi", num: true },
-  { label: "P. Sattu", key: "quarterly_packets_poushik_sattu_mix", num: true },
-  { label: "Sattu(gm)", key: "poushik_sattu_mix_75_days_packet_size_gm", num: true },
-  { label: "Panj 2625", key: "panjeeri_75_days_2625gm_quarterly_packets", num: true },
-  { label: "Panj 4625", key: "panjeeri_75_days_4625gm_quarterly_packets", num: true },
-  { label: "Sattu 2250", key: "quarterly_packets_sattu_2250gm", num: true },
-  { label: "Mix 1000", key: "quarterly_packets_mix_1000gm", num: true },
-  { label: "Multi Aata", key: "quarterly_packets_multi_grain_aata_1250gm", num: true },
+  { label: "Pregnant/Lactating", key: "pregnant_woman_lactating_mother", num: true },
+  { label: "Poushik Sattu", key: "poushik_sattu_preg_lat", num: true },
+  { label: "Children 6m-3y", key: "children_6m_3y", num: true },
+  { label: "Panjeeri 6m-3y", key: "panjeeri_6m_3y", num: true },
+  { label: "SAM 6m-5y / SUW 6m-6y", key: "sam_children_6m_5y_suw_children_6m_6y", num: true },
+  { label: "Panjeeri SAM/SUW", key: "panjeeri_sam_6m_5y_suw_6m_6y", num: true },
+  { label: "SAM 3y-5y / SUW 3y-6y", key: "sam_children_3y_5y_suw_children_3y_6y", num: true },
+  { label: "Sattu SAM/SUW", key: "sattu_sam_3y_5y_suw_3y_6y", num: true },
+  { label: "HCM 3y-6y", key: "hcm_beneficiaries_3y_6y", num: true },
+  { label: "Mung Dal Khichdi", key: "mung_dal_khichdi_3y_6y", num: true },
+  { label: "Multi Grain Aata", key: "multi_grain_aata_3y_6y", num: true },
 ];
 
 const NUMERIC_AGG_FIELDS = TABLE_COLUMNS.filter(c => c.num || c.strong);
@@ -150,24 +170,17 @@ const downloadPDF = async ({ title, filename, headers, rows, footer, fontSize })
 };
 
 const SUMMARY_PILLS = [
-  { key: "total_beneficiaries", label: "Total", icon: <FaUsers size={10} /> },
-  { key: "active_beneficiaries", label: "Active", icon: <FaUserFriends size={10} /> },
-  { key: "pregnant_women_lactating_mothers", label: "Preg/Lact", icon: <FaBaby size={10} /> },
-  { key: "children_6m_3y_beneficiaries", label: "6m-3y", icon: <FaBaby size={10} /> },
-  { key: "thr_25_days_frs_hcm_beneficiaries_3y_6y", label: "THR 25d", icon: <FaUsers size={10} /> },
-  { key: "hcm_beneficiaries_3y_6y", label: "HCM 3-6y", icon: <FaUsers size={10} /> },
-  { key: "sam_children_6m_6y", label: "SAM 6m-6y", icon: <FaBaby size={10} /> },
-  { key: "suw_children_6m_6y", label: "SUW 6m-6y", icon: <FaBaby size={10} /> },
-  { key: "sam_children_3y_6y", label: "SAM 3-6y", icon: <FaBaby size={10} /> },
-  { key: "suw_children_3y_6y", label: "SUW 3-6y", icon: <FaBaby size={10} /> },
-  { key: "quarterly_packets_mung_dal_khichdi", label: "Mung Dal", icon: <FaBoxes size={10} /> },
-  { key: "quarterly_packets_poushik_sattu_mix", label: "P. Sattu", icon: <FaBoxes size={10} /> },
-  { key: "poushik_sattu_mix_75_days_packet_size_gm", label: "Sattu(gm)", icon: <FaBoxes size={10} /> },
-  { key: "panjeeri_75_days_2625gm_quarterly_packets", label: "Panj 2625", icon: <FaBoxes size={10} /> },
-  { key: "panjeeri_75_days_4625gm_quarterly_packets", label: "Panj 4625", icon: <FaBoxes size={10} /> },
-  { key: "quarterly_packets_sattu_2250gm", label: "Sattu 2250", icon: <FaBoxes size={10} /> },
-  { key: "quarterly_packets_mix_1000gm", label: "Mix 1000", icon: <FaBoxes size={10} /> },
-  { key: "quarterly_packets_multi_grain_aata_1250gm", label: "Multi Aata", icon: <FaBoxes size={10} /> },
+  { key: "pregnant_woman_lactating_mother", label: "Preg/Lact", icon: <FaBaby size={10} /> },
+  { key: "poushik_sattu_preg_lat", label: "Poushik Sattu", icon: <FaBoxes size={10} /> },
+  { key: "children_6m_3y", label: "Children 6m-3y", icon: <FaBaby size={10} /> },
+  { key: "panjeeri_6m_3y", label: "Panjeeri 6m-3y", icon: <FaBoxes size={10} /> },
+  { key: "sam_children_6m_5y_suw_children_6m_6y", label: "SAM/SUW 6m-6y", icon: <FaBaby size={10} /> },
+  { key: "panjeeri_sam_6m_5y_suw_6m_6y", label: "Panjeeri SAM/SUW", icon: <FaBoxes size={10} /> },
+  { key: "sam_children_3y_5y_suw_children_3y_6y", label: "SAM/SUW 3y-6y", icon: <FaBaby size={10} /> },
+  { key: "sattu_sam_3y_5y_suw_3y_6y", label: "Sattu SAM/SUW", icon: <FaBoxes size={10} /> },
+  { key: "hcm_beneficiaries_3y_6y", label: "HCM 3y-6y", icon: <FaUsers size={10} /> },
+  { key: "mung_dal_khichdi_3y_6y", label: "Mung Dal", icon: <FaBoxes size={10} /> },
+  { key: "multi_grain_aata_3y_6y", label: "Multi Grain Aata", icon: <FaBoxes size={10} /> },
 ];
 
 // Custom Multi-Select Dropdown Component
@@ -239,7 +252,7 @@ const DirectorDashboard = () => {
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [selectedSectors, setSelectedSectors] = useState([]);
   
-  const [aggregateView, setAggregateView] = useState("sector"); // 'sector' | 'project' | 'district'
+  const [aggregateView, setAggregateView] = useState("sector");
 
   // Pagination States
   const [aggPage, setAggPage] = useState(1);
@@ -247,7 +260,7 @@ const DirectorDashboard = () => {
 
   // Supplies Dynamic States
   const [suppliesTab, setSuppliesTab] = useState("thr");
-  const [suppliesViewMode, setSuppliesViewMode] = useState("district"); // 'district' | 'project' | 'sector' | 'awc'
+  const [suppliesViewMode, setSuppliesViewMode] = useState("district");
   const [suppliesRecords, setSuppliesRecords] = useState({});
   const [suppliesDetailRecords, setSuppliesDetailRecords] = useState([]);
   const [suppliesLoading, setSuppliesLoading] = useState(true);
@@ -267,7 +280,6 @@ const DirectorDashboard = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Fetch Food Item Counts dynamically from /categoryandfooditem/
   const fetchFoodItemCounts = async () => {
     try {
       const response = await api.get("/categoryandfooditem/");
@@ -298,7 +310,6 @@ const DirectorDashboard = () => {
     }
   };
 
-  // Dynamic Supplies Data Fetching (Handles both 'thr' and 'hcm' dynamically)
   const fetchSuppliesData = async (type) => {
     const reqId = ++suppliesReqId.current;
     setSuppliesLoading(true);
@@ -315,7 +326,6 @@ const DirectorDashboard = () => {
         throw new Error("The reconciliation response does not contain detail records.");
       }
 
-      // Use summary arrays directly from API
       const summaries = {
         overallSummary: result.overall_summary || [],
         districtSummary: result.district_summary || [],
@@ -353,19 +363,15 @@ const DirectorDashboard = () => {
     }
   }, [suppliesTab]);
 
-  // Unique months and financial years from detail records for filtering
   const suppliesMonths = useMemo(
-    () => [...new Set(suppliesDetailRecords.map((record) => record.month).filter(Boolean))]
-      .sort(),
+    () => [...new Set(suppliesDetailRecords.map((record) => record.month).filter(Boolean))].sort(),
     [suppliesDetailRecords]
   );
   const suppliesFinancialYears = useMemo(
-    () => [...new Set(suppliesDetailRecords.map((record) => record.financial_year).filter(Boolean))]
-      .sort(),
+    () => [...new Set(suppliesDetailRecords.map((record) => record.financial_year).filter(Boolean))].sort(),
     [suppliesDetailRecords]
   );
 
-  // Filtered detail records based on month/year filters
   const filteredDetailRecords = useMemo(() => {
     return suppliesDetailRecords.filter((record) =>
       (selectedSupplyMonths.length === 0 || selectedSupplyMonths.includes(record.month)) &&
@@ -373,7 +379,6 @@ const DirectorDashboard = () => {
     );
   }, [suppliesDetailRecords, selectedSupplyMonths, selectedSupplyFYs]);
 
-  // Extract unique food items dynamically from suppliesRecords
   const suppliesFoodItems = useMemo(() => {
     const items = new Set();
     const summaries = suppliesRecords || {};
@@ -383,7 +388,6 @@ const DirectorDashboard = () => {
     return Array.from(items);
   }, [suppliesRecords]);
 
-  // District-wise aggregation from district_summary
   const districtSuppliesData = useMemo(() => {
     const districts = {};
     const summary = suppliesRecords.districtSummary || [];
@@ -407,7 +411,6 @@ const DirectorDashboard = () => {
     })).sort((a, b) => a.district.localeCompare(b.district));
   }, [suppliesRecords, suppliesFoodItems]);
 
-  // Project-wise aggregation from project_summary
   const projectSuppliesData = useMemo(() => {
     const projects = {};
     const summary = suppliesRecords.projectSummary || [];
@@ -431,7 +434,6 @@ const DirectorDashboard = () => {
     })).sort((a, b) => a.project.localeCompare(b.project));
   }, [suppliesRecords, suppliesFoodItems]);
 
-  // Sector-wise aggregation from sector_summary
   const sectorSuppliesData = useMemo(() => {
     const sectors = {};
     const summary = suppliesRecords.sectorSummary || [];
@@ -455,7 +457,6 @@ const DirectorDashboard = () => {
     })).sort((a, b) => a.sector.localeCompare(b.sector));
   }, [suppliesRecords, suppliesFoodItems]);
 
-  // AWC-wise aggregation from detail records
   const awcSuppliesData = useMemo(() => {
     const awcs = new Map();
     filteredDetailRecords.forEach((record) => {
@@ -484,7 +485,6 @@ const DirectorDashboard = () => {
     })).sort((a, b) => a.district.localeCompare(b.district) || a.project.localeCompare(b.project) || a.sector.localeCompare(b.sector) || a.awc_name.localeCompare(b.awc_name));
   }, [filteredDetailRecords]);
 
-  // Get the current data based on view mode
   const currentSuppliesData = useMemo(() => {
     switch (suppliesViewMode) {
       case 'district': return districtSuppliesData;
@@ -495,7 +495,6 @@ const DirectorDashboard = () => {
     }
   }, [suppliesViewMode, districtSuppliesData, projectSuppliesData, sectorSuppliesData, awcSuppliesData]);
 
-  // Calculate Totals for dynamic supplies table
   const suppliesTotals = useMemo(() => {
     const totals = {};
     suppliesFoodItems.forEach(fi => {
@@ -513,7 +512,6 @@ const DirectorDashboard = () => {
     return totals;
   }, [currentSuppliesData, suppliesFoodItems]);
 
-  // Main records table logic
   const uniqueMonths = useMemo(() => [...new Set(records.map(r => r.month).filter(Boolean))].sort(), [records]);
   const uniqueFYs = useMemo(() => [...new Set(records.map(r => r.financial_year).filter(Boolean))].sort(), [records]);
   const uniqueProjects = useMemo(() => [...new Set(records.map(r => r.project).filter(Boolean))].sort(), [records]);
@@ -635,7 +633,6 @@ const DirectorDashboard = () => {
     );
   };
 
-  // Paginated Data Slices
   const currentAggregated = useMemo(() => {
     return aggregatedData.slice((aggPage - 1) * ITEMS_PER_PAGE, aggPage * ITEMS_PER_PAGE);
   }, [aggregatedData, aggPage]);
@@ -742,7 +739,7 @@ const DirectorDashboard = () => {
 
     const groupColSpan = suppliesViewMode === 'awc' ? 5 : 1;
     const footer = [[
-      { text: 'Total', colSpan: 1 + groupColSpan },
+      { text: 'total', colSpan: 1 + groupColSpan },
       ...suppliesFoodItems.flatMap(fi => {
         const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
         return [{ text: t.received.toLocaleString() }, { text: t.distributed.toLocaleString() }, { text: t.balance.toLocaleString() }];
@@ -784,19 +781,64 @@ const DirectorDashboard = () => {
     });
   };
 
+  /* ── Detailed Records Export (Grant-wise structure) ── */
   const exportDetailsToExcel = () => {
-    const data = searchedRecords.map((r, i) => ({ "S. No.": i + 1, ...TABLE_COLUMNS.reduce((o, c) => ({ ...o, [c.label]: r[c.key] || 0 }), {}) }));
-    data.push({ "S. No.": "", [TABLE_COLUMNS[0].label]: "Total", ...NUMERIC_AGG_FIELDS.reduce((o, f) => ({ ...o, [f.label]: totalDetailed[f.key] }), {}) });
-    const ws = XLSX.utils.json_to_sheet(data);
+    const cols = TABLE_COLUMNS.filter((c) => c.key !== "_index" && c.key !== "_actions");
+    const dataToExport = searchedRecords.map((row, i) => {
+      const obj = { "S. No.": i + 1 };
+      cols.forEach((c) => (obj[c.label] = row[c.key] || 0));
+      return obj;
+    });
+    const totalObj = { "S. No.": "" };
+    cols.forEach((c) => {
+      if (c.num || c.strong) totalObj[c.label] = totalDetailed[c.key];
+      else totalObj[c.label] = "";
+    });
+    totalObj[cols[0].label] = "Total";
+    dataToExport.push(totalObj);
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Records");
     XLSX.writeFile(wb, "Supplementary_Records.xlsx");
   };
 
   const exportDetailsToPDF = () => {
-    const headers = [["S. No.", ...TABLE_COLUMNS.map(c => c.label)]];
-    const rows = searchedRecords.map((r, i) => [i + 1, ...TABLE_COLUMNS.map(c => r[c.key] || "—")]);
-    const footer = [["", ...TABLE_COLUMNS.map(c => (c.num || c.strong) ? totalDetailed[c.key] : (c.key === "district" ? "Total" : ""))]];
+    const groupHeaders = [
+      { text: 'S. No.', rowSpan: 2 },
+      ...EXCEL_META_COLUMNS.map(col => ({ text: col.header, rowSpan: 2 })),
+      ...GRANT_CATEGORIES.map(cat => ({ text: cat.title, colSpan: 4 })),
+      { text: 'SUPPLEMENTARY NUTRITION DETAILS', colSpan: FOOD_FIELDS.length }
+    ];
+    const subHeaders = [
+      ...GRANT_CATEGORIES.flatMap(() => ['Grant 15', 'Grant 30', 'Grant 31', 'TOTAL']),
+      ...FOOD_FIELDS.map(f => f.header)
+    ];
+    const headers = [groupHeaders, subHeaders];
+    
+    const rows = searchedRecords.map((r, i) => {
+      const row = [i + 1];
+      EXCEL_META_COLUMNS.forEach(col => row.push(r[col.key] || "—"));
+      GRANT_CATEGORIES.forEach(cat => {
+        const grants = Array.isArray(r[cat.grantKey]) ? r[cat.grantKey].map(Number) : [];
+        [15, 30, 31].forEach(gid => row.push(grants.includes(gid) ? String(gid) : "—"));
+        row.push(Number(r[cat.countKey] || 0).toLocaleString());
+      });
+      FOOD_FIELDS.forEach(f => row.push(Number(r[f.key] || 0).toLocaleString()));
+      return row;
+    });
+    
+    const footer = [[
+      { text: '', colSpan: 1 + EXCEL_META_COLUMNS.length },
+      ...GRANT_CATEGORIES.flatMap(cat => [
+        { text: '' },
+        { text: '' },
+        { text: '' },
+        { text: totalDetailed[cat.countKey]?.toLocaleString() || 0 }
+      ]),
+      ...FOOD_FIELDS.map(f => ({ text: totalDetailed[f.key]?.toLocaleString() || 0 }))
+    ]];
+    
     return handlePDFExport({
       title: "Supplementary Nutrition Records",
       filename: "Supplementary_Records.pdf",
@@ -809,20 +851,7 @@ const DirectorDashboard = () => {
 
   return (
     <div className="dashboard-container">
-      {/* CSS Override to fix dropdown overlapping issues inside cards */}
-      <style>{`
-        .dpo-table-card {
-          overflow: visible !important;
-        }
-        .dpo-table-header {
-          border-radius: 10px 10px 0 0;
-          position: relative;
-          z-index: 20;
-        }
-        .dpo-multi-menu {
-          z-index: 1060 !important;
-        }
-      `}</style>
+   
 
       <DirectorLeftNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} />
       <div className="main-content-dash">
@@ -831,7 +860,6 @@ const DirectorDashboard = () => {
         <Container fluid className="dashboard-box mt-3">
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
 
-          {/* DPO Purple Header Section */}
           <div className="dashboard-header-section mt-4">
             <div>
               <h4 className="dashboard-main-title">
@@ -894,7 +922,6 @@ const DirectorDashboard = () => {
             </Button>
           </div>
 
-          {/* Wrapped Summary Pills */}
           {summaryStats && (
             <div className="dpo-stat-strip">
               {SUMMARY_PILLS.map(field => (
@@ -907,7 +934,7 @@ const DirectorDashboard = () => {
             </div>
           )}
 
-          {/* Supplies Received & Distributed Table (Dynamic with View Mode) */}
+          {/* Supplies Received & Distributed Table */}
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
@@ -1128,7 +1155,7 @@ const DirectorDashboard = () => {
             </Card.Body>
           </Card>
 
-          {/* Detailed Records Table */}
+          {/* ─── Detailed Records Table (Grant-wise Structure) ─── */}
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
@@ -1150,27 +1177,63 @@ const DirectorDashboard = () => {
               </div>
             </Card.Header>
             <Card.Body className="p-0">
-              <div className="dpo-table-wrapper">
+              <div className="dpo-table-wrapper" style={{ overflowX: "auto" }}>
                 {loading ? <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div> : (
-                  <Table hover className="dpo-data-table mb-0">
+                  <Table hover className="dpo-data-table mb-0 dpo-grant-master-table" style={{ minWidth: "2400px", borderCollapse: "separate", borderSpacing: 0 }}>
                     <thead>
                       <tr>
-                        <th>S. No.</th>
-                        {TABLE_COLUMNS.map((col, i) => <th key={i} className={col.num || col.strong ? "text-end" : ""}>{col.label}</th>)}
+                        <th rowSpan={2} className="text-center align-middle">S. No.</th>
+                        {EXCEL_META_COLUMNS.map((col) => (
+                          <th key={col.key} rowSpan={2} className="text-center align-middle">{col.header}</th>
+                        ))}
+                        {GRANT_CATEGORIES.map((cat) => (
+                          <th key={cat.countKey} colSpan={4} className="text-center align-middle dpo-grant-group-header">{cat.title}</th>
+                        ))}
+                        <th colSpan={FOOD_FIELDS.length} className="text-center align-middle dpo-food-group-header">SUPPLEMENTARY NUTRITION DETAILS</th>
+                      </tr>
+                      <tr>
+                        {GRANT_CATEGORIES.flatMap((cat) => [15, 30, 31].map((grantId) => (
+                          <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
+                        )).concat([
+                          <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>
+                        ]))}
+                        {FOOD_FIELDS.map((food) => (
+                          <th key={food.key} className="text-center">{food.header}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
                       {currentDetailed.length === 0 ? (
-                        <tr><td colSpan={TABLE_COLUMNS.length + 1} className="text-center p-5 text-muted">No records found.</td></tr>
-                      ) : currentDetailed.map((row, i) => (
-                        <tr key={i}>
-                          <td>{(detailsPage - 1) * ITEMS_PER_PAGE + i + 1}</td>
-                          {TABLE_COLUMNS.map((col, c) => {
-                            const val = row[col.key];
-                            if (col.strong) return <td key={c} className="text-end"><strong className="text-primary">{val ? Number(val).toLocaleString() : 0}</strong></td>;
-                            if (col.num) return <td key={c} className="text-end">{val ? Number(val).toLocaleString() : 0}</td>;
-                            return <td key={c}>{val || "—"}</td>;
+                        <tr>
+                          <td colSpan={1 + EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4 + FOOD_FIELDS.length} className="text-center py-5 text-muted">
+                            No records found.
+                          </td>
+                        </tr>
+                      ) : currentDetailed.map((record, index) => (
+                        <tr key={record.id || index}>
+                          <td className="text-center text-muted">{(detailsPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
+                          {EXCEL_META_COLUMNS.map((col) => (
+                            <td key={col.key} className={col.key === "month" ? "text-center" : ""}>
+                              {col.key === "month" && record[col.key]
+                                ? <Badge className="dpo-month-badge">{record[col.key]}</Badge>
+                                : (record[col.key] || "—")}
+                            </td>
+                          ))}
+                          {GRANT_CATEGORIES.flatMap((cat) => {
+                            const grants = Array.isArray(record[cat.grantKey]) ? record[cat.grantKey].map(Number) : [];
+                            return [15, 30, 31].map((grantId) => (
+                              <td key={`${cat.countKey}-${grantId}`} className="text-center dpo-grant-cell">
+                                {grants.includes(grantId) ? grantId : "—"}
+                              </td>
+                            )).concat([
+                              <td key={`${cat.countKey}-total`} className="text-end fw-semibold dpo-total-cell">
+                                {Number(record[cat.countKey] || 0).toLocaleString()}
+                              </td>
+                            ]);
                           })}
+                          {FOOD_FIELDS.map((food) => (
+                            <td key={food.key} className="text-end">{Number(record[food.key] || 0).toLocaleString()}</td>
+                          ))}
                         </tr>
                       ))}
                     </tbody>
@@ -1178,10 +1241,17 @@ const DirectorDashboard = () => {
                       <tfoot>
                         <tr>
                           <th></th>
-                          {TABLE_COLUMNS.map((col, c) => (
-                            <th key={c} className={col.num || col.strong ? "text-end" : ""}>
-                              {col.num || col.strong ? (totalDetailed[col.key]?.toLocaleString() || 0) : (c === 0 ? "Total" : "")}
-                            </th>
+                          {EXCEL_META_COLUMNS.map((col, idx) => (
+                            <th key={col.key}>{idx === 0 ? "TOTAL" : ""}</th>
+                          ))}
+                          {GRANT_CATEGORIES.flatMap((cat) => [
+                            <th key={`${cat.countKey}-g15`}></th>,
+                            <th key={`${cat.countKey}-g30`}></th>,
+                            <th key={`${cat.countKey}-g31`}></th>,
+                            <th key={`${cat.countKey}-total`} className="text-end">{totalDetailed[cat.countKey]?.toLocaleString() || 0}</th>,
+                          ])}
+                          {FOOD_FIELDS.map((food) => (
+                            <th key={food.key} className="text-end">{totalDetailed[food.key]?.toLocaleString() || 0}</th>
                           ))}
                         </tr>
                       </tfoot>
