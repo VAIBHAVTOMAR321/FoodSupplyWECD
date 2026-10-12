@@ -60,6 +60,8 @@ const HcmSupervisorDistributions = () => {
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
+    { dataField: 'expired_quantity', text: 'Expired Qty', visible: true },
+    { dataField: 'anganwadi_remark', text: 'Remark', visible: true },
     { dataField: 'sector_status', text: 'Sector Status', visible: true },
     { dataField: 'action', text: 'Action', visible: true },
   ]);
@@ -903,10 +905,17 @@ const HcmSupervisorDistributions = () => {
           </Modal.Header>
           <Modal.Body>
             {selectedRemarks && (
-              <div className="mb-3">
-                <h6>Sector Remark</h6>
-                <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>{selectedRemarks.sector_status || 'pending'}</Badge></p>
-                <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.sector_remark || "No remark"}</p>
+              <div>
+                <div className="mb-3">
+                  <h6>Sector Remark</h6>
+                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>{selectedRemarks.sector_status || 'pending'}</Badge></p>
+                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.sector_remark || "No remark"}</p>
+                </div>
+                <div className="mb-3">
+                  <h6>Anganwadi Details</h6>
+                  <p className="mb-1"><strong>Expired Quantity:</strong> {selectedRemarks.expired_quantity || 0}</p>
+                  <p className="mb-0"><strong>Anganwadi Remark:</strong> {selectedRemarks.anganwadi_remark || "No remark"}</p>
+                </div>
               </div>
             )}
           </Modal.Body>

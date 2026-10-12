@@ -127,7 +127,9 @@ const AnganwadiDashboard = () => {
     fin_year: '', 
     months: [], 
     food_item_id: '',
-    date: new Date().toISOString().split('T')[0] //  Added Date to state
+    date: new Date().toISOString().split('T')[0],
+    expired_quantity: '',
+    anganwadi_remark: ''
   });
   const [distributionError, setDistributionError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -336,7 +338,9 @@ const AnganwadiDashboard = () => {
         fin_year: existingRecord.fin_year,
         months: existingMonths,
         food_item_id: foodItemDetails?.id,
-        date: existingRecord.date ? new Date(existingRecord.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0], // ✅ Include Date
+        date: existingRecord.date ? new Date(existingRecord.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        expired_quantity: existingRecord.expired_quantity || '',
+        anganwadi_remark: existingRecord.anganwadi_remark || '',
       });
       setSelectedFoodItem(foodItemDetails);
     } else {
@@ -345,7 +349,9 @@ const AnganwadiDashboard = () => {
         fin_year: getCurrentFinancialYear(),
         months: [],
         food_item_id: '',
-        date: new Date().toISOString().split('T')[0], //  Include Date
+        date: new Date().toISOString().split('T')[0],
+        expired_quantity: '',
+        anganwadi_remark: '',
       });
     }
 
@@ -471,7 +477,6 @@ const AnganwadiDashboard = () => {
       }
     }
 
-    //  Construct a clean payload with 'date' included
     let payload = {
       food_item: selectedFoodItemDetails.food_item,
       total_beneficiaries: parseInt(distributionData.total_beneficiaries, 10),
@@ -481,8 +486,10 @@ const AnganwadiDashboard = () => {
       days_allotted: selectedFoodItemDetails.days_allotted,
       fin_year: distributionData.fin_year,
       months: selectedMonths,
-      quarter: quarterString, // Send as string instead of array
-      date: distributionData.date || new Date().toISOString().split('T')[0], // ✅ Include Date
+      quarter: quarterString,
+      date: distributionData.date || new Date().toISOString().split('T')[0],
+      expired_quantity: distributionData.expired_quantity ? parseInt(distributionData.expired_quantity, 10) : 0,
+      anganwadi_remark: distributionData.anganwadi_remark || '',
     };
 
     if (isEdit) {
@@ -632,6 +639,8 @@ const AnganwadiDashboard = () => {
                         <th>Total Beneficiaries</th>
                         <th>Quantity</th>
                         <th>Unit</th>
+                        <th>Expired Qty</th>
+                        <th>Remark</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -644,10 +653,12 @@ const AnganwadiDashboard = () => {
                           <td>{record.date ? new Date(record.date).toLocaleDateString() : '-'}</td>
                           <td>{formatMonths(record.months || record.quarter)}</td>
                           <td>{record.fin_year}</td>
-                          <td>{record.total_beneficiaries}</td>
-                          <td>{record.quantity}</td>
-                          <td>{record.unit}</td>
-                          <td>
+                           <td>{record.total_beneficiaries}</td>
+                           <td>{record.quantity}</td>
+                           <td>{record.unit}</td>
+                           <td>{record.expired_quantity || 0}</td>
+                           <td>{record.anganwadi_remark || '-'}</td>
+                           <td>
                             <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleOpenViewModal(record)}>
                               <FaEye />
                             </Button>
@@ -751,16 +762,39 @@ const AnganwadiDashboard = () => {
                     </Form.Select>
                   </Form.Group>
 
-                  <Form.Group className="mb-3">
-                    <Form.Label>Date of Distribution</Form.Label>
-                    <Form.Control
-                      type="date"
-                      name="date"
-                      value={distributionData.date || ''}
-                      onChange={(e) => setDistributionData({ ...distributionData, date: e.target.value })}
-                      required
-                    />
-                  </Form.Group>
+                   <Form.Group className="mb-3">
+                     <Form.Label>Date of Distribution</Form.Label>
+                     <Form.Control
+                       type="date"
+                       name="date"
+                       value={distributionData.date || ''}
+                       onChange={(e) => setDistributionData({ ...distributionData, date: e.target.value })}
+                       required
+                     />
+                   </Form.Group>
+
+                   <Form.Group className="mb-3">
+                     <Form.Label>Expired Quantity</Form.Label>
+                     <Form.Control
+                       type="number"
+                       name="expired_quantity"
+                       value={distributionData.expired_quantity || ''}
+                       onChange={(e) => setDistributionData({ ...distributionData, expired_quantity: e.target.value })}
+                       placeholder="Enter expired quantity"
+                       min="0"
+                     />
+                   </Form.Group>
+
+                   <Form.Group className="mb-3">
+                     <Form.Label>Anganwadi Remark</Form.Label>
+                     <Form.Control
+                       type="text"
+                       name="anganwadi_remark"
+                       value={distributionData.anganwadi_remark || ''}
+                       onChange={(e) => setDistributionData({ ...distributionData, anganwadi_remark: e.target.value })}
+                       placeholder="Enter remark"
+                     />
+                   </Form.Group>
 
                   <Form.Group className="mb-3">
                     <Form.Label>Total Beneficiaries</Form.Label>
@@ -932,9 +966,11 @@ const AnganwadiDashboard = () => {
                   <ListGroup.Item><FaHashtag className="view-modal-icon" /> <strong>AWC Code:</strong> {viewItem.awc_code}</ListGroup.Item>
                   <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>Food Item:</strong> {viewItem.food_item}</ListGroup.Item>
                   <ListGroup.Item><FaUsers className="view-modal-icon" /> <strong>Beneficiaries:</strong> {viewItem.total_beneficiaries}</ListGroup.Item>
-                  <ListGroup.Item><FaWeightHanging className="view-modal-icon" /> <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}</ListGroup.Item>
-                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Date:</strong> {viewItem.date ? new Date(viewItem.date).toLocaleDateString() : '-'}</ListGroup.Item>
-                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Financial Year:</strong> {viewItem.fin_year}</ListGroup.Item>
+                   <ListGroup.Item><FaWeightHanging className="view-modal-icon" /> <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}</ListGroup.Item>
+                   <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Date:</strong> {viewItem.date ? new Date(viewItem.date).toLocaleDateString() : '-'}</ListGroup.Item>
+                   <ListGroup.Item><FaHashtag className="view-modal-icon" /> <strong>Expired Quantity:</strong> {viewItem.expired_quantity || 0}</ListGroup.Item>
+                   <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>Anganwadi Remark:</strong> {viewItem.anganwadi_remark || '-'}</ListGroup.Item>
+                   <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Financial Year:</strong> {viewItem.fin_year}</ListGroup.Item>
                   <ListGroup.Item><FaCubes className="view-modal-icon" /> <strong>Months:</strong> {formatMonths(viewItem.months || viewItem.quarter)}</ListGroup.Item>
                   <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>Sector:</strong> {viewItem.sector}</ListGroup.Item>
                   <ListGroup.Item><FaProjectDiagram className="view-modal-icon" /> <strong>Project:</strong> {viewItem.project}</ListGroup.Item>
