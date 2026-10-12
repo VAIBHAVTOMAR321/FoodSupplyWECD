@@ -116,3 +116,42 @@
   font-size: 0.75rem;
   margin-bottom: 0;
 }
+.supp-grant-master-table th,
+          .supp-grant-master-table td {
+            font-size: 0.72rem;
+            padding: 4px 6px;
+            vertical-align: middle;
+          }
+          .supp-grant-group-header {
+            background: #4f46e5 !important;
+            color: #fff !important;
+            text-align: center !important;
+            font-weight: 700;
+            font-size: 0.68rem !important;
+            letter-spacing: 0.2px;
+          }
+          .supp-food-group-header {
+            background: #4f46e5 !important;
+            color: #fff !important;
+            text-align: center !important;
+            font-weight: 700;
+            font-size: 0.68rem !important;
+            letter-spacing: 0.2px;
+          }
+          .supp-grant-cell {
+            background: #fafbff;
+            color: #4f46e5;
+            font-weight: 600;
+          }
+          .supp-total-cell {
+            background: #ecfdf5;
+            color: #4f46e5;
+          }
+          .supp-month-badge {
+            background: #e0e7ff;
+            color: #ffffff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+          }

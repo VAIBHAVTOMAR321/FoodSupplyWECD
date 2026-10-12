@@ -14,8 +14,11 @@ import "../../assets/css/AnganwadiDashboard.css";
 import {
   FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUtensils, FaUsers,
   FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes,
-  FaProjectDiagram, FaInfoCircle, FaClock
+  FaProjectDiagram, FaInfoCircle, FaClock, FaFileExcel, FaFilePdf,
+  FaBoxes
 } from "react-icons/fa";
+import * as XLSX from "xlsx";
+import html2pdf from "html2pdf.js";
 
 const API_URLS = {
   hcm_receiving: "/hcm-anganwadi-receiving/",
@@ -23,6 +26,37 @@ const API_URLS = {
   supp_nutrition: "/supplementary-nutrition-anganwadi/",
   category_food_item: "/categoryandfooditem/",
 };
+
+/* ── Grant-wise Table schema (mirrors FoodSupplementary) ── */
+const GRANT_IDS = [15, 30, 31];
+const GRANT_CATEGORIES = [
+  { title: "Pregnant Woman and Lactating Mother", countKey: "pregnant_woman_lactating_mother", grantKey: "pregnant_woman_lactating_mother_grant" },
+  { title: "Children 6m-3y", countKey: "children_6m_3y", grantKey: "children_6m_3y_grant" },
+  { title: "SAM 6M-5Y / SUW 6M-6Y", countKey: "sam_children_6m_5y_suw_children_6m_6y", grantKey: "sam_children_6m_5y_suw_children_6m_6y_grant" },
+  { title: "SAM 3Y-5Y / SUW 3Y-6Y", countKey: "sam_children_3y_5y_suw_children_3y_6y", grantKey: "sam_children_3y_5y_suw_children_3y_6y_grant" },
+  { title: "HCM Beneficiaries 3Y-6Y (Normal Children)", countKey: "hcm_beneficiaries_3y_6y", grantKey: "hcm_beneficiaries_3y_6y_grant" },
+];
+const FOOD_FIELDS = [
+  { header: "Poushik Sattu - Pregnant/Lactating Mother", key: "poushik_sattu_preg_lat" },
+  { header: "Panjeeri - Children 6m-3y", key: "panjeeri_6m_3y" },
+  { header: "Panjeeri - SAM 6M-5Y / SUW 6M-6Y", key: "panjeeri_sam_6m_5y_suw_6m_6y" },
+  { header: "Sattu - SAM 3Y-5Y / SUW 3Y-6Y", key: "sattu_sam_3y_5y_suw_3y_6y" },
+  { header: "Mung Dal Khichdi - HCM 3Y-6Y", key: "mung_dal_khichdi_3y_6y" },
+  { header: "Multi Grain Aata - HCM 3Y-6Y", key: "multi_grain_aata_3y_6y" },
+];
+const EXCEL_META_COLUMNS = [
+  { header: "DISTRICT", key: "district" },
+  { header: "PROJECT", key: "project" },
+  { header: "SECTOR", key: "sector" },
+  { header: "AWC NAME", key: "awc_name" },
+  { header: "AWC CODE", key: "awc_code" },
+  { header: "MONTH", key: "month" },
+  { header: "FINANCIAL YEAR", key: "financial_year" },
+];
+const NUMERIC_TOTAL_KEYS = [
+  ...GRANT_CATEGORIES.map((c) => c.countKey),
+  ...FOOD_FIELDS.map((f) => f.key),
+];
 
 const getCurrentFinancialYear = () => {
   const today = new Date();
@@ -60,22 +94,17 @@ const monthLabels = monthOptions.reduce((acc, month) => {
     return acc;
   }, {});
 
-// Build a reverse lookup: label (lowercase) -> value, plus numeric/month-name fallbacks
 const monthLabelToValue = {};
 monthOptions.forEach(m => {
     monthLabelToValue[m.label.toLowerCase()] = m.value;
     monthLabelToValue[m.value.toLowerCase()] = m.value;
 });
-// Add common Hindi/other month name mappings if needed
+
 const normalizeMonthKey = (raw) => {
     if (raw === undefined || raw === null) return null;
     const str = String(raw).trim().toLowerCase();
     if (!str) return null;
-    // Direct value match (apr, may, etc.)
     if (monthLabelToValue[str]) return monthLabelToValue[str];
-    // Try matching against labels (april, may, etc.)
-    if (monthLabelToValue[str]) return monthLabelToValue[str];
-    // Try partial match (e.g., "month:4" or "4")
     const found = monthOptions.find(m =>
       m.value === str || m.label.toLowerCase() === str ||
       m.label.toLowerCase().startsWith(str) || str.startsWith(m.label.toLowerCase())
@@ -83,37 +112,28 @@ const normalizeMonthKey = (raw) => {
     return found ? found.value : null;
 };
 
-// Helper to safely parse months regardless of backend format
 const getMonthsArray = (item) => {
     if (!item) return [];
-    // Direct months array
     if (Array.isArray(item.months)) {
       return item.months.map(m => normalizeMonthKey(m)).filter(Boolean);
     }
-    // months as string (JSON or comma-separated)
     if (typeof item.months === 'string' && item.months) {
       try {
         const parsed = JSON.parse(item.months);
         if (Array.isArray(parsed)) return parsed.map(m => normalizeMonthKey(m)).filter(Boolean);
-      } catch (e) {
-        /* ignore, fall through */
-      }
+      } catch (e) { /* ignore */ }
       return item.months.split(',').map(m => normalizeMonthKey(m)).filter(Boolean);
     }
-    // quarter as array
     if (Array.isArray(item.quarter)) {
       return item.quarter.map(m => normalizeMonthKey(m)).filter(Boolean);
     }
-    // quarter as string - map via quarterToMonths
     if (typeof item.quarter === 'string' && item.quarter) {
       if (quarterToMonths[item.quarter]) return quarterToMonths[item.quarter];
-      // Could be comma-separated month keys
       return item.quarter.split(',').map(m => normalizeMonthKey(m)).filter(Boolean);
     }
     return [];
 };
 
-// ✅ Shared mapping for Beneficiary Categories
 const FOOD_BENE_CATEGORY_MAP = {
   'पौष्टिक सत्तू मिक्स': 'Pregnant Women & Lactating Mothers',
   'पंजीरी': 'Children (6m-3y)',
@@ -127,28 +147,143 @@ const formatMonths = (months = []) => {
   return months.map((month) => monthLabels[month] || month).join(', ');
 };
 
-// Normalize a supp nutrition record's month field into a single month key
 const normalizeSuppMonth = (rawMonth) => {
   if (!rawMonth) return '';
-  // Handle numeric month (1-12)
   if (typeof rawMonth === 'number' && rawMonth >= 1 && rawMonth <= 12) {
     return monthOptions[rawMonth - 1].value;
   }
-  // Handle string month
   const str = String(rawMonth).trim();
   if (!str) return '';
-  // Try direct value match
   const direct = monthOptions.find(m => m.value === str.toLowerCase());
   if (direct) return direct.value;
-  // Try label match (case-insensitive)
   const byLabel = monthOptions.find(m => m.label.toLowerCase() === str.toLowerCase());
   if (byLabel) return byLabel.value;
-  // Try partial match
   const partial = monthOptions.find(m =>
     m.value.toLowerCase().includes(str.toLowerCase()) ||
     m.label.toLowerCase().includes(str.toLowerCase())
   );
   return partial ? partial.value : str.toLowerCase();
+};
+
+/* ── Hindi PDF font loader + PDF generator (grant-wise master) ── */
+let hindiPdfFontPromise;
+const loadHindiPdfFont = async () => {
+  if (!hindiPdfFontPromise) {
+    hindiPdfFontPromise = new Promise((resolve) => {
+      const fontLink = document.createElement("link");
+      fontLink.rel = "stylesheet";
+      fontLink.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap";
+      fontLink.onload = () => resolve(true);
+      fontLink.onerror = () => resolve(false);
+      document.head.appendChild(fontLink);
+    });
+  }
+  if (await hindiPdfFontPromise) {
+    try { await document.fonts.load('400 12px "Noto Sans Devanagari"', "हिंदी"); } catch (e) { /* noop */ }
+  }
+};
+
+const downloadGrantWisePDF = async ({ title, filename, records, totalsRow }) => {
+  const content = document.createElement("div");
+  content.style.cssText = "box-sizing:border-box;width:100%;padding:14px;background:#fff;color:#1e293b;font-family:'Noto Sans Devanagari','Noto Sans','Nirmala UI',sans-serif;";
+
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  heading.style.cssText = "margin:0 0 12px;text-align:center;color:#1e3a5f;font-size:16px;font-weight:700;";
+  content.appendChild(heading);
+
+  const table = document.createElement("table");
+  table.style.cssText = "width:100%;border-collapse:collapse;table-layout:fixed;font-size:7px;line-height:1.35;";
+
+  const createCell = (tagName, cell) => {
+    const element = document.createElement(tagName);
+    const value = typeof cell === "object" && cell !== null ? cell : { text: cell };
+    element.textContent = value.text == null ? "" : String(value.text);
+    if (value.colSpan) element.colSpan = value.colSpan;
+    if (value.rowSpan) element.rowSpan = value.rowSpan;
+    element.style.cssText = "border:1px solid #cbd5e1;padding:4px;text-align:left;vertical-align:middle;overflow-wrap:anywhere;word-break:normal;";
+    return element;
+  };
+
+  // Two-row header
+  const groupHeaders = [
+    { text: 'S. No.', rowSpan: 2 },
+    ...EXCEL_META_COLUMNS.map(col => ({ text: col.header, rowSpan: 2 })),
+    ...GRANT_CATEGORIES.map(cat => ({ text: cat.title, colSpan: 4 })),
+    { text: 'SUPPLEMENTARY NUTRITION DETAILS', colSpan: FOOD_FIELDS.length },
+  ];
+  const subHeaders = [
+    ...GRANT_CATEGORIES.flatMap(() => ['Grant 15', 'Grant 30', 'Grant 31', 'TOTAL']),
+    ...FOOD_FIELDS.map(f => f.header),
+  ];
+
+  const thead = document.createElement("thead");
+  [groupHeaders, subHeaders].forEach((headerRow, rowIndex) => {
+    const row = document.createElement("tr");
+    headerRow.forEach((cell) => {
+      const header = createCell("th", cell);
+      header.style.cssText += `;background-color:${rowIndex === 0 ? "#4f46e5" : "#e0e7ff"};color:${rowIndex === 0 ? "#fff" : "#312e81"};border-color:${rowIndex === 0 ? "#4338ca" : "#a5b4fc"};padding:6px 4px;text-align:center;font-weight:700;font-size:8px;line-height:1.25;white-space:normal;`;
+      row.appendChild(header);
+    });
+    thead.appendChild(row);
+  });
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  records.forEach((r, i) => {
+    const row = document.createElement("tr");
+    const values = [i + 1];
+    EXCEL_META_COLUMNS.forEach(col => values.push(r[col.key] || "—"));
+    GRANT_CATEGORIES.forEach(cat => {
+      const grants = Array.isArray(r[cat.grantKey]) ? r[cat.grantKey].map(Number) : [];
+      [15, 30, 31].forEach(gid => values.push(grants.includes(gid) ? String(gid) : "—"));
+      values.push(Number(r[cat.countKey] || 0).toLocaleString());
+    });
+    FOOD_FIELDS.forEach(f => values.push(Number(r[f.key] || 0).toLocaleString()));
+    values.forEach(v => row.appendChild(createCell("td", v)));
+    tbody.appendChild(row);
+  });
+  table.appendChild(tbody);
+
+  // Footer totals row
+  const tfoot = document.createElement("tfoot");
+  const footRow = document.createElement("tr");
+  const footValues = [
+    { text: '', colSpan: 1 + EXCEL_META_COLUMNS.length },
+    ...GRANT_CATEGORIES.flatMap(cat => [
+      { text: '' }, { text: '' }, { text: '' },
+      { text: totalsRow[cat.countKey]?.toLocaleString() || 0 },
+    ]),
+    ...FOOD_FIELDS.map(f => ({ text: totalsRow[f.key]?.toLocaleString() || 0 })),
+  ];
+  footValues.forEach(cell => {
+    const c = createCell("td", cell);
+    c.style.backgroundColor = "#f1f5f9";
+    c.style.fontWeight = "700";
+    footRow.appendChild(c);
+  });
+  tfoot.appendChild(footRow);
+  table.appendChild(tfoot);
+
+  content.appendChild(table);
+  document.body.appendChild(content);
+
+  try {
+    await loadHindiPdfFont();
+    await html2pdf()
+      .set({
+        margin: [10, 10, 10, 10],
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
+        jsPDF: { unit: "mm", format: "a3", orientation: "landscape" },
+        pagebreak: { mode: ["css", "legacy"] },
+      })
+      .from(content)
+      .save();
+  } finally {
+    content.remove();
+  }
 };
 
 const FoodItemReceiving = () => {
@@ -175,6 +310,9 @@ const FoodItemReceiving = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewItem, setViewItem] = useState(null);
 
+  // Supp nutrition filters
+  const [suppFilters, setSuppFilters] = useState({ month: '', financial_year: '' });
+
   const [filters, setFilters] = useState({ fin_year: '', months: [] });
   const [uniqueFilterOptions, setUniqueFilterOptions] = useState({
     hcm: { fin_year: [], months: [] },
@@ -182,7 +320,6 @@ const FoodItemReceiving = () => {
   });
 
   const availableMonthsFromSupp = useMemo(() => {
-    // Get unique months from supplementary nutrition data
     const monthsFromData = new Set();
     suppNutritionData.forEach(rec => {
       if (rec._monthKeys) {
@@ -192,11 +329,35 @@ const FoodItemReceiving = () => {
         if (normalized) monthsFromData.add(normalized);
       }
     });
-    // Return sorted months based on monthOptions order
     return monthOptions
       .filter(m => monthsFromData.has(m.value))
       .map(m => m.value);
   }, [suppNutritionData]);
+
+  // Unique month/FY for supp tab filters
+  const suppUniqueMonths = useMemo(() => {
+    return [...new Set(suppNutritionData.map(r => r.month).filter(Boolean))]
+      .sort((a, b) => monthOptions.findIndex(m => m.value === a) - monthOptions.findIndex(m => m.value === b));
+  }, [suppNutritionData]);
+  const suppUniqueFYs = useMemo(() => {
+    return [...new Set(suppNutritionData.map(r => r.financial_year).filter(Boolean))].sort().reverse();
+  }, [suppNutritionData]);
+
+  const filteredSuppNutritionData = useMemo(() => {
+    return suppNutritionData.filter(rec => {
+      const monthMatch = !suppFilters.month || rec.month === suppFilters.month;
+      const fyMatch = !suppFilters.financial_year || rec.financial_year === suppFilters.financial_year;
+      return monthMatch && fyMatch;
+    });
+  }, [suppNutritionData, suppFilters]);
+
+  const suppTotals = useMemo(() => {
+    const totals = {};
+    NUMERIC_TOTAL_KEYS.forEach(key => {
+      totals[key] = filteredSuppNutritionData.reduce((sum, r) => sum + (parseInt(r[key]) || 0), 0);
+    });
+    return totals;
+  }, [filteredSuppNutritionData]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -219,11 +380,9 @@ const FoodItemReceiving = () => {
 
       setHcmReceivings(hcmData);
       setThrReceivings(thrData);
-      // Normalize supp nutrition data: handle different response shapes
       const normalizedSupp = Array.isArray(suppData)
         ? suppData
         : (suppData.food_data || suppResp.data?.results || []);
-      // Normalize month field on each record for consistent downstream usage
       const normalizedSuppWithMonths = normalizedSupp.map(rec => ({
         ...rec,
         _monthKeys: normalizeSuppMonth(rec.month),
@@ -262,6 +421,15 @@ const FoodItemReceiving = () => {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleSuppFilterChange = (e) => {
+    const { name, value } = e.target;
+    setSuppFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  const resetSuppFilters = () => {
+    setSuppFilters({ month: '', financial_year: '' });
+  };
+
   const handleMultiSelectChange = (filterName, value) => {
     setFilters(prevFilters => {
       const currentValues = prevFilters[filterName];
@@ -285,8 +453,6 @@ const FoodItemReceiving = () => {
     setEditingItem(item);
     if (item) {
       const parsedMonths = getMonthsArray(item);
-      // Match the exact food item entry: the same food item name can exist
-      // for multiple beneficiary categories
       const optionMatch = foodItemOptions.find(opt =>
         opt.food_item === item.food_item &&
         String(opt.beneficiary_category || FOOD_BENE_CATEGORY_MAP[opt.food_item] || '') ===
@@ -333,12 +499,10 @@ const FoodItemReceiving = () => {
     return foodItemOptions.filter(item => item.category === tabCategory);
   }, [foodItemOptions, activeTab]);
 
-const handleFormChange = (e) => {
+  const handleFormChange = (e) => {
     const { name, value } = e.target;
 
     if (name === 'food_item') {
-      // Value may be "food_item|||beneficiary_category" so the same food item
-      // can be received for a different beneficiary category in the same month
       const [selectedFoodItem, selectedBeneCategory] = value.split('|||');
       const selectedItem = foodItemOptions.find(item =>
         item.food_item === selectedFoodItem &&
@@ -354,11 +518,9 @@ const handleFormChange = (e) => {
 
       if (selectedItem) {
         autoFieldName = selectedItem.field_name || '';
-        // Use API's beneficiary_category directly, fallback to mapping for backward compatibility
         autoBeneCategory = selectedItem.beneficiary_category || FOOD_BENE_CATEGORY_MAP[selectedFoodItem] || selectedItem.bene_category || selectedItem.category || '';
       }
 
-      // Use functional updater to get the absolute latest state for auto-filling logic
       setFormData(prev => {
         if (suppNutritionData.length > 0 && autoFieldName) {
           const matchingRecord = suppNutritionData.find(rec => {
@@ -375,7 +537,6 @@ const handleFormChange = (e) => {
 
           if (matchingRecord) {
             autoQuantity = matchingRecord[autoFieldName] || '';
-            // Auto-select months from the matching supplementary nutrition record
             if (matchingRecord._monthKeys) {
               autoMonths = [matchingRecord._monthKeys];
             } else if (matchingRecord.month) {
@@ -409,42 +570,27 @@ const handleFormChange = (e) => {
 
     const isThr = activeTab === 'thr';
 
-    // Safely parse and calculate payload values
     const parsedQuantity = parseFloat(formData.quantity) || 0;
     const selectedMonths = Array.isArray(formData.months) ? formData.months : [];
 
-    // Calculate Quarter string from selected months
     let quarterString = formData.quarter || '';
     if (selectedMonths.length > 0) {
       const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
         const qMonths = quarterToMonths[qKey];
         return selectedMonths.length === qMonths.length && selectedMonths.every(m => qMonths.includes(m));
       });
-      if (matchedQuarter) {
-        quarterString = matchedQuarter;
-      } else {
-        quarterString = selectedMonths.join(',');
-      }
+      if (matchedQuarter) quarterString = matchedQuarter;
+      else quarterString = selectedMonths.join(',');
     }
 
-    // Prevent duplicate receiving: same food_item + bene_category + fin_year + overlapping months.
-    // The same month CAN be received for a different beneficiary category.
     const existingRecords = isThr ? thrReceivings : hcmReceivings;
     const duplicate = existingRecords.find(rec => {
-      if (editingItem && rec.id === editingItem.id) {
-        return false;
-      }
+      if (editingItem && rec.id === editingItem.id) return false;
       const recMonths = getMonthsArray(rec);
       if (rec.food_item !== formData.food_item ||
-          rec.fin_year !== (formData.fin_year || getCurrentFinancialYear())) {
-        return false;
-      }
-      // Only block when the beneficiary category also matches, so the same
-      // month can be received for a different category
+          rec.fin_year !== (formData.fin_year || getCurrentFinancialYear())) return false;
       if (formData.bene_category && rec.bene_category &&
-          formData.bene_category !== rec.bene_category) {
-        return false;
-      }
+          formData.bene_category !== rec.bene_category) return false;
       return selectedMonths.some(m => recMonths.includes(m));
     });
 
@@ -454,7 +600,6 @@ const handleFormChange = (e) => {
       return;
     }
 
-    // Construct a clean payload explicitly to avoid backend schema rejection
     let payload = {
       food_item: formData.food_item || '',
       quantity: parsedQuantity,
@@ -463,14 +608,12 @@ const handleFormChange = (e) => {
       date: formData.date || new Date().toISOString().split('T')[0],
       fin_year: formData.fin_year || getCurrentFinancialYear(),
       months: selectedMonths,
-      quarter: quarterString, 
+      quarter: quarterString,
     };
 
     if (editingItem) {
       payload.id = editingItem.id;
-      if (editingItem.sector_status) {
-        payload.sector_status = editingItem.sector_status;
-      }
+      if (editingItem.sector_status) payload.sector_status = editingItem.sector_status;
     }
 
     const url = isThr ? API_URLS.thr_receiving : API_URLS.hcm_receiving;
@@ -484,11 +627,9 @@ const handleFormChange = (e) => {
       const errData = err.response?.data;
       let backendMessage = '';
       if (errData) {
-        if (typeof errData === 'string') {
-          backendMessage = errData;
-        } else if (errData.error || errData.detail) {
-          backendMessage = errData.error || errData.detail;
-        } else {
+        if (typeof errData === 'string') backendMessage = errData;
+        else if (errData.error || errData.detail) backendMessage = errData.error || errData.detail;
+        else {
           const firstField = Object.keys(errData)[0];
           if (firstField) {
             backendMessage = Array.isArray(errData[firstField])
@@ -541,6 +682,54 @@ const handleFormChange = (e) => {
     });
   }, [thrReceivings, filters]);
 
+  /* ── Supp Nutrition Excel Export (Grant-wise) ── */
+  const exportSuppToExcel = () => {
+    if (!filteredSuppNutritionData.length) return;
+    const dataToExport = filteredSuppNutritionData.map((row, i) => {
+      const obj = { "S. No.": i + 1 };
+      EXCEL_META_COLUMNS.forEach(c => { obj[c.header] = row[c.key] ?? ""; });
+      GRANT_CATEGORIES.forEach(cat => {
+        const grants = Array.isArray(row[cat.grantKey]) ? row[cat.grantKey].map(Number) : [];
+        [15, 30, 31].forEach(gid => {
+          obj[`${cat.title} - Grant ${gid}`] = grants.includes(gid) ? gid : "";
+        });
+        obj[`${cat.title} - Total`] = Number(row[cat.countKey] || 0);
+      });
+      FOOD_FIELDS.forEach(f => { obj[f.header] = Number(row[f.key] || 0); });
+      return obj;
+    });
+
+    const totalObj = { "S. No.": "" };
+    EXCEL_META_COLUMNS.forEach(c => { totalObj[c.header] = c.key === "district" ? "TOTAL" : ""; });
+    GRANT_CATEGORIES.forEach(cat => {
+      [15, 30, 31].forEach(gid => { totalObj[`${cat.title} - Grant ${gid}`] = ""; });
+      totalObj[`${cat.title} - Total`] = suppTotals[cat.countKey] || 0;
+    });
+    FOOD_FIELDS.forEach(f => { totalObj[f.header] = suppTotals[f.key] || 0; });
+    dataToExport.push(totalObj);
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Supp Nutrition");
+    XLSX.writeFile(wb, "Supplementary_Nutrition_Grant_Wise.xlsx");
+  };
+
+  /* ── Supp Nutrition PDF Export (Grant-wise 2-row header) ── */
+  const exportSuppToPDF = async () => {
+    if (!filteredSuppNutritionData.length) return;
+    try {
+      await downloadGrantWisePDF({
+        title: "Supplementary Nutrition Records - Grant Wise Master",
+        filename: "Supplementary_Nutrition_Grant_Wise.pdf",
+        records: filteredSuppNutritionData,
+        totalsRow: suppTotals,
+      });
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      setError("Failed to generate PDF. Please try again.");
+    }
+  };
+
   const renderTable = (records) => {
     const totalQuantity = records.reduce((sum, rec) => sum + (parseFloat(rec.quantity) || 0), 0);
 
@@ -592,9 +781,7 @@ const handleFormChange = (e) => {
               </td>
             </tr>
           )) : (
-            <tr>
-              <td colSpan="10" className="text-center">No records found.</td>
-            </tr>
+            <tr><td colSpan="10" className="text-center">No records found.</td></tr>
           )}
         </tbody>
         {records.length > 0 && (
@@ -610,122 +797,146 @@ const handleFormChange = (e) => {
     );
   };
 
+  /* ── New Grant-wise Master Supp Nutrition Table ── */
   const renderSuppTable = (records) => {
-    const totals = records.reduce((acc, rec) => {
-      acc.active_beneficiaries += rec.active_beneficiaries || 0;
-      acc.total_beneficiaries += rec.total_beneficiaries || 0;
-      acc.hcm_beneficiaries_3y_6y += rec.hcm_beneficiaries_3y_6y || 0;
-      acc.thr_25_days_frs_hcm_beneficiaries_3y_6y += rec.thr_25_days_frs_hcm_beneficiaries_3y_6y || 0;
-      acc.children_6m_3y_beneficiaries += rec.children_6m_3y_beneficiaries || 0;
-      acc.pregnant_women_lactating_mothers += rec.pregnant_women_lactating_mothers || 0;
-      acc.sam_children_6m_6y += rec.sam_children_6m_6y || 0;
-      acc.suw_children_6m_6y += rec.suw_children_6m_6y || 0;
-      acc.quarterly_packets_mung_dal_khichdi += rec.quarterly_packets_mung_dal_khichdi || 0;
-      acc.quarterly_packets_poushik_sattu_mix += rec.quarterly_packets_poushik_sattu_mix || 0;
-      acc.panjeeri_75_days_2625gm_quarterly_packets += rec.panjeeri_75_days_2625gm_quarterly_packets || 0;
-      acc.panjeeri_75_days_4625gm_quarterly_packets += rec.panjeeri_75_days_4625gm_quarterly_packets || 0;
-      acc.quarterly_packets_sattu_2250gm += rec.quarterly_packets_sattu_2250gm || 0;
-      acc.quarterly_packets_mix_1000gm += rec.quarterly_packets_mix_1000gm || 0;
-      acc.quarterly_packets_multi_grain_aata_1250gm += rec.quarterly_packets_multi_grain_aata_1250gm || 0;
-      return acc;
-    }, {
-      active_beneficiaries: 0, total_beneficiaries: 0, hcm_beneficiaries_3y_6y: 0, thr_25_days_frs_hcm_beneficiaries_3y_6y: 0,
-      children_6m_3y_beneficiaries: 0, pregnant_women_lactating_mothers: 0, sam_children_6m_6y: 0, suw_children_6m_6y: 0,
-      quarterly_packets_mung_dal_khichdi: 0, quarterly_packets_poushik_sattu_mix: 0, panjeeri_75_days_2625gm_quarterly_packets: 0,
-      panjeeri_75_days_4625gm_quarterly_packets: 0, quarterly_packets_sattu_2250gm: 0, quarterly_packets_mix_1000gm: 0, quarterly_packets_multi_grain_aata_1250gm: 0
-    });
+    const totalCols = 1 + EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4 + FOOD_FIELDS.length;
 
     return (
-      <Table striped bordered hover responsive className="mt-4">
-        <thead>
-          <tr style={{ backgroundColor: '#073f73', color: 'white', textAlign: 'center' }}>
-            <th rowSpan="2">#</th>
-            <th rowSpan="2">AWC Name</th>
-            <th rowSpan="2">District</th>
-            <th rowSpan="2">Project</th>
-            <th rowSpan="2">Sector</th>
-            <th rowSpan="2">Month</th>
-            <th rowSpan="2">Fin. Year</th>
-            <th rowSpan="2">Active Beneficiaries</th>
-            <th rowSpan="2">Total Beneficiaries</th>
-            <th colSpan="4">Children & Mothers Beneficiaries</th>
-            <th colSpan="2">SAM / SUW Children</th>
-            <th colSpan="7">Quarterly Packets Distribution</th>
-          </tr>
-          <tr style={{ backgroundColor: '#073f73', color: 'white', textAlign: 'center' }}>
-            <th>HCM (3-6y)</th>
-            <th>THR 25d (3-6y)</th>
-            <th>Children (6m-3y)</th>
-            <th>PW &amp; LM</th>
-            <th>SAM (6m-6y)</th>
-            <th>SUW (6m-6y)</th>
-            <th>Mung Dal Khichdi</th>
-            <th>Sattu Mix (Packets)</th>
-            <th>Panjeeri (2625gm)</th>
-            <th>Panjeeri (4625gm)</th>
-            <th>Sattu (2250gm)</th>
-            <th>Mix (1000gm)</th>
-            <th>Aata (1250gm)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {records.length > 0 ? records.map((rec, index) => (
-            <tr key={rec.id} style={{ textAlign: 'center' }}>
-              <td>{index + 1}</td>
-              <td style={{ textAlign: 'left' }}>{rec.awc_name}</td>
-              <td style={{ textAlign: 'left' }}>{rec.district}</td>
-              <td style={{ textAlign: 'left' }}>{rec.project}</td>
-              <td style={{ textAlign: 'left' }}>{rec.sector}</td>
-              <td>{rec.month}</td>
-              <td>{rec.financial_year}</td>
-              <td>{rec.active_beneficiaries}</td>
-              <td>{rec.total_beneficiaries}</td>
+      <>
 
-              <td>{rec.hcm_beneficiaries_3y_6y}</td>
-              <td>{rec.thr_25_days_frs_hcm_beneficiaries_3y_6y}</td>
-              <td>{rec.children_6m_3y_beneficiaries}</td>
-              <td>{rec.pregnant_women_lactating_mothers}</td>
+        <div className="mt-4">
+          {/* Filter + Export Bar */}
+          <Row className="mb-3 g-2 align-items-end">
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Month</Form.Label>
+                <Form.Select name="month" value={suppFilters.month} onChange={handleSuppFilterChange}>
+                  <option value="">All Months</option>
+                  {suppUniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Financial Year</Form.Label>
+                <Form.Select name="financial_year" value={suppFilters.financial_year} onChange={handleSuppFilterChange}>
+                  <option value="">All Years</option>
+                  {suppUniqueFYs.map(y => <option key={y} value={y}>{y}</option>)}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={6} className="d-flex gap-2 justify-content-end align-items-end">
+              <Button variant="secondary" size="sm" onClick={resetSuppFilters}>Reset</Button>
+              <Button variant="success" size="sm" onClick={exportSuppToExcel} disabled={!records.length}>
+                <FaFileExcel className="me-1" /> Excel
+              </Button>
+              <Button variant="danger" size="sm" onClick={exportSuppToPDF} disabled={!records.length}>
+                <FaFilePdf className="me-1" /> PDF
+              </Button>
+            </Col>
+          </Row>
 
-              <td>{rec.sam_children_6m_6y}</td>
-              <td>{rec.suw_children_6m_6y}</td>
-
-              <td>{rec.quarterly_packets_mung_dal_khichdi}</td>
-              <td>{rec.quarterly_packets_poushik_sattu_mix}</td>
-              <td>{rec.panjeeri_75_days_2625gm_quarterly_packets}</td>
-              <td>{rec.panjeeri_75_days_4625gm_quarterly_packets}</td>
-              <td>{rec.quarterly_packets_sattu_2250gm}</td>
-              <td>{rec.quarterly_packets_mix_1000gm}</td>
-              <td>{rec.quarterly_packets_multi_grain_aata_1250gm}</td>
-            </tr>
-          )) : (
-            <tr>
-              <td colSpan="23" className="text-center">No records found.</td>
-            </tr>
-          )}
-        </tbody>
-        {records.length > 0 && (
-          <tfoot>
-            <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold', textAlign: 'center' }}>
-              <td colSpan="7" className="text-end">TOTAL COUNT:</td>
-              <td>{totals.active_beneficiaries}</td>
-              <td>{totals.total_beneficiaries}</td>
-              <td>{totals.hcm_beneficiaries_3y_6y}</td>
-              <td>{totals.thr_25_days_frs_hcm_beneficiaries_3y_6y}</td>
-              <td>{totals.children_6m_3y_beneficiaries}</td>
-              <td>{totals.pregnant_women_lactating_mothers}</td>
-              <td>{totals.sam_children_6m_6y}</td>
-              <td>{totals.suw_children_6m_6y}</td>
-              <td>{totals.quarterly_packets_mung_dal_khichdi}</td>
-              <td>{totals.quarterly_packets_poushik_sattu_mix}</td>
-              <td>{totals.panjeeri_75_days_2625gm_quarterly_packets}</td>
-              <td>{totals.panjeeri_75_days_4625gm_quarterly_packets}</td>
-              <td>{totals.quarterly_packets_sattu_2250gm}</td>
-              <td>{totals.quarterly_packets_mix_1000gm}</td>
-              <td>{totals.quarterly_packets_multi_grain_aata_1250gm}</td>
-            </tr>
-          </tfoot>
-        )}
-      </Table>
+          <div className="table-responsive">
+            <Table
+              bordered
+              hover
+              className="supp-grant-master-table"
+              style={{ minWidth: "2400px", borderCollapse: "separate", borderSpacing: 0 }}
+            >
+              <thead>
+                <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
+                  <th rowSpan={2} className="text-center align-middle">S. No.</th>
+                  {EXCEL_META_COLUMNS.map((col) => (
+                    <th key={col.key} rowSpan={2} className="text-center align-middle">{col.header}</th>
+                  ))}
+                  {GRANT_CATEGORIES.map((cat) => (
+                    <th key={cat.countKey} colSpan={4} className="text-center align-middle supp-grant-group-header">
+                      {cat.title}
+                    </th>
+                  ))}
+                  <th colSpan={FOOD_FIELDS.length} className="text-center align-middle supp-food-group-header">
+                    SUPPLEMENTARY NUTRITION DETAILS
+                  </th>
+                </tr>
+                <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
+                  {GRANT_CATEGORIES.flatMap((cat) =>
+                    [15, 30, 31].map((grantId) => (
+                      <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
+                    )).concat([
+                      <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>
+                    ])
+                  )}
+                  {FOOD_FIELDS.map((food) => (
+                    <th key={food.key} className="text-center">{food.header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.length > 0 ? records.map((rec, index) => (
+                  <tr key={rec.id || index}>
+                    <td className="text-center text-muted">{index + 1}</td>
+                    {EXCEL_META_COLUMNS.map((col) => (
+                      <td key={col.key} className={col.key === "month" ? "text-center" : ""}>
+                        {col.key === "month" && rec[col.key] ? (
+                          <Badge className="supp-month-badge">{rec[col.key]}</Badge>
+                        ) : (
+                          rec[col.key] || "—"
+                        )}
+                      </td>
+                    ))}
+                    {GRANT_CATEGORIES.flatMap((cat) => {
+                      const grants = Array.isArray(rec[cat.grantKey]) ? rec[cat.grantKey].map(Number) : [];
+                      return [15, 30, 31]
+                        .map((grantId) => (
+                          <td key={`${cat.countKey}-${grantId}`} className="text-center supp-grant-cell">
+                            {grants.includes(grantId) ? grantId : "—"}
+                          </td>
+                        ))
+                        .concat([
+                          <td key={`${cat.countKey}-total`} className="text-end fw-semibold supp-total-cell">
+                            {Number(rec[cat.countKey] || 0).toLocaleString()}
+                          </td>
+                        ]);
+                    })}
+                    {FOOD_FIELDS.map((food) => (
+                      <td key={food.key} className="text-end">{Number(rec[food.key] || 0).toLocaleString()}</td>
+                    ))}
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={totalCols} className="text-center text-muted p-4">
+                      No supplementary nutrition records found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              {records.length > 0 && (
+                <tfoot>
+                  <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
+                    <th></th>
+                    {EXCEL_META_COLUMNS.map((col, idx) => (
+                      <th key={col.key}>{idx === 0 ? "TOTAL" : ""}</th>
+                    ))}
+                    {GRANT_CATEGORIES.flatMap((cat) => [
+                      <th key={`${cat.countKey}-g15`}></th>,
+                      <th key={`${cat.countKey}-g30`}></th>,
+                      <th key={`${cat.countKey}-g31`}></th>,
+                      <th key={`${cat.countKey}-total`} className="text-end">
+                        {suppTotals[cat.countKey]?.toLocaleString() || 0}
+                      </th>,
+                    ])}
+                    {FOOD_FIELDS.map((food) => (
+                      <th key={food.key} className="text-end">
+                        {suppTotals[food.key]?.toLocaleString() || 0}
+                      </th>
+                    ))}
+                  </tr>
+                </tfoot>
+              )}
+            </Table>
+          </div>
+        </div>
+      </>
     );
   };
 
@@ -754,9 +965,7 @@ const handleFormChange = (e) => {
           </Form.Group>
         </Col>
         <Col md={4} className="d-flex align-items-end">
-          <Button variant="secondary" onClick={resetFilters}>
-            Reset
-          </Button>
+          <Button variant="secondary" onClick={resetFilters}>Reset</Button>
         </Col>
       </Row>
     );
@@ -767,17 +976,11 @@ const handleFormChange = (e) => {
       const width = window.innerWidth;
       setIsMobile(width < 768);
       setIsTablet(width >= 768 && width < 1024);
-
-      if (width < 768) {
-        setSidebarOpen(false);
-      } else {
-        setSidebarOpen(true);
-      }
+      if (width < 768) setSidebarOpen(false);
+      else setSidebarOpen(true);
     };
-
     handleResize();
     window.addEventListener("resize", handleResize);
-
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
@@ -796,7 +999,7 @@ const handleFormChange = (e) => {
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading d-flex justify-content-between align-items-center">
             <h3 className="fw-bold mb-4">
-              Food Item Receiving
+              <FaBoxes className="me-2" /> Food Item Receiving
             </h3>
             {activeTab !== 'supp' && (
               <Button onClick={() => handleOpenModal()}>Add New Receiving</Button>
@@ -832,7 +1035,7 @@ const handleFormChange = (e) => {
               {!loading && !error && (
                 <>
                   <h5 className="mt-4">Supplementary Nutrition Records</h5>
-                  {renderSuppTable(suppNutritionData)}
+                  {renderSuppTable(filteredSuppNutritionData)}
                 </>
               )}
             </Tab>
@@ -858,8 +1061,6 @@ const handleFormChange = (e) => {
                       required
                     >
                       <option value="">Select Quarterly Packets Distribution</option>
-                      {/* ✅ Value is "food_item|||beneficiary_category" so the same
-                          food item can be received for a different category */}
                       {availableFoodItems.map((item, index) => {
                         const itemCategory = item.beneficiary_category || FOOD_BENE_CATEGORY_MAP[item.food_item] || '';
                         const itemValue = itemCategory
@@ -960,7 +1161,6 @@ const handleFormChange = (e) => {
                               id={`month-${month.value}`}
                               label={month.label}
                               checked={(formData.months || []).includes(month.value)}
-                              // FIX: Used functional state updater to prevent stale closure bugs
                               onChange={(e) => {
                                 if (!isAvailable) return;
                                 setFormData(prev => {
@@ -969,7 +1169,6 @@ const handleFormChange = (e) => {
                                     ? [...new Set([...currentMonths, month.value])]
                                     : currentMonths.filter((m) => m !== month.value);
 
-                                  // Keep Quarter state synced up
                                   let quarterString = '';
                                   if (nextMonths.length > 0) {
                                     const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
@@ -988,9 +1187,9 @@ const handleFormChange = (e) => {
                           );
                         })}
                       </div>
-{availableMonthsFromSupp.length === 0 && (
-                      <small className="text-muted">No months available in Supplementary Nutrition data</small>
-                    )}
+                      {availableMonthsFromSupp.length === 0 && (
+                        <small className="text-muted">No months available in Supplementary Nutrition data</small>
+                      )}
                     </Form.Group>
                   </Col>
                 </>
@@ -1039,13 +1238,11 @@ const handleFormChange = (e) => {
               </ListGroup>
             </Modal.Body>
             <Modal.Footer className="view-modal-footer">
-              <Button variant="secondary" onClick={handleCloseViewModal}>
-                Close
-              </Button>
+              <Button variant="secondary" onClick={handleCloseViewModal}>Close</Button>
             </Modal.Footer>
           </Modal>
         )}
-        
+
       </div>
     </div>
   );
