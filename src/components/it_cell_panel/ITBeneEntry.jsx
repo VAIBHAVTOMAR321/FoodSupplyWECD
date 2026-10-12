@@ -21,10 +21,8 @@ import ITCellLeftNav from "./ITCellLeftNav";
 import ITCellHeader from "./ITCellHeader";
 import "../../assets/css/dashboard.css";
 import {
-  FaPlus,
   FaEdit,
   FaTrash,
-  FaEye,
   FaUpload,
   FaFileExcel,
   FaExclamationTriangle,
@@ -37,25 +35,86 @@ const getCurrentFinancialYear = () => {
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
   return currentMonth >= 3
-    ? `${currentYear}-${(currentYear + 1).toString().slice(-2)}`
-    : `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
+    ? `${currentYear}-${currentYear + 1}`
+    : `${currentYear - 1}-${currentYear}`;
 };
 
-const API_URL = "/director/beneficiary-summary/";
+const API_URL = "/supplementary-nutrition-master/";
 
-// Only these 3 fields are checked for duplicate entry
-const DUPLICATE_CHECK_FIELDS = ["fin_year", "month", "awc_name"];
+// Fields checked for duplicate entries
+const DUPLICATE_CHECK_FIELDS = [
+  "district",
+  "project",
+  "month",
+  "financial_year",
+];
 
-// Numeric fields - only validated for format, NOT for duplicates
+// Column mapping from Excel headers to API field names
+const COLUMN_MAPPING = {
+  DISTRICT: "district",
+  PROJECT: "project",
+  MONTH: "month",
+  "FINANCIAL YEAR": "financial_year",
+  "Pregnant Woman and Lactating Mother": "pregnant_woman_lactating_mother",
+  "Children 6m-3y": "children_6m_3y",
+  "SAM 6M-5Y / SUW 6M-6Y": "sam_children_6m_5y_suw_children_6m_6y",
+  "SAM 3Y-5Y / SUW 3Y-6Y": "sam_children_3y_5y_suw_children_3y_6y",
+  "HCM Beneficiaries 3Y-6Y (Normal Children)": "hcm_beneficiaries_3y_6y",
+  POUSHIK_SATTU_PREG_LAT: "poushik_sattu_preg_lat",
+  PANJEERI_6M_3Y: "panjeeri_6m_3y",
+  PANJEERI_SAM_6M_5Y_SUW_6M_6Y: "panjeeri_sam_6m_5y_suw_6m_6y",
+  SATTU_SAM_3Y_5Y_SUW_3Y_6Y: "sattu_sam_3y_5y_suw_3y_6y",
+  MUNG_DAL_KHICHDI_3Y_6Y: "mung_dal_khichdi_3y_6y",
+  MULTI_GRAIN_AATA_3Y_6Y: "multi_grain_aata_3y_6y",
+};
+
+// All numeric fields
 const NUMERIC_FIELDS = [
-  "pw_lm",
-  "children_3_6y",
+  "pregnant_woman_lactating_mother",
+  "poushik_sattu_preg_lat",
   "children_6m_3y",
-  "adolescent_girls",
-  "sam_6m_3y",
-  "sam_3_5y",
-  "suw_6m_3y",
-  "suw_3_6y",
+  "panjeeri_6m_3y",
+  "sam_children_6m_5y_suw_children_6m_6y",
+  "panjeeri_sam_6m_5y_suw_6m_6y",
+  "sam_children_3y_5y_suw_children_3y_6y",
+  "sattu_sam_3y_5y_suw_3y_6y",
+  "hcm_beneficiaries_3y_6y",
+  "mung_dal_khichdi_3y_6y",
+  "multi_grain_aata_3y_6y",
+];
+
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+// Preview table columns definition
+const PREVIEW_COLUMNS = [
+  { key: "district", label: "District", isDuplicate: true },
+  { key: "project", label: "Project", isDuplicate: true },
+  { key: "month", label: "Month", isDuplicate: true },
+  { key: "financial_year", label: "Financial Year", isDuplicate: true },
+  { key: "pregnant_woman_lactating_mother", label: "PW & LM", isDuplicate: false },
+  { key: "poushik_sattu_preg_lat", label: "Poushik Sattu", isDuplicate: false },
+  { key: "children_6m_3y", label: "Children 6m-3y", isDuplicate: false },
+  { key: "panjeeri_6m_3y", label: "Panjeeri 6m-3y", isDuplicate: false },
+  { key: "sam_children_6m_5y_suw_children_6m_6y", label: "SAM 6M-5Y/SUW 6M-6Y", isDuplicate: false },
+  { key: "panjeeri_sam_6m_5y_suw_6m_6y", label: "Panjeeri SAM", isDuplicate: false },
+  { key: "sam_children_3y_5y_suw_children_3y_6y", label: "SAM 3Y-5Y/SUW 3Y-6Y", isDuplicate: false },
+  { key: "sattu_sam_3y_5y_suw_3y_6y", label: "Sattu SAM", isDuplicate: false },
+  { key: "hcm_beneficiaries_3y_6y", label: "HCM 3Y-6Y", isDuplicate: false },
+  { key: "mung_dal_khichdi_3y_6y", label: "Mung Dal Khichdi", isDuplicate: false },
+  { key: "multi_grain_aata_3y_6y", label: "Multi Grain Aata", isDuplicate: false },
 ];
 
 const ITBeneEntry = () => {
@@ -75,11 +134,9 @@ const ITBeneEntry = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [filters, setFilters] = useState({
-    fin_year: "",
+    financial_year: "",
     month: "",
   });
-  const [showRemarkModal, setShowRemarkModal] = useState(false);
-  const [viewingRemark, setViewingRemark] = useState("");
 
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [bulkFile, setBulkFile] = useState(null);
@@ -87,103 +144,88 @@ const ITBeneEntry = () => {
   const [bulkPreviewData, setBulkPreviewData] = useState([]);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [reportsLoadingForModal, setReportsLoadingForModal] = useState(false);
-
-  const [awcList, setAwcList] = useState([]);
-  const [awcListLoading, setAwcListLoading] = useState(true);
   const [bulkFileInputKey, setBulkFileInputKey] = useState(0);
 
-  // Use a ref to always have the latest reports data available
   const reportsRef = useRef([]);
+  const isFetchingRef = useRef(false); // Prevent duplicate fetches
 
   const initialFormData = {
-    fin_year: getCurrentFinancialYear(),
-    month: "",
-    pw_lm: "",
-    children_3_6y: "",
-    children_6m_3y: "",
-    adolescent_girls: "",
-    sam_6m_3y: "",
-    sam_3_5y: "",
-    suw_6m_3y: "",
-    suw_3_6y: "",
     district: "",
     project: "",
-    sector: "",
-    awc_name: "",
+    month: "",
+    financial_year: getCurrentFinancialYear(),
+    pregnant_woman_lactating_mother: "",
+    poushik_sattu_preg_lat: "",
+    children_6m_3y: "",
+    panjeeri_6m_3y: "",
+    sam_children_6m_5y_suw_children_6m_6y: "",
+    panjeeri_sam_6m_5y_suw_6m_6y: "",
+    sam_children_3y_5y_suw_children_3y_6y: "",
+    sattu_sam_3y_5y_suw_3y_6y: "",
+    hcm_beneficiaries_3y_6y: "",
+    mung_dal_khichdi_3y_6y: "",
+    multi_grain_aata_3y_6y: "",
+    sam_children_6m_5y_suw_children_6m_6y_grant: [],
+    sam_children_3y_5y_suw_children_3y_6y_grant: [],
+    hcm_beneficiaries_3y_6y_grant: [],
   };
 
   const [formData, setFormData] = useState(initialFormData);
 
+  // ===================== FETCH REPORTS =====================
   const fetchReports = useCallback(async () => {
+    if (isFetchingRef.current) return; // Prevent double execution
+    isFetchingRef.current = true;
+    
     setLoading(true);
     setError("");
     try {
-      const response = await api.get(API_URL);
+      const response = await api.get(API_URL, { timeout: 30000 }); // 30s timeout
       let data = [];
-      if (response.data?.results?.data) {
+      if (Array.isArray(response.data)) {
+        data = response.data;
+      } else if (response.data?.results?.data) {
         data = response.data.results.data;
       } else if (response.data?.data) {
         data = response.data.data;
-      } else if (Array.isArray(response.data)) {
-        data = response.data;
       } else if (response.data?.results) {
         data = Array.isArray(response.data.results) ? response.data.results : [];
       }
       setReports(data);
       reportsRef.current = data;
-      console.log("Fetched reports count:", data.length);
     } catch (err) {
-      setError("Failed to fetch beneficiary reports.");
-      console.error("Fetch reports error:", err);
+      setError("Failed to fetch supplementary nutrition records. Please try again.");
+      console.error("Fetch reports error:", err.message);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   }, [api]);
 
-  // Fetch reports specifically for modal (ensures fresh data)
+  // Fetch reports specifically for modal
   const fetchReportsForModal = useCallback(async () => {
     setReportsLoadingForModal(true);
     try {
-      const response = await api.get(API_URL);
+      const response = await api.get(API_URL, { timeout: 30000 });
       let data = [];
-      if (response.data?.results?.data) {
+      if (Array.isArray(response.data)) {
+        data = response.data;
+      } else if (response.data?.results?.data) {
         data = response.data.results.data;
       } else if (response.data?.data) {
         data = response.data.data;
-      } else if (Array.isArray(response.data)) {
-        data = response.data;
       } else if (response.data?.results) {
         data = Array.isArray(response.data.results) ? response.data.results : [];
       }
       setReports(data);
       reportsRef.current = data;
-      console.log("Modal - Fetched reports count:", data.length);
       return data;
     } catch (err) {
-      console.error("Modal fetch error:", err);
+      console.error("Modal fetch error:", err.message);
       return [];
     } finally {
       setReportsLoadingForModal(false);
     }
-  }, [api]);
-
-  useEffect(() => {
-    const fetchAwcList = async () => {
-      setAwcListLoading(true);
-      try {
-        const response = await api.get("/director/awc-list/");
-        const awcs = (response.data.data || []).map(awc => ({
-          ...awc,
-          district_name: awc.district,
-        }));
-        setAwcList(awcs);
-      } catch (err) {
-        console.error("Failed to fetch AWC list:", err);
-      } finally {
-        setAwcListLoading(false);
-      }
-    };
-    fetchAwcList();
   }, [api]);
 
   useEffect(() => {
@@ -192,7 +234,6 @@ const ITBeneEntry = () => {
       setIsMobile(width < 768);
       setIsTablet(width >= 768 && width < 1024);
     };
-
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -202,16 +243,18 @@ const ITBeneEntry = () => {
     fetchReports();
   }, [fetchReports]);
 
-  // Helper function to normalize a string for comparison
+  // ===================== HELPERS =====================
   const normalizeStr = (str) => {
     if (str === undefined || str === null) return "";
     return String(str).trim().toLowerCase();
   };
 
-  // Helper function to create a unique key for duplicate checking
-  // ONLY uses awc_name, fin_year, month - NOT the numeric count fields
-  const createDuplicateKey = (finYear, month, awcName) => {
-    return `${normalizeStr(finYear)}|||${normalizeStr(month)}|||${normalizeStr(awcName)}`;
+  const createDuplicateKey = (district, project, month, finYear) => {
+    return `${normalizeStr(district)}|||${normalizeStr(project)}|||${normalizeStr(month)}|||${normalizeStr(finYear)}`;
+  };
+
+  const hasDuplicateError = (errors) => {
+    return !!errors.duplicate_server || !!errors.duplicate_file;
   };
 
   const toggleSidebar = () => {
@@ -229,278 +272,266 @@ const ITBeneEntry = () => {
     setCurrentPage(1);
   };
 
-  const handleShowRemarkModal = (remark) => {
-    setViewingRemark(remark);
-    setShowRemarkModal(true);
-  };
-
-  const handleCloseRemarkModal = () => {
-    setShowRemarkModal(false);
-    setViewingRemark("");
-  };
-
-  const handleAddNew = () => {
-    setEditingId(null);
-    setFormData(initialFormData);
-    setShowForm(true);
-  };
-
+  // ===================== EDIT (PUT) =====================
   const handleEdit = (report) => {
     setEditingId(report.id);
-    setFormData({ ...report });
+    setFormData({
+      ...initialFormData,
+      ...report,
+      sam_children_6m_5y_suw_children_6m_6y_grant:
+        report.sam_children_6m_5y_suw_children_6m_6y_grant || [],
+      sam_children_3y_5y_suw_children_3y_6y_grant:
+        report.sam_children_3y_5y_suw_children_3y_6y_grant || [],
+      hcm_beneficiaries_3y_6y_grant:
+        report.hcm_beneficiaries_3y_6y_grant || [],
+    });
     setShowForm(true);
     window.scrollTo(0, 0);
   };
 
+  // ===================== DELETE =====================
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this report?")) {
+    if (window.confirm("Are you sure you want to delete this record?")) {
       try {
         await api.delete(API_URL, { data: { ids: [id] } });
-        setSuccess("Report deleted successfully.");
+        setSuccess("Record deleted successfully.");
         fetchReports();
       } catch (err) {
-        setError("Failed to delete report.");
+        setError("Failed to delete record.");
         console.error(err);
       }
     }
   };
 
+  // ===================== BULK UPLOAD MODAL =====================
   const handleShowBulkUploadModal = async () => {
     setBulkFile(null);
     setBulkPreviewData([]);
     setBulkUploadError("");
-    setBulkFileInputKey(prev => prev + 1);
+    setBulkFileInputKey((prev) => prev + 1);
     setShowBulkUploadModal(true);
-    // Always fetch fresh reports when opening modal
     await fetchReportsForModal();
   };
 
   const handleCloseBulkUploadModal = () => setShowBulkUploadModal(false);
 
+  // ===================== DOWNLOAD TEMPLATE =====================
   const downloadSampleFile = () => {
-    const sampleData = [
-      {
-        fin_year: getCurrentFinancialYear(),
-        month: "apr",
-        pw_lm: 10,
-        children_6m_3y: 15,
-        children_3_6y: 20,
-        adolescent_girls: 5,
-        sam_6m_3y: 1,
-        sam_3_5y: 2,
-        suw_6m_3y: 3,
-        suw_3_6y: 4,
-        awc_name: "Sample AWC",
-      },
+    const headerRow1 = [
+      "S. No.",
+      "DISTRICT",
+      "PROJECT",
+      "MONTH",
+      "FINANCIAL YEAR",
+      "Pregnant Woman and Lactating Mother",
+      "Children 6m-3y",
+      "SAM 6M-5Y / SUW 6M-6Y",
+      "SAM 3Y-5Y / SUW 3Y-6Y",
+      "HCM Beneficiaries 3Y-6Y (Normal Children)",
+      "Supplementary Nutrition Details",
+      "",
+      "",
+      "",
+      "",
+      "",
     ];
-    const worksheet = XLSX.utils.json_to_sheet(sampleData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiary Data");
-    XLSX.writeFile(workbook, "SampleBeneficiaryEntry.xlsx");
+    const headerRow2 = [
+      "", // Removed the "1" to prevent the extra row look
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "POUSHIK_SATTU_PREG_LAT",
+      "PANJEERI_6M_3Y",
+      "PANJEERI_SAM_6M_5Y_SUW_6M_6Y",
+      "SATTU_SAM_3Y_5Y_SUW_3Y_6Y",
+      "MUNG_DAL_KHICHDI_3Y_6Y",
+      "MULTI_GRAIN_AATA_3Y_6Y",
+    ];
+    const sampleRow = [
+      1,
+      "almora",
+      "Bhaisiyachana [0506401]",
+      "September",
+      "2026-2027",
+      150,
+      200,
+      25,
+      15,
+      300,
+      150,
+      200,
+      25,
+      15,
+      300,
+      300,
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet([headerRow1, headerRow2, sampleRow]);
+
+    // Set column widths
+    ws["!cols"] = [
+      { wch: 8 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 30 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 25 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Grant Wise Master");
+    XLSX.writeFile(wb, "supplementarynutrimaster_template.xlsx");
   };
 
-  // Levenshtein distance function
-  const levenshteinDistance = (a, b) => {
-    if (a.length === 0) return b.length;
-    if (b.length === 0) return a.length;
-    const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
-    for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
-    for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
-    for (let j = 1; j <= b.length; j++) {
-      for (let i = 1; i <= a.length; i++) {
-        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-        matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + cost);
-      }
-    }
-    return matrix[b.length][a.length];
-  };
-
-  // Helper: check if errors object has ONLY suggestion (allowed to upload)
-  const hasOnlySuggestionError = (errors) => {
-    const errorKeys = Object.keys(errors);
-    return errorKeys.length === 1 && errorKeys[0] === 'awc_name_suggestion';
-  };
-
-  // Helper: check if errors object has any duplicate error
-  const hasDuplicateError = (errors) => {
-    return !!errors.duplicate_server || !!errors.duplicate_file;
-  };
-
+  // ===================== FILE SELECT & PARSE =====================
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (awcList.length === 0) {
-      if (awcListLoading) {
-        setBulkUploadError("AWC list is still loading. Please wait a moment and select the file again.");
-      } else {
-        setBulkUploadError("AWC list is not available. Please refresh the page and try again.");
-      }
-      setBulkPreviewData([]);
-      setBulkFile(null);
-      return;
-    }
-
-    // Always fetch fresh reports before processing file
     const latestReports = await fetchReportsForModal();
-
-    if (latestReports.length === 0) {
-      setBulkUploadError("No existing records found in the system. Please ensure data is available before uploading.");
-      setBulkPreviewData([]);
-      setBulkFile(null);
-      return;
-    }
 
     setBulkFile(file);
     setBulkPreviewData([]);
-    setBulkUploadError('');
+    setBulkUploadError("");
 
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const data = new Uint8Array(event.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
-        if (json.length === 0) {
-          setBulkUploadError("The Excel file is empty.");
+        const aoa = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+
+        if (aoa.length < 3) {
+          setBulkUploadError("The Excel file is empty or has no data rows (minimum 2 header rows + 1 data row required).");
           return;
         }
 
-        const requiredHeaders = [
-          "fin_year", "month", "awc_name", "pw_lm", "children_3_6y",
-          "children_6m_3y", "adolescent_girls", "sam_6m_3y", "sam_3_5y",
-          "suw_6m_3y", "suw_3_6y"
-        ];
-        const fileHeaders = Object.keys(json[0] || {});
-        const missingHeaders = requiredHeaders.filter(h => !fileHeaders.includes(h));
+        const row0 = aoa[0] || [];
+        const row1 = aoa[1] || [];
 
-        if (missingHeaders.length > 0) {
-          setBulkUploadError(`Missing required columns: ${missingHeaders.join(", ")}`);
+        const columnMap = {};
+        const maxCols = Math.max(row0.length, row1.length);
+        for (let c = 0; c < maxCols; c++) {
+          const h0 = String(row0[c] || "").trim();
+          const h1 = String(row1[c] || "").trim();
+          let header = null;
+          
+          // Updated exclusion logic to match new template
+          if (h1 && h1 !== "*" && h1 !== "1" && h1 !== "") {
+            header = h1;
+          } else if (
+            h0 && 
+            h0 !== "S. No." && 
+            h0 !== "Supplementary Nutrition Details" && 
+            h0 !== "" && 
+            h0 !== "*"
+          ) {
+            header = h0;
+          }
+
+          if (header && COLUMN_MAPPING[header]) {
+            columnMap[c] = COLUMN_MAPPING[header];
+          }
+        }
+
+        const mappedFields = Object.values(columnMap);
+        const missingFields = DUPLICATE_CHECK_FIELDS.filter((f) => !mappedFields.includes(f));
+        if (missingFields.length > 0) {
+          setBulkUploadError(`Missing required columns: ${missingFields.join(", ")}. Please use the downloaded template.`);
           return;
         }
 
-        // Create a map for quick, case-insensitive AWC name lookup
-        const awcNameMap = new Map();
-        awcList.forEach(awc => awcNameMap.set(String(awc.awc_name).trim().toUpperCase(), awc.awc_name));
+        const jsonData = [];
+        for (let r = 2; r < aoa.length; r++) {
+          const row = aoa[r];
+          if (!row || row.every((v) => v === "" || v === null || v === undefined)) continue;
+          const obj = {};
+          for (const [colIdx, fieldName] of Object.entries(columnMap)) {
+            obj[fieldName] = row[colIdx] !== undefined && row[colIdx] !== null ? row[colIdx] : "";
+          }
+          jsonData.push(obj);
+        }
 
-        // For duplicate checking within file
-        const seenEntriesInFile = new Set();
+        if (jsonData.length === 0) {
+          setBulkUploadError("No data rows found in the file.");
+          return;
+        }
 
-        // Create existing entries set from LATEST reports
-        // ONLY using awc_name + fin_year + month as the key
         const existingEntriesMap = new Map();
-        latestReports.forEach(r => {
-          const key = createDuplicateKey(r.fin_year, r.month, r.awc_name);
-          existingEntriesMap.set(key, {
-            fin_year: r.fin_year,
-            month: r.month,
-            awc_name: r.awc_name
-          });
+        latestReports.forEach((r) => {
+          const key = createDuplicateKey(r.district, r.project, r.month, r.financial_year);
+          existingEntriesMap.set(key, r);
         });
 
-        console.log("Existing entries in DB:", existingEntriesMap.size);
-        console.log("Sample existing keys:", [...existingEntriesMap.keys()].slice(0, 5));
-
+        const seenEntriesInFile = new Set();
         let duplicateCount = 0;
         const duplicateDetails = [];
 
-        const previewData = json.map((row, index) => {
+        const previewData = jsonData.map((row, index) => {
           const rowErrors = {};
 
-          // =============================================
-          // STEP 1: Validate required fields are present
-          // =============================================
-          DUPLICATE_CHECK_FIELDS.forEach(header => {
-            const value = row[header];
+          DUPLICATE_CHECK_FIELDS.forEach((field) => {
+            const value = row[field];
             if (value === undefined || value === null || String(value).trim() === "") {
-              rowErrors[header] = `'${header}' is missing.`;
+              rowErrors[field] = `'${field}' is missing.`;
             }
           });
 
-          // =============================================
-          // STEP 2: Validate numeric fields (format only, NOT for duplicates)
-          // =============================================
-          NUMERIC_FIELDS.forEach(header => {
-            const value = row[header];
+          NUMERIC_FIELDS.forEach((field) => {
+            const value = row[field];
             if (value === undefined || value === null || String(value).trim() === "") {
-              rowErrors[header] = `'${header}' is missing.`;
+              rowErrors[field] = `'${field}' is missing.`;
             } else if (isNaN(Number(value))) {
-              rowErrors[header] = `'${header}' must be a valid number.`;
+              rowErrors[field] = `'${field}' must be a valid number.`;
             }
           });
 
-          // =============================================
-          // STEP 3: Validate awc_name against the AWC list
-          // =============================================
-          const excelAwcName = row.awc_name ? String(row.awc_name).trim().toUpperCase() : "";
-          if (!excelAwcName) {
-            // Already handled in STEP 1
-          } else if (awcNameMap.has(excelAwcName)) {
-            row.awc_name = awcNameMap.get(excelAwcName); // Correct casing
-          } else {
-            let bestMatch = null;
-            let minDistance = Infinity;
-            awcList.forEach(awc => {
-              const distance = levenshteinDistance(excelAwcName, awc.awc_name.toUpperCase());
-              if (distance < minDistance) {
-                minDistance = distance;
-                bestMatch = awc.awc_name;
-              }
-            });
-
-            if (bestMatch && minDistance <= 2) {
-              rowErrors['awc_name_suggestion'] = `Original: '${row.awc_name}'. Corrected to '${bestMatch}'.`;
-              row.awc_name = bestMatch;
-            } else {
-              const errorMessage = bestMatch
-                ? `'${row.awc_name}' is not a valid AWC name. Did you mean '${bestMatch}'?`
-                : `'${row.awc_name}' is not a valid AWC name.`;
-              rowErrors['awc_name'] = errorMessage;
-            }
-          }
-
-          // =============================================
-          // STEP 4: Duplicate check - ONLY awc_name + fin_year + month
-          // Numeric count fields are NOT checked for duplicates
-          // =============================================
-          const hasOnlySuggestion = hasOnlySuggestionError(rowErrors);
-          // Check if the 3 key fields are present (no missing/format errors on them)
-          const keyFieldsValid = !rowErrors.fin_year && !rowErrors.month && !rowErrors.awc_name;
-
+          const keyFieldsValid = DUPLICATE_CHECK_FIELDS.every((f) => !rowErrors[f]);
           if (keyFieldsValid) {
-            // Create duplicate key using ONLY awc_name, fin_year, month
-            const dupKey = createDuplicateKey(row.fin_year, row.month, row.awc_name);
+            const dupKey = createDuplicateKey(row.district, row.project, row.month, row.financial_year);
 
-            console.log(`Row ${index + 1} duplicate key:`, dupKey, "| Exists in DB:", existingEntriesMap.has(dupKey));
-
-            // Check against existing database entries
             if (existingEntriesMap.has(dupKey)) {
-              const dupErrorMsg = `For month '${String(row.month).trim()}' of financial year '${String(row.fin_year).trim()}', the entry for AWC '${String(row.awc_name).trim()}' is already present.`;
-              rowErrors['duplicate_server'] = dupErrorMsg;
-              // Highlight only the 3 key fields, NOT the numeric fields
-              rowErrors['fin_year_duplicate'] = dupErrorMsg;
-              rowErrors['month_duplicate'] = dupErrorMsg;
-              rowErrors['awc_name_duplicate'] = dupErrorMsg;
+              const dupErrorMsg = `For month '${String(row.month).trim()}' of financial year '${String(row.financial_year).trim()}', the entry for District '${String(row.district).trim()}' and Project '${String(row.project).trim()}' is already present.`;
+              rowErrors["duplicate_server"] = dupErrorMsg;
+              DUPLICATE_CHECK_FIELDS.forEach((f) => {
+                rowErrors[`${f}_duplicate`] = dupErrorMsg;
+              });
               duplicateCount++;
               duplicateDetails.push({
-                row: index + 1,
-                awc_name: row.awc_name,
+                row: index + 3,
+                district: row.district,
+                project: row.project,
                 month: row.month,
-                fin_year: row.fin_year
+                fin_year: row.financial_year,
               });
             }
 
-            // Check for duplicates within the same file
             if (seenEntriesInFile.has(dupKey)) {
-              const fileDupMsg = `Duplicate within file: For month '${row.month}' of financial year '${row.fin_year}', AWC '${row.awc_name}' appears multiple times.`;
-              rowErrors['duplicate_file'] = fileDupMsg;
+              const fileDupMsg = `Duplicate within file: For month '${row.month}' of financial year '${row.financial_year}', District '${row.district}' and Project '${row.project}' appears multiple times.`;
+              rowErrors["duplicate_file"] = fileDupMsg;
               if (!rowErrors.duplicate_server) {
-                rowErrors['fin_year_duplicate'] = fileDupMsg;
-                rowErrors['month_duplicate'] = fileDupMsg;
-                rowErrors['awc_name_duplicate'] = fileDupMsg;
+                DUPLICATE_CHECK_FIELDS.forEach((f) => {
+                  rowErrors[`${f}_duplicate`] = fileDupMsg;
+                });
               }
               duplicateCount++;
             } else {
@@ -513,29 +544,21 @@ const ITBeneEntry = () => {
 
         setBulkPreviewData(previewData);
 
-        // Set appropriate error messages
-        const hasNonDuplicateErrors = previewData.some(item => {
+        const hasNonDuplicateErrors = previewData.some((item) => {
           const keys = Object.keys(item.errors);
-          // Filter out suggestion and duplicate-specific keys
-          const realErrors = keys.filter(k =>
-            !['awc_name_suggestion', 'duplicate_server', 'duplicate_file',
-              'fin_year_duplicate', 'month_duplicate', 'awc_name_duplicate'].includes(k)
+          const realErrors = keys.filter(
+            (k) => !["duplicate_server", "duplicate_file", ...DUPLICATE_CHECK_FIELDS.map((f) => `${f}_duplicate`)].includes(k)
           );
           return realErrors.length > 0;
         });
 
         if (duplicateCount > 0 && hasNonDuplicateErrors) {
           setBulkUploadError(
-            `Found ${duplicateCount} duplicate entry/entries and ${previewData.filter(i => hasNonDuplicateErrors(i)).length} row(s) with validation errors. ` +
-            `Duplicates: ${duplicateDetails.map(d => `Row ${d.row} (${d.awc_name} - ${d.month} - ${d.fin_year})`).join(', ')}. ` +
-            `Please fix all errors before uploading.`
+            `Found ${duplicateCount} duplicate entry/entries and rows with validation errors. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.month} - ${d.fin_year})`).join(", ")}. Please fix all errors before uploading.`
           );
         } else if (duplicateCount > 0) {
           setBulkUploadError(
-            `Found ${duplicateCount} duplicate entry/entries! ` +
-            `For the specified month(s) of this financial year, the entry for the AWC name(s) is already present. ` +
-            `Duplicates: ${duplicateDetails.map(d => `Row ${d.row} (${d.awc_name} - ${d.month} - ${d.fin_year})`).join(', ')}. ` +
-            `Please remove duplicate rows before uploading.`
+            `Found ${duplicateCount} duplicate entry/entries! For the specified month(s) of this financial year, the entry for the District/Project combination is already present. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.month} - ${d.fin_year})`).join(", ")}. Please remove duplicate rows before uploading.`
           );
         } else if (hasNonDuplicateErrors) {
           setBulkUploadError("Your file contains validation errors. Please fix them before uploading.");
@@ -548,12 +571,9 @@ const ITBeneEntry = () => {
     reader.readAsArrayBuffer(file);
   };
 
+  // ===================== BULK UPLOAD (POST) =====================
   const handleBulkUpload = async () => {
-    // Check if any row has blocking errors (excluding suggestion-only and duplicate)
-    const hasErrors = bulkPreviewData.some(item => {
-      const keys = Object.keys(item.errors);
-      return keys.length > 0 && !hasOnlySuggestionError(item.errors);
-    });
+    const hasErrors = bulkPreviewData.some((item) => Object.keys(item.errors).length > 0);
 
     if (!bulkFile || hasErrors) {
       setBulkUploadError("Cannot upload. Please select a valid file and fix all errors including duplicate entries.");
@@ -564,21 +584,30 @@ const ITBeneEntry = () => {
     setBulkUploadError("");
 
     try {
-      const validRows = bulkPreviewData.filter(item =>
-        Object.keys(item.errors).length === 0 || hasOnlySuggestionError(item.errors)
-      );
-      const uploadPromises = validRows.map(item => {
-        const selectedAwc = awcList.find(awc => awc.awc_name === item.data.awc_name);
-        const payload = {
-          ...item.data,
-          district: selectedAwc?.district_name || '',
-          project: selectedAwc?.project || '',
-          sector: selectedAwc?.sector || '',
-        };
-        return api.post("/ang-beneficiary-report/", payload);
-      });
+      const validRows = bulkPreviewData.map((item) => ({
+        district: String(item.data.district).trim(),
+        project: String(item.data.project).trim(),
+        month: String(item.data.month).trim(),
+        financial_year: String(item.data.financial_year).trim(),
+        pregnant_woman_lactating_mother: Number(item.data.pregnant_woman_lactating_mother) || 0,
+        poushik_sattu_preg_lat: Number(item.data.poushik_sattu_preg_lat) || 0,
+        children_6m_3y: Number(item.data.children_6m_3y) || 0,
+        panjeeri_6m_3y: Number(item.data.panjeeri_6m_3y) || 0,
+        sam_children_6m_5y_suw_children_6m_6y: Number(item.data.sam_children_6m_5y_suw_children_6m_6y) || 0,
+        panjeeri_sam_6m_5y_suw_6m_6y: Number(item.data.panjeeri_sam_6m_5y_suw_6m_6y) || 0,
+        sam_children_3y_5y_suw_children_3y_6y: Number(item.data.sam_children_3y_5y_suw_children_3y_6y) || 0,
+        sattu_sam_3y_5y_suw_3y_6y: Number(item.data.sattu_sam_3y_5y_suw_3y_6y) || 0,
+        hcm_beneficiaries_3y_6y: Number(item.data.hcm_beneficiaries_3y_6y) || 0,
+        mung_dal_khichdi_3y_6y: Number(item.data.mung_dal_khichdi_3y_6y) || 0,
+        multi_grain_aata_3y_6y: Number(item.data.multi_grain_aata_3y_6y) || 0,
+        sam_children_6m_5y_suw_children_6m_6y_grant: [],
+        sam_children_3y_5y_suw_children_3y_6y_grant: [],
+        hcm_beneficiaries_3y_6y_grant: [],
+      }));
 
+      const uploadPromises = validRows.map((payload) => api.post(API_URL, payload));
       await Promise.all(uploadPromises);
+      
       setSuccess("Bulk upload successful!");
       handleCloseBulkUploadModal();
       fetchReports();
@@ -590,6 +619,7 @@ const ITBeneEntry = () => {
     }
   };
 
+  // ===================== UPDATE (PUT) =====================
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -598,26 +628,30 @@ const ITBeneEntry = () => {
     setFormErrors({});
 
     const payload = {
-      ...formData,
-      pw_lm: Number(formData.pw_lm) || 0,
-      children_3_6y: Number(formData.children_3_6y) || 0,
+      id: editingId,
+      district: formData.district,
+      project: formData.project,
+      month: formData.month,
+      financial_year: formData.financial_year,
+      pregnant_woman_lactating_mother: Number(formData.pregnant_woman_lactating_mother) || 0,
+      poushik_sattu_preg_lat: Number(formData.poushik_sattu_preg_lat) || 0,
       children_6m_3y: Number(formData.children_6m_3y) || 0,
-      adolescent_girls: Number(formData.adolescent_girls) || 0,
-      sam_6m_3y: Number(formData.sam_6m_3y) || 0,
-      sam_3_5y: Number(formData.sam_3_5y) || 0,
-      suw_6m_3y: Number(formData.suw_6m_3y) || 0,
-      suw_3_6y: Number(formData.suw_3_6y) || 0,
+      panjeeri_6m_3y: Number(formData.panjeeri_6m_3y) || 0,
+      sam_children_6m_5y_suw_children_6m_6y: Number(formData.sam_children_6m_5y_suw_children_6m_6y) || 0,
+      panjeeri_sam_6m_5y_suw_6m_6y: Number(formData.panjeeri_sam_6m_5y_suw_6m_6y) || 0,
+      sam_children_3y_5y_suw_children_3y_6y: Number(formData.sam_children_3y_5y_suw_children_3y_6y) || 0,
+      sattu_sam_3y_5y_suw_3y_6y: Number(formData.sattu_sam_3y_5y_suw_3y_6y) || 0,
+      hcm_beneficiaries_3y_6y: Number(formData.hcm_beneficiaries_3y_6y) || 0,
+      mung_dal_khichdi_3y_6y: Number(formData.mung_dal_khichdi_3y_6y) || 0,
+      multi_grain_aata_3y_6y: Number(formData.multi_grain_aata_3y_6y) || 0,
+      sam_children_6m_5y_suw_children_6m_6y_grant: formData.sam_children_6m_5y_suw_children_6m_6y_grant || [],
+      sam_children_3y_5y_suw_children_3y_6y_grant: formData.sam_children_3y_5y_suw_children_3y_6y_grant || [],
+      hcm_beneficiaries_3y_6y_grant: formData.hcm_beneficiaries_3y_6y_grant || [],
     };
 
     try {
-      if (editingId) {
-        payload.id = editingId;
-        await api.put(API_URL, payload);
-        setSuccess("Report updated successfully.");
-      } else {
-        await api.post(API_URL, payload);
-        setSuccess("Report created successfully.");
-      }
+      await api.put(API_URL, payload);
+      setSuccess("Record updated successfully.");
       setShowForm(false);
       setFormData(initialFormData);
       setEditingId(null);
@@ -625,27 +659,29 @@ const ITBeneEntry = () => {
     } catch (err) {
       const errors = err.response?.data || {};
       setFormErrors(errors);
-      setError(`Failed to ${editingId ? "update" : "create"} report.`);
+      setError("Failed to update record.");
       console.error(err);
     } finally {
       setSubmitting(false);
     }
   };
 
+  // ===================== DERIVED DATA =====================
   const uniqueFinYears = useMemo(() => {
-    return [...new Set(reports.map((report) => report.fin_year))].sort((a, b) => b.localeCompare(a));
+    return [...new Set(reports.map((r) => r.financial_year))].sort((a, b) => b.localeCompare(a));
   }, [reports]);
 
   const uniqueMonths = useMemo(() => {
-    const monthOrder = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-    const months = [...new Set(reports.map((report) => report.month))];
-    return months.sort((a, b) => monthOrder.indexOf(a) - monthOrder.indexOf(b));
+    const months = [...new Set(reports.map((r) => r.month))];
+    return months.sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
   }, [reports]);
 
   const filteredReports = useMemo(() => {
-    return reports.filter(report => {
-      return (filters.fin_year ? report.fin_year === filters.fin_year : true) &&
-        (filters.month ? report.month === filters.month : true);
+    return reports.filter((report) => {
+      return (
+        (filters.financial_year ? report.financial_year === filters.financial_year : true) &&
+        (filters.month ? report.month === filters.month : true)
+      );
     });
   }, [reports, filters]);
 
@@ -654,15 +690,13 @@ const ITBeneEntry = () => {
   const currentItems = filteredReports.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
 
-  // Check if bulk upload should be disabled
   const isBulkUploadDisabled = useMemo(() => {
-    return bulkUploading ||
+    return (
+      bulkUploading ||
       !bulkFile ||
       reportsLoadingForModal ||
-      bulkPreviewData.some(item => {
-        const keys = Object.keys(item.errors);
-        return keys.length > 0 && !hasOnlySuggestionError(item.errors);
-      });
+      bulkPreviewData.some((item) => Object.keys(item.errors).length > 0)
+    );
   }, [bulkUploading, bulkFile, bulkPreviewData, reportsLoadingForModal]);
 
   const renderPagination = () => {
@@ -670,11 +704,7 @@ const ITBeneEntry = () => {
     let items = [];
     for (let number = 1; number <= totalPages; number++) {
       items.push(
-        <Pagination.Item
-          key={number}
-          active={number === currentPage}
-          onClick={() => setCurrentPage(number)}
-        >
+        <Pagination.Item key={number} active={number === currentPage} onClick={() => setCurrentPage(number)}>
           {number}
         </Pagination.Item>
       );
@@ -682,117 +712,180 @@ const ITBeneEntry = () => {
     return <Pagination>{items}</Pagination>;
   };
 
-  // Get error for a cell - only highlight the 3 key fields for duplicates, NOT numeric fields
+  // ===================== PREVIEW TABLE HELPERS =====================
   const getCellError = (item, key) => {
-    // Direct error on this field (missing, format, invalid awc name)
     if (item.errors[key]) return item.errors[key];
-    // Duplicate error only on the 3 key fields
-    if (key === 'fin_year' && item.errors.fin_year_duplicate) return item.errors.fin_year_duplicate;
-    if (key === 'month' && item.errors.month_duplicate) return item.errors.month_duplicate;
-    if (key === 'awc_name' && item.errors.awc_name_duplicate) return item.errors.awc_name_duplicate;
-    // Numeric fields: never show duplicate error
+    if (DUPLICATE_CHECK_FIELDS.includes(key) && item.errors[`${key}_duplicate`]) return item.errors[`${key}_duplicate`];
     return null;
   };
 
-  // Get cell CSS class - only highlight key fields red for duplicates
   const getCellClass = (item, key) => {
-    // Direct error on this field
-    if (item.errors[key]) return 'table-danger';
-    // Suggestion on awc_name (only if no duplicate error)
-    if (key === 'awc_name' && item.errors.awc_name_suggestion && !item.errors.awc_name_duplicate) return 'table-warning';
-    // Duplicate highlighting only on the 3 key fields
-    if (key === 'fin_year' && item.errors.fin_year_duplicate) return 'table-danger';
-    if (key === 'month' && item.errors.month_duplicate) return 'table-danger';
-    if (key === 'awc_name' && item.errors.awc_name_duplicate) return 'table-danger';
-    // Numeric fields: never highlight for duplicates
-    return '';
+    if (item.errors[key]) return "table-danger";
+    if (DUPLICATE_CHECK_FIELDS.includes(key) && item.errors[`${key}_duplicate`]) return "table-danger";
+    return "";
   };
 
+  // ===================== RENDER =====================
   return (
     <div className="dashboard-container">
-      <ITCellLeftNav
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        isMobile={isMobile}
-        isTablet={isTablet}
-      />
+      <ITCellLeftNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} />
 
       <div className="main-content-dash">
         <ITCellHeader toggleSidebar={toggleSidebar} />
 
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading d-flex justify-content-between align-items-center">
-            <h3 className="mb-4 fw-bold">
-              Beneficiary Entry
-            </h3>
+            <h3 className="mb-4 fw-bold">Supplementary Nutrition Master</h3>
             <div>
-              <Button onClick={handleShowBulkUploadModal} variant="success" className="me-2"><FaUpload className="me-2" /> Bulk Upload</Button>
-              <Button onClick={handleAddNew} variant="primary"><FaPlus className="me-2" /> Add Beneficiary Details</Button>
+              <Button onClick={handleShowBulkUploadModal} variant="success" className="me-2">
+                <FaUpload className="me-2" /> Bulk Upload
+              </Button>
             </div>
           </div>
 
-          {success && <Alert variant="success">{success}</Alert>}
-          {error && <Alert variant="danger">{error}</Alert>}
+          {success && <Alert variant="success" onClose={() => setSuccess("")} dismissible>{success}</Alert>}
+          {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
 
+          {/* ===================== EDIT FORM (PUT) ===================== */}
           <Collapse in={showForm}>
             <Card className="mb-4">
-              <Card.Header as="h5">
-                {editingId ? "Edit" : "Add"} Beneficiary Report
-              </Card.Header>
+              <Card.Header as="h5">Edit Supplementary Nutrition Record</Card.Header>
               <Card.Body>
                 <Form onSubmit={handleSubmit}>
                   <Row>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>District</Form.Label><Form.Control type="text" name="district" value={formData.district} onChange={handleFormChange} required disabled /></Form.Group></Col>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Project</Form.Label><Form.Control type="text" name="project" value={formData.project} onChange={handleFormChange} required disabled /></Form.Group></Col>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Sector</Form.Label><Form.Control type="text" name="sector" value={formData.sector} onChange={handleFormChange} required disabled /></Form.Group></Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>District</Form.Label>
+                        <Form.Control type="text" name="district" value={formData.district} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Project</Form.Label>
+                        <Form.Control type="text" name="project" value={formData.project} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Month</Form.Label>
+                        <Form.Select name="month" value={formData.month} onChange={handleFormChange} required>
+                          <option value="">Select Month</option>
+                          {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Financial Year</Form.Label>
+                        <Form.Control type="text" name="financial_year" value={formData.financial_year} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
                   </Row>
-                  <Row>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>AWC Name</Form.Label><Form.Control type="text" name="awc_name" value={formData.awc_name} onChange={handleFormChange} required disabled /></Form.Group></Col>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Sector Status</Form.Label><Form.Select name="sector_status" value={formData.sector_status} onChange={handleFormChange} required><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></Form.Select></Form.Group></Col>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>Month</Form.Label>
-                      <Form.Select name="month" value={formData.month} onChange={handleFormChange} required>
-                        <option value="">Select Month</option>
-                        <option value="jan">January</option><option value="feb">February</option><option value="mar">March</option>
-                        <option value="apr">April</option><option value="may">May</option><option value="jun">June</option>
-                        <option value="jul">July</option><option value="aug">August</option><option value="sep">September</option>
-                        <option value="oct">October</option><option value="nov">November</option><option value="dec">December</option>
-                      </Form.Select>
-                    </Form.Group></Col>
-                  </Row>
+
                   <hr />
-                  <h6 className="mb-3">Beneficiary Numbers</h6>
+                  <h6 className="mb-3">Beneficiary Numbers & Supplementary Nutrition Details</h6>
+
                   <Row>
-                    <Col md><Form.Group className="mb-3"><Form.Label>PW & LM</Form.Label><Form.Control type="number" name="pw_lm" value={formData.pw_lm} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md><Form.Group className="mb-3"><Form.Label>Children (6m-3y)</Form.Label><Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md><Form.Group className="mb-3"><Form.Label>Children (3-6y)</Form.Label><Form.Control type="number" name="children_3_6y" value={formData.children_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Pregnant Woman & Lactating Mother</Form.Label>
+                        <Form.Control type="number" name="pregnant_woman_lactating_mother" value={formData.pregnant_woman_lactating_mother} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Poushik Sattu (PW & LM)</Form.Label>
+                        <Form.Control type="number" name="poushik_sattu_preg_lat" value={formData.poushik_sattu_preg_lat} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
                   </Row>
+
                   <Row>
-                    <Col md><Form.Group className="mb-3"><Form.Label>Adolescent Girls</Form.Label><Form.Control type="number" name="adolescent_girls" value={formData.adolescent_girls} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md><Form.Group className="mb-3"><Form.Label>SAM (6m-3y)</Form.Label><Form.Control type="number" name="sam_6m_3y" value={formData.sam_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md><Form.Group className="mb-3"><Form.Label>SAM (3-5y)</Form.Label><Form.Control type="number" name="sam_3_5y" value={formData.sam_3_5y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Children 6m-3y</Form.Label>
+                        <Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Panjeeri 6m-3y</Form.Label>
+                        <Form.Control type="number" name="panjeeri_6m_3y" value={formData.panjeeri_6m_3y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
                   </Row>
+
                   <Row>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>SUW (6m-3y)</Form.Label><Form.Control type="number" name="suw_6m_3y" value={formData.suw_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={4}><Form.Group className="mb-3"><Form.Label>SUW (3-6y)</Form.Label><Form.Control type="number" name="suw_3_6y" value={formData.suw_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md={4}></Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>SAM 6M-5Y / SUW 6M-6Y</Form.Label>
+                        <Form.Control type="number" name="sam_children_6m_5y_suw_children_6m_6y" value={formData.sam_children_6m_5y_suw_children_6m_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Panjeeri SAM 6M-5Y / SUW 6M-6Y</Form.Label>
+                        <Form.Control type="number" name="panjeeri_sam_6m_5y_suw_6m_6y" value={formData.panjeeri_sam_6m_5y_suw_6m_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
                   </Row>
-                  <Button variant="secondary" onClick={() => setShowForm(false)} className="me-2">Cancel</Button>
+
+                  <Row>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>SAM 3Y-5Y / SUW 3Y-6Y</Form.Label>
+                        <Form.Control type="number" name="sam_children_3y_5y_suw_children_3y_6y" value={formData.sam_children_3y_5y_suw_children_3y_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Sattu SAM 3Y-5Y / SUW 3Y-6Y</Form.Label>
+                        <Form.Control type="number" name="sattu_sam_3y_5y_suw_3y_6y" value={formData.sattu_sam_3y_5y_suw_3y_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
+                  <Row>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>HCM Beneficiaries 3Y-6Y</Form.Label>
+                        <Form.Control type="number" name="hcm_beneficiaries_3y_6y" value={formData.hcm_beneficiaries_3y_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Mung Dal Khichdi 3Y-6Y</Form.Label>
+                        <Form.Control type="number" name="mung_dal_khichdi_3y_6y" value={formData.mung_dal_khichdi_3y_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Multi Grain Aata 3Y-6Y</Form.Label>
+                        <Form.Control type="number" name="multi_grain_aata_3y_6y" value={formData.multi_grain_aata_3y_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
+                  <Button variant="secondary" onClick={() => { setShowForm(false); setEditingId(null); setFormData(initialFormData); }} className="me-2">
+                    Cancel
+                  </Button>
                   <Button variant="primary" type="submit" disabled={submitting}>
-                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingId ? "Update Report" : "Save Report")}
+                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : "Update Record"}
                   </Button>
                 </Form>
               </Card.Body>
             </Card>
           </Collapse>
 
-          <h5 className="mt-4">Existing Beneficiary Reports</h5>
+          {/* ===================== DATA TABLE ===================== */}
+          <h5 className="mt-4">Existing Supplementary Nutrition Records</h5>
           <Row className="mb-3">
             <Col md={3}>
               <Form.Group>
                 <Form.Label>Filter by Financial Year</Form.Label>
-                <Form.Select name="fin_year" value={filters.fin_year} onChange={handleFilterChange}>
+                <Form.Select name="financial_year" value={filters.financial_year} onChange={handleFilterChange}>
                   <option value="">All Years</option>
-                  {uniqueFinYears.map(year => <option key={year} value={year}>{year}</option>)}
+                  {uniqueFinYears.map((year) => <option key={year} value={year}>{year}</option>)}
                 </Form.Select>
               </Form.Group>
             </Col>
@@ -801,7 +894,7 @@ const ITBeneEntry = () => {
                 <Form.Label>Filter by Month</Form.Label>
                 <Form.Select name="month" value={filters.month} onChange={handleFilterChange}>
                   <option value="">All Months</option>
-                  {uniqueMonths.map(month => <option key={month} value={month}>{month}</option>)}
+                  {uniqueMonths.map((month) => <option key={month} value={month}>{month}</option>)}
                 </Form.Select>
               </Form.Group>
             </Col>
@@ -809,27 +902,30 @@ const ITBeneEntry = () => {
 
           <div className="table-responsive">
             {loading ? (
-              <div className="text-center"><Spinner animation="border" /></div>
+              <div className="text-center my-5">
+                <Spinner animation="border" variant="primary" />
+                <p className="mt-2 text-muted">Fetching records, please wait...</p>
+              </div>
             ) : (
-              <Table striped bordered hover responsive>
+              <Table striped bordered hover responsive size="sm">
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>AWC Name</th>
                     <th>District</th>
                     <th>Project</th>
-                    <th>Sector</th>
-                    <th>Financial Year</th>
                     <th>Month</th>
+                    <th>Financial Year</th>
                     <th>PW & LM</th>
-                    <th>Children (6m-3y)</th>
-                    <th>Children (3-6y)</th>
-                    <th>Adolescent Girls</th>
-                    <th>SAM (6m-3y)</th>
-                    <th>SAM (3-5y)</th>
-                    <th>SUW (6m-3y)</th>
-                    <th>SUW (3-6y)</th>
-                    <th>Sector Status</th>
+                    <th>Poushik Sattu</th>
+                    <th>Children 6m-3y</th>
+                    <th>Panjeeri 6m-3y</th>
+                    <th>SAM 6M-5Y/SUW 6M-6Y</th>
+                    <th>Panjeeri SAM</th>
+                    <th>SAM 3Y-5Y/SUW 3Y-6Y</th>
+                    <th>Sattu SAM</th>
+                    <th>HCM 3Y-6Y</th>
+                    <th>Mung Dal Khichdi</th>
+                    <th>Multi Grain Aata</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -838,34 +934,35 @@ const ITBeneEntry = () => {
                     currentItems.map((report, index) => (
                       <tr key={report.id}>
                         <td>{indexOfFirstItem + index + 1}</td>
-                        <td>{report.awc_name}</td>
                         <td>{report.district}</td>
                         <td>{report.project}</td>
-                        <td>{report.sector}</td>
-                        <td>{report.fin_year}</td>
                         <td>{report.month}</td>
-                        <td>{report.pw_lm}</td>
+                        <td>{report.financial_year}</td>
+                        <td>{report.pregnant_woman_lactating_mother}</td>
+                        <td>{report.poushik_sattu_preg_lat}</td>
                         <td>{report.children_6m_3y}</td>
-                        <td>{report.children_3_6y}</td>
-                        <td>{report.adolescent_girls}</td>
-                        <td>{report.sam_6m_3y}</td>
-                        <td>{report.sam_3_5y}</td>
-                        <td>{report.suw_6m_3y}</td>
-                        <td>{report.suw_3_6y}</td>
-                        <td><span className={`badge bg-${report.sector_status === 'approved' ? 'success' : 'warning'}`}>{report.sector_status}</span></td>
+                        <td>{report.panjeeri_6m_3y}</td>
+                        <td>{report.sam_children_6m_5y_suw_children_6m_6y}</td>
+                        <td>{report.panjeeri_sam_6m_5y_suw_6m_6y}</td>
+                        <td>{report.sam_children_3y_5y_suw_children_3y_6y}</td>
+                        <td>{report.sattu_sam_3y_5y_suw_3y_6y}</td>
+                        <td>{report.hcm_beneficiaries_3y_6y}</td>
+                        <td>{report.mung_dal_khichdi_3y_6y}</td>
+                        <td>{report.multi_grain_aata_3y_6y}</td>
                         <td>
-                          <>
-                            <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(report)}><FaEdit /></Button>
-                            <Button variant="outline-danger" size="sm" onClick={() => handleDelete(report.id)}><FaTrash /></Button>
-                          </>
-                          {report.sector_remark && (
-                            <Button variant="outline-info" size="sm" onClick={() => handleShowRemarkModal(report.sector_remark)}><FaEye /></Button>
-                          )}
+                          <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(report)}>
+                            <FaEdit />
+                          </Button>
+                          <Button variant="outline-danger" size="sm" onClick={() => handleDelete(report.id)}>
+                            <FaTrash />
+                          </Button>
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan="17" className="text-center">No reports found.</td></tr>
+                    <tr>
+                      <td colSpan="17" className="text-center">No records found.</td>
+                    </tr>
                   )}
                 </tbody>
               </Table>
@@ -873,21 +970,10 @@ const ITBeneEntry = () => {
             {renderPagination()}
           </div>
 
-          <Modal show={showRemarkModal} onHide={handleCloseRemarkModal} centered>
-            <Modal.Header closeButton>
-              <Modal.Title>Sector Remark</Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-              <p>{viewingRemark}</p>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="secondary" onClick={handleCloseRemarkModal}>Close</Button>
-            </Modal.Footer>
-          </Modal>
-
+          {/* ===================== BULK UPLOAD MODAL ===================== */}
           <Modal show={showBulkUploadModal} onHide={handleCloseBulkUploadModal} centered size="xl">
             <Modal.Header closeButton>
-              <Modal.Title>Bulk Upload Beneficiary Reports</Modal.Title>
+              <Modal.Title>Bulk Upload Supplementary Nutrition Records</Modal.Title>
             </Modal.Header>
             <Modal.Body>
               {reportsLoadingForModal && (
@@ -904,35 +990,30 @@ const ITBeneEntry = () => {
                 </Alert>
               )}
 
-              <p>Upload an Excel file with the required columns. The column names must match the sample file.</p>
-              
+              <p>Upload an Excel file with the required columns. The column names must match the downloaded template.</p>
+
               <div className="d-flex align-items-center mb-3">
                 <Button variant="link" onClick={downloadSampleFile} className="p-0 me-3">
-                  <FaFileExcel className="me-1" /> Download Sample File
+                  <FaFileExcel className="me-1" /> Download Template File
                 </Button>
                 <Badge bg="info" pill>
                   {reportsRef.current.length} existing records in system
                 </Badge>
               </div>
 
-              <div className="mb-3 p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '0.85rem' }}>
-                <strong>Duplicate Check Rule:</strong> An entry is considered duplicate if the combination of 
-                <Badge bg="primary" className="mx-1">AWC Name</Badge> + 
-                <Badge bg="primary" className="mx-1">Financial Year</Badge> + 
-                <Badge bg="primary" className="mx-1">Month</Badge> 
-                already exists. The beneficiary count fields are NOT checked for duplicates.
+              <div className="mb-3 p-2" style={{ backgroundColor: "#f8f9fa", borderRadius: "4px", fontSize: "0.85rem" }}>
+                <strong>Duplicate Check Rule:</strong> An entry is considered duplicate if the combination of{" "}
+                <Badge bg="primary" className="mx-1">District</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">Project</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">Month</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">Financial Year</Badge>{" "}
+                already exists. The numeric count fields are NOT checked for duplicates.
               </div>
 
               <Form.Group controlId="formFile" className="mb-3">
                 <Form.Label>Select Excel File</Form.Label>
-                <Form.Control
-                  key={bulkFileInputKey}
-                  type="file"
-                  accept=".xlsx, .xls"
-                  onChange={handleFileSelect}
-                  disabled={awcListLoading || reportsLoadingForModal}
-                />
-                {(awcListLoading || reportsLoadingForModal) && (
+                <Form.Control key={bulkFileInputKey} type="file" accept=".xlsx, .xls" onChange={handleFileSelect} disabled={reportsLoadingForModal} />
+                {reportsLoadingForModal && (
                   <Form.Text className="text-muted">
                     Loading required data... file selection will be enabled shortly.
                   </Form.Text>
@@ -940,23 +1021,16 @@ const ITBeneEntry = () => {
               </Form.Group>
 
               {bulkPreviewData.length > 0 && (
-                <div className="mt-4" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <div className="mt-4" style={{ maxHeight: "400px", overflowY: "auto" }}>
                   <h6>File Preview</h6>
                   <Table striped bordered hover responsive size="sm">
                     <thead>
                       <tr>
                         <th>#</th>
-                        {Object.keys(initialFormData).filter(k => !['district', 'project', 'sector'].includes(k)).map(key => (
-                          <th 
-                            key={key} 
-                            style={{ 
-                              backgroundColor: DUPLICATE_CHECK_FIELDS.includes(key) ? '#cce5ff' : 'transparent',
-                              fontWeight: DUPLICATE_CHECK_FIELDS.includes(key) ? 'bold' : 'normal'
-                            }}
-                            title={DUPLICATE_CHECK_FIELDS.includes(key) ? "Checked for duplicates" : "Format validated only, not checked for duplicates"}
-                          >
-                            {key.replace(/_/g, ' ')}
-                            {DUPLICATE_CHECK_FIELDS.includes(key) && <span style={{ color: '#004085', fontSize: '0.7rem' }}> *</span>}
+                        {PREVIEW_COLUMNS.map((col) => (
+                          <th key={col.key} style={{ backgroundColor: col.isDuplicate ? "#cce5ff" : "transparent", fontWeight: col.isDuplicate ? "bold" : "normal" }} title={col.isDuplicate ? "Checked for duplicates" : "Format validated only, not checked for duplicates"}>
+                            {col.label}
+                            {col.isDuplicate && <span style={{ color: "#004085", fontSize: "0.7rem" }}> *</span>}
                           </th>
                         ))}
                         <th>Status / Error</th>
@@ -964,50 +1038,27 @@ const ITBeneEntry = () => {
                     </thead>
                     <tbody>
                       {bulkPreviewData.map((item, index) => {
-                        const hasErrors = Object.keys(item.errors).length > 0 && !hasOnlySuggestionError(item.errors);
+                        const hasErrors = Object.keys(item.errors).length > 0;
                         const hasDupError = hasDuplicateError(item.errors);
-                        const hasOnlySugg = hasOnlySuggestionError(item.errors);
-
                         return (
-                          <tr key={index} className={hasErrors ? 'table-danger' : hasOnlySugg ? 'table-warning' : ''}>
+                          <tr key={index} className={hasErrors ? "table-danger" : ""}>
                             <td>{index + 1}</td>
-                            {Object.keys(initialFormData).filter(k => !['district', 'project', 'sector'].includes(k)).map(key => {
-                              const cellError = getCellError(item, key);
-                              const cellClass = getCellClass(item, key);
-                              const isKeyField = DUPLICATE_CHECK_FIELDS.includes(key);
+                            {PREVIEW_COLUMNS.map((col) => {
+                              const cellError = getCellError(item, col.key);
+                              const cellClass = getCellClass(item, col.key);
                               return (
-                                <td
-                                  key={key}
-                                  className={cellClass}
-                                  title={cellError || (isKeyField ? "Checked for duplicates" : "Count field - not checked for duplicates")}
-                                  style={{
-                                    cursor: cellError ? 'help' : 'default',
-                                    fontSize: '0.85rem',
-                                    backgroundColor: isKeyField && !cellClass ? '#f0f7ff' : undefined
-                                  }}
-                                >
-                                  {item.data[key]}
-                                  {cellError && (
-                                    <div className="text-danger mt-1" style={{ fontSize: '0.65rem', fontWeight: '600' }}>
-                                      ⚠ DUPLICATE
-                                    </div>
-                                  )}
+                                <td key={col.key} className={cellClass} title={cellError || (col.isDuplicate ? "Checked for duplicates" : "Count field - not checked for duplicates")} style={{ cursor: cellError ? "help" : "default", fontSize: "0.85rem", backgroundColor: col.isDuplicate && !cellClass ? "#f0f7ff" : undefined }}>
+                                  {item.data[col.key]}
+                                  {cellError && <div className="text-danger mt-1" style={{ fontSize: "0.65rem", fontWeight: "600" }}>⚠ DUPLICATE</div>}
                                 </td>
                               );
                             })}
-                            <td style={{ fontSize: '0.8rem', minWidth: '220px' }}>
+                            <td style={{ fontSize: "0.8rem", minWidth: "220px" }}>
                               {hasErrors ? (
                                 <div>
-                                  <Badge bg="danger" className="mb-1">DUPLICATE</Badge>
-                                  <div className="text-danger" style={{ fontSize: '0.7rem' }}>
-                                    {item.errors.duplicate_server || item.errors.duplicate_file}
-                                  </div>
-                                </div>
-                              ) : hasOnlySugg ? (
-                                <div>
-                                  <Badge bg="warning" text="dark" className="mb-1">SUGGESTION</Badge>
-                                  <div className="text-warning" style={{ fontSize: '0.7rem' }}>
-                                    {item.errors.awc_name_suggestion}
+                                  <Badge bg="danger" className="mb-1">{hasDupError ? "DUPLICATE" : "ERROR"}</Badge>
+                                  <div className="text-danger" style={{ fontSize: "0.7rem" }}>
+                                    {item.errors.duplicate_server || item.errors.duplicate_file || Object.values(item.errors).filter((e) => e !== item.errors.duplicate_server && e !== item.errors.duplicate_file).join(", ")}
                                   </div>
                                 </div>
                               ) : (
@@ -1020,22 +1071,21 @@ const ITBeneEntry = () => {
                     </tbody>
                   </Table>
 
-                  {/* Summary of duplicate errors */}
-                  {bulkPreviewData.some(item => hasDuplicateError(item.errors)) && (
+                  {bulkPreviewData.some((item) => hasDuplicateError(item.errors)) && (
                     <Alert variant="danger" className="mt-3 mb-0">
                       <FaExclamationTriangle className="me-2" />
                       <strong>Duplicate Entries Found - Upload Disabled!</strong>
-                      <div className="mt-2 mb-1" style={{ fontSize: '0.8rem' }}>
-                        The following rows have the same <strong>AWC Name + Financial Year + Month</strong> combination that already exists:
+                      <div className="mt-2 mb-1" style={{ fontSize: "0.8rem" }}>
+                        The following rows have the same{" "}
+                        <strong>District + Project + Month + Financial Year</strong> combination that already exists:
                       </div>
-                      <ul className="mb-0" style={{ fontSize: '0.8rem' }}>
-                        {bulkPreviewData
-                          .filter(item => hasDuplicateError(item.errors))
-                          .map((item, idx) => (
-                            <li key={idx}>
-                              <strong>Row {bulkPreviewData.indexOf(item) + 1}:</strong> {item.errors.duplicate_server || item.errors.duplicate_file}
-                            </li>
-                          ))}
+                      <ul className="mb-0" style={{ fontSize: "0.8rem" }}>
+                        {bulkPreviewData.filter((item) => hasDuplicateError(item.errors)).map((item, idx) => (
+                          <li key={idx}>
+                            <strong>Row {bulkPreviewData.indexOf(item) + 1}:</strong>{" "}
+                            {item.errors.duplicate_server || item.errors.duplicate_file}
+                          </li>
+                        ))}
                       </ul>
                     </Alert>
                   )}
@@ -1044,12 +1094,7 @@ const ITBeneEntry = () => {
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onClick={handleCloseBulkUploadModal} disabled={bulkUploading}>Cancel</Button>
-              <Button
-                variant="primary"
-                onClick={handleBulkUpload}
-                disabled={isBulkUploadDisabled}
-                title={isBulkUploadDisabled && bulkFile ? "Fix all duplicate errors (AWC Name + Financial Year + Month) before uploading" : ""}
-              >
+              <Button variant="primary" onClick={handleBulkUpload} disabled={isBulkUploadDisabled} title={isBulkUploadDisabled && bulkFile ? "Fix all duplicate errors (District + Project + Month + Financial Year) before uploading" : ""}>
                 {bulkUploading ? (
                   <><Spinner as="span" animation="border" size="sm" /> Uploading...</>
                 ) : (
@@ -1062,6 +1107,6 @@ const ITBeneEntry = () => {
       </div>
     </div>
   );
-}
+};
 
 export default ITBeneEntry;
