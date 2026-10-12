@@ -80,6 +80,8 @@ const THRDirectorReport = () => {
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Quantity', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
+    { dataField: 'expired_quantity', text: 'Expired Qty', visible: true },
+    { dataField: 'anganwadi_remark', text: 'Remark', visible: true },
     { dataField: 'sector_status', text: 'Sector Status', visible: true }
   ];
 
