@@ -10,18 +10,15 @@ import "../../assets/css/dashboard.css";
 import { FaUtensils, FaBoxOpen, FaChevronDown, FaChevronUp, FaDolly, FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUsers, FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes, FaProjectDiagram, FaInfoCircle, FaClock } from "react-icons/fa";
 import "../../assets/css/AnganwadiDashboard.css";
 
-//  Same API URLs as used in FoodReceiving (supplementary-nutrition-anganwadi/ included)
 const API_URLS = {
   categoryandfooditem: "/categoryandfooditem/",
   hcm_distribution: "/hcm-anganwadi-distribution/",
   thr_distribution: "/thr-anganwadi-distribution/",
   hcm_receiving: "/hcm-anganwadi-receiving/",
   thr_receiving: "/thr-anganwadi-receiving/",
-  supp_nutrition: "/supplementary-nutrition-anganwadi/",   // added for auto-fill
+  supp_nutrition: "/supplementary-nutrition-anganwadi/",
 };
 
-// Configuration to map API field_name to required properties
-// Updated to English names to exactly match FoodItemReceiving
 const supplementaryFoodConfig = [
   { key: 'quarterly_packets_mung_dal_khichdi', bene_category: "Children (3-6y)", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
   { key: 'quarterly_packets_poushik_sattu_mix', bene_category: "Pregnant Women & Lactating Mothers", unit: 'Packets', qty_per_ben: 1, days_allotted: 75 },
@@ -32,7 +29,7 @@ const supplementaryFoodConfig = [
 
 const getCurrentFinancialYear = () => {
   const today = new Date();
-  const currentMonth = today.getMonth(); // 0-11
+  const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
   if (currentMonth >= 3) {
     return `${currentYear}-${(currentYear + 1).toString().slice(-2)}`;
@@ -68,7 +65,6 @@ const monthLabels = {
   oct: 'October', nov: 'November', dec: 'December', jan: 'January', feb: 'February', mar: 'March',
 };
 
-// Normalize a supp nutrition record's month field into a single month key
 const normalizeSuppMonth = (rawMonth) => {
   if (!rawMonth) return '';
   if (typeof rawMonth === 'number' && rawMonth >= 1 && rawMonth <= 12) {
@@ -99,12 +95,6 @@ const formatMonths = (monthsOrQuarter) => {
   return '';
 };
 
-const areSameMonthSets = (monthsA, monthsB) => {
-  if (!monthsA || !monthsB) return false;
-  if (monthsA.length !== monthsB.length) return false;
-  return monthsA.every((month) => monthsB.includes(month));
-};
-
 const AnganwadiDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -117,7 +107,8 @@ const AnganwadiDashboard = () => {
   const [foodItems, setFoodItems] = useState([]);
   const [distributionRecords, setDistributionRecords] = useState([]);
   const [receivedMonths, setReceivedMonths] = useState([]);
-  //  Supplementary nutrition data (used for auto-filling Total Beneficiaries)
+  const [receivedMonthsStatus, setReceivedMonthsStatus] = useState({});
+  
   const [suppNutritionData, setSuppNutritionData] = useState([]);
 
   const [showDistributionModal, setShowDistributionModal] = useState(false);
@@ -184,45 +175,59 @@ const AnganwadiDashboard = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  //  Helper: compute auto Total Beneficiaries from supplementary nutrition data
+  //  Highly robust helper: computes auto Total Beneficiaries from supplementary nutrition data
   const computeAutoTotalBeneficiaries = (foodItemObj, finYear, months) => {
     if (!foodItemObj || !suppNutritionData || suppNutritionData.length === 0) return '';
 
+    // Find a record that matches the selected year and ANY of the selected months
     const matchingRecord = suppNutritionData.find(rec => {
-      const matchesYear = finYear ? rec.financial_year === finYear : true;
+      const recYearStr = String(rec.financial_year || '');
+      const selYearStr = String(finYear || '');
+      const matchesYear = !selYearStr || recYearStr.includes(selYearStr.substring(0, 4));
+
       const matchesMonth = months && months.length > 0
-        ? months.some(m => rec.month && rec.month.toLowerCase().includes(m))
+        ? months.some(m => {
+            const recMonthKey = rec._monthKeys || (rec.month ? normalizeSuppMonth(rec.month) : '');
+            const recMonthStr = String(rec.month || '').toLowerCase();
+            const selMonthStr = String(m || '').toLowerCase();
+            return recMonthKey === m || recMonthStr.includes(selMonthStr);
+          })
         : true;
       return matchesYear && matchesMonth;
-    }) || suppNutritionData[0];
+    });
 
     if (!matchingRecord) return '';
 
-    // Category-specific beneficiary count, consistent with FoodItemReceiving's
-    // FOOD_BENE_CATEGORY_MAP and the /categoryandfooditem/ beneficiary_category:
-    // Children (6m-3y) -> children_6m_3y_beneficiaries
-    // Children (3-6y)  -> hcm_beneficiaries_3y_6y
-    // PW & LM          -> pregnant_women_lactating_mothers
-    const beneCategory = foodItemObj?.bene_category || '';
-    const categoryCountMap = {
-      'Children (6m-3y)': matchingRecord.children_6m_3y_beneficiaries,
-      'Children (3-6y)': matchingRecord.hcm_beneficiaries_3y_6y,
-      'Pregnant Women & Lactating Mothers': matchingRecord.pregnant_women_lactating_mothers,
-    };
-
-    if (beneCategory && categoryCountMap[beneCategory] !== undefined) {
-      return categoryCountMap[beneCategory];
+    const beneCategory = String(foodItemObj?.bene_category || '').toLowerCase();
+    
+    // 1. Robustly match beneficiary category regardless of Hindi/English text
+    if (beneCategory.includes('pregnant') || beneCategory.includes('lactating') || beneCategory.includes('garbh') || beneCategory.includes('dhatri')) {
+      return matchingRecord.pregnant_woman_lactating_mother || 0;
+    }
+    if (beneCategory.includes('3-6') || beneCategory.includes('3y-6y') || beneCategory.includes('3 से 6') || beneCategory.includes('normal')) {
+      return matchingRecord.hcm_beneficiaries_3y_6y || 0;
+    }
+    if (beneCategory.includes('6m-3') || beneCategory.includes('6m-3y') || beneCategory.includes('6 माह से 3')) {
+      return matchingRecord.children_6m_3y || 0;
+    }
+    if (beneCategory.includes('sam') || beneCategory.includes('suw')) {
+      return matchingRecord.sam_children_6m_5y_suw_children_6m_6y || matchingRecord.sam_children_3y_5y_suw_children_3y_6y || 0;
     }
 
-    // Fallback: map by the food item's supplementary nutrition field_name
+    // 2. Fallback: Map by the food item's supplementary nutrition field_name if text match fails
     const fieldName = foodItemObj?.field_name;
     const beneMap = {
       'quarterly_packets_mung_dal_khichdi': matchingRecord.hcm_beneficiaries_3y_6y,
-      'quarterly_packets_poushik_sattu_mix': matchingRecord.pregnant_women_lactating_mothers,
-      'panjeeri_75_days_2625gm_quarterly_packets': matchingRecord.children_6m_3y_beneficiaries,
-      'panjeeri_75_days_4625gm_quarterly_packets': matchingRecord.children_6m_3y_beneficiaries,
-      'quarterly_packets_sattu_2250gm': matchingRecord.children_6m_3y_beneficiaries,
+      'mung_dal_khichdi_3y_6y': matchingRecord.hcm_beneficiaries_3y_6y,
+      'quarterly_packets_poushik_sattu_mix': matchingRecord.pregnant_woman_lactating_mother,
+      'poushik_sattu_preg_lat': matchingRecord.pregnant_woman_lactating_mother,
+      'panjeeri_75_days_2625gm_quarterly_packets': matchingRecord.children_6m_3y,
+      'panjeeri_75_days_4625gm_quarterly_packets': matchingRecord.children_6m_3y,
+      'panjeeri_6m_3y': matchingRecord.children_6m_3y,
+      'quarterly_packets_sattu_2250gm': matchingRecord.children_6m_3y,
+      'sattu_sam_3y_5y_suw_3y_6y': matchingRecord.sam_children_3y_5y_suw_children_3y_6y,
       'quarterly_packets_multi_grain_aata_1250gm': matchingRecord.hcm_beneficiaries_3y_6y,
+      'multi_grain_aata_3y_6y': matchingRecord.hcm_beneficiaries_3y_6y,
     };
 
     if (fieldName && beneMap[fieldName] !== undefined) {
@@ -241,6 +246,7 @@ const AnganwadiDashboard = () => {
       setActiveScheme(null);
       setFoodItems([]);
       setReceivedMonths([]);
+      setReceivedMonthsStatus({});
       setSuppNutritionData([]);
       return;
     }
@@ -251,6 +257,7 @@ const AnganwadiDashboard = () => {
     setFoodItems([]);
     setDistributionRecords([]);
     setReceivedMonths([]);
+    setReceivedMonthsStatus({});
     setSuppNutritionData([]);
 
     try {
@@ -282,19 +289,24 @@ const AnganwadiDashboard = () => {
       });
 
       const allowedMonths = new Set();
+      const monthsStatus = {};
       (receivingResponse.data || []).forEach(rec => {
         const m = Array.isArray(rec.months)
           ? rec.months
           : Array.isArray(rec.quarter)
             ? rec.quarter
             : quarterToMonths[rec.quarter] || [];
-        m.forEach(month => allowedMonths.add(month));
+        m.forEach(month => {
+          allowedMonths.add(month);
+          monthsStatus[month] = monthsStatus[month] || rec.sector_status === 'approved';
+        });
       });
       setReceivedMonths(Array.from(allowedMonths));
+      setReceivedMonthsStatus(monthsStatus);
 
       const suppData = suppResponse.data || [];
-      const normalizedSupp = Array.isArray(suppData) ? suppData : (suppData.food_data || []);
-      // Normalize month field on each record for consistent downstream usage
+      // Safely extract array whether it's returned directly or inside `.data` / `.food_data`
+      const normalizedSupp = Array.isArray(suppData) ? suppData : (suppData.data || suppData.food_data || []);
       const normalizedSuppWithMonths = normalizedSupp.map(rec => ({
         ...rec,
         _monthKeys: normalizeSuppMonth(rec.month),
@@ -396,7 +408,6 @@ const AnganwadiDashboard = () => {
       return;
     }
 
-    //  Prevent selecting months for which receiving is not done
     const unreceivedMonths = distributionData.months.filter(m => !receivedMonths.includes(m));
     if (unreceivedMonths.length > 0) {
       setDistributionError(`त्रुटि: ${formatMonths(unreceivedMonths)} के लिए रिसीविंग (Receiving) पंजीकृत नहीं है। कृपया पहले रिसीविंग दर्ज करें।`);
@@ -404,12 +415,17 @@ const AnganwadiDashboard = () => {
       return;
     }
 
-    // Prevent duplicate entries for both HCM and THR when a month is already allotted
+    const unapprovedMonths = distributionData.months.filter(m => !receivedMonthsStatus[m]);
+    if (unapprovedMonths.length > 0) {
+      setDistributionError(`त्रुटि: ${formatMonths(unapprovedMonths)} के लिए रिसीविंग स्वीकृत (approved) नहीं है। कृपया सुपरवाइजर से पहले रिसीविंग अनुमोदित करवाएं।`);
+      setSubmitting(false);
+      return;
+    }
+
     const duplicate = distributionRecords.find(rec => {
       if (selectedItem.isEdit && rec.id === selectedItem.recordId) {
         return false;
       }
-      // Normalize record months: handle both months array and quarter string/array
       let recMonths = [];
       if (Array.isArray(rec.months)) {
         recMonths = rec.months;
@@ -418,7 +434,6 @@ const AnganwadiDashboard = () => {
       } else if (typeof rec.quarter === 'string') {
         recMonths = quarterToMonths[rec.quarter] || rec.quarter.split(',').map(m => m.trim());
       }
-      // Compare with case-insensitive trim for safety
       const recFoodItem = (rec.food_item || '').trim().toLowerCase();
       const selFoodItem = (selectedFoodItemDetails.food_item || '').trim().toLowerCase();
       const recFinYear = (rec.fin_year || '').trim();
@@ -431,12 +446,10 @@ const AnganwadiDashboard = () => {
           recBeneCat !== selBeneCat) {
         return false;
       }
-      // Normalize months for comparison
       const normalizeMonth = (m) => (m || '').trim().toLowerCase();
       const normRecMonths = recMonths.map(normalizeMonth);
       const normSelMonths = (distributionData.months || []).map(normalizeMonth);
       
-      // Check if any selected month is already allotted for this food item + beneficiary category
       return normSelMonths.some(m => normRecMonths.includes(m));
     });
 
@@ -446,23 +459,9 @@ const AnganwadiDashboard = () => {
       return;
     }
 
-    //  Validate total beneficiaries against available beneficiaries from supplementary nutrition data
-    const maxAvailableBeneficiaries = computeAutoTotalBeneficiaries(
-      selectedFoodItemDetails,
-      distributionData.fin_year,
-      distributionData.months
-    );
-    const enteredBeneficiaries = parseInt(distributionData.total_beneficiaries, 10);
-    if (maxAvailableBeneficiaries && enteredBeneficiaries > maxAvailableBeneficiaries) {
-      setDistributionError(`त्रुटि: कुल लाभार्थी (${enteredBeneficiaries}) उपलब्ध लाभार्थियों (${maxAvailableBeneficiaries}) से अधिक नहीं हो सकते।`);
-      setSubmitting(false);
-      return;
-    }
-
     const isEdit = selectedItem.isEdit;
     const calculatedQuantity = parseFloat(selectedFoodItemDetails.qty_per_ben) * parseInt(distributionData.total_beneficiaries, 10);
 
-    //  Calculate Quarter string properly to avoid Bad Request
     const selectedMonths = Array.isArray(distributionData.months) ? distributionData.months : [];
     let quarterString = '';
     if (selectedMonths.length > 0) {
@@ -506,8 +505,6 @@ const AnganwadiDashboard = () => {
       handleCardClick(activeScheme);
     } catch (err) {
       console.error("API Error:", err.response?.data || err);
-      
-      // Extract and display exact backend validation errors
       let errorMessage = `वितरण ${isEdit ? 'अपडेट' : 'रिकॉर्ड'} करने में विफल। कृपया पुन: प्रयास करें।`;
       if (err.response && err.response.data) {
         const errorData = err.response.data;
@@ -815,7 +812,6 @@ const AnganwadiDashboard = () => {
                         const value = e.target.value;
                         const enteredBeneficiaries = parseInt(value, 10) || 0;
                         
-                        // Live validation against available beneficiaries
                         let error = '';
                         if (value && distributionData.months?.length > 0 && distributionData.food_item_id) {
                           const selectedFoodItem = foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10));
@@ -855,9 +851,9 @@ const AnganwadiDashboard = () => {
                   <Form.Group className="mb-3">
                     <Form.Label>Months</Form.Label>
                     <div className="month-checkbox-group d-flex flex-wrap gap-2">
-                      {monthOptions.map((month) => {
+                      {monthOptions.filter(m => receivedMonths.includes(m.value)).map((month) => {
                         const checked = distributionData.months?.includes(month.value) || false;
-                        const isReceived = receivedMonths.includes(month.value);
+                        const isApproved = receivedMonthsStatus[month.value];
                         
                         return (
                           <Form.Check
@@ -867,14 +863,13 @@ const AnganwadiDashboard = () => {
                             id={`month-${month.value}`}
                             label={month.label}
                             checked={checked}
-                            //  If user selects an unreceived month, show error and prevent checking
+                            disabled={!isApproved}
                             onChange={(e) => {
-                              if (e.target.checked && !isReceived) {
-                                setDistributionError(`त्रुटि: ${month.label} महीने के लिए रिसीविंग (Receiving) पंजीकृत नहीं है। कृपया पहले रिसीविंग दर्ज करें।`);
-                                return; // Prevent checking
+                              if (e.target.checked && !isApproved) {
+                                setDistributionError(`त्रुटि: ${month.label} महीने के लिए रिसीविंग स्वीकृत (approved) नहीं है। कृपया सुपरवाइजर से पहले रिसीविंग अनुमोदित करवाएं।`);
+                                return;
                               }
                               
-                              // Clear error if they uncheck or check a valid month
                               if (distributionError) setDistributionError('');
 
                               const nextMonths = e.target.checked
@@ -900,11 +895,15 @@ const AnganwadiDashboard = () => {
                         );
                       })}
                     </div>
-                    {receivedMonths.length === 0 && (
+                    {receivedMonths.length === 0 ? (
                       <Alert variant="warning" className="p-2 mt-2">
-                       वितरण हेतु कोई माह उपलब्ध नहीं है। कृपया पहले प्राप्ति रिकॉर्ड दर्ज करें।
+                        वितरण हेतु कोई माह उपलब्ध नहीं है। कृपया पहले प्राप्ति रिकॉर्ड दर्ज करें।
                       </Alert>
-                    )}
+                    ) : receivedMonths.every(m => !receivedMonthsStatus[m]) ? (
+                      <Alert variant="warning" className="p-2 mt-2">
+                        कोई भी स्वीकृत माह उपलब्ध नहीं है। कृपया सुपरवाइजर से रिसीविंग अनुमोदित करवाएं।
+                      </Alert>
+                    ) : null}
                   </Form.Group>
 
                   <Form.Group className="mb-3">
