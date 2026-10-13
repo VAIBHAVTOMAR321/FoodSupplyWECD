@@ -34,6 +34,17 @@ import html2pdf from "html2pdf.js";
 
 /* ── Grant-wise Table schema (mirrors FoodSupplementary) ── */
 const GRANT_IDS = [15, 30, 31];
+
+// API grant arrays are ordered as [Grant 15 value, Grant 30 value, Grant 31 value].
+// Display 0 when supplied; use a dash only for a missing value.
+const getGrantValue = (record, grantKey, grantIndex) => {
+  const values = record && record[grantKey];
+  if (!Array.isArray(values) || grantIndex >= values.length) return "—";
+  const value = values[grantIndex];
+  if (value === null || value === undefined || value === "") return "—";
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue.toLocaleString() : String(value);
+};
 const GRANT_CATEGORIES = [
   {
     title: "Pregnant Woman and Lactating Mother",
@@ -399,9 +410,13 @@ const StockAllocation = () => {
         obj[c.header] = row[c.key] ?? "";
       });
       GRANT_CATEGORIES.forEach((cat) => {
-        const grants = Array.isArray(row[cat.grantKey]) ? row[cat.grantKey].map(Number) : [];
-        [15, 30, 31].forEach((gid) => {
-          obj[`${cat.title} - Grant ${gid}`] = grants.includes(gid) ? gid : "";
+        [15, 30, 31].forEach((grantId, grantIndex) => {
+          const values = row[cat.grantKey];
+          const value = Array.isArray(values) ? values[grantIndex] : undefined;
+          obj[`${cat.title} - Grant ${grantId}`] =
+            value === null || value === undefined || value === ""
+              ? ""
+              : (Number.isFinite(Number(value)) ? Number(value) : value);
         });
         obj[`${cat.title} - Total`] = Number(row[cat.countKey] || 0);
       });
@@ -452,10 +467,9 @@ const StockAllocation = () => {
       const row = [i + 1];
       EXCEL_META_COLUMNS.forEach((col) => row.push(r[col.key] || "—"));
       GRANT_CATEGORIES.forEach((cat) => {
-        const grants = Array.isArray(r[cat.grantKey]) ? r[cat.grantKey].map(Number) : [];
-        [15, 30, 31].forEach((gid) =>
-          row.push(grants.includes(gid) ? String(gid) : "—")
-        );
+        [15, 30, 31].forEach((grantId, grantIndex) => {
+          row.push(getGrantValue(r, cat.grantKey, grantIndex));
+        });
         row.push(Number(r[cat.countKey] || 0).toLocaleString());
       });
       FOOD_FIELDS.forEach((f) =>
@@ -502,7 +516,7 @@ const StockAllocation = () => {
 
   return (
     <div className="dashboard-container">
-      
+
 
       <SupervisorLeftNav
         sidebarOpen={sidebarOpen}
@@ -803,16 +817,13 @@ const StockAllocation = () => {
                               </td>
                             ))}
                             {GRANT_CATEGORIES.flatMap((cat) => {
-                              const grants = Array.isArray(record[cat.grantKey])
-                                ? record[cat.grantKey].map(Number)
-                                : [];
                               return [15, 30, 31]
-                                .map((grantId) => (
+                                .map((grantId, grantIndex) => (
                                   <td
                                     key={`${cat.countKey}-${grantId}`}
                                     className="text-center sa-grant-cell"
                                   >
-                                    {grants.includes(grantId) ? grantId : "—"}
+                                    {getGrantValue(record, cat.grantKey, grantIndex)}
                                   </td>
                                 ))
                                 .concat([

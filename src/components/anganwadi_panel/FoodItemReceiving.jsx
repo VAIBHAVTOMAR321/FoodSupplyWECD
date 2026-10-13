@@ -28,6 +28,18 @@ const API_URLS = {
 };
 
 const GRANT_IDS = [15, 30, 31];
+
+// Grant fields from the API are arrays of values in this order:
+// [Grant 15 value, Grant 30 value, Grant 31 value].
+// Preserve numeric zero; only show a dash when a value is genuinely absent.
+const getGrantValue = (record, grantKey, grantIndex) => {
+  const values = record && record[grantKey];
+  if (!Array.isArray(values) || grantIndex >= values.length) return "—";
+  const value = values[grantIndex];
+  if (value === null || value === undefined || value === "") return "—";
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue.toLocaleString() : String(value);
+};
 const GRANT_CATEGORIES = [
   { title: "Pregnant Woman and Lactating Mother", countKey: "pregnant_woman_lactating_mother", grantKey: "pregnant_woman_lactating_mother_grant" },
   { title: "Children 6m-3y", countKey: "children_6m_3y", grantKey: "children_6m_3y_grant" },
@@ -259,8 +271,9 @@ const downloadGrantWisePDF = async ({ title, filename, records, totalsRow }) => 
     const values = [i + 1];
     EXCEL_META_COLUMNS.forEach(col => values.push(r[col.key] || "—"));
     GRANT_CATEGORIES.forEach(cat => {
-      const grants = Array.isArray(r[cat.grantKey]) ? r[cat.grantKey].map(Number) : [];
-      [15, 30, 31].forEach(gid => values.push(grants.includes(gid) ? String(gid) : "—"));
+      [15, 30, 31].forEach((grantId, grantIndex) => {
+        values.push(getGrantValue(r, cat.grantKey, grantIndex));
+      });
       values.push(Number(r[cat.countKey] || 0).toLocaleString());
     });
     FOOD_FIELDS.forEach(f => values.push(Number(r[f.key] || 0).toLocaleString()));
@@ -948,9 +961,11 @@ const FoodItemReceiving = () => {
       const obj = { "S. No.": i + 1 };
       EXCEL_META_COLUMNS.forEach(c => { obj[c.header] = row[c.key] == null ? "" : row[c.key]; });
       GRANT_CATEGORIES.forEach(cat => {
-        const grants = Array.isArray(row[cat.grantKey]) ? row[cat.grantKey].map(Number) : [];
-        [15, 30, 31].forEach(gid => {
-          obj[`${cat.title} - Grant ${gid}`] = grants.includes(gid) ? gid : "";
+        [15, 30, 31].forEach((grantId, grantIndex) => {
+          const values = row[cat.grantKey];
+          const value = Array.isArray(values) ? values[grantIndex] : undefined;
+          obj[`${cat.title} - Grant ${grantId}`] =
+            value === null || value === undefined || value === "" ? "" : (Number.isFinite(Number(value)) ? Number(value) : value);
         });
         obj[`${cat.title} - Total`] = Number(row[cat.countKey] || 0);
       });
@@ -1156,11 +1171,10 @@ const FoodItemReceiving = () => {
                       </td>
                     ))}
                     {GRANT_CATEGORIES.flatMap((cat) => {
-                      const grants = Array.isArray(rec[cat.grantKey]) ? rec[cat.grantKey].map(Number) : [];
                       return [15, 30, 31]
-                        .map((grantId) => (
+                        .map((grantId, grantIndex) => (
                           <td key={`${cat.countKey}-${grantId}`} className="text-center supp-grant-cell">
-                            {grants.includes(grantId) ? grantId : "—"}
+                            {getGrantValue(rec, cat.grantKey, grantIndex)}
                           </td>
                         ))
                         .concat([

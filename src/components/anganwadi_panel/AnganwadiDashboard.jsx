@@ -294,43 +294,47 @@ const AnganwadiDashboard = () => {
       const responses = await Promise.all(fetchPromises);
       const [catResponse, distributionsResponse, receivingResponse, suppResponse, hcmFoodResponse] = responses;
 
-      // Map food items
+      // Map food items - use categoryandfooditem API for both HCM and THR (like FoodItemReceiving.jsx)
+      const allFoodData = catResponse.data?.food_data || [];
+      const schemeFoodData = allFoodData.filter(f => f.category === scheme.toUpperCase());
+
+      // For HCM, also get additional fields from hcm_food_items API
+      let hcmExtraData = {};
       if (scheme === 'hcm' && hcmFoodResponse && hcmFoodResponse.data) {
         const hcmData = Array.isArray(hcmFoodResponse.data) ? hcmFoodResponse.data : [];
-        const mappedHcmItems = hcmData.map((data) => ({
-          id: data.id,
-          food_item: data.food_item,
-          field_name: '',
-          bene_category: data.bene_category || 'N/A',
-          unit: 'ग्राम',
-          qty_per_ben: parseFloat(data.qty_per_ben) || 0,
-          daily_consumption_qty: parseFloat(data.daily_consumption_qty) || 0,
-          days_allotted: data.days_allotted || 0,
-          total_quantity: parseFloat(data.total_quantity) || 0,
-          financial_year: data.financial_year,
-          quarter: data.quarter,
-        }));
-        setFoodItems(mappedHcmItems);
-      } else {
-        const allFoodData = catResponse.data?.food_data || [];
-        const schemeFoodData = allFoodData.filter(f => f.category === scheme.toUpperCase());
-
-        const mappedFoodItems = schemeFoodData.map((data, index) => {
-          const config = supplementaryFoodConfig.find(c => c.key === data.field_name);
-          return {
-            id: index + 1,
-            food_item: data.food_item,
-            field_name: data.field_name,
-            bene_category: data.beneficiary_category || config?.bene_category || 'N/A',
-            unit: config?.unit || 'Packets',
-            qty_per_ben: config?.qty_per_ben || 1,
-            days_allotted: config?.days_allotted || 75,
-            total_quantity: 0
+        hcmExtraData = hcmData.reduce((acc, item) => {
+          acc[item.food_item] = {
+            qty_per_ben: parseFloat(item.qty_per_ben) || 0,
+            daily_consumption_qty: parseFloat(item.daily_consumption_qty) || 0,
+            days_allotted: item.days_allotted || 0,
+            total_quantity: parseFloat(item.total_quantity) || 0,
+            financial_year: item.financial_year,
+            quarter: item.quarter,
           };
-        });
-
-        setFoodItems(mappedFoodItems);
+          return acc;
+        }, {});
       }
+
+      const mappedFoodItems = schemeFoodData.map((data, index) => {
+        const config = supplementaryFoodConfig.find(c => c.key === data.field_name);
+        const extra = hcmExtraData[data.food_item] || {};
+        
+        return {
+          id: index + 1,
+          food_item: data.food_item,
+          field_name: data.field_name,
+          bene_category: data.beneficiary_category || config?.bene_category || 'N/A',
+          unit: scheme === 'hcm' ? 'ग्राम' : (config?.unit || 'Packets'),
+          qty_per_ben: extra.qty_per_ben !== undefined ? extra.qty_per_ben : (config?.qty_per_ben || 1),
+          daily_consumption_qty: extra.daily_consumption_qty || 0,
+          days_allotted: extra.days_allotted !== undefined ? extra.days_allotted : (config?.days_allotted || 75),
+          total_quantity: extra.total_quantity || 0,
+          financial_year: extra.financial_year || '',
+          quarter: extra.quarter || '',
+        };
+      });
+
+      setFoodItems(mappedFoodItems);
 
       const allowedMonths = new Set();
       const monthsStatus = {};

@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   Container, Alert, Spinner, Card, Table, Row, Col,
   Pagination, Dropdown, Tabs, Tab, Button, Modal, Form,
+  ListGroup,
 } from "react-bootstrap";
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
 import { useAuth } from "../all_login/AuthContext";
-import { FaFileExcel, FaEye, FaFilePdf } from "react-icons/fa";
+import { FaFileExcel, FaEye, FaFilePdf, FaCalendarCheck } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
@@ -75,10 +76,37 @@ const CDPOHCMReceiving = () => {
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
     { dataField: "months", text: "Months", visible: true },
-    { dataField: "curr_month", text: "Current Month", visible: true }, // New Field
-    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true }, // New Field
+    { dataField: "curr_month", text: "Current Month", visible: true },
+    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
     { dataField: "date", text: "Date", visible: true },
+    { dataField: "actions", text: "Actions", visible: true },
   ]);
+
+  // ── NEW: Expiry details modal state ──
+  const [showExpiryModal, setShowExpiryModal] = useState(false);
+  const [expiryViewItem, setExpiryViewItem] = useState(null);
+
+  // ── NEW: Helper to check if a record has packet_expiry data ──
+  const hasPacketExpiry = (rec) => {
+    if (!rec) return false;
+    if (!Array.isArray(rec.packet_expiry) || rec.packet_expiry.length === 0) return false;
+    return rec.packet_expiry.some(pe => {
+      const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
+      const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
+      return (count !== '' && count != null) || (date !== '' && date != null);
+    });
+  };
+
+  // ── NEW: Expiry modal handlers ──
+  const handleOpenExpiryModal = (record) => {
+    setExpiryViewItem(record);
+    setShowExpiryModal(true);
+  };
+
+  const handleCloseExpiryModal = () => {
+    setShowExpiryModal(false);
+    setExpiryViewItem(null);
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -412,11 +440,26 @@ const CDPOHCMReceiving = () => {
                                 {visibleColumns.map((col) => (
                                   <td key={col.dataField}>
                                     {col.dataField === "#"
-                                      ? (currentPage - 1) * itemsPerPage + index + 1 
+                                      ? (currentPage - 1) * itemsPerPage + index + 1
                                       : col.dataField === 'months'
                                       ? formatMonths(row.months || row.quarter)
                                       : col.dataField === 'max_expirydate'
                                       ? (row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString() : '-')
+                                      : col.dataField === 'actions'
+                                      ? (
+                                        <div className="d-flex gap-1 flex-wrap">
+                                          {hasPacketExpiry(row) && (
+                                            <Button
+                                              variant="outline-warning"
+                                              size="sm"
+                                              onClick={() => handleOpenExpiryModal(row)}
+                                              title="View Packet Expiry Details"
+                                            >
+                                              <FaCalendarCheck /> Expiry
+                                            </Button>
+                                          )}
+                                        </div>
+                                      )
                                       : row[col.dataField]}
                                   </td>
                                 ))}
@@ -486,6 +529,105 @@ const CDPOHCMReceiving = () => {
           </Table>
         </Modal.Body>
       </Modal>
+
+      {/* ── NEW: Expiry Details Modal ── */}
+      {expiryViewItem && (
+        <Modal show={showExpiryModal} onHide={handleCloseExpiryModal} centered>
+          <Modal.Header closeButton className="view-modal-header">
+            <Modal.Title>
+              <FaCalendarCheck className="me-2" />
+              Packet Expiry Details: {expiryViewItem.food_item}
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body className="view-modal-body">
+            <ListGroup variant="flush">
+              <ListGroup.Item>
+                <strong>AWC Name:</strong> {expiryViewItem.awc_name}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <strong>AWC Code:</strong> {expiryViewItem.awc_code}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <strong>Food Item:</strong> {expiryViewItem.food_item}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <strong>Total Packets:</strong> {expiryViewItem.quantity} {expiryViewItem.unit}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <strong>Date of Receiving:</strong>{' '}
+                {expiryViewItem.date ? new Date(expiryViewItem.date).toLocaleDateString() : '-'}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <strong>Months:</strong>{' '}
+                {formatMonths(expiryViewItem.months || expiryViewItem.quarter)}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <strong>Max Expiry Date:</strong>{' '}
+                {expiryViewItem.max_expirydate ? new Date(expiryViewItem.max_expirydate).toLocaleDateString() : '-'}
+              </ListGroup.Item>
+            </ListGroup>
+
+            <hr />
+
+            <h6 className="mb-2">
+              <FaCalendarCheck className="me-1" /> Packet-wise Expiry List
+            </h6>
+            <Table bordered striped size="sm" className="mb-0">
+              <thead>
+                <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
+                  <th className="text-center" style={{ width: '50px' }}>S. No.</th>
+                  <th className="text-center">Packets</th>
+                  <th className="text-center">Expiry Date</th>
+                  <th className="text-center">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.isArray(expiryViewItem.packet_expiry) && expiryViewItem.packet_expiry.length > 0 ? (
+                  expiryViewItem.packet_expiry.map((pe, i) => {
+                    const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
+                    const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
+                    const remark = Array.isArray(pe) ? pe[2] : (pe && (pe.remark || pe.remarks));
+                    return (
+                      <tr key={i}>
+                        <td className="text-center">{i + 1}</td>
+                        <td className="text-center fw-semibold">{count == null || count === '' ? '-' : count}</td>
+                        <td className="text-center">
+                          {date ? new Date(date).toLocaleDateString() : '-'}
+                        </td>
+                        <td>{remark || '-'}</td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="text-center text-muted p-3">
+                      No packet expiry details available.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              {Array.isArray(expiryViewItem.packet_expiry) && expiryViewItem.packet_expiry.length > 0 && (
+                <tfoot>
+                  <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
+                    <td className="text-end">Total:</td>
+                    <td className="text-center">
+                      {expiryViewItem.packet_expiry.reduce((sum, pe) => {
+                        const c = Array.isArray(pe) ? pe[0] : (pe && pe.count);
+                        return sum + (parseFloat(c) || 0);
+                      }, 0)}
+                    </td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              )}
+            </Table>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseExpiryModal}>Close</Button>
+          </Modal.Footer>
+        </Modal>
+      )}
     </div>
   );
 };
