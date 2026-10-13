@@ -95,6 +95,24 @@ const formatMonths = (monthsOrQuarter) => {
   return '';
 };
 
+/**
+ * Helper to normalize any date input (YYYY-MM-DD, ISO string, Date object)
+ * into a 'YYYY-MM-DD' string for safe same-day comparison.
+ */
+const toDateOnly = (input) => {
+  if (!input) return '';
+  try {
+    const d = new Date(input);
+    if (isNaN(d.getTime())) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  } catch (e) {
+    return '';
+  }
+};
+
 const AnganwadiDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -175,11 +193,9 @@ const AnganwadiDashboard = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  //  Highly robust helper: computes auto Total Beneficiaries from supplementary nutrition data
   const computeAutoTotalBeneficiaries = (foodItemObj, finYear, months) => {
     if (!foodItemObj || !suppNutritionData || suppNutritionData.length === 0) return '';
 
-    // Find a record that matches the selected year and ANY of the selected months
     const matchingRecord = suppNutritionData.find(rec => {
       const recYearStr = String(rec.financial_year || '');
       const selYearStr = String(finYear || '');
@@ -200,7 +216,6 @@ const AnganwadiDashboard = () => {
 
     const beneCategory = String(foodItemObj?.bene_category || '').toLowerCase();
     
-    // 1. Robustly match beneficiary category regardless of Hindi/English text
     if (beneCategory.includes('pregnant') || beneCategory.includes('lactating') || beneCategory.includes('garbh') || beneCategory.includes('dhatri')) {
       return matchingRecord.pregnant_woman_lactating_mother || 0;
     }
@@ -214,7 +229,6 @@ const AnganwadiDashboard = () => {
       return matchingRecord.sam_children_6m_5y_suw_children_6m_6y || matchingRecord.sam_children_3y_5y_suw_children_3y_6y || 0;
     }
 
-    // 2. Fallback: Map by the food item's supplementary nutrition field_name if text match fails
     const fieldName = foodItemObj?.field_name;
     const beneMap = {
       'quarterly_packets_mung_dal_khichdi': matchingRecord.hcm_beneficiaries_3y_6y,
@@ -305,7 +319,6 @@ const AnganwadiDashboard = () => {
       setReceivedMonthsStatus(monthsStatus);
 
       const suppData = suppResponse.data || [];
-      // Safely extract array whether it's returned directly or inside `.data` / `.food_data`
       const normalizedSupp = Array.isArray(suppData) ? suppData : (suppData.data || suppData.food_data || []);
       const normalizedSuppWithMonths = normalizedSupp.map(rec => ({
         ...rec,
@@ -422,41 +435,72 @@ const AnganwadiDashboard = () => {
       return;
     }
 
-    const duplicate = distributionRecords.find(rec => {
-      if (selectedItem.isEdit && rec.id === selectedItem.recordId) {
-        return false;
-      }
-      let recMonths = [];
-      if (Array.isArray(rec.months)) {
-        recMonths = rec.months;
-      } else if (Array.isArray(rec.quarter)) {
-        recMonths = rec.quarter;
-      } else if (typeof rec.quarter === 'string') {
-        recMonths = quarterToMonths[rec.quarter] || rec.quarter.split(',').map(m => m.trim());
-      }
-      const recFoodItem = (rec.food_item || '').trim().toLowerCase();
-      const selFoodItem = (selectedFoodItemDetails.food_item || '').trim().toLowerCase();
-      const recFinYear = (rec.fin_year || '').trim();
-      const selFinYear = (distributionData.fin_year || '').trim();
-      const recBeneCat = (rec.bene_category || '').trim().toLowerCase();
-      const selBeneCat = (selectedFoodItemDetails.bene_category || '').trim().toLowerCase();
-      
-      if (recFoodItem !== selFoodItem ||
-          recFinYear !== selFinYear ||
-          recBeneCat !== selBeneCat) {
-        return false;
-      }
-      const normalizeMonth = (m) => (m || '').trim().toLowerCase();
-      const normRecMonths = recMonths.map(normalizeMonth);
-      const normSelMonths = (distributionData.months || []).map(normalizeMonth);
-      
-      return normSelMonths.some(m => normRecMonths.includes(m));
-    });
+    /* ───────────────────────────────────────────────────────────────
+       DUPLICATE CHECK
+       - For HCM: DAILY-wise check — only ONE distribution record per
+         date is allowed (across ALL food items). If no record exists
+         for the chosen date, post freely with no error.
+       - For THR: keep the original month-wise duplicate check.
+       The month-wise error message ("इस माह का स्टॉक पहले ही आवंटित...")
+       is NEVER shown for HCM anymore.
+    ─────────────────────────────────────────────────────────────── */
+    if (activeScheme === 'hcm') {
+      const selectedDateOnly = toDateOnly(distributionData.date || new Date().toISOString().split('T')[0]);
 
-    if (duplicate) {
-      setDistributionError("इस माह का स्टॉक पहले ही आवंटित किया जा चुका है। कृपया इस माह के लिए दोबारा वितरण न करें।");
-      setSubmitting(false);
-      return;
+      const duplicateDate = distributionRecords.find(rec => {
+        // Skip the record currently being edited
+        if (selectedItem.isEdit && rec.id === selectedItem.recordId) return false;
+        if (!rec.date) return false;
+        const recDateOnly = toDateOnly(rec.date);
+        return recDateOnly && recDateOnly === selectedDateOnly;
+      });
+
+      if (duplicateDate) {
+        setDistributionError(
+          `इस दिनांक (${selectedDateOnly}) के लिए वितरण पहले ही दर्ज किया जा चुका है। एक दिनांक पर केवल एक ही HCM वितरण रिकॉर्ड किया जा सकता है।`
+        );
+        setSubmitting(false);
+        return;
+      }
+      // No duplicate found for this date → proceed silently (no error message)
+    } else {
+      // THR: retain the month-wise duplicate check
+      const duplicate = distributionRecords.find(rec => {
+        if (selectedItem.isEdit && rec.id === selectedItem.recordId) {
+          return false;
+        }
+        let recMonths = [];
+        if (Array.isArray(rec.months)) {
+          recMonths = rec.months;
+        } else if (Array.isArray(rec.quarter)) {
+          recMonths = rec.quarter;
+        } else if (typeof rec.quarter === 'string') {
+          recMonths = quarterToMonths[rec.quarter] || rec.quarter.split(',').map(m => m.trim());
+        }
+        const recFoodItem = (rec.food_item || '').trim().toLowerCase();
+        const selFoodItem = (selectedFoodItemDetails.food_item || '').trim().toLowerCase();
+        const recFinYear = (rec.fin_year || '').trim();
+        const selFinYear = (distributionData.fin_year || '').trim();
+        const recBeneCat = (rec.bene_category || '').trim().toLowerCase();
+        const selBeneCat = (selectedFoodItemDetails.bene_category || '').trim().toLowerCase();
+
+        if (recFoodItem !== selFoodItem ||
+            recFinYear !== selFinYear ||
+            recBeneCat !== selBeneCat) {
+          return false;
+        }
+        const normalizeMonth = (m) => (m || '').trim().toLowerCase();
+        const normRecMonths = recMonths.map(normalizeMonth);
+        const normSelMonths = (distributionData.months || []).map(normalizeMonth);
+
+        return normSelMonths.some(m => normRecMonths.includes(m));
+      });
+
+      if (duplicate) {
+        setDistributionError("इस माह का स्टॉक पहले ही आवंटित किया जा चुका है। कृपया इस माह के लिए दोबारा वितरण न करें।");
+        setSubmitting(false);
+        return;
+      }
     }
 
     const isEdit = selectedItem.isEdit;
@@ -768,6 +812,11 @@ const AnganwadiDashboard = () => {
                        onChange={(e) => setDistributionData({ ...distributionData, date: e.target.value })}
                        required
                      />
+                     {activeScheme === 'hcm' && (
+                       <Form.Text className="text-muted d-block mt-1">
+                         नोट: एक दिनांक पर केवल एक ही HCM वितरण रिकॉर्ड किया जा सकता है।
+                       </Form.Text>
+                     )}
                    </Form.Group>
 
                    <Form.Group className="mb-3">

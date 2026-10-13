@@ -15,7 +15,7 @@ import {
   FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUtensils, FaUsers,
   FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes,
   FaProjectDiagram, FaInfoCircle, FaClock, FaFileExcel, FaFilePdf,
-  FaBoxes
+  FaBoxes, FaPlus, FaMinus, FaCalendarCheck
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import html2pdf from "html2pdf.js";
@@ -27,7 +27,6 @@ const API_URLS = {
   category_food_item: "/categoryandfooditem/",
 };
 
-/* ── Grant-wise Table schema (mirrors FoodSupplementary) ── */
 const GRANT_IDS = [15, 30, 31];
 const GRANT_CATEGORIES = [
   { title: "Pregnant Woman and Lactating Mother", countKey: "pregnant_woman_lactating_mother", grantKey: "pregnant_woman_lactating_mother_grant" },
@@ -67,7 +66,6 @@ const getCurrentFinancialYear = () => {
     : `${currentYear - 1}-${currentYear.toString().slice(-2)}`;
 };
 
-// Helper to get current month name
 const getCurrentMonth = () => {
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   return monthNames[new Date().getMonth()];
@@ -171,7 +169,20 @@ const normalizeSuppMonth = (rawMonth) => {
   return partial ? partial.value : str.toLowerCase();
 };
 
-/* ── Hindi PDF font loader + PDF generator (grant-wise master) ── */
+const normalizePacketExpiry = (raw) => {
+  if (!Array.isArray(raw) || raw.length === 0) return [['', '']];
+  const out = raw.map(row => {
+    if (Array.isArray(row)) {
+      return [String(row[0] == null ? '' : row[0]), String(row[1] == null ? '' : row[1])];
+    }
+    if (row && typeof row === 'object') {
+      return [String(row.count == null ? '' : row.count), String(row.date == null ? '' : row.date)];
+    }
+    return ['', ''];
+  });
+  return out.length > 0 ? out : [['', '']];
+};
+
 let hindiPdfFontPromise;
 const loadHindiPdfFont = async () => {
   if (!hindiPdfFontPromise) {
@@ -211,7 +222,6 @@ const downloadGrantWisePDF = async ({ title, filename, records, totalsRow }) => 
     return element;
   };
 
-  // Two-row header
   const groupHeaders = [
     { text: 'S. No.', rowSpan: 2 },
     ...EXCEL_META_COLUMNS.map(col => ({ text: col.header, rowSpan: 2 })),
@@ -251,7 +261,6 @@ const downloadGrantWisePDF = async ({ title, filename, records, totalsRow }) => 
   });
   table.appendChild(tbody);
 
-  // Footer totals row
   const tfoot = document.createElement("tfoot");
   const footRow = document.createElement("tr");
   const footValues = [
@@ -316,19 +325,19 @@ const FoodItemReceiving = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewItem, setViewItem] = useState(null);
 
-  // Supp nutrition filters
-  const [suppFilters, setSuppFilters] = useState({ month: '', financial_year: '' });
+  // ── NEW: Expiry details modal state ──
+  const [showExpiryModal, setShowExpiryModal] = useState(false);
+  const [expiryViewItem, setExpiryViewItem] = useState(null);
 
+  const [suppFilters, setSuppFilters] = useState({ month: '', financial_year: '' });
   const [filters, setFilters] = useState({ fin_year: '', months: [] });
   const [uniqueFilterOptions, setUniqueFilterOptions] = useState({
     hcm: { fin_year: [], months: [] },
     thr: { fin_year: [], months: [] },
   });
 
-  // Dynamically calculate available months ONLY for the selected food item
   const availableMonthsForSelectedFoodItem = useMemo(() => {
     if (!formData.field_name || suppNutritionData.length === 0) return [];
-
     const monthsFromData = new Set();
     suppNutritionData.forEach(rec => {
       const quantity = parseInt(rec[formData.field_name], 10) || 0;
@@ -337,17 +346,14 @@ const FoodItemReceiving = () => {
         if (normalized) monthsFromData.add(normalized);
       }
     });
-
-    return monthOptions
-      .filter(m => monthsFromData.has(m.value))
-      .map(m => m.value);
+    return monthOptions.filter(m => monthsFromData.has(m.value)).map(m => m.value);
   }, [suppNutritionData, formData.field_name]);
 
-  // Unique month/FY for supp tab filters
   const suppUniqueMonths = useMemo(() => {
     return [...new Set(suppNutritionData.map(r => r.month).filter(Boolean))]
       .sort((a, b) => monthOptions.findIndex(m => m.value === a) - monthOptions.findIndex(m => m.value === b));
   }, [suppNutritionData]);
+
   const suppUniqueFYs = useMemo(() => {
     return [...new Set(suppNutritionData.map(r => r.financial_year).filter(Boolean))].sort().reverse();
   }, [suppNutritionData]);
@@ -368,42 +374,45 @@ const FoodItemReceiving = () => {
     return totals;
   }, [filteredSuppNutritionData]);
 
-  /**
-   * ── CORE AUTO-FETCH HELPER ──
-   * Computes the total packet count from the supplementary nutrition table
-   * for a given food item (identified by its `fieldName`) restricted to the
-   * provided `months` array. Returns 0 if no data is available.
-   *
-   * Year preference: if any matching record exists for `finYear`, only those
-   * records are counted; otherwise all matching records (any year) are summed
-   * as a fallback so packets are still autofetched.
-   */
   const computePacketsForMonths = (monthsArray, fieldName, finYear) => {
     if (!fieldName || !Array.isArray(monthsArray) || monthsArray.length === 0 || suppNutritionData.length === 0) {
       return 0;
     }
-
-    // First pass: collect all matching records (any year) for the requested months
     const matchingRecords = suppNutritionData.filter(rec => {
       const qty = parseInt(rec[fieldName], 10) || 0;
       if (qty <= 0) return false;
       const recMonth = rec._monthKeys || normalizeSuppMonth(rec.month);
       return recMonth && monthsArray.includes(recMonth);
     });
-
     if (matchingRecords.length === 0) return 0;
-
-    // If a finYear is supplied, prefer records matching that year (per month)
     if (finYear) {
       const yearMatched = matchingRecords.filter(rec => rec.financial_year === finYear);
       if (yearMatched.length > 0) {
         return yearMatched.reduce((sum, rec) => sum + (parseInt(rec[fieldName], 10) || 0), 0);
       }
     }
-
-    // Fallback: sum all matching records regardless of year
     return matchingRecords.reduce((sum, rec) => sum + (parseInt(rec[fieldName], 10) || 0), 0);
   };
+
+  const packetExpiryTotal = useMemo(() => {
+    const rows = formData.packet_expiry || [];
+    return rows.reduce((sum, row) => sum + (parseFloat(row && row[0]) || 0), 0);
+  }, [formData.packet_expiry]);
+
+  const packetExpiryMatchInfo = useMemo(() => {
+    const totalQty = parseFloat(formData.quantity) || 0;
+    const listTotal = packetExpiryTotal;
+    if (!totalQty && !listTotal) {
+      return { ok: false, message: 'Enter quantity & packet details.', variant: 'muted' };
+    }
+    if (listTotal > totalQty) {
+      return { ok: false, message: `List total (${listTotal}) exceeds quantity (${totalQty}).`, variant: 'danger' };
+    }
+    if (listTotal === totalQty) {
+      return { ok: true, message: `List total (${listTotal}) matches quantity ✓`, variant: 'success' };
+    }
+    return { ok: false, message: `List total (${listTotal}). Required: ${totalQty}. Remaining: ${totalQty - listTotal}`, variant: 'warning' };
+  }, [packetExpiryTotal, formData.quantity]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -428,11 +437,11 @@ const FoodItemReceiving = () => {
       setThrReceivings(thrData);
       const normalizedSupp = Array.isArray(suppData)
         ? suppData
-        : (suppData.food_data || suppResp.data?.results || []);
-      const normalizedSuppWithMonths = normalizedSupp.map(rec => ({
-        ...rec,
-        _monthKeys: normalizeSuppMonth(rec.month),
-      }));
+        : (suppData.food_data || (suppResp.data && suppResp.data.results) || []);
+      const normalizedSuppWithMonths = normalizedSupp.map(rec => {
+        const m = normalizeSuppMonth(rec.month);
+        return { ...rec, _monthKeys: m };
+      });
       setSuppNutritionData(normalizedSuppWithMonths);
       setFoodItemOptions(foodData);
 
@@ -456,6 +465,7 @@ const FoodItemReceiving = () => {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
 
   useEffect(() => {
@@ -507,12 +517,7 @@ const FoodItemReceiving = () => {
       const foodItemValue = (optionMatch && item.bene_category)
         ? `${item.food_item}|||${item.bene_category}`
         : item.food_item;
-      const fieldName = optionMatch?.field_name || '';
-
-      // When editing, autofetch packet total for the existing months too
-      const autoQty = fieldName
-        ? computePacketsForMonths(parsedMonths, fieldName, item.fin_year)
-        : item.quantity;
+      const fieldName = optionMatch ? (optionMatch.field_name || '') : '';
 
       setFormData({
         ...item,
@@ -523,8 +528,8 @@ const FoodItemReceiving = () => {
         quarter: item.quarter || '',
         food_item_value: foodItemValue,
         field_name: fieldName,
-        // Keep the original quantity (don't override on edit) — user can still toggle months to recalc
-        quantity: String(item.quantity ?? ''),
+        quantity: String(item.quantity == null ? '' : item.quantity),
+        packet_expiry: normalizePacketExpiry(item.packet_expiry),
       });
     } else {
       setFormData({
@@ -532,8 +537,11 @@ const FoodItemReceiving = () => {
         date: new Date().toISOString().split('T')[0],
         max_expirydate: '',
         curr_month: getCurrentMonth(),
-        fin_year: getCurrentFinancialYear(), months: [], quarter: '',
+        fin_year: getCurrentFinancialYear(),
+        months: [],
+        quarter: '',
         field_name: '',
+        packet_expiry: [['', '']],
       });
     }
     setFormError('');
@@ -555,24 +563,29 @@ const FoodItemReceiving = () => {
     setViewItem(null);
   };
 
+  // ── NEW: Expiry details handlers ──
+  const handleOpenExpiryModal = (record) => {
+    setExpiryViewItem(record);
+    setShowExpiryModal(true);
+  };
+
+  const handleCloseExpiryModal = () => {
+    setShowExpiryModal(false);
+    setExpiryViewItem(null);
+  };
+
   const availableFoodItems = useMemo(() => {
     const tabCategory = activeTab.toUpperCase();
     return foodItemOptions.filter(item => item.category === tabCategory);
   }, [foodItemOptions, activeTab]);
 
-  /**
-   * ── AUTO-FETCH PACKETS FROM SUPPLEMENTARY NUTRITION TABLE ──
-   * When a food item is selected:
-   *   1. Resolve `field_name` from food-item-master (foodItemOptions)
-   *   2. Find ALL supp nutrition records where that field_name has qty > 0
-   *   3. Pre-select every available month
-   *   4. Set packets = sum of all matching record quantities (using computePacketsForMonths)
-   */
   const handleFormChange = (e) => {
     const { name, value } = e.target;
 
     if (name === 'food_item') {
-      const [selectedFoodItem, selectedBeneCategory] = value.split('|||');
+      const parts = value.split('|||');
+      const selectedFoodItem = parts[0] || '';
+      const selectedBeneCategory = parts[1] || '';
       const selectedItem = foodItemOptions.find(item =>
         item.food_item === selectedFoodItem &&
         (selectedBeneCategory
@@ -596,8 +609,6 @@ const FoodItemReceiving = () => {
 
       setFormData(prev => {
         const currentFinYear = prev.fin_year || getCurrentFinancialYear();
-
-        // Determine ALL months where this food item has packets in supp nutrition
         const monthSet = new Set();
         if (autoFieldName && suppNutritionData.length > 0) {
           suppNutritionData.forEach(rec => {
@@ -609,13 +620,10 @@ const FoodItemReceiving = () => {
           });
         }
         const autoMonths = monthOptions.filter(m => monthSet.has(m.value)).map(m => m.value);
-
-        // Compute packet total for the auto-selected months
         const autoQuantity = autoMonths.length > 0
           ? String(computePacketsForMonths(autoMonths, autoFieldName, currentFinYear))
           : '';
 
-        // Derive the quarter string from the auto-selected months
         let quarterString = '';
         if (autoMonths.length > 0) {
           const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
@@ -638,6 +646,7 @@ const FoodItemReceiving = () => {
           bene_category: autoBeneCategory,
           months: autoMonths,
           quarter: quarterString,
+          packet_expiry: [['', '']],
         };
       });
     } else {
@@ -645,22 +654,13 @@ const FoodItemReceiving = () => {
     }
   };
 
-  /**
-   * ── MONTH TOGGLE HANDLER ──
-   * When a month checkbox is toggled:
-   *   - Recompute the selected months array
-   *   - Recompute the packet total based on the NEW month selection
-   *   - Update the quarter string
-   *   - Update the quantity field to reflect the new selection
-   */
   const handleMonthToggle = (monthValue, isChecked) => {
     setFormData(prev => {
       const currentMonths = prev.months || [];
       const nextMonths = isChecked
-        ? [...new Set([...currentMonths, monthValue])]
+        ? Array.from(new Set([...currentMonths, monthValue]))
         : currentMonths.filter(m => m !== monthValue);
 
-      // Derive quarter string from the new month selection
       let quarterString = '';
       if (nextMonths.length > 0) {
         const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
@@ -673,7 +673,6 @@ const FoodItemReceiving = () => {
         quarterString = matchedQuarter || nextMonths.join(',');
       }
 
-      // Recompute packet count from supp nutrition table for the new month selection
       const currentFinYear = prev.fin_year || getCurrentFinancialYear();
       const recomputedQty = computePacketsForMonths(nextMonths, prev.field_name, currentFinYear);
 
@@ -686,13 +685,58 @@ const FoodItemReceiving = () => {
     });
   };
 
+  const handlePacketExpiryChange = (index, field, value) => {
+    setFormData(prev => {
+      const rows = Array.isArray(prev.packet_expiry) ? prev.packet_expiry.map(r => [...r]) : [['', '']];
+      const current = rows[index] || ['', ''];
+      if (field === 'count') {
+        const totalQty = parseFloat(prev.quantity) || 0;
+        const sumWithoutThis = rows.reduce((sum, row, i) => {
+          if (i === index) return sum;
+          return sum + (parseFloat(row && row[0]) || 0);
+        }, 0);
+        const entered = parseFloat(value) || 0;
+        if (totalQty > 0 && sumWithoutThis + entered > totalQty) {
+          const allowed = Math.max(0, totalQty - sumWithoutThis);
+          rows[index] = [String(allowed), current[1] || ''];
+        } else {
+          rows[index] = [String(value), current[1] || ''];
+        }
+      } else if (field === 'date') {
+        rows[index] = [current[0] || '', String(value)];
+      }
+      return { ...prev, packet_expiry: rows };
+    });
+  };
+
+  const handleAddPacketRow = () => {
+    setFormData(prev => {
+      const rows = Array.isArray(prev.packet_expiry) ? prev.packet_expiry.map(r => [...r]) : [];
+      const totalQty = parseFloat(prev.quantity) || 0;
+      const currentSum = rows.reduce((s, r) => s + (parseFloat(r && r[0]) || 0), 0);
+      if (totalQty > 0 && currentSum >= totalQty) {
+        return prev;
+      }
+      rows.push(['', '']);
+      return { ...prev, packet_expiry: rows };
+    });
+  };
+
+  const handleRemovePacketRow = (index) => {
+    setFormData(prev => {
+      const rows = Array.isArray(prev.packet_expiry) ? prev.packet_expiry.map(r => [...r]) : [];
+      rows.splice(index, 1);
+      if (rows.length === 0) rows.push(['', '']);
+      return { ...prev, packet_expiry: rows };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setFormError('');
 
     const isThr = activeTab === 'thr';
-
     const parsedQuantity = parseFloat(formData.quantity) || 0;
     const selectedMonths = Array.isArray(formData.months) ? formData.months : [];
 
@@ -723,6 +767,42 @@ const FoodItemReceiving = () => {
       return;
     }
 
+    const peRows = Array.isArray(formData.packet_expiry) ? formData.packet_expiry : [];
+    const cleanedPacketExpiry = peRows
+      .map(r => {
+        const c = Array.isArray(r) ? r : ['', ''];
+        return [String(c[0] == null ? '' : c[0]).trim(), String(c[1] == null ? '' : c[1]).trim()];
+      })
+      .filter(r => r[0] !== '' || r[1] !== '');
+
+    const peTotal = cleanedPacketExpiry.reduce((s, r) => s + (parseFloat(r[0]) || 0), 0);
+
+    if (parsedQuantity > 0) {
+      if (cleanedPacketExpiry.length === 0) {
+        setFormError("कृपया Packet Details में कम से कम एक पंक्ति भरें।");
+        setSubmitting(false);
+        return;
+      }
+      if (peTotal > parsedQuantity) {
+        setFormError(`Packet details का योग (${peTotal}) quantity (${parsedQuantity}) से अधिक नहीं हो सकता।`);
+        setSubmitting(false);
+        return;
+      }
+      if (peTotal !== parsedQuantity) {
+        setFormError(
+          `Packet details का योग (${peTotal}) और quantity (${parsedQuantity}) समान होना चाहिए। शेष: ${parsedQuantity - peTotal}`
+        );
+        setSubmitting(false);
+        return;
+      }
+      const incomplete = cleanedPacketExpiry.find(r => r[0] === '' || r[1] === '');
+      if (incomplete) {
+        setFormError("कृपया हर packet row में packets और expiry date दोनों भरें।");
+        setSubmitting(false);
+        return;
+      }
+    }
+
     let payload = {
       food_item: formData.food_item || '',
       quantity: parsedQuantity,
@@ -734,6 +814,7 @@ const FoodItemReceiving = () => {
       quarter: quarterString,
       curr_month: formData.curr_month || getCurrentMonth(),
       max_expirydate: formData.max_expirydate || null,
+      packet_expiry: cleanedPacketExpiry.length > 0 ? cleanedPacketExpiry : [['', '']],
     };
 
     if (editingItem) {
@@ -756,7 +837,7 @@ const FoodItemReceiving = () => {
       handleCloseModal();
       fetchData();
     } catch (err) {
-      const errData = err.response?.data;
+      const errData = err.response && err.response.data;
       let backendMessage = '';
       if (errData) {
         if (typeof errData === 'string') backendMessage = errData;
@@ -771,7 +852,7 @@ const FoodItemReceiving = () => {
         }
       }
       setFormError(`Failed to ${editingItem ? 'update' : 'create'} record. ${backendMessage || 'Please try again.'}`);
-      console.error("API Error:", err.response?.data || err);
+      console.error("API Error:", err.response ? err.response.data : err);
     } finally {
       setSubmitting(false);
     }
@@ -798,6 +879,17 @@ const FoodItemReceiving = () => {
     }
   };
 
+  // Helper: check if a record has packet_expiry data
+  const hasPacketExpiry = (rec) => {
+    if (!rec) return false;
+    if (!Array.isArray(rec.packet_expiry) || rec.packet_expiry.length === 0) return false;
+    return rec.packet_expiry.some(pe => {
+      const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
+      const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
+      return (count !== '' && count != null) || (date !== '' && date != null);
+    });
+  };
+
   const filteredHcmReceivings = useMemo(() => {
     return hcmReceivings.filter(item => {
       const itemMonths = getMonthsArray(item).map(m => monthLabels[m] || m);
@@ -814,12 +906,11 @@ const FoodItemReceiving = () => {
     });
   }, [thrReceivings, filters]);
 
-  /* ── Supp Nutrition Excel Export (Grant-wise) ── */
   const exportSuppToExcel = () => {
     if (!filteredSuppNutritionData.length) return;
     const dataToExport = filteredSuppNutritionData.map((row, i) => {
       const obj = { "S. No.": i + 1 };
-      EXCEL_META_COLUMNS.forEach(c => { obj[c.header] = row[c.key] ?? ""; });
+      EXCEL_META_COLUMNS.forEach(c => { obj[c.header] = row[c.key] == null ? "" : row[c.key]; });
       GRANT_CATEGORIES.forEach(cat => {
         const grants = Array.isArray(row[cat.grantKey]) ? row[cat.grantKey].map(Number) : [];
         [15, 30, 31].forEach(gid => {
@@ -846,7 +937,6 @@ const FoodItemReceiving = () => {
     XLSX.writeFile(wb, "Supplementary_Nutrition_Grant_Wise.xlsx");
   };
 
-  /* ── Supp Nutrition PDF Export (Grant-wise 2-row header) ── */
   const exportSuppToPDF = async () => {
     if (!filteredSuppNutritionData.length) return;
     try {
@@ -900,20 +990,33 @@ const FoodItemReceiving = () => {
                 <Badge bg={getStatusVariant(rec.sector_status)}>{rec.sector_status || 'pending'}</Badge>
               </td>
               <td>
-                {rec.sector_status === 'approved' || rec.sector_status === 'rejected' ? (
-                  <Button variant="outline-info" size="sm" onClick={() => handleOpenViewModal(rec)}>
-                    <FaEye /> View
-                  </Button>
-                ) : (
-                  <>
-                    <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenModal(rec)}>
-                      <FaEdit />
+                <div className="d-flex gap-1 flex-wrap">
+                  {rec.sector_status === 'approved' || rec.sector_status === 'rejected' ? (
+                    <Button variant="outline-info" size="sm" onClick={() => handleOpenViewModal(rec)}>
+                      <FaEye /> View
                     </Button>
-                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(rec.id)}>
-                      <FaTrash />
+                  ) : (
+                    <>
+                      <Button variant="outline-primary" size="sm" onClick={() => handleOpenModal(rec)}>
+                        <FaEdit />
+                      </Button>
+                      <Button variant="outline-danger" size="sm" onClick={() => handleDelete(rec.id)}>
+                        <FaTrash />
+                      </Button>
+                    </>
+                  )}
+                  {/* ── NEW: View Expiry button ── */}
+                  {hasPacketExpiry(rec) && (
+                    <Button
+                      variant="outline-warning"
+                      size="sm"
+                      onClick={() => handleOpenExpiryModal(rec)}
+                      title="View Packet Expiry Details"
+                    >
+                      <FaCalendarCheck /> Expiry
                     </Button>
-                  </>
-                )}
+                  )}
+                </div>
               </td>
             </tr>
           )) : (
@@ -933,15 +1036,12 @@ const FoodItemReceiving = () => {
     );
   };
 
-  /* ── New Grant-wise Master Supp Nutrition Table ── */
   const renderSuppTable = (records) => {
     const totalCols = 1 + EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4 + FOOD_FIELDS.length;
 
     return (
       <>
-
         <div className="mt-4">
-          {/* Filter + Export Bar */}
           <Row className="mb-3 g-2 align-items-end">
             <Col md={3}>
               <Form.Group>
@@ -1058,12 +1158,12 @@ const FoodItemReceiving = () => {
                       <th key={`${cat.countKey}-g30`}></th>,
                       <th key={`${cat.countKey}-g31`}></th>,
                       <th key={`${cat.countKey}-total`} className="text-end">
-                        {suppTotals[cat.countKey]?.toLocaleString() || 0}
+                        {suppTotals[cat.countKey] ? suppTotals[cat.countKey].toLocaleString() : 0}
                       </th>,
                     ])}
                     {FOOD_FIELDS.map((food) => (
                       <th key={food.key} className="text-end">
-                        {suppTotals[food.key]?.toLocaleString() || 0}
+                        {suppTotals[food.key] ? suppTotals[food.key].toLocaleString() : 0}
                       </th>
                     ))}
                   </tr>
@@ -1085,7 +1185,7 @@ const FoodItemReceiving = () => {
             <Form.Label>Financial Year</Form.Label>
             <Form.Select name="fin_year" value={filters.fin_year} onChange={handleFilterChange}>
               <option value="">All Years</option>
-              {currentFilters?.fin_year.map(year => <option key={year} value={year}>{year}</option>)}
+              {currentFilters && currentFilters.fin_year ? currentFilters.fin_year.map(year => <option key={year} value={year}>{year}</option>) : null}
             </Form.Select>
           </Form.Group>
         </Col>
@@ -1095,7 +1195,11 @@ const FoodItemReceiving = () => {
             <Dropdown>
               <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? `${filters.months.length} selected` : 'All Months'}</Dropdown.Toggle>
               <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                {currentFilters?.months.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.months.includes(v)} onChange={() => handleMultiSelectChange('months', v)} /></Dropdown.Item>)) }
+                {currentFilters && currentFilters.months ? currentFilters.months.map(v => (
+                  <Dropdown.Item key={v} as="div">
+                    <Form.Check type="checkbox" label={v} checked={filters.months.includes(v)} onChange={() => handleMultiSelectChange('months', v)} />
+                  </Dropdown.Item>
+                )) : null}
               </Dropdown.Menu>
             </Dropdown>
           </Form.Group>
@@ -1179,7 +1283,7 @@ const FoodItemReceiving = () => {
           </Tabs>
         </Container>
 
-        <Modal show={showModal} onHide={handleCloseModal} centered>
+        <Modal show={showModal} onHide={handleCloseModal} centered size="lg">
           <Modal.Header closeButton>
             <Modal.Title>{editingItem ? 'Edit' : 'Add'} {activeTab.toUpperCase()} Receiving</Modal.Title>
           </Modal.Header>
@@ -1249,6 +1353,7 @@ const FoodItemReceiving = () => {
                   </Form.Group>
                 </Col>
               </Row>
+
               <Row>
                 <Col>
                   <Form.Group className="mb-3">
@@ -1265,6 +1370,7 @@ const FoodItemReceiving = () => {
                   </Form.Group>
                 </Col>
               </Row>
+
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
@@ -1287,7 +1393,8 @@ const FoodItemReceiving = () => {
                       value={formData.fin_year || ''}
                       onChange={handleFormChange}
                       placeholder="e.g., 2025-26"
-                      required disabled
+                      required
+                      disabled
                     />
                   </Form.Group>
                 </Col>
@@ -1356,11 +1463,99 @@ const FoodItemReceiving = () => {
                 </Col>
               </Row>
 
+              <Row>
+                <Col md={12}>
+                  <Form.Group className="mb-3">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h6 className="mb-0">Packet Details (Per Expiry Batch)</h6>
+                      <Button
+                        variant="success"
+                        size="sm"
+                        onClick={handleAddPacketRow}
+                        disabled={
+                          (parseFloat(formData.quantity) || 0) > 0 &&
+                          packetExpiryTotal >= (parseFloat(formData.quantity) || 0)
+                        }
+                      >
+                        <FaPlus className="me-1" /> Add Row
+                      </Button>
+                    </div>
+
+                    <Table bordered responsive size="sm" className="mb-2">
+                      <thead>
+                        <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
+                          <th style={{ width: '50px' }}>#</th>
+                          <th>Packets</th>
+                          <th>Expiry Date</th>
+                          <th style={{ width: '100px' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(formData.packet_expiry || [['', '']]).map((row, idx) => (
+                          <tr key={idx}>
+                            <td className="text-center">{idx + 1}</td>
+                            <td>
+                              <Form.Control
+                                type="number"
+                                min="0"
+                                value={row ? row[0] : ''}
+                                onChange={(e) => handlePacketExpiryChange(idx, 'count', e.target.value)}
+                                placeholder="Enter packet count"
+                                isInvalid={
+                                  (parseFloat(formData.quantity) || 0) > 0 &&
+                                  (parseFloat(row && row[0]) || 0) > 0 &&
+                                  packetExpiryTotal > (parseFloat(formData.quantity) || 0)
+                                }
+                              />
+                            </td>
+                            <td>
+                              <Form.Control
+                                type="date"
+                                value={row ? row[1] : ''}
+                                onChange={(e) => handlePacketExpiryChange(idx, 'date', e.target.value)}
+                              />
+                            </td>
+                            <td className="text-center">
+                              <Button
+                                variant="outline-danger"
+                                size="sm"
+                                onClick={() => handleRemovePacketRow(idx)}
+                                disabled={(formData.packet_expiry || []).length <= 1}
+                              >
+                                <FaMinus />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
+                          <td colSpan={1} className="text-end">Total:</td>
+                          <td>{packetExpiryTotal}</td>
+                          <td colSpan={2}>
+                            <small className={`text-${packetExpiryMatchInfo.variant}`}>
+                              {packetExpiryMatchInfo.message}
+                            </small>
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </Table>
+                    <small className="text-muted d-block">
+                      नोट: Packet details का योग (Total) auto-fetched Packets संख्या के बराबर होना चाहिए — अधिक नहीं हो सकता।
+                    </small>
+                  </Form.Group>
+                </Col>
+              </Row>
+
               <div className="d-flex justify-content-end">
                 <Button variant="secondary" onClick={handleCloseModal} className="me-2">
                   Cancel
                 </Button>
-                <Button variant="primary" type="submit" disabled={submitting}>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={submitting || !packetExpiryMatchInfo.ok}
+                >
                   {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingItem ? 'Update' : 'Submit')}
                 </Button>
               </div>
@@ -1393,6 +1588,28 @@ const FoodItemReceiving = () => {
                 {viewItem.max_expirydate && (
                   <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Max Expiry Date:</strong> {new Date(viewItem.max_expirydate).toLocaleDateString()}</ListGroup.Item>
                 )}
+                {Array.isArray(viewItem.packet_expiry) && viewItem.packet_expiry.length > 0 && (
+                  <ListGroup.Item>
+                    <FaInfoCircle className="view-modal-icon" /> <strong>Packet Details:</strong>
+                    <Table bordered size="sm" className="mt-2 mb-0">
+                      <thead>
+                        <tr><th>Packets</th><th>Expiry Date</th></tr>
+                      </thead>
+                      <tbody>
+                        {viewItem.packet_expiry.map((pe, i) => {
+                          const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
+                          const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
+                          return (
+                            <tr key={i}>
+                              <td>{count == null ? '-' : count}</td>
+                              <td>{date ? new Date(date).toLocaleDateString() : '-'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </Table>
+                  </ListGroup.Item>
+                )}
                 <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>Sector:</strong> {viewItem.sector}</ListGroup.Item>
                 <ListGroup.Item><FaProjectDiagram className="view-modal-icon" /> <strong>Project:</strong> {viewItem.project}</ListGroup.Item>
                 <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>District:</strong> {viewItem.district}</ListGroup.Item>
@@ -1406,6 +1623,101 @@ const FoodItemReceiving = () => {
             </Modal.Body>
             <Modal.Footer className="view-modal-footer">
               <Button variant="secondary" onClick={handleCloseViewModal}>Close</Button>
+            </Modal.Footer>
+          </Modal>
+        )}
+
+        {/* ── NEW: Expiry Details Modal ── */}
+        {expiryViewItem && (
+          <Modal show={showExpiryModal} onHide={handleCloseExpiryModal} centered>
+            <Modal.Header closeButton className="view-modal-header">
+              <Modal.Title>
+                <FaCalendarCheck className="me-2" />
+                Packet Expiry Details: {expiryViewItem.food_item}
+              </Modal.Title>
+            </Modal.Header>
+            <Modal.Body className="view-modal-body">
+              <ListGroup variant="flush">
+                <ListGroup.Item>
+                  <FaUtensils className="view-modal-icon" />
+                  <strong>Food Item:</strong> {expiryViewItem.food_item}
+                </ListGroup.Item>
+                <ListGroup.Item>
+                  <FaWeightHanging className="view-modal-icon" />
+                  <strong>Total Packets:</strong> {expiryViewItem.quantity} {expiryViewItem.unit}
+                </ListGroup.Item>
+                <ListGroup.Item>
+                  <FaCalendarDay className="view-modal-icon" />
+                  <strong>Date of Receiving:</strong>{' '}
+                  {expiryViewItem.date ? new Date(expiryViewItem.date).toLocaleDateString() : '-'}
+                </ListGroup.Item>
+                <ListGroup.Item>
+                  <FaCubes className="view-modal-icon" />
+                  <strong>Months:</strong> {formatMonths(getMonthsArray(expiryViewItem))}
+                </ListGroup.Item>
+                <ListGroup.Item>
+                  <FaInfoCircle className="view-modal-icon" />
+                  <strong>Sector Status:</strong>{' '}
+                  <Badge bg={getStatusVariant(expiryViewItem.sector_status)}>
+                    {expiryViewItem.sector_status || 'pending'}
+                  </Badge>
+                </ListGroup.Item>
+              </ListGroup>
+
+              <hr />
+
+              <h6 className="mb-2">
+                <FaCalendarCheck className="me-1" /> Packet-wise Expiry List
+              </h6>
+              <Table bordered striped size="sm" className="mb-0">
+                <thead>
+                  <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
+                    <th className="text-center" style={{ width: '60px' }}>S. No.</th>
+                    <th className="text-center">Packets</th>
+                    <th className="text-center">Expiry Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.isArray(expiryViewItem.packet_expiry) && expiryViewItem.packet_expiry.length > 0 ? (
+                    expiryViewItem.packet_expiry.map((pe, i) => {
+                      const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
+                      const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
+                      return (
+                        <tr key={i}>
+                          <td className="text-center">{i + 1}</td>
+                          <td className="text-center fw-semibold">{count == null || count === '' ? '-' : count}</td>
+                          <td className="text-center">
+                            {date ? new Date(date).toLocaleDateString() : '-'}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="text-center text-muted p-3">
+                        No packet expiry details available.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                {Array.isArray(expiryViewItem.packet_expiry) && expiryViewItem.packet_expiry.length > 0 && (
+                  <tfoot>
+                    <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
+                      <td className="text-end">Total:</td>
+                      <td className="text-center">
+                        {expiryViewItem.packet_expiry.reduce((sum, pe) => {
+                          const c = Array.isArray(pe) ? pe[0] : (pe && pe.count);
+                          return sum + (parseFloat(c) || 0);
+                        }, 0)}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </Table>
+            </Modal.Body>
+            <Modal.Footer className="view-modal-footer">
+              <Button variant="secondary" onClick={handleCloseExpiryModal}>Close</Button>
             </Modal.Footer>
           </Modal>
         )}
