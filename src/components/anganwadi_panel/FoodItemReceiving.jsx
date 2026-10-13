@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Container, Tabs, Tab, Form, Button, Table, Modal, Spinner, Alert,
   Row, Col, InputGroup, Badge, ListGroup, Dropdown
@@ -170,17 +170,25 @@ const normalizeSuppMonth = (rawMonth) => {
 };
 
 const normalizePacketExpiry = (raw) => {
-  if (!Array.isArray(raw) || raw.length === 0) return [['', '']];
+  if (!Array.isArray(raw) || raw.length === 0) return [['', '', '']];
   const out = raw.map(row => {
     if (Array.isArray(row)) {
-      return [String(row[0] == null ? '' : row[0]), String(row[1] == null ? '' : row[1])];
+      return [
+        String(row[0] == null ? '' : row[0]),
+        String(row[1] == null ? '' : row[1]),
+        String(row[2] == null ? '' : row[2])
+      ];
     }
     if (row && typeof row === 'object') {
-      return [String(row.count == null ? '' : row.count), String(row.date == null ? '' : row.date)];
+      return [
+        String(row.count == null ? '' : row.count),
+        String(row.date == null ? '' : row.date),
+        String(row.remark == null ? (row.remarks == null ? '' : row.remarks) : row.remark)
+      ];
     }
-    return ['', ''];
+    return ['', '', ''];
   });
-  return out.length > 0 ? out : [['', '']];
+  return out.length > 0 ? out : [['', '', '']];
 };
 
 let hindiPdfFontPromise;
@@ -267,9 +275,9 @@ const downloadGrantWisePDF = async ({ title, filename, records, totalsRow }) => 
     { text: '', colSpan: 1 + EXCEL_META_COLUMNS.length },
     ...GRANT_CATEGORIES.flatMap(cat => [
       { text: '' }, { text: '' }, { text: '' },
-      { text: totalsRow[cat.countKey]?.toLocaleString() || 0 },
+      { text: totalsRow[cat.countKey] ? totalsRow[cat.countKey].toLocaleString() : 0 },
     ]),
-    ...FOOD_FIELDS.map(f => ({ text: totalsRow[f.key]?.toLocaleString() || 0 })),
+    ...FOOD_FIELDS.map(f => ({ text: totalsRow[f.key] ? totalsRow[f.key].toLocaleString() : 0 })),
   ];
   footValues.forEach(cell => {
     const c = createCell("td", cell);
@@ -304,6 +312,9 @@ const downloadGrantWisePDF = async ({ title, filename, records, totalsRow }) => 
 const FoodItemReceiving = () => {
   const { api } = useAuth();
 
+  // ── NEW: ref for scrolling modal to top on error ──
+  const modalBodyRef = useRef(null);
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -325,7 +336,6 @@ const FoodItemReceiving = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewItem, setViewItem] = useState(null);
 
-  // ── NEW: Expiry details modal state ──
   const [showExpiryModal, setShowExpiryModal] = useState(false);
   const [expiryViewItem, setExpiryViewItem] = useState(null);
 
@@ -335,6 +345,22 @@ const FoodItemReceiving = () => {
     hcm: { fin_year: [], months: [] },
     thr: { fin_year: [], months: [] },
   });
+
+  // ── NEW: Helper to scroll modal body to top ──
+  const scrollModalToTop = () => {
+    if (modalBodyRef && modalBodyRef.current) {
+      modalBodyRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // ── NEW: Wrapper that sets error AND scrolls to top ──
+  const setFormErrorAndScroll = (msg) => {
+    setFormError(msg);
+    // Use setTimeout to ensure the DOM has updated with the error Alert before scrolling
+    setTimeout(() => {
+      scrollModalToTop();
+    }, 50);
+  };
 
   const availableMonthsForSelectedFoodItem = useMemo(() => {
     if (!formData.field_name || suppNutritionData.length === 0) return [];
@@ -541,7 +567,7 @@ const FoodItemReceiving = () => {
         months: [],
         quarter: '',
         field_name: '',
-        packet_expiry: [['', '']],
+        packet_expiry: [['', '', '']],
       });
     }
     setFormError('');
@@ -563,7 +589,6 @@ const FoodItemReceiving = () => {
     setViewItem(null);
   };
 
-  // ── NEW: Expiry details handlers ──
   const handleOpenExpiryModal = (record) => {
     setExpiryViewItem(record);
     setShowExpiryModal(true);
@@ -609,6 +634,7 @@ const FoodItemReceiving = () => {
 
       setFormData(prev => {
         const currentFinYear = prev.fin_year || getCurrentFinancialYear();
+
         const monthSet = new Set();
         if (autoFieldName && suppNutritionData.length > 0) {
           suppNutritionData.forEach(rec => {
@@ -620,6 +646,7 @@ const FoodItemReceiving = () => {
           });
         }
         const autoMonths = monthOptions.filter(m => monthSet.has(m.value)).map(m => m.value);
+
         const autoQuantity = autoMonths.length > 0
           ? String(computePacketsForMonths(autoMonths, autoFieldName, currentFinYear))
           : '';
@@ -646,12 +673,14 @@ const FoodItemReceiving = () => {
           bene_category: autoBeneCategory,
           months: autoMonths,
           quarter: quarterString,
-          packet_expiry: [['', '']],
+          packet_expiry: [['', '', '']],
         };
       });
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
+    // Clear any previous error when user edits a field
+    if (formError) setFormError('');
   };
 
   const handleMonthToggle = (monthValue, isChecked) => {
@@ -680,15 +709,16 @@ const FoodItemReceiving = () => {
         ...prev,
         months: nextMonths,
         quarter: quarterString,
-        quantity: recomputedQty > 0 ? String(recomputedQty) : '',
+        quantity: recomputedQty > 0 ? String(recomputedQty) : (prev.quantity || ''),
       };
     });
+    if (formError) setFormError('');
   };
 
   const handlePacketExpiryChange = (index, field, value) => {
     setFormData(prev => {
-      const rows = Array.isArray(prev.packet_expiry) ? prev.packet_expiry.map(r => [...r]) : [['', '']];
-      const current = rows[index] || ['', ''];
+      const rows = Array.isArray(prev.packet_expiry) ? prev.packet_expiry.map(r => [...r]) : [['', '', '']];
+      const current = rows[index] || ['', '', ''];
       if (field === 'count') {
         const totalQty = parseFloat(prev.quantity) || 0;
         const sumWithoutThis = rows.reduce((sum, row, i) => {
@@ -698,15 +728,18 @@ const FoodItemReceiving = () => {
         const entered = parseFloat(value) || 0;
         if (totalQty > 0 && sumWithoutThis + entered > totalQty) {
           const allowed = Math.max(0, totalQty - sumWithoutThis);
-          rows[index] = [String(allowed), current[1] || ''];
+          rows[index] = [String(allowed), current[1] || '', current[2] || ''];
         } else {
-          rows[index] = [String(value), current[1] || ''];
+          rows[index] = [String(value), current[1] || '', current[2] || ''];
         }
       } else if (field === 'date') {
-        rows[index] = [current[0] || '', String(value)];
+        rows[index] = [current[0] || '', String(value), current[2] || ''];
+      } else if (field === 'remarks') {
+        rows[index] = [current[0] || '', current[1] || '', String(value)];
       }
       return { ...prev, packet_expiry: rows };
     });
+    if (formError) setFormError('');
   };
 
   const handleAddPacketRow = () => {
@@ -717,7 +750,7 @@ const FoodItemReceiving = () => {
       if (totalQty > 0 && currentSum >= totalQty) {
         return prev;
       }
-      rows.push(['', '']);
+      rows.push(['', '', '']);
       return { ...prev, packet_expiry: rows };
     });
   };
@@ -726,7 +759,7 @@ const FoodItemReceiving = () => {
     setFormData(prev => {
       const rows = Array.isArray(prev.packet_expiry) ? prev.packet_expiry.map(r => [...r]) : [];
       rows.splice(index, 1);
-      if (rows.length === 0) rows.push(['', '']);
+      if (rows.length === 0) rows.push(['', '', '']);
       return { ...prev, packet_expiry: rows };
     });
   };
@@ -762,7 +795,7 @@ const FoodItemReceiving = () => {
     });
 
     if (duplicate) {
-      setFormError("इस माह का प्राप्ति रिकॉर्ड इसी श्रेणी (category) के लिए पहले ही दर्ज है।");
+      setFormErrorAndScroll("इस माह का प्राप्ति रिकॉर्ड इसी श्रेणी (category) के लिए पहले ही दर्ज है।");
       setSubmitting(false);
       return;
     }
@@ -770,26 +803,30 @@ const FoodItemReceiving = () => {
     const peRows = Array.isArray(formData.packet_expiry) ? formData.packet_expiry : [];
     const cleanedPacketExpiry = peRows
       .map(r => {
-        const c = Array.isArray(r) ? r : ['', ''];
-        return [String(c[0] == null ? '' : c[0]).trim(), String(c[1] == null ? '' : c[1]).trim()];
+        const c = Array.isArray(r) ? r : ['', '', ''];
+        return [
+          String(c[0] == null ? '' : c[0]).trim(),
+          String(c[1] == null ? '' : c[1]).trim(),
+          String(c[2] == null ? '' : c[2]).trim()
+        ];
       })
-      .filter(r => r[0] !== '' || r[1] !== '');
+      .filter(r => r[0] !== '' || r[1] !== '' || r[2] !== '');
 
     const peTotal = cleanedPacketExpiry.reduce((s, r) => s + (parseFloat(r[0]) || 0), 0);
 
     if (parsedQuantity > 0) {
       if (cleanedPacketExpiry.length === 0) {
-        setFormError("कृपया Packet Details में कम से कम एक पंक्ति भरें।");
+        setFormErrorAndScroll("कृपया Packet Details में कम से कम एक पंक्ति भरें।");
         setSubmitting(false);
         return;
       }
       if (peTotal > parsedQuantity) {
-        setFormError(`Packet details का योग (${peTotal}) quantity (${parsedQuantity}) से अधिक नहीं हो सकता।`);
+        setFormErrorAndScroll(`Packet details का योग (${peTotal}) quantity (${parsedQuantity}) से अधिक नहीं हो सकता।`);
         setSubmitting(false);
         return;
       }
       if (peTotal !== parsedQuantity) {
-        setFormError(
+        setFormErrorAndScroll(
           `Packet details का योग (${peTotal}) और quantity (${parsedQuantity}) समान होना चाहिए। शेष: ${parsedQuantity - peTotal}`
         );
         setSubmitting(false);
@@ -797,7 +834,7 @@ const FoodItemReceiving = () => {
       }
       const incomplete = cleanedPacketExpiry.find(r => r[0] === '' || r[1] === '');
       if (incomplete) {
-        setFormError("कृपया हर packet row में packets और expiry date दोनों भरें।");
+        setFormErrorAndScroll("कृपया हर packet row में packets और expiry date दोनों भरें।");
         setSubmitting(false);
         return;
       }
@@ -814,7 +851,7 @@ const FoodItemReceiving = () => {
       quarter: quarterString,
       curr_month: formData.curr_month || getCurrentMonth(),
       max_expirydate: formData.max_expirydate || null,
-      packet_expiry: cleanedPacketExpiry.length > 0 ? cleanedPacketExpiry : [['', '']],
+      packet_expiry: cleanedPacketExpiry.length > 0 ? cleanedPacketExpiry : [['', '', '']],
     };
 
     if (editingItem) {
@@ -851,7 +888,7 @@ const FoodItemReceiving = () => {
           }
         }
       }
-      setFormError(`Failed to ${editingItem ? 'update' : 'create'} record. ${backendMessage || 'Please try again.'}`);
+      setFormErrorAndScroll(`Failed to ${editingItem ? 'update' : 'create'} record. ${backendMessage || 'Please try again.'}`);
       console.error("API Error:", err.response ? err.response.data : err);
     } finally {
       setSubmitting(false);
@@ -879,7 +916,6 @@ const FoodItemReceiving = () => {
     }
   };
 
-  // Helper: check if a record has packet_expiry data
   const hasPacketExpiry = (rec) => {
     if (!rec) return false;
     if (!Array.isArray(rec.packet_expiry) || rec.packet_expiry.length === 0) return false;
@@ -1005,7 +1041,6 @@ const FoodItemReceiving = () => {
                       </Button>
                     </>
                   )}
-                  {/* ── NEW: View Expiry button ── */}
                   {hasPacketExpiry(rec) && (
                     <Button
                       variant="outline-warning"
@@ -1287,7 +1322,7 @@ const FoodItemReceiving = () => {
           <Modal.Header closeButton>
             <Modal.Title>{editingItem ? 'Edit' : 'Add'} {activeTab.toUpperCase()} Receiving</Modal.Title>
           </Modal.Header>
-          <Modal.Body>
+          <Modal.Body ref={modalBodyRef} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             {formError && <Alert variant="danger">{formError}</Alert>}
             <Form onSubmit={handleSubmit}>
               <Row>
@@ -1428,10 +1463,10 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={12}>
                   <Form.Group className="mb-3">
-                    <h6 className="mt-2 mb-3">Select Months (Multi-Select — Packets will recalculate)</h6>
+                    <h6 className="mt-2 mb-3">Select Months (All months available — Packets auto-recalculate for months with data)</h6>
                     <div className="month-checkbox-group d-flex flex-wrap gap-2">
                       {monthOptions.map((month) => {
-                        const isAvailable = availableMonthsForSelectedFoodItem.includes(month.value) || (formData.months || []).includes(month.value);
+                        const hasData = availableMonthsForSelectedFoodItem.includes(month.value);
                         const isChecked = (formData.months || []).includes(month.value);
                         return (
                           <Form.Check
@@ -1439,24 +1474,20 @@ const FoodItemReceiving = () => {
                             inline
                             type="checkbox"
                             id={`month-${month.value}`}
-                            label={month.label}
+                            label={hasData ? `${month.label} ✓` : month.label}
                             checked={isChecked}
                             onChange={(e) => {
-                              if (!isAvailable) return;
                               handleMonthToggle(month.value, e.target.checked);
                             }}
-                            disabled={!isAvailable}
                           />
                         );
                       })}
                     </div>
                     {!formData.field_name ? (
-                      <small className="text-muted">Please select a food item to view available months.</small>
-                    ) : availableMonthsForSelectedFoodItem.length === 0 && (formData.months || []).length === 0 ? (
-                      <small className="text-muted">No months available in Supplementary Nutrition data for this food item.</small>
+                      <small className="text-muted">Select a food item first. All months are selectable — months with data will auto-fetch packets.</small>
                     ) : (
-                      <small className="text-success">
-                        ✓ Toggling a month will auto-add / auto-deduct packets from the Supplementary Nutrition table.
+                      <small className="text-muted">
+                        ✓ All 12 months are selectable. Months with Supplementary Nutrition data are marked with ✓ and will auto-fetch/deduct packets. Months without data won't change the packet count.
                       </small>
                     )}
                   </Form.Group>
@@ -1484,14 +1515,15 @@ const FoodItemReceiving = () => {
                     <Table bordered responsive size="sm" className="mb-2">
                       <thead>
                         <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
-                          <th style={{ width: '50px' }}>#</th>
-                          <th>Packets</th>
-                          <th>Expiry Date</th>
-                          <th style={{ width: '100px' }}>Action</th>
+                          <th style={{ width: '40px' }}>#</th>
+                          <th style={{ width: '120px' }}>Packets</th>
+                          <th style={{ width: '160px' }}>Expiry Date</th>
+                          <th>Remarks</th>
+                          <th style={{ width: '80px' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(formData.packet_expiry || [['', '']]).map((row, idx) => (
+                        {(formData.packet_expiry || [['', '', '']]).map((row, idx) => (
                           <tr key={idx}>
                             <td className="text-center">{idx + 1}</td>
                             <td>
@@ -1500,7 +1532,7 @@ const FoodItemReceiving = () => {
                                 min="0"
                                 value={row ? row[0] : ''}
                                 onChange={(e) => handlePacketExpiryChange(idx, 'count', e.target.value)}
-                                placeholder="Enter packet count"
+                                placeholder="Packets"
                                 isInvalid={
                                   (parseFloat(formData.quantity) || 0) > 0 &&
                                   (parseFloat(row && row[0]) || 0) > 0 &&
@@ -1513,6 +1545,14 @@ const FoodItemReceiving = () => {
                                 type="date"
                                 value={row ? row[1] : ''}
                                 onChange={(e) => handlePacketExpiryChange(idx, 'date', e.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <Form.Control
+                                type="text"
+                                value={row ? row[2] : ''}
+                                onChange={(e) => handlePacketExpiryChange(idx, 'remarks', e.target.value)}
+                                placeholder="Enter remarks for this batch"
                               />
                             </td>
                             <td className="text-center">
@@ -1530,9 +1570,9 @@ const FoodItemReceiving = () => {
                       </tbody>
                       <tfoot>
                         <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
-                          <td colSpan={1} className="text-end">Total:</td>
+                          <td className="text-end">Total:</td>
                           <td>{packetExpiryTotal}</td>
-                          <td colSpan={2}>
+                          <td colSpan={3}>
                             <small className={`text-${packetExpiryMatchInfo.variant}`}>
                               {packetExpiryMatchInfo.message}
                             </small>
@@ -1593,16 +1633,18 @@ const FoodItemReceiving = () => {
                     <FaInfoCircle className="view-modal-icon" /> <strong>Packet Details:</strong>
                     <Table bordered size="sm" className="mt-2 mb-0">
                       <thead>
-                        <tr><th>Packets</th><th>Expiry Date</th></tr>
+                        <tr><th>Packets</th><th>Expiry Date</th><th>Remarks</th></tr>
                       </thead>
                       <tbody>
                         {viewItem.packet_expiry.map((pe, i) => {
                           const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
                           const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
+                          const remark = Array.isArray(pe) ? pe[2] : (pe && (pe.remark || pe.remarks));
                           return (
                             <tr key={i}>
                               <td>{count == null ? '-' : count}</td>
                               <td>{date ? new Date(date).toLocaleDateString() : '-'}</td>
+                              <td>{remark || '-'}</td>
                             </tr>
                           );
                         })}
@@ -1627,7 +1669,6 @@ const FoodItemReceiving = () => {
           </Modal>
         )}
 
-        {/* ── NEW: Expiry Details Modal ── */}
         {expiryViewItem && (
           <Modal show={showExpiryModal} onHide={handleCloseExpiryModal} centered>
             <Modal.Header closeButton className="view-modal-header">
@@ -1672,9 +1713,10 @@ const FoodItemReceiving = () => {
               <Table bordered striped size="sm" className="mb-0">
                 <thead>
                   <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
-                    <th className="text-center" style={{ width: '60px' }}>S. No.</th>
+                    <th className="text-center" style={{ width: '50px' }}>S. No.</th>
                     <th className="text-center">Packets</th>
                     <th className="text-center">Expiry Date</th>
+                    <th className="text-center">Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1682,6 +1724,7 @@ const FoodItemReceiving = () => {
                     expiryViewItem.packet_expiry.map((pe, i) => {
                       const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
                       const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
+                      const remark = Array.isArray(pe) ? pe[2] : (pe && (pe.remark || pe.remarks));
                       return (
                         <tr key={i}>
                           <td className="text-center">{i + 1}</td>
@@ -1689,12 +1732,13 @@ const FoodItemReceiving = () => {
                           <td className="text-center">
                             {date ? new Date(date).toLocaleDateString() : '-'}
                           </td>
+                          <td>{remark || '-'}</td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan={3} className="text-center text-muted p-3">
+                      <td colSpan={4} className="text-center text-muted p-3">
                         No packet expiry details available.
                       </td>
                     </tr>
@@ -1710,6 +1754,7 @@ const FoodItemReceiving = () => {
                           return sum + (parseFloat(c) || 0);
                         }, 0)}
                       </td>
+                      <td></td>
                       <td></td>
                     </tr>
                   </tfoot>

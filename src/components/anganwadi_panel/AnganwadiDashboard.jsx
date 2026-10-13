@@ -523,10 +523,12 @@ const AnganwadiDashboard = () => {
     const isEdit = selectedItem.isEdit;
 
     // Calculate quantity based on scheme
+    // HCM: Total = daily_consumption_qty × total_beneficiaries (NO days_allotted in calculation)
+    // THR: Total = qty_per_ben × total_beneficiaries
     let calculatedQuantity;
     if (activeScheme === 'hcm') {
-      const perPersonGrams = (parseFloat(selectedFoodItemDetails.daily_consumption_qty) || 0) * (parseInt(selectedFoodItemDetails.days_allotted) || 0);
-      calculatedQuantity = (parseInt(distributionData.total_beneficiaries, 10) || 0) * perPersonGrams;
+      const perPersonQty = parseFloat(selectedFoodItemDetails.daily_consumption_qty) || 0;
+      calculatedQuantity = (parseInt(distributionData.total_beneficiaries, 10) || 0) * perPersonQty;
     } else {
       calculatedQuantity = parseFloat(selectedFoodItemDetails.qty_per_ben) * parseInt(distributionData.total_beneficiaries, 10);
     }
@@ -614,19 +616,20 @@ const AnganwadiDashboard = () => {
     : selectedItem;
 
   // Calculate total quantity display
+  // HCM: Total = daily_consumption_qty × total_beneficiaries (NO days_allotted)
+  // THR: Total = qty_per_ben × total_beneficiaries
   const beneficiaries = parseInt(distributionData.total_beneficiaries, 10) || 0;
 
   let calculatedQuantityDisplay = '0.00';
   let calculatedQuantityGrams = 0;
   let calculatedQuantityKg = '0.00';
-  let perPersonAllotmentGrams = 0;
+  let perPersonQtyGrams = 0;
 
   if (selectedFoodItemForCalc) {
     if (activeScheme === 'hcm') {
-      // HCM: Per Person Allotment = daily_consumption_qty × days_allotted (grams)
-      // Total = beneficiaries × per-person allotment (grams)
-      perPersonAllotmentGrams = (parseFloat(selectedFoodItemForCalc.daily_consumption_qty) || 0) * (parseInt(selectedFoodItemForCalc.days_allotted) || 0);
-      calculatedQuantityGrams = beneficiaries * perPersonAllotmentGrams;
+      // Per Person Qty = daily_consumption_qty (grams) — NO days_allotted multiplier
+      perPersonQtyGrams = parseFloat(selectedFoodItemForCalc.daily_consumption_qty) || 0;
+      calculatedQuantityGrams = beneficiaries * perPersonQtyGrams;
       calculatedQuantityKg = (calculatedQuantityGrams / 1000).toFixed(2);
       calculatedQuantityDisplay = `${calculatedQuantityGrams} ग्राम (${calculatedQuantityKg} kg)`;
     } else {
@@ -789,16 +792,13 @@ const AnganwadiDashboard = () => {
                           <th>#</th>
                           <th>Food Item</th>
                           <th>Packet Weight (g)</th>
-                          <th>Daily Consumption (g/person/day)</th>
-                          <th>Days Allotted</th>
-                          <th>Per Person Allotment (g)</th>
+                          <th>Per Person Qty (g)</th>
                           <th>Total Quantity (g)</th>
                           <th>Total Quantity (kg)</th>
                         </tr>
                       </thead>
                       <tbody>
                         {foodItems.map((item, index) => {
-                          const perPersonGrams = (parseFloat(item.daily_consumption_qty) || 0) * (parseInt(item.days_allotted) || 0);
                           const totalGrams = parseFloat(item.total_quantity) || 0;
                           const totalKg = (totalGrams / 1000).toFixed(2);
                           return (
@@ -807,8 +807,6 @@ const AnganwadiDashboard = () => {
                               <td>{item.food_item}</td>
                               <td>{item.qty_per_ben}</td>
                               <td>{item.daily_consumption_qty}</td>
-                              <td>{item.days_allotted}</td>
-                              <td>{perPersonGrams}</td>
                               <td>{totalGrams}</td>
                               <td>{totalKg}</td>
                             </tr>
@@ -1050,14 +1048,6 @@ const AnganwadiDashboard = () => {
                       disabled
                     />
                   </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Days Allotted</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={selectedFoodItemForCalc?.days_allotted || ''}
-                      disabled
-                    />
-                  </Form.Group>
 
                   {/* ── Total Quantity with grams & kg for HCM ── */}
                   <Form.Group className="mb-3">
@@ -1072,8 +1062,8 @@ const AnganwadiDashboard = () => {
                           disabled
                         />
                         <Form.Text className="d-block mt-1">
-                          <strong>Per Person Allotment:</strong> {perPersonAllotmentGrams} ग्राम ({(perPersonAllotmentGrams / 1000).toFixed(2)} kg)<br/>
-                          <strong>Calculation:</strong> {selectedFoodItemForCalc?.daily_consumption_qty || 0} g/day × {selectedFoodItemForCalc?.days_allotted || 0} days × {beneficiaries} beneficiaries<br/>
+                          <strong>Per Person Qty:</strong> {perPersonQtyGrams} ग्राम ({(perPersonQtyGrams / 1000).toFixed(2)} kg)<br/>
+                          <strong>Calculation:</strong> {perPersonQtyGrams} g × {beneficiaries} beneficiaries<br/>
                           <strong>= {calculatedQuantityGrams} ग्राम ({calculatedQuantityKg} kg)</strong>
                         </Form.Text>
                       </>
@@ -1110,8 +1100,8 @@ const AnganwadiDashboard = () => {
                         disabled
                       />
                       <Form.Text>
-                        1 packet = {selectedFoodItemForCalc.qty_per_ben}g | 
-                        Daily consumption per beneficiary = {selectedFoodItemForCalc.daily_consumption_qty}g
+                        1 packet = {selectedFoodItemForCalc.qty_per_ben}g |
+                        Per person allotted quantity = {selectedFoodItemForCalc.daily_consumption_qty}g
                       </Form.Text>
                     </Form.Group>
                   )}
@@ -1141,7 +1131,7 @@ const AnganwadiDashboard = () => {
                   <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>Food Item:</strong> {viewItem.food_item}</ListGroup.Item>
                   <ListGroup.Item><FaUsers className="view-modal-icon" /> <strong>Beneficiaries:</strong> {viewItem.total_beneficiaries}</ListGroup.Item>
                    <ListGroup.Item>
-                     <FaWeightHanging className="view-modal-icon" /> 
+                     <FaWeightHanging className="view-modal-icon" />
                      <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}
                      {activeScheme === 'hcm' && viewItem.quantity && (
                        <span className="text-muted ms-2">
