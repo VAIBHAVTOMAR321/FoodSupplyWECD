@@ -516,7 +516,11 @@ const FoodSupplementary = () => {
       ...FOOD_FIELDS.map((f) => f.header),
     ];
     const sampleRow = ["Almora", "Bhaisiyachana [0506401]", "SERAGHAT [02]", "HATOLA-02", "5064010220", "September", "2026-2027"];
-    GRANT_CATEGORIES.forEach((c, idx) => sampleRow.push(15, 30, 31, [25, 30, 10, 8, 40][idx]));
+    const sampleGrantValues = [[10, 5, 10], [10, 10, 10], [4, 3, 3], [3, 2, 3], [15, 10, 15]];
+    GRANT_CATEGORIES.forEach((c, idx) => {
+      const [grant15, grant30, grant31] = sampleGrantValues[idx];
+      sampleRow.push(grant15, grant30, grant31, grant15 + grant30 + grant31);
+    });
     sampleRow.push(25, 30, 10, 0, 40, 40);
     const ws = XLSX.utils.aoa_to_sheet([categoryRow, headerRow, sampleRow, Array(headerRow.length).fill("")]);
     const merges = [];
@@ -573,18 +577,29 @@ const FoodSupplementary = () => {
           .filter((row) => row.some((v) => v !== "" && v !== null && v !== undefined));
         const parsedRecords = dataRows.map((row, i) => {
           const record = { _rowNum: dataStartIdx + i + 1 };
-          EXCEL_META_COLUMNS.forEach((col, j) => { record[col.key] = String(row[metaIndexes[j]] ?? "").trim(); });
+          EXCEL_META_COLUMNS.forEach((col, j) => {
+            record[col.key] = String(row[metaIndexes[j]] ?? "").trim();
+          });
+
+          // Read the actual numeric cell values from Grant 15 / Grant 30 / Grant 31.
+          // The API stores these as [grant15Value, grant30Value, grant31Value], not grant IDs.
           GRANT_CATEGORIES.forEach((cat, catIdx) => {
             const base = EXCEL_META_COLUMNS.length + catIdx * 4;
-            const grantValues = GRANT_IDS.filter((grantId, grantIdx) => {
-              const cell = row[base + grantIdx];
-              return cell !== "" && cell !== null && cell !== undefined && cell !== 0 && String(cell).trim() !== "0";
-            });
-            record[cat.countKey] = Number(row[base + 3]) || 0;
-            record[cat.grantKey] = grantValues.length ? grantValues : [...GRANT_IDS];
+            const grant15 = Number(row[base]) || 0;
+            const grant30 = Number(row[base + 1]) || 0;
+            const grant31 = Number(row[base + 2]) || 0;
+            const excelTotal = Number(row[base + 3]) || 0;
+
+            record[cat.countKey] = excelTotal;
+            // API schema stores the three grant CELL VALUES as an array.
+            // Index 0 = Grant 15, index 1 = Grant 30, index 2 = Grant 31.
+            record[cat.grantKey] = [grant15, grant30, grant31];
           });
+
           const foodStart = EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4;
-          FOOD_FIELDS.forEach((food, i) => { record[food.key] = Number(row[foodStart + i]) || 0; });
+          FOOD_FIELDS.forEach((food, i) => {
+            record[food.key] = Number(row[foodStart + i]) || 0;
+          });
           return record;
         }).filter((r) => r.awc_code || r.month || r.financial_year);
         if (!parsedRecords.length) throw new Error("No data rows found in the Excel file.");
@@ -605,9 +620,19 @@ const FoodSupplementary = () => {
           const payload = { awc_code: rec.awc_code, month: rec.month, financial_year: rec.financial_year };
           GRANT_CATEGORIES.forEach((cat) => {
             payload[cat.countKey] = Number(rec[cat.countKey]) || 0;
-            payload[cat.grantKey] = rec[cat.grantKey];
+
+            // Preserve each Excel grant-column value in the request instead of
+            // replacing the uploaded values with the fixed IDs [15, 30, 31].
+            const grantValues = Array.isArray(rec[cat.grantKey]) ? rec[cat.grantKey] : [];
+            payload[cat.grantKey] = [
+              Number(grantValues[0]) || 0,
+              Number(grantValues[1]) || 0,
+              Number(grantValues[2]) || 0,
+            ];
           });
-          FOOD_FIELDS.forEach((food) => { payload[food.key] = Number(rec[food.key]) || 0; });
+          FOOD_FIELDS.forEach((food) => {
+            payload[food.key] = Number(rec[food.key]) || 0;
+          });
           try {
             const response = await api.post("/supplementary-nutrition-details/", payload);
             // API returns a record object; count successful 2xx responses as uploaded.
@@ -1503,10 +1528,12 @@ const FoodSupplementary = () => {
                                       </td>
                                     ))}
                                     {GRANT_CATEGORIES.flatMap((cat) => {
-                                      const grants = Array.isArray(record[cat.grantKey]) ? record[cat.grantKey].map(Number) : [];
-                                      return [15, 30, 31].map((grantId) => (
+                                      const grantValues = Array.isArray(record[cat.grantKey])
+                                        ? record[cat.grantKey].map((value) => Number(value) || 0)
+                                        : [];
+                                      return [15, 30, 31].map((grantId, grantIndex) => (
                                         <td key={`${cat.countKey}-${grantId}`} className="text-center fs-grant-cell">
-                                          {grants.includes(grantId) ? grantId : "—"}
+                                          {Number(grantValues[grantIndex] || 0).toLocaleString()}
                                         </td>
                                       )).concat([
                                         <td key={`${cat.countKey}-total`} className="text-end fw-semibold fs-total-cell">
