@@ -17,6 +17,7 @@ const API_URLS = {
   hcm_receiving: "/hcm-anganwadi-receiving/",
   thr_receiving: "/thr-anganwadi-receiving/",
   supp_nutrition: "/supplementary-nutrition-anganwadi/",
+  hcm_food_items: "/hcm-food-items/",
 };
 
 const supplementaryFoodConfig = [
@@ -95,10 +96,6 @@ const formatMonths = (monthsOrQuarter) => {
   return '';
 };
 
-/**
- * Helper to normalize any date input (YYYY-MM-DD, ISO string, Date object)
- * into a 'YYYY-MM-DD' string for safe same-day comparison.
- */
 const toDateOnly = (input) => {
   if (!input) return '';
   try {
@@ -216,13 +213,18 @@ const AnganwadiDashboard = () => {
 
     const beneCategory = String(foodItemObj?.bene_category || '').toLowerCase();
     
-    if (beneCategory.includes('pregnant') || beneCategory.includes('lactating') || beneCategory.includes('garbh') || beneCategory.includes('dhatri')) {
+    if (beneCategory.includes('pregnant') || beneCategory.includes('lactating') || 
+        beneCategory.includes('garbh') || beneCategory.includes('dhatri') ||
+        beneCategory.includes('गर्भवती') || beneCategory.includes('धात्री')) {
       return matchingRecord.pregnant_woman_lactating_mother || 0;
     }
-    if (beneCategory.includes('3-6') || beneCategory.includes('3y-6y') || beneCategory.includes('3 से 6') || beneCategory.includes('normal')) {
+    if (beneCategory.includes('3-6') || beneCategory.includes('3y-6y') || 
+        beneCategory.includes('3 से 6') || beneCategory.includes('normal') ||
+        beneCategory.includes('3 वर्ष से 6') || beneCategory.includes('सामान्य')) {
       return matchingRecord.hcm_beneficiaries_3y_6y || 0;
     }
-    if (beneCategory.includes('6m-3') || beneCategory.includes('6m-3y') || beneCategory.includes('6 माह से 3')) {
+    if (beneCategory.includes('6m-3') || beneCategory.includes('6m-3y') || 
+        beneCategory.includes('6 माह से 3') || beneCategory.includes('6 महिने से 3')) {
       return matchingRecord.children_6m_3y || 0;
     }
     if (beneCategory.includes('sam') || beneCategory.includes('suw')) {
@@ -278,29 +280,57 @@ const AnganwadiDashboard = () => {
       const distributionUrl = scheme === 'hcm' ? API_URLS.hcm_distribution : API_URLS.thr_distribution;
       const receivingUrl = scheme === 'hcm' ? API_URLS.hcm_receiving : API_URLS.thr_receiving;
 
-      const [catResponse, distributionsResponse, receivingResponse, suppResponse] = await Promise.all([
+      const fetchPromises = [
         api.get(API_URLS.categoryandfooditem),
         api.get(distributionUrl),
         api.get(receivingUrl),
         api.get(API_URLS.supp_nutrition),
-      ]);
+      ];
 
-      const allFoodData = catResponse.data?.food_data || [];
-      const schemeFoodData = allFoodData.filter(f => f.category === scheme.toUpperCase());
+      if (scheme === 'hcm') {
+        fetchPromises.push(api.get(API_URLS.hcm_food_items));
+      }
 
-      const mappedFoodItems = schemeFoodData.map((data, index) => {
-        const config = supplementaryFoodConfig.find(c => c.key === data.field_name);
-        return {
-          id: index + 1,
+      const responses = await Promise.all(fetchPromises);
+      const [catResponse, distributionsResponse, receivingResponse, suppResponse, hcmFoodResponse] = responses;
+
+      // Map food items
+      if (scheme === 'hcm' && hcmFoodResponse && hcmFoodResponse.data) {
+        const hcmData = Array.isArray(hcmFoodResponse.data) ? hcmFoodResponse.data : [];
+        const mappedHcmItems = hcmData.map((data) => ({
+          id: data.id,
           food_item: data.food_item,
-          field_name: data.field_name,
-          bene_category: data.beneficiary_category || config?.bene_category || 'N/A',
-          unit: config?.unit || 'Packets',
-          qty_per_ben: config?.qty_per_ben || 1,
-          days_allotted: config?.days_allotted || 75,
-          total_quantity: 0
-        };
-      });
+          field_name: '',
+          bene_category: data.bene_category || 'N/A',
+          unit: 'ग्राम',
+          qty_per_ben: parseFloat(data.qty_per_ben) || 0,
+          daily_consumption_qty: parseFloat(data.daily_consumption_qty) || 0,
+          days_allotted: data.days_allotted || 0,
+          total_quantity: parseFloat(data.total_quantity) || 0,
+          financial_year: data.financial_year,
+          quarter: data.quarter,
+        }));
+        setFoodItems(mappedHcmItems);
+      } else {
+        const allFoodData = catResponse.data?.food_data || [];
+        const schemeFoodData = allFoodData.filter(f => f.category === scheme.toUpperCase());
+
+        const mappedFoodItems = schemeFoodData.map((data, index) => {
+          const config = supplementaryFoodConfig.find(c => c.key === data.field_name);
+          return {
+            id: index + 1,
+            food_item: data.food_item,
+            field_name: data.field_name,
+            bene_category: data.beneficiary_category || config?.bene_category || 'N/A',
+            unit: config?.unit || 'Packets',
+            qty_per_ben: config?.qty_per_ben || 1,
+            days_allotted: config?.days_allotted || 75,
+            total_quantity: 0
+          };
+        });
+
+        setFoodItems(mappedFoodItems);
+      }
 
       const allowedMonths = new Set();
       const monthsStatus = {};
@@ -326,7 +356,6 @@ const AnganwadiDashboard = () => {
       }));
       setSuppNutritionData(normalizedSuppWithMonths);
 
-      setFoodItems(mappedFoodItems);
       setDistributionRecords(distributionsResponse.data);
     } catch (err) {
       setError(prev => ({ ...prev, table: `Failed to fetch ${scheme.toUpperCase()} items.` }));
@@ -435,20 +464,10 @@ const AnganwadiDashboard = () => {
       return;
     }
 
-    /* ───────────────────────────────────────────────────────────────
-       DUPLICATE CHECK
-       - For HCM: DAILY-wise check — only ONE distribution record per
-         date is allowed (across ALL food items). If no record exists
-         for the chosen date, post freely with no error.
-       - For THR: keep the original month-wise duplicate check.
-       The month-wise error message ("इस माह का स्टॉक पहले ही आवंटित...")
-       is NEVER shown for HCM anymore.
-    ─────────────────────────────────────────────────────────────── */
     if (activeScheme === 'hcm') {
       const selectedDateOnly = toDateOnly(distributionData.date || new Date().toISOString().split('T')[0]);
 
       const duplicateDate = distributionRecords.find(rec => {
-        // Skip the record currently being edited
         if (selectedItem.isEdit && rec.id === selectedItem.recordId) return false;
         if (!rec.date) return false;
         const recDateOnly = toDateOnly(rec.date);
@@ -462,9 +481,7 @@ const AnganwadiDashboard = () => {
         setSubmitting(false);
         return;
       }
-      // No duplicate found for this date → proceed silently (no error message)
     } else {
-      // THR: retain the month-wise duplicate check
       const duplicate = distributionRecords.find(rec => {
         if (selectedItem.isEdit && rec.id === selectedItem.recordId) {
           return false;
@@ -504,7 +521,15 @@ const AnganwadiDashboard = () => {
     }
 
     const isEdit = selectedItem.isEdit;
-    const calculatedQuantity = parseFloat(selectedFoodItemDetails.qty_per_ben) * parseInt(distributionData.total_beneficiaries, 10);
+
+    // Calculate quantity based on scheme
+    let calculatedQuantity;
+    if (activeScheme === 'hcm') {
+      const perPersonGrams = (parseFloat(selectedFoodItemDetails.daily_consumption_qty) || 0) * (parseInt(selectedFoodItemDetails.days_allotted) || 0);
+      calculatedQuantity = (parseInt(distributionData.total_beneficiaries, 10) || 0) * perPersonGrams;
+    } else {
+      calculatedQuantity = parseFloat(selectedFoodItemDetails.qty_per_ben) * parseInt(distributionData.total_beneficiaries, 10);
+    }
 
     const selectedMonths = Array.isArray(distributionData.months) ? distributionData.months : [];
     let quarterString = '';
@@ -524,7 +549,7 @@ const AnganwadiDashboard = () => {
       food_item: selectedFoodItemDetails.food_item,
       total_beneficiaries: parseInt(distributionData.total_beneficiaries, 10),
       quantity: isNaN(calculatedQuantity) ? 0 : calculatedQuantity,
-      unit: selectedFoodItemDetails.unit,
+      unit: activeScheme === 'hcm' ? 'ग्राम' : selectedFoodItemDetails.unit,
       bene_category: selectedFoodItemDetails.bene_category,
       days_allotted: selectedFoodItemDetails.days_allotted,
       fin_year: distributionData.fin_year,
@@ -588,9 +613,28 @@ const AnganwadiDashboard = () => {
     ? foodItems.find(fi => fi.id === parseInt(distributionData.food_item_id, 10))
     : selectedItem;
 
-  const calculatedQuantity = selectedFoodItemForCalc
-    ? (parseFloat(selectedFoodItemForCalc.qty_per_ben) * (parseInt(distributionData.total_beneficiaries, 10) || 0)).toFixed(2)
-    : '0.00';
+  // Calculate total quantity display
+  const beneficiaries = parseInt(distributionData.total_beneficiaries, 10) || 0;
+
+  let calculatedQuantityDisplay = '0.00';
+  let calculatedQuantityGrams = 0;
+  let calculatedQuantityKg = '0.00';
+  let perPersonAllotmentGrams = 0;
+
+  if (selectedFoodItemForCalc) {
+    if (activeScheme === 'hcm') {
+      // HCM: Per Person Allotment = daily_consumption_qty × days_allotted (grams)
+      // Total = beneficiaries × per-person allotment (grams)
+      perPersonAllotmentGrams = (parseFloat(selectedFoodItemForCalc.daily_consumption_qty) || 0) * (parseInt(selectedFoodItemForCalc.days_allotted) || 0);
+      calculatedQuantityGrams = beneficiaries * perPersonAllotmentGrams;
+      calculatedQuantityKg = (calculatedQuantityGrams / 1000).toFixed(2);
+      calculatedQuantityDisplay = `${calculatedQuantityGrams} ग्राम (${calculatedQuantityKg} kg)`;
+    } else {
+      // THR: existing logic
+      const qty = (parseFloat(selectedFoodItemForCalc.qty_per_ben) * beneficiaries).toFixed(2);
+      calculatedQuantityDisplay = qty;
+    }
+  }
 
   return (
     <div className="dashboard-container">
@@ -695,7 +739,14 @@ const AnganwadiDashboard = () => {
                           <td>{formatMonths(record.months || record.quarter)}</td>
                           <td>{record.fin_year}</td>
                            <td>{record.total_beneficiaries}</td>
-                           <td>{record.quantity}</td>
+                           <td>
+                             {record.quantity}
+                             {activeScheme === 'hcm' && record.quantity && (
+                               <small className="text-muted d-block">
+                                 ({(parseFloat(record.quantity) / 1000).toFixed(2)} kg)
+                               </small>
+                             )}
+                           </td>
                            <td>{record.unit}</td>
                            <td>{record.expired_quantity || 0}</td>
                            <td>{record.anganwadi_remark || '-'}</td>
@@ -730,7 +781,43 @@ const AnganwadiDashboard = () => {
                     <Alert variant="danger">{error.table}</Alert>
                   ) : foodItems.length === 0 ? (
                     <div className="empty-state">No items found for {activeScheme.toUpperCase()}.</div>
+                  ) : activeScheme === 'hcm' ? (
+                    /* ── HCM-specific Food Item List with grams/kg columns ── */
+                    <Table striped bordered hover responsive>
+                      <thead>
+                        <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
+                          <th>#</th>
+                          <th>Food Item</th>
+                          <th>Packet Weight (g)</th>
+                          <th>Daily Consumption (g/person/day)</th>
+                          <th>Days Allotted</th>
+                          <th>Per Person Allotment (g)</th>
+                          <th>Total Quantity (g)</th>
+                          <th>Total Quantity (kg)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {foodItems.map((item, index) => {
+                          const perPersonGrams = (parseFloat(item.daily_consumption_qty) || 0) * (parseInt(item.days_allotted) || 0);
+                          const totalGrams = parseFloat(item.total_quantity) || 0;
+                          const totalKg = (totalGrams / 1000).toFixed(2);
+                          return (
+                            <tr key={item.id}>
+                              <td>{index + 1}</td>
+                              <td>{item.food_item}</td>
+                              <td>{item.qty_per_ben}</td>
+                              <td>{item.daily_consumption_qty}</td>
+                              <td>{item.days_allotted}</td>
+                              <td>{perPersonGrams}</td>
+                              <td>{totalGrams}</td>
+                              <td>{totalKg}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </Table>
                   ) : (
+                    /* ── THR Food Item List (existing) ── */
                     <Table striped bordered hover responsive>
                       <thead>
                         <tr>
@@ -971,25 +1058,64 @@ const AnganwadiDashboard = () => {
                       disabled
                     />
                   </Form.Group>
+
+                  {/* ── Total Quantity with grams & kg for HCM ── */}
                   <Form.Group className="mb-3">
-                    <Form.Label>Total Quantity</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={selectedFoodItemForCalc ? `${calculatedQuantity} ${selectedFoodItemForCalc.unit}` : '0.00'}
-                      disabled
-                    />
-                    <Form.Text>
-                      ({selectedFoodItemForCalc?.qty_per_ben || 0} {selectedFoodItemForCalc?.unit} per beneficiary)
-                    </Form.Text>
+                    <Form.Label>
+                      Total Quantity {activeScheme === 'hcm' ? '(in grams & kg)' : ''}
+                    </Form.Label>
+                    {activeScheme === 'hcm' ? (
+                      <>
+                        <Form.Control
+                          type="text"
+                          value={calculatedQuantityDisplay}
+                          disabled
+                        />
+                        <Form.Text className="d-block mt-1">
+                          <strong>Per Person Allotment:</strong> {perPersonAllotmentGrams} ग्राम ({(perPersonAllotmentGrams / 1000).toFixed(2)} kg)<br/>
+                          <strong>Calculation:</strong> {selectedFoodItemForCalc?.daily_consumption_qty || 0} g/day × {selectedFoodItemForCalc?.days_allotted || 0} days × {beneficiaries} beneficiaries<br/>
+                          <strong>= {calculatedQuantityGrams} ग्राम ({calculatedQuantityKg} kg)</strong>
+                        </Form.Text>
+                      </>
+                    ) : (
+                      <>
+                        <Form.Control
+                          type="text"
+                          value={selectedFoodItemForCalc ? `${calculatedQuantityDisplay} ${selectedFoodItemForCalc.unit}` : '0.00'}
+                          disabled
+                        />
+                        <Form.Text>
+                          ({selectedFoodItemForCalc?.qty_per_ben || 0} {selectedFoodItemForCalc?.unit} per beneficiary)
+                        </Form.Text>
+                      </>
+                    )}
                   </Form.Group>
+
                   <Form.Group className="mb-3">
                     <Form.Label>Unit</Form.Label>
                     <Form.Control
                       type="text"
-                      value={selectedFoodItemForCalc?.unit || ''}
+                      value={activeScheme === 'hcm' ? 'ग्राम' : (selectedFoodItemForCalc?.unit || '')}
                       disabled
                     />
                   </Form.Group>
+
+                  {/* Show Packet Weight info for HCM */}
+                  {activeScheme === 'hcm' && selectedFoodItemForCalc && (
+                    <Form.Group className="mb-3">
+                      <Form.Label>Packet Weight (1 packet = ? grams)</Form.Label>
+                      <Form.Control
+                        type="text"
+                        value={`${selectedFoodItemForCalc.qty_per_ben} ग्राम`}
+                        disabled
+                      />
+                      <Form.Text>
+                        1 packet = {selectedFoodItemForCalc.qty_per_ben}g | 
+                        Daily consumption per beneficiary = {selectedFoodItemForCalc.daily_consumption_qty}g
+                      </Form.Text>
+                    </Form.Group>
+                  )}
+
                   <div className="d-flex justify-content-end">
                     <Button variant="secondary" onClick={handleCloseDistributionModal} className="me-2">
                       Cancel
@@ -1014,7 +1140,15 @@ const AnganwadiDashboard = () => {
                   <ListGroup.Item><FaHashtag className="view-modal-icon" /> <strong>AWC Code:</strong> {viewItem.awc_code}</ListGroup.Item>
                   <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>Food Item:</strong> {viewItem.food_item}</ListGroup.Item>
                   <ListGroup.Item><FaUsers className="view-modal-icon" /> <strong>Beneficiaries:</strong> {viewItem.total_beneficiaries}</ListGroup.Item>
-                   <ListGroup.Item><FaWeightHanging className="view-modal-icon" /> <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}</ListGroup.Item>
+                   <ListGroup.Item>
+                     <FaWeightHanging className="view-modal-icon" /> 
+                     <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}
+                     {activeScheme === 'hcm' && viewItem.quantity && (
+                       <span className="text-muted ms-2">
+                         ({(parseFloat(viewItem.quantity) / 1000).toFixed(2)} kg)
+                       </span>
+                     )}
+                   </ListGroup.Item>
                    <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Date:</strong> {viewItem.date ? new Date(viewItem.date).toLocaleDateString() : '-'}</ListGroup.Item>
                    <ListGroup.Item><FaHashtag className="view-modal-icon" /> <strong>Expired Quantity:</strong> {viewItem.expired_quantity || 0}</ListGroup.Item>
                    <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>Anganwadi Remark:</strong> {viewItem.anganwadi_remark || '-'}</ListGroup.Item>
