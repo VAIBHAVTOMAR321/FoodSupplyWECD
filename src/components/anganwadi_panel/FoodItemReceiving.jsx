@@ -327,12 +327,10 @@ const FoodItemReceiving = () => {
 
   // Dynamically calculate available months ONLY for the selected food item
   const availableMonthsForSelectedFoodItem = useMemo(() => {
-    // If no food item selected, or no field_name mapped, no months are available yet.
     if (!formData.field_name || suppNutritionData.length === 0) return [];
 
     const monthsFromData = new Set();
     suppNutritionData.forEach(rec => {
-      // Check if the specific food item has a quantity > 0 in this record
       const quantity = parseInt(rec[formData.field_name], 10) || 0;
       if (quantity > 0) {
         const normalized = rec._monthKeys || normalizeSuppMonth(rec.month);
@@ -369,6 +367,43 @@ const FoodItemReceiving = () => {
     });
     return totals;
   }, [filteredSuppNutritionData]);
+
+  /**
+   * ── CORE AUTO-FETCH HELPER ──
+   * Computes the total packet count from the supplementary nutrition table
+   * for a given food item (identified by its `fieldName`) restricted to the
+   * provided `months` array. Returns 0 if no data is available.
+   *
+   * Year preference: if any matching record exists for `finYear`, only those
+   * records are counted; otherwise all matching records (any year) are summed
+   * as a fallback so packets are still autofetched.
+   */
+  const computePacketsForMonths = (monthsArray, fieldName, finYear) => {
+    if (!fieldName || !Array.isArray(monthsArray) || monthsArray.length === 0 || suppNutritionData.length === 0) {
+      return 0;
+    }
+
+    // First pass: collect all matching records (any year) for the requested months
+    const matchingRecords = suppNutritionData.filter(rec => {
+      const qty = parseInt(rec[fieldName], 10) || 0;
+      if (qty <= 0) return false;
+      const recMonth = rec._monthKeys || normalizeSuppMonth(rec.month);
+      return recMonth && monthsArray.includes(recMonth);
+    });
+
+    if (matchingRecords.length === 0) return 0;
+
+    // If a finYear is supplied, prefer records matching that year (per month)
+    if (finYear) {
+      const yearMatched = matchingRecords.filter(rec => rec.financial_year === finYear);
+      if (yearMatched.length > 0) {
+        return yearMatched.reduce((sum, rec) => sum + (parseInt(rec[fieldName], 10) || 0), 0);
+      }
+    }
+
+    // Fallback: sum all matching records regardless of year
+    return matchingRecords.reduce((sum, rec) => sum + (parseInt(rec[fieldName], 10) || 0), 0);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -472,6 +507,13 @@ const FoodItemReceiving = () => {
       const foodItemValue = (optionMatch && item.bene_category)
         ? `${item.food_item}|||${item.bene_category}`
         : item.food_item;
+      const fieldName = optionMatch?.field_name || '';
+
+      // When editing, autofetch packet total for the existing months too
+      const autoQty = fieldName
+        ? computePacketsForMonths(parsedMonths, fieldName, item.fin_year)
+        : item.quantity;
+
       setFormData({
         ...item,
         date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
@@ -480,6 +522,9 @@ const FoodItemReceiving = () => {
         months: parsedMonths,
         quarter: item.quarter || '',
         food_item_value: foodItemValue,
+        field_name: fieldName,
+        // Keep the original quantity (don't override on edit) — user can still toggle months to recalc
+        quantity: String(item.quantity ?? ''),
       });
     } else {
       setFormData({
@@ -487,7 +532,8 @@ const FoodItemReceiving = () => {
         date: new Date().toISOString().split('T')[0],
         max_expirydate: '',
         curr_month: getCurrentMonth(),
-        fin_year: getCurrentFinancialYear(), months: [], quarter: ''
+        fin_year: getCurrentFinancialYear(), months: [], quarter: '',
+        field_name: '',
       });
     }
     setFormError('');
@@ -514,6 +560,14 @@ const FoodItemReceiving = () => {
     return foodItemOptions.filter(item => item.category === tabCategory);
   }, [foodItemOptions, activeTab]);
 
+  /**
+   * ── AUTO-FETCH PACKETS FROM SUPPLEMENTARY NUTRITION TABLE ──
+   * When a food item is selected:
+   *   1. Resolve `field_name` from food-item-master (foodItemOptions)
+   *   2. Find ALL supp nutrition records where that field_name has qty > 0
+   *   3. Pre-select every available month
+   *   4. Set packets = sum of all matching record quantities (using computePacketsForMonths)
+   */
   const handleFormChange = (e) => {
     const { name, value } = e.target;
 
@@ -525,35 +579,53 @@ const FoodItemReceiving = () => {
           ? String(item.beneficiary_category || FOOD_BENE_CATEGORY_MAP[item.food_item] || '') === selectedBeneCategory
           : true)
       );
+
       let autoUnit = 'Packets';
-      let autoQuantity = '';
       let autoFieldName = '';
       let autoBeneCategory = '';
-      let autoMonths = [];
 
       if (selectedItem) {
         autoFieldName = selectedItem.field_name || '';
-        autoBeneCategory = selectedItem.beneficiary_category || FOOD_BENE_CATEGORY_MAP[selectedFoodItem] || selectedItem.bene_category || selectedItem.category || '';
+        autoBeneCategory =
+          selectedItem.beneficiary_category ||
+          FOOD_BENE_CATEGORY_MAP[selectedFoodItem] ||
+          selectedItem.bene_category ||
+          selectedItem.category ||
+          '';
       }
 
       setFormData(prev => {
-        // Ensure we have a matching record that actually contains the food item
-        if (suppNutritionData.length > 0 && autoFieldName) {
-          const matchingRecord = suppNutritionData.find(rec => {
-            const hasItem = parseInt(rec[autoFieldName], 10) > 0;
-            const matchesYear = prev.fin_year ? rec.financial_year === prev.fin_year : true;
-            return hasItem && matchesYear;
-          });
+        const currentFinYear = prev.fin_year || getCurrentFinancialYear();
 
-          if (matchingRecord) {
-            autoQuantity = matchingRecord[autoFieldName] || '';
-            if (matchingRecord._monthKeys) {
-              autoMonths = [matchingRecord._monthKeys];
-            } else if (matchingRecord.month) {
-              const normalized = normalizeSuppMonth(matchingRecord.month);
-              if (normalized) autoMonths = [normalized];
+        // Determine ALL months where this food item has packets in supp nutrition
+        const monthSet = new Set();
+        if (autoFieldName && suppNutritionData.length > 0) {
+          suppNutritionData.forEach(rec => {
+            const qty = parseInt(rec[autoFieldName], 10) || 0;
+            if (qty > 0) {
+              const m = rec._monthKeys || normalizeSuppMonth(rec.month);
+              if (m) monthSet.add(m);
             }
-          }
+          });
+        }
+        const autoMonths = monthOptions.filter(m => monthSet.has(m.value)).map(m => m.value);
+
+        // Compute packet total for the auto-selected months
+        const autoQuantity = autoMonths.length > 0
+          ? String(computePacketsForMonths(autoMonths, autoFieldName, currentFinYear))
+          : '';
+
+        // Derive the quarter string from the auto-selected months
+        let quarterString = '';
+        if (autoMonths.length > 0) {
+          const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
+            const qMonths = quarterToMonths[qKey];
+            return (
+              autoMonths.length === qMonths.length &&
+              autoMonths.every(m => qMonths.includes(m))
+            );
+          });
+          quarterString = matchedQuarter || autoMonths.join(',');
         }
 
         return {
@@ -565,12 +637,53 @@ const FoodItemReceiving = () => {
           quantity: autoQuantity,
           bene_category: autoBeneCategory,
           months: autoMonths,
-          quarter: autoMonths.length > 0 ? (quarterToMonths[Object.keys(quarterToMonths).find(q => quarterToMonths[q].includes(autoMonths[0]))] || autoMonths.join(',')) : ''
+          quarter: quarterString,
         };
       });
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  /**
+   * ── MONTH TOGGLE HANDLER ──
+   * When a month checkbox is toggled:
+   *   - Recompute the selected months array
+   *   - Recompute the packet total based on the NEW month selection
+   *   - Update the quarter string
+   *   - Update the quantity field to reflect the new selection
+   */
+  const handleMonthToggle = (monthValue, isChecked) => {
+    setFormData(prev => {
+      const currentMonths = prev.months || [];
+      const nextMonths = isChecked
+        ? [...new Set([...currentMonths, monthValue])]
+        : currentMonths.filter(m => m !== monthValue);
+
+      // Derive quarter string from the new month selection
+      let quarterString = '';
+      if (nextMonths.length > 0) {
+        const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
+          const qMonths = quarterToMonths[qKey];
+          return (
+            nextMonths.length === qMonths.length &&
+            nextMonths.every(m => qMonths.includes(m))
+          );
+        });
+        quarterString = matchedQuarter || nextMonths.join(',');
+      }
+
+      // Recompute packet count from supp nutrition table for the new month selection
+      const currentFinYear = prev.fin_year || getCurrentFinancialYear();
+      const recomputedQty = computePacketsForMonths(nextMonths, prev.field_name, currentFinYear);
+
+      return {
+        ...prev,
+        months: nextMonths,
+        quarter: quarterString,
+        quantity: recomputedQty > 0 ? String(recomputedQty) : '',
+      };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -625,7 +738,6 @@ const FoodItemReceiving = () => {
 
     if (editingItem) {
       payload.id = editingItem.id;
-      // Include existing non-editable fields so they aren't wiped out on PUT
       payload.awc_name = editingItem.awc_name;
       payload.awc_code = editingItem.awc_code;
       payload.awc_type = editingItem.awc_type;
@@ -1104,7 +1216,7 @@ const FoodItemReceiving = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Packets</Form.Label>
+                    <Form.Label>Packets (Auto-fetched from Supplementary Nutrition)</Form.Label>
                     <InputGroup>
                       <Form.Control
                         type="number"
@@ -1124,6 +1236,16 @@ const FoodItemReceiving = () => {
                         required
                       />
                     </InputGroup>
+                    {formData.field_name && (formData.quantity === '' || formData.quantity === undefined) && (
+                      <small className="text-warning d-block mt-1">
+                        No packet data found in Supplementary Nutrition table for the selected months.
+                      </small>
+                    )}
+                    {formData.field_name && formData.quantity !== '' && formData.quantity !== undefined && Number(formData.quantity) > 0 && (
+                      <small className="text-success d-block mt-1">
+                        ✓ Packets auto-fetched for {(formData.months || []).length} selected month(s).
+                      </small>
+                    )}
                   </Form.Group>
                 </Col>
               </Row>
@@ -1199,10 +1321,11 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={12}>
                   <Form.Group className="mb-3">
-                    <h6 className="mt-2 mb-3">Select Months (Multi-Select)</h6>
+                    <h6 className="mt-2 mb-3">Select Months (Multi-Select — Packets will recalculate)</h6>
                     <div className="month-checkbox-group d-flex flex-wrap gap-2">
                       {monthOptions.map((month) => {
                         const isAvailable = availableMonthsForSelectedFoodItem.includes(month.value) || (formData.months || []).includes(month.value);
+                        const isChecked = (formData.months || []).includes(month.value);
                         return (
                           <Form.Check
                             key={month.value}
@@ -1210,27 +1333,10 @@ const FoodItemReceiving = () => {
                             type="checkbox"
                             id={`month-${month.value}`}
                             label={month.label}
-                            checked={(formData.months || []).includes(month.value)}
+                            checked={isChecked}
                             onChange={(e) => {
                               if (!isAvailable) return;
-                              setFormData(prev => {
-                                const currentMonths = prev.months || [];
-                                const nextMonths = e.target.checked
-                                  ? [...new Set([...currentMonths, month.value])]
-                                  : currentMonths.filter((m) => m !== month.value);
-
-                                let quarterString = '';
-                                if (nextMonths.length > 0) {
-                                  const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
-                                    const qMonths = quarterToMonths[qKey];
-                                    return nextMonths.length === qMonths.length && nextMonths.every(m => qMonths.includes(m));
-                                  });
-                                  if (matchedQuarter) quarterString = matchedQuarter;
-                                  else quarterString = nextMonths.join(',');
-                                }
-
-                                return { ...prev, months: nextMonths, quarter: quarterString };
-                              });
+                              handleMonthToggle(month.value, e.target.checked);
                             }}
                             disabled={!isAvailable}
                           />
@@ -1241,7 +1347,11 @@ const FoodItemReceiving = () => {
                       <small className="text-muted">Please select a food item to view available months.</small>
                     ) : availableMonthsForSelectedFoodItem.length === 0 && (formData.months || []).length === 0 ? (
                       <small className="text-muted">No months available in Supplementary Nutrition data for this food item.</small>
-                    ) : null}
+                    ) : (
+                      <small className="text-success">
+                        ✓ Toggling a month will auto-add / auto-deduct packets from the Supplementary Nutrition table.
+                      </small>
+                    )}
                   </Form.Group>
                 </Col>
               </Row>
