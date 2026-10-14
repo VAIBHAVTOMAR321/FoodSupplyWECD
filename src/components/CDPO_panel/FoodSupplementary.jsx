@@ -73,6 +73,13 @@ const monthNames = [
   "December",
 ];
 
+const quarterOptions = [
+  "Apr-May-Jun",
+  "Jul-Aug-Sep",
+  "Oct-Nov-Dec",
+  "Jan-Feb-Mar",
+];
+
 /* ── Grant-wise Excel / API schema ── */
 const GRANT_IDS = [15, 30, 31];
 const GRANT_CATEGORIES = [
@@ -96,7 +103,7 @@ const EXCEL_META_COLUMNS = [
   { header: "SECTOR", key: "sector" },
   { header: "AWC NAME", key: "awc_name" },
   { header: "AWC CODE", key: "awc_code" },
-  { header: "MONTH", key: "month" },
+  { header: "QUARTER", key: "quarter" },
   { header: "FINANCIAL YEAR", key: "financial_year" },
 ];
 const TABLE_COLUMNS = [
@@ -106,7 +113,7 @@ const TABLE_COLUMNS = [
   { label: "Sector", key: "sector" },
   { label: "AWC Name", key: "awc_name" },
   { label: "AWC Code", key: "awc_code" },
-  { label: "Month", key: "month", badge: true },
+  { label: "Quarter", key: "quarter", badge: true },
   { label: "Fin. Year", key: "financial_year" },
   { label: "Pregnant/Lactating", key: "pregnant_woman_lactating_mother", num: true },
   { label: "Children 6m-3y", key: "children_6m_3y", num: true },
@@ -136,7 +143,7 @@ const SUMMARY_PILLS = [
   { key: "multi_grain_aata_3y_6y", label: "Multi Grain Aata", icon: <FaBox size={10} /> },
 ];
 const initialFormData = {
-  id: null, awc_code: "", month: "September", financial_year: "2026-2027",
+  id: null, awc_code: "", quarter: "Oct-Nov-Dec", financial_year: "2026-2027",
   pregnant_woman_lactating_mother: 0, poushik_sattu_preg_lat: 0,
   children_6m_3y: 0, panjeeri_6m_3y: 0,
   sam_children_6m_5y_suw_children_6m_6y: 0, panjeeri_sam_6m_5y_suw_6m_6y: 0,
@@ -413,18 +420,21 @@ const FoodSupplementary = () => {
     return totals;
   }, [suppliesData, awcSuppliesData, suppliesFoodItems, suppliesViewMode]);
 
-  const uniqueMonths = useMemo(() => [...new Set(records.map((r) => r.month).filter(Boolean))].sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b)), [records]);
+  const uniqueQuarters = useMemo(
+    () => quarterOptions.filter((quarter) => records.some((record) => record.quarter === quarter)),
+    [records]
+  );
   const uniqueFYs = useMemo(() => [...new Set(records.map((r) => r.financial_year).filter(Boolean))].sort(), [records]);
   const uniqueProjects = useMemo(() => [...new Set(records.map((r) => r.project).filter(Boolean))].sort(), [records]);
   const uniqueSectors = useMemo(() => [...new Set(records.map((r) => r.sector).filter(Boolean))].sort(), [records]);
 
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
-      const m = selectedMonths.length === 0 ? true : selectedMonths.includes(r.month);
+      const q = selectedMonths.length === 0 ? true : selectedMonths.includes(r.quarter);
       const y = selectedFYs.length === 0 ? true : selectedFYs.includes(r.financial_year);
       const p = selectedProjects.length === 0 ? true : selectedProjects.includes(r.project);
       const s = selectedSectors.length === 0 ? true : selectedSectors.includes(r.sector);
-      return m && y && p && s;
+      return q && y && p && s;
     });
   }, [records, selectedMonths, selectedFYs, selectedProjects, selectedSectors]);
 
@@ -441,7 +451,7 @@ const FoodSupplementary = () => {
     if (!searchTerm.trim()) return filteredRecords;
     const term = searchTerm.toLowerCase();
     return filteredRecords.filter((r) =>
-      (r.month || "").toLowerCase().includes(term) ||
+      (r.quarter || "").toLowerCase().includes(term) ||
       (r.financial_year || "").toLowerCase().includes(term) ||
       (r.district || "").toLowerCase().includes(term) ||
       (r.project || "").toLowerCase().includes(term) ||
@@ -471,12 +481,12 @@ const FoodSupplementary = () => {
       if (!grouped[groupKey]) {
         grouped[groupKey] = {
           groupKey,
-          months: new Set(),
+          quarters: new Set(),
           fys: new Set(),
           totals: NUMERIC_AGG_FIELDS.reduce((acc, { key }) => ({ ...acc, [key]: 0 }), {}),
         };
       }
-      if (r.month) grouped[groupKey].months.add(r.month);
+      if (r.quarter) grouped[groupKey].quarters.add(r.quarter);
       if (r.financial_year) grouped[groupKey].fys.add(r.financial_year);
       NUMERIC_AGG_FIELDS.forEach(({ key }) => {
         grouped[groupKey].totals[key] += parseInt(r[key]) || 0;
@@ -484,7 +494,7 @@ const FoodSupplementary = () => {
     });
     return Object.values(grouped).map((g) => ({
       groupKey: g.groupKey,
-      months: Array.from(g.months).join(", "),
+      quarters: quarterOptions.filter((quarter) => g.quarters.has(quarter)).join(", "),
       fys: Array.from(g.fys).join(", "),
       ...g.totals,
     }));
@@ -515,7 +525,7 @@ const FoodSupplementary = () => {
       ...GRANT_CATEGORIES.flatMap(() => ["Grant 15", "Grant 30", "Grant 31", "TOTAL"]),
       ...FOOD_FIELDS.map((f) => f.header),
     ];
-    const sampleRow = ["Almora", "Bhaisiyachana [0506401]", "SERAGHAT [02]", "HATOLA-02", "5064010220", "September", "2026-2027"];
+    const sampleRow = ["Almora", "Bhaisiyachana [0506401]", "SERAGHAT [02]", "HATOLA-02", "5064010220", "Oct-Nov-Dec", "2026-2027"];
     const sampleGrantValues = [[10, 5, 10], [10, 10, 10], [4, 3, 3], [3, 2, 3], [15, 10, 15]];
     GRANT_CATEGORIES.forEach((c, idx) => {
       const [grant15, grant30, grant31] = sampleGrantValues[idx];
@@ -601,7 +611,7 @@ const FoodSupplementary = () => {
             record[food.key] = Number(row[foodStart + i]) || 0;
           });
           return record;
-        }).filter((r) => r.awc_code || r.month || r.financial_year);
+        }).filter((r) => r.awc_code || r.quarter || r.financial_year);
         if (!parsedRecords.length) throw new Error("No data rows found in the Excel file.");
 
         setShowUploadModal(true);
@@ -611,13 +621,13 @@ const FoodSupplementary = () => {
         for (let i = 0; i < parsedRecords.length; i++) {
           const rec = parsedRecords[i];
           setUploadProgress((prev) => ({ ...prev, currentRow: i + 1 }));
-          if (!rec.awc_code || !rec.month || !rec.financial_year) {
+          if (!rec.awc_code || !rec.quarter || !rec.financial_year) {
             failedCount++;
-            errorsList.push({ row: rec._rowNum, awcCode: rec.awc_code || "—", error: "AWC CODE, MONTH and FINANCIAL YEAR are required." });
+            errorsList.push({ row: rec._rowNum, awcCode: rec.awc_code || "—", error: "AWC CODE, QUARTER and FINANCIAL YEAR are required." });
             setUploadProgress((prev) => ({ ...prev, uploaded: uploadedCount, failed: failedCount, errors: [...errorsList] }));
             continue;
           }
-          const payload = { awc_code: rec.awc_code, month: rec.month, financial_year: rec.financial_year };
+          const payload = { awc_code: rec.awc_code, quarter: rec.quarter, financial_year: rec.financial_year };
           GRANT_CATEGORIES.forEach((cat) => {
             payload[cat.countKey] = Number(rec[cat.countKey]) || 0;
 
@@ -707,7 +717,7 @@ const FoodSupplementary = () => {
   const validateForm = (data) => {
     const errors = {};
     if (!data.awc_code) errors.awc_code = "AWC Code is required";
-    if (!data.month) errors.month = "Month is required";
+    if (!data.quarter) errors.quarter = "Quarter is required";
     if (!data.financial_year) errors.financial_year = "Financial year is required";
     return errors;
   };
@@ -764,7 +774,7 @@ const FoodSupplementary = () => {
         <Form.Label className="fs-field-label">{label}</Form.Label>
         {isSelect ? (
           <Form.Select name={name} value={formData[name] ?? ""} onChange={handleInputChange} className={formErrors[name] ? "is-invalid" : ""}>
-            {monthNames.map((m) => (<option key={m} value={m}>{m}</option>))}
+            {(name === "quarter" ? quarterOptions : monthNames).map((option) => (<option key={option} value={option}>{option}</option>))}
           </Form.Select>
         ) : (
           <Form.Control type={type} name={name} value={formData[name] ?? ""} onChange={handleInputChange} placeholder={placeholder} className={formErrors[name] ? "is-invalid" : ""} />
@@ -924,11 +934,11 @@ const FoodSupplementary = () => {
 
   const exportAggToExcel = () => {
     const dataToExport = aggregatedData.map((row, i) => {
-      const obj = { "S. No.": i + 1, Sector: row.groupKey, Months: row.months, "Fin. Years": row.fys };
+      const obj = { "S. No.": i + 1, Sector: row.groupKey, Quarter: row.quarters, "Fin. Years": row.fys };
       NUMERIC_AGG_FIELDS.forEach((f) => (obj[f.label] = row[f.key]));
       return obj;
     });
-    const totalObj = { "S. No.": "", Sector: "Total", Months: "", "Fin. Years": "" };
+    const totalObj = { "S. No.": "", Sector: "Total", Quarter: "", "Fin. Years": "" };
     NUMERIC_AGG_FIELDS.forEach((f) => (totalObj[f.label] = totalAggregated[f.key]));
     dataToExport.push(totalObj);
 
@@ -952,7 +962,7 @@ const FoodSupplementary = () => {
                 <tr style="background-color:#4f46e5; color:white;">
                   <th style="border:1px solid #ddd; padding:6px 4px;">S. No.</th>
                   <th style="border:1px solid #ddd; padding:6px 4px;">Sector</th>
-                  <th style="border:1px solid #ddd; padding:6px 4px;">Months</th>
+                  <th style="border:1px solid #ddd; padding:6px 4px;">Quarter</th>
                   <th style="border:1px solid #ddd; padding:6px 4px;">Fin. Years</th>
                   ${NUMERIC_AGG_FIELDS.map(f => `<th style="border:1px solid #ddd; padding:6px 4px; text-align:right;">${f.label}</th>`).join("")}
                 </tr>
@@ -962,7 +972,7 @@ const FoodSupplementary = () => {
                   <tr>
                     <td style="border:1px solid #ddd; padding:4px; text-align:center;">${i + 1}</td>
                     <td style="border:1px solid #ddd; padding:4px;"><strong>${row.groupKey}</strong></td>
-                    <td style="border:1px solid #ddd; padding:4px;">${row.months}</td>
+                    <td style="border:1px solid #ddd; padding:4px;">${row.quarters}</td>
                     <td style="border:1px solid #ddd; padding:4px;">${row.fys}</td>
                     ${NUMERIC_AGG_FIELDS.map(f => `
                       <td style="border:1px solid #ddd; padding:4px; text-align:right;">${row[f.key] ? Number(row[f.key]).toLocaleString() : 0}</td>
@@ -1109,7 +1119,7 @@ const FoodSupplementary = () => {
                         <FaSearch className="me-1" /> Search
                       </Dropdown.Toggle>
                       <Dropdown.Menu style={{ minWidth: "300px", padding: "12px" }}>
-                        <Form.Control type="text" placeholder="Search month, year, district, AWC..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="mb-2" />
+                        <Form.Control type="text" placeholder="Search quarter, year, district, AWC..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="mb-2" />
                         {searchTerm && <div className="text-muted small">Results: {searchedRecords.length}</div>}
                       </Dropdown.Menu>
                     </Dropdown>
@@ -1135,7 +1145,7 @@ const FoodSupplementary = () => {
                 <>
                   {/* ─── Multi-Select Filter Bar ─── */}
                   <div className="fs-filter-bar">
-                    <MultiSelectDropdown label="Month" options={uniqueMonths} selected={selectedMonths} onChange={setSelectedMonths} />
+                    <MultiSelectDropdown label="Quarter" options={uniqueQuarters} selected={selectedMonths} onChange={setSelectedMonths} />
                     <MultiSelectDropdown label="Financial Year" options={uniqueFYs} selected={selectedFYs} onChange={setSelectedFYs} />
                     <MultiSelectDropdown label="Project" options={uniqueProjects} selected={selectedProjects} onChange={setSelectedProjects} />
                     <MultiSelectDropdown label="Sector" options={uniqueSectors} selected={selectedSectors} onChange={setSelectedSectors} />
@@ -1408,7 +1418,7 @@ const FoodSupplementary = () => {
                                 <tr>
                                   <th>S. No.</th>
                                   <th>Sector</th>
-                                  <th>Months</th>
+                                  <th>Quarter</th>
                                   <th>Fin. Years</th>
                                   {NUMERIC_AGG_FIELDS.map((col, idx) => (
                                     <th key={idx} className="text-end">{col.label}</th>
@@ -1427,7 +1437,7 @@ const FoodSupplementary = () => {
                                     <tr key={idx}>
                                       <td>{idx + 1}</td>
                                       <td><strong>{row.groupKey}</strong></td>
-                                      <td>{row.months}</td>
+                                      <td>{row.quarters}</td>
                                       <td>{row.fys}</td>
                                       {NUMERIC_AGG_FIELDS.map((col, cIdx) => (
                                         <td key={cIdx} className="text-end">
@@ -1521,8 +1531,8 @@ const FoodSupplementary = () => {
                                   <tr key={record.id || index}>
                                     <td className="text-center text-muted">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                                     {EXCEL_META_COLUMNS.map((col) => (
-                                      <td key={col.key} className={col.key === "month" ? "text-center" : ""}>
-                                        {col.key === "month" && record[col.key]
+                                      <td key={col.key} className={col.key === "quarter" ? "text-center" : ""}>
+                                        {col.key === "quarter" && record[col.key]
                                           ? <Badge className="fs-month-badge">{record[col.key]}</Badge>
                                           : (record[col.key] || "—")}
                                       </td>
@@ -1624,7 +1634,7 @@ const FoodSupplementary = () => {
                       <h6 className="fs-section-subtitle">Basic Information</h6>
                       <Row>
                         <Col md={6} lg={4}>{renderFormField("AWC Code", "awc_code", "text", "5064010220")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Month", "month", "select")}</Col>
+                        <Col md={6} lg={4}>{renderFormField("Quarter", "quarter", "select")}</Col>
                         <Col md={6} lg={4}>{renderFormField("Financial Year", "financial_year", "text", "2026-2027")}</Col>
                       </Row>
                     </div>
@@ -1738,7 +1748,7 @@ const FoodSupplementary = () => {
           {deleteTarget && (
             <div className="fs-delete-detail">
               <strong>AWC Code:</strong> {deleteTarget.awc_code} &nbsp;|&nbsp;
-              <strong>Month:</strong> {deleteTarget.month} &nbsp;|&nbsp;
+              <strong>Quarter:</strong> {deleteTarget.quarter} &nbsp;|&nbsp;
               <strong>Year:</strong> {deleteTarget.financial_year} &nbsp;|&nbsp;
               <strong>Pregnant/Lactating Count:</strong> {deleteTarget.pregnant_woman_lactating_mother}
             </div>
@@ -1766,7 +1776,7 @@ const FoodSupplementary = () => {
                   <Col md={6}><strong>Sector:</strong> {viewRecord.sector || "—"}</Col>
                   <Col md={6}><strong>AWC Name:</strong> {viewRecord.awc_name || "—"}</Col>
                   <Col md={6}><strong>AWC Code:</strong> {viewRecord.awc_code}</Col>
-                  <Col md={6}><strong>Month:</strong> {viewRecord.month}</Col>
+                  <Col md={6}><strong>Quarter:</strong> {viewRecord.quarter}</Col>
                   <Col md={6}><strong>Financial Year:</strong> {viewRecord.financial_year}</Col>
                 </Row>
               </div>
