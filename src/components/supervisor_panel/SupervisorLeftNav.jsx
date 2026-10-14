@@ -82,26 +82,7 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
         active: true,
       },
 
-      {
-        icon: <FaBook />,
-        label: "AWC List",
-        path: "/AwcAganWadi",
-        active: true,
-      },
-
-       {
-        icon: <FaBook />,
-        label: "Stock Allocation",
-        path: "/StockAllocation",
-        active: true,
-      },
-
-{
-         icon: <FaBuilding />,
-         label: "Sector Profile",
-         path: "/SectorProfile",
-         active: true,
-       },
+      
        
 
       //   {
@@ -143,7 +124,26 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
               icon: <FaFileAlt />,
             },
           ],
-        },
+        },{
+        icon: <FaBook />,
+        label: "AWC List",
+        path: "/AwcAganWadi",
+        active: true,
+      },
+
+       {
+        icon: <FaBook />,
+        label: "Stock Allocation",
+        path: "/StockAllocation",
+        active: true,
+      },
+
+{
+         icon: <FaBuilding />,
+         label: "Sector Profile",
+         path: "/SectorProfile",
+         active: true,
+       },
             
    
     
