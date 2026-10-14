@@ -14,6 +14,13 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
+// Helper to format months array to string
+const formatMonthsArray = (months) => {
+  if (!months) return "";
+  if (Array.isArray(months)) return months.join(", ");
+  return months;
+};
+
 const HcmSupervisorDistributions = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -49,7 +56,7 @@ const HcmSupervisorDistributions = () => {
     { dataField: '#', text: '#', visible: true },
     { dataField: 'awc_name', text: 'AWC Name', visible: true },
     { dataField: 'awc_code', text: 'AWC Code', visible: true },
-    { dataField: 'awc_type', text: 'AWC Type', visible: true },
+    { dataField: 'awc_type', text: 'AWC Type', visible: false },
     { dataField: 'sector', text: 'Sector', visible: true },
     { dataField: 'project', text: 'Project', visible: true },
     { dataField: 'district', text: 'District', visible: true },
@@ -57,10 +64,11 @@ const HcmSupervisorDistributions = () => {
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
     { dataField: 'date', text: 'Date', visible: true },
+    { dataField: 'fin_year', text: 'Fin Year', visible: true },
+    { dataField: 'months', text: 'Months', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
-    { dataField: 'expired_quantity', text: 'Expired Qty', visible: true },
     { dataField: 'anganwadi_remark', text: 'Remark', visible: true },
     { dataField: 'sector_status', text: 'Sector Status', visible: true },
     { dataField: 'action', text: 'Action', visible: true },
@@ -442,6 +450,8 @@ const HcmSupervisorDistributions = () => {
         if (col.dataField !== '#') {
           if (col.dataField === 'date' && row[col.dataField]) {
             newRow[col.text] = new Date(row[col.dataField]).toLocaleDateString('en-GB');
+          } else if (col.dataField === 'months') {
+            newRow[col.text] = formatMonthsArray(row.months);
           } else {
             newRow[col.text] = row[col.dataField];
           }
@@ -726,6 +736,8 @@ const HcmSupervisorDistributions = () => {
                                   cellContent = index + 1;
                                 } else if (col.dataField === 'date' && row[col.dataField]) {
                                   cellContent = new Date(row[col.dataField]).toLocaleDateString('en-GB');
+                                } else if (col.dataField === 'months') {
+                                  cellContent = formatMonthsArray(row.months);
                                 } else if (col.dataField === 'bene_category') {
                                   cellContent = <div>{row[col.dataField]}</div>;
                                   cellClassName = 'bene-category-cell'; // This class remains on the <td>

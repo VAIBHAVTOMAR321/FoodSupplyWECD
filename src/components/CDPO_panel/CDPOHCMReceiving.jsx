@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   Container, Alert, Spinner, Card, Table, Row, Col,
   Pagination, Dropdown, Tabs, Tab, Button, Modal, Form,
-  ListGroup,
+  ListGroup, Badge,
 } from "react-bootstrap";
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
@@ -45,6 +45,14 @@ const formatMonths = (monthsOrQuarter) => {
   return monthsOrQuarter; // Fallback for single month strings or other formats
 };
 
+const getStatusVariant = (status) => {
+  switch (status) {
+    case "approved": return "success";
+    case "rejected": return "danger";
+    default: return "warning";
+  }
+};
+
 const CDPOHCMReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -76,6 +84,8 @@ const CDPOHCMReceiving = () => {
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
     { dataField: "months", text: "Months", visible: true },
+    { dataField: "quarter", text: "Trimester", visible: true },
+    { dataField: "sector_status", text: "Sector Status", visible: true },
     { dataField: "curr_month", text: "Current Month", visible: true },
     { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
     { dataField: "date", text: "Date", visible: true },
@@ -212,6 +222,10 @@ const CDPOHCMReceiving = () => {
       visCols.forEach((col) => {
         if (col.dataField === 'months') {
           r[col.text] = formatMonths(row.months || row.quarter);
+        } else if (col.dataField === 'quarter') {
+          r[col.text] = row.quarter || '';
+        } else if (col.dataField === 'sector_status') {
+          r[col.text] = row.sector_status || 'pending';
         } else if (col.dataField === 'max_expirydate') {
           r[col.text] = row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString('en-CA') : '';
         } else {
@@ -437,32 +451,36 @@ const CDPOHCMReceiving = () => {
                           <tbody>
                             {currentItems.map((row, index) => (
                               <tr key={row.id}>
-                                {visibleColumns.map((col) => (
-                                  <td key={col.dataField}>
-                                    {col.dataField === "#"
-                                      ? (currentPage - 1) * itemsPerPage + index + 1
-                                      : col.dataField === 'months'
-                                      ? formatMonths(row.months || row.quarter)
-                                      : col.dataField === 'max_expirydate'
-                                      ? (row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString() : '-')
-                                      : col.dataField === 'actions'
-                                      ? (
-                                        <div className="d-flex gap-1 flex-wrap">
-                                          {hasPacketExpiry(row) && (
-                                            <Button
-                                              variant="outline-warning"
-                                              size="sm"
-                                              onClick={() => handleOpenExpiryModal(row)}
-                                              title="View Packet Expiry Details"
-                                            >
-                                              <FaCalendarCheck /> Expiry
-                                            </Button>
-                                          )}
-                                        </div>
-                                      )
-                                      : row[col.dataField]}
-                                  </td>
-                                ))}
+{visibleColumns.map((col) => (
+                                    <td key={col.dataField}>
+                                      {col.dataField === "#"
+                                        ? (currentPage - 1) * itemsPerPage + index + 1
+                                        : col.dataField === 'months'
+                                        ? formatMonths(row.months || row.quarter)
+                                        : col.dataField === 'quarter'
+                                        ? (row.quarter || '-')
+                                        : col.dataField === 'sector_status'
+                                        ? <Badge bg={getStatusVariant(row.sector_status)}>{row.sector_status || 'pending'}</Badge>
+                                        : col.dataField === 'max_expirydate'
+                                        ? (row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString() : '-')
+                                        : col.dataField === 'actions'
+                                        ? (
+                                            <div className="d-flex gap-1 flex-wrap">
+                                              {hasPacketExpiry(row) && (
+                                                <Button
+                                                  variant="outline-warning"
+                                                  size="sm"
+                                                  onClick={() => handleOpenExpiryModal(row)}
+                                                  title="View Packet Expiry Details"
+                                                >
+                                                  <FaCalendarCheck /> Expiry
+                                                </Button>
+                                              )}
+                                            </div>
+                                          )
+                                        : row[col.dataField]}
+                                    </td>
+                                  ))}
                               </tr>
                             ))}
                           </tbody>

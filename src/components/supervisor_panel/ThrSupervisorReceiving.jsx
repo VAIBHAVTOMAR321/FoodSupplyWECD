@@ -98,6 +98,7 @@ const ThrSupervisorReceiving = () => {
     { dataField: "bene_category", text: "Beneficiary Category", visible: true },
     { dataField: "date", text: "Date", visible: true },
     { dataField: "fin_year", text: "Financial Year", visible: true },
+    { dataField: "quarter", text: "Trimester", visible: true },
     { dataField: "months", text: "Months", visible: true },
     { dataField: "curr_month", text: "Current Month", visible: true },
     { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
@@ -462,6 +463,8 @@ const ThrSupervisorReceiving = () => {
           row[col.text] = item.max_expirydate ? new Date(item.max_expirydate).toLocaleDateString('en-CA') : '';
         } else if (col.dataField === 'months') {
           row[col.text] = (item.months || []).map(m => monthLabels[m] || m).join(', ');
+        } else if (col.dataField === 'quarter') {
+          row[col.text] = item.quarter || '';
         } else {
           row[col.text] = item[col.dataField];
         }
@@ -651,6 +654,9 @@ const ThrSupervisorReceiving = () => {
                               break;
                             case "months":
                               cellContent = (item.months || []).map(m => monthLabels[m] || m).join(', ');
+                              break;
+                            case "quarter":
+                              cellContent = item.quarter || '-';
                               break;
                             case "sector_status":
                               if (isPrinting) {

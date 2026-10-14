@@ -129,11 +129,11 @@ const hideFooterRoutes = ["/DirectorHCMReceiving", "/CDPOFoodSupplementary", "/D
               <CdpoAWCList />
             </ProtectedRoute>
           } />
-            <Route path="/CDPOFoodSupplementary" element={
+            {/* <Route path="/CDPOFoodSupplementary" element={
             <ProtectedRoute>
               <CDPOFoodSupplementary />
             </ProtectedRoute>
-          } />
+          } /> */}
 
            <Route path="/CDPOHCMReceiving" element={
             <ProtectedRoute>
