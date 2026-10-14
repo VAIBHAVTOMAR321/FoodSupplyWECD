@@ -61,7 +61,7 @@ const EXCEL_META_COLUMNS = [
   { header: "SECTOR", key: "sector" },
   { header: "AWC NAME", key: "awc_name" },
   { header: "AWC CODE", key: "awc_code" },
-  { header: "MONTH", key: "month" },
+  { header: "Trimester", key: "quarter" },
   { header: "FINANCIAL YEAR", key: "financial_year" },
 ];
 const NUMERIC_TOTAL_KEYS = [
@@ -352,7 +352,7 @@ const FoodItemReceiving = () => {
   const [showExpiryModal, setShowExpiryModal] = useState(false);
   const [expiryViewItem, setExpiryViewItem] = useState(null);
 
-  const [suppFilters, setSuppFilters] = useState({ month: '', financial_year: '' });
+  const [suppFilters, setSuppFilters] = useState({ quarter: '', financial_year: '' });
   const [filters, setFilters] = useState({ fin_year: '', months: [] });
   const [uniqueFilterOptions, setUniqueFilterOptions] = useState({
     hcm: { fin_year: [], months: [] },
@@ -388,9 +388,26 @@ const FoodItemReceiving = () => {
     return monthOptions.filter(m => monthsFromData.has(m.value)).map(m => m.value);
   }, [suppNutritionData, formData.field_name]);
 
-  const suppUniqueMonths = useMemo(() => {
-    return [...new Set(suppNutritionData.map(r => r.month).filter(Boolean))]
-      .sort((a, b) => monthOptions.findIndex(m => m.value === a) - monthOptions.findIndex(m => m.value === b));
+  const suppUniqueQuarters = useMemo(() => {
+    const quarterOrder = [
+      'Apr-May-Jun',
+      'Jul-Aug-Sep',
+      'Oct-Nov-Dec',
+      'Jan-Feb-Mar',
+      'April-May-June',
+      'July-August-September',
+      'October-November-December',
+      'January-February-March',
+    ];
+    return [...new Set(suppNutritionData.map(r => r.quarter).filter(Boolean))]
+      .sort((a, b) => {
+        const aIndex = quarterOrder.indexOf(String(a).trim());
+        const bIndex = quarterOrder.indexOf(String(b).trim());
+        if (aIndex === -1 && bIndex === -1) return String(a).localeCompare(String(b));
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      });
   }, [suppNutritionData]);
 
   const suppUniqueFYs = useMemo(() => {
@@ -399,9 +416,9 @@ const FoodItemReceiving = () => {
 
   const filteredSuppNutritionData = useMemo(() => {
     return suppNutritionData.filter(rec => {
-      const monthMatch = !suppFilters.month || rec.month === suppFilters.month;
+      const quarterMatch = !suppFilters.quarter || String(rec.quarter || '') === suppFilters.quarter;
       const fyMatch = !suppFilters.financial_year || rec.financial_year === suppFilters.financial_year;
-      return monthMatch && fyMatch;
+      return quarterMatch && fyMatch;
     });
   }, [suppNutritionData, suppFilters]);
 
@@ -522,7 +539,7 @@ const FoodItemReceiving = () => {
   };
 
   const resetSuppFilters = () => {
-    setSuppFilters({ month: '', financial_year: '' });
+    setSuppFilters({ quarter: '', financial_year: '' });
   };
 
   const handleMultiSelectChange = (filterName, value) => {
@@ -1095,10 +1112,12 @@ const FoodItemReceiving = () => {
           <Row className="mb-3 g-2 align-items-end">
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Month</Form.Label>
-                <Form.Select name="month" value={suppFilters.month} onChange={handleSuppFilterChange}>
-                  <option value="">All Months</option>
-                  {suppUniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                <Form.Label>Quarter</Form.Label>
+                <Form.Select name="quarter" value={suppFilters.quarter} onChange={handleSuppFilterChange}>
+                  <option value="">All Quarters</option>
+                  {suppUniqueQuarters.map(quarter => (
+                    <option key={quarter} value={quarter}>{quarter}</option>
+                  ))}
                 </Form.Select>
               </Form.Group>
             </Col>
@@ -1162,9 +1181,9 @@ const FoodItemReceiving = () => {
                   <tr key={rec.id || index}>
                     <td className="text-center text-muted">{index + 1}</td>
                     {EXCEL_META_COLUMNS.map((col) => (
-                      <td key={col.key} className={col.key === "month" ? "text-center" : ""}>
-                        {col.key === "month" && rec[col.key] ? (
-                          <Badge className="supp-month-badge">{rec[col.key]}</Badge>
+                      <td key={col.key} className={col.key === "quarter" ? "text-center" : ""}>
+                        {col.key === "quarter" && rec[col.key] ? (
+                          <Badge className="supp-quarter-badge">{rec[col.key]}</Badge>
                         ) : (
                           rec[col.key] || "—"
                         )}
