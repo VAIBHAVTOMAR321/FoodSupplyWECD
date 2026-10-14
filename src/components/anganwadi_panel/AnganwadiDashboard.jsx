@@ -827,7 +827,16 @@ const AnganwadiDashboard = () => {
         ? existingRecord.months
         : Array.isArray(existingRecord.quarter)
           ? existingRecord.quarter
-          : quarterToMonths[existingRecord.quarter] || [];
+          : quarterToMonths[existingRecord.quarter] ||
+            trimesterToMonths[normalizeTrimester(existingRecord.trimester || existingRecord.quarter)] ||
+            [];
+
+      // Existing distribution records store the selected trimester in `quarter`,
+      // matching the HCM/THR Receiving API contract.
+      const existingTrimester = normalizeTrimester(
+        existingRecord.trimester || existingRecord.quarter,
+        existingMonths,
+      );
 
       setDistributionData({
         total_beneficiaries: existingRecord.total_beneficiaries,
@@ -856,6 +865,8 @@ const AnganwadiDashboard = () => {
         fin_year: getCurrentFinancialYear(),
 
         months: [],
+
+        trimester: "",
 
         food_item_id: "",
 
@@ -1217,9 +1228,20 @@ const AnganwadiDashboard = () => {
       ? distributionData.months
       : [];
 
-    const selectedTrimester = distributionData.trimester;
-    // Keep `quarter` as the backend field for compatibility. The UI uses trimester terminology.
+    // Use the exact same trimester value format as HCM/THR Receiving:
+    // quarter: "Apr-May-Jun" | "Jul-Aug-Sep" | "Oct-Nov-Dec" | "Jan-Feb-Mar".
+    // The backend receiving APIs persist this value in the `quarter` field.
+    const selectedTrimester =
+      normalizeTrimester(distributionData.trimester, selectedMonths) ||
+      distributionData.trimester ||
+      "";
     const quarterString = selectedTrimester;
+
+    if (!quarterString || !trimesterToMonths[quarterString]) {
+      setDistributionError("कृपया वितरण के लिए सही Trimester चुनें।");
+      setSubmitting(false);
+      return;
+    }
 
     let payload = {
       food_item: selectedFoodItemDetails.food_item,
@@ -1238,9 +1260,11 @@ const AnganwadiDashboard = () => {
 
       months: selectedMonths,
 
-      trimester: selectedTrimester,
-
+      // `quarter` is the backend field, same as Receiving; `trimester` is
+      // also sent for APIs/serializers that expose the explicit trimester field.
       quarter: quarterString,
+
+      trimester: quarterString,
 
       date: distributionData.date || new Date().toISOString().split("T")[0],
 
@@ -1832,6 +1856,8 @@ const AnganwadiDashboard = () => {
                           distributionData.fin_year,
 
                           distributionData.months,
+
+                          distributionData.trimester,
                         );
 
                         setDistributionData((prev) => ({
