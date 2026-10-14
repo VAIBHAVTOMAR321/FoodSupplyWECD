@@ -98,11 +98,22 @@ const monthOptions = [
   { value: 'March', label: 'March' },
 ];
 
-const quarterToMonths = {
-  'April-May-June': ['April', 'May', 'June'],
-  'July-August-September': ['July', 'August', 'September'],
-  'October-November-December': ['October', 'November', 'December'],
-  'January-February-March': ['January', 'February', 'March'],
+const TRIMESTER_OPTIONS = [
+  { value: 'Apr-May-Jun', label: 'Apr-May-Jun', months: ['April', 'May', 'June'] },
+  { value: 'Jul-Aug-Sep', label: 'Jul-Aug-Sep', months: ['July', 'August', 'September'] },
+  { value: 'Oct-Nov-Dec', label: 'Oct-Nov-Dec', months: ['October', 'November', 'December'] },
+  { value: 'Jan-Feb-Mar', label: 'Jan-Feb-Mar', months: ['January', 'February', 'March'] },
+];
+const trimesterToMonths = Object.fromEntries(TRIMESTER_OPTIONS.map(q => [q.value, q.months]));
+const normalizeTrimester = (raw) => {
+  const value = String(raw || '').trim().toLowerCase();
+  const aliases = {
+    'apr-may-jun': 'Apr-May-Jun', 'april-may-june': 'Apr-May-Jun',
+    'jul-aug-sep': 'Jul-Aug-Sep', 'july-august-september': 'Jul-Aug-Sep',
+    'oct-nov-dec': 'Oct-Nov-Dec', 'october-november-december': 'Oct-Nov-Dec',
+    'jan-feb-mar': 'Jan-Feb-Mar', 'january-february-march': 'Jan-Feb-Mar'
+  };
+  return aliases[value] || '';
 };
 
 const monthLabels = monthOptions.reduce((acc, month) => {
@@ -144,7 +155,7 @@ const getMonthsArray = (item) => {
       return item.quarter.map(m => normalizeMonthKey(m)).filter(Boolean);
     }
     if (typeof item.quarter === 'string' && item.quarter) {
-      if (quarterToMonths[item.quarter]) return quarterToMonths[item.quarter];
+      if (trimesterToMonths[item.quarter]) return trimesterToMonths[item.quarter];
       return item.quarter.split(',').map(m => normalizeMonthKey(m)).filter(Boolean);
     }
     return [];
@@ -376,20 +387,45 @@ const FoodItemReceiving = () => {
   };
 
   const availableMonthsForSelectedFoodItem = useMemo(() => {
-    if (!formData.field_name || suppNutritionData.length === 0) return [];
-    const monthsFromData = new Set();
+    const trimesterMonths = trimesterToMonths[normalizeTrimester(formData.quarter)] || [];
+    if (!formData.field_name || !formData.quarter) return trimesterMonths;
+    const dataMonths = new Set();
     suppNutritionData.forEach(rec => {
-      const quantity = parseInt(rec[formData.field_name], 10) || 0;
-      if (quantity > 0) {
-        const normalized = rec._monthKeys || normalizeSuppMonth(rec.month);
-        if (normalized) monthsFromData.add(normalized);
+      const recTrimester = normalizeTrimester(rec.quarter);
+      const quantity = Number(rec[formData.field_name]) || 0;
+      if (recTrimester === normalizeTrimester(formData.quarter) && quantity > 0) {
+        const month = rec._monthKeys || normalizeSuppMonth(rec.month);
+        if (month) dataMonths.add(month);
       }
     });
-    return monthOptions.filter(m => monthsFromData.has(m.value)).map(m => m.value);
-  }, [suppNutritionData, formData.field_name]);
+    // Show only months belonging to the selected trimester. Months remain selectable
+    // for recording receiving; they do not drive the auto-fetched packet total.
+    return trimesterMonths;
+  }, [suppNutritionData, formData.field_name, formData.quarter]);
 
-  const suppUniqueQuarters = useMemo(() => {
-    const quarterOrder = [
+  // A trimester is available only when Supplementary Nutrition contains
+  // a positive allocation for the selected food field (or any food field
+  // before a food item has been selected).
+  const selectedTrimesterHasData = useMemo(() => {
+    const selectedTrimester = normalizeTrimester(formData.quarter);
+    if (!selectedTrimester) return true;
+
+    const trimesterRecords = suppNutritionData.filter(
+      rec => normalizeTrimester(rec.quarter) === selectedTrimester
+    );
+    if (!trimesterRecords.length) return false;
+
+    const fieldsToCheck = formData.field_name
+      ? [formData.field_name]
+      : FOOD_FIELDS.map(food => food.key);
+
+    return trimesterRecords.some(rec =>
+      fieldsToCheck.some(field => Number(rec[field]) > 0)
+    );
+  }, [suppNutritionData, formData.quarter, formData.field_name]);
+
+  const suppUniqueTrimesters = useMemo(() => {
+    const trimesterOrder = [
       'Apr-May-Jun',
       'Jul-Aug-Sep',
       'Oct-Nov-Dec',
@@ -401,8 +437,8 @@ const FoodItemReceiving = () => {
     ];
     return [...new Set(suppNutritionData.map(r => r.quarter).filter(Boolean))]
       .sort((a, b) => {
-        const aIndex = quarterOrder.indexOf(String(a).trim());
-        const bIndex = quarterOrder.indexOf(String(b).trim());
+        const aIndex = trimesterOrder.indexOf(String(a).trim());
+        const bIndex = trimesterOrder.indexOf(String(b).trim());
         if (aIndex === -1 && bIndex === -1) return String(a).localeCompare(String(b));
         if (aIndex === -1) return 1;
         if (bIndex === -1) return -1;
@@ -416,9 +452,9 @@ const FoodItemReceiving = () => {
 
   const filteredSuppNutritionData = useMemo(() => {
     return suppNutritionData.filter(rec => {
-      const quarterMatch = !suppFilters.quarter || String(rec.quarter || '') === suppFilters.quarter;
+      const trimesterMatch = !suppFilters.quarter || String(rec.quarter || '') === suppFilters.quarter;
       const fyMatch = !suppFilters.financial_year || rec.financial_year === suppFilters.financial_year;
-      return quarterMatch && fyMatch;
+      return trimesterMatch && fyMatch;
     });
   }, [suppNutritionData, suppFilters]);
 
@@ -430,25 +466,72 @@ const FoodItemReceiving = () => {
     return totals;
   }, [filteredSuppNutritionData]);
 
-  const computePacketsForMonths = (monthsArray, fieldName, finYear) => {
-    if (!fieldName || !Array.isArray(monthsArray) || monthsArray.length === 0 || suppNutritionData.length === 0) {
-      return 0;
-    }
+  const computePacketsForTrimester = (trimester, fieldName, finYear) => {
+    const selectedTrimester = normalizeTrimester(trimester);
+    if (!selectedTrimester || !fieldName || !Array.isArray(suppNutritionData) || suppNutritionData.length === 0) return 0;
+
+    // Use the exact food-item field selected from the Category/Food Item API.
+    // Supplementary Nutrition can contain financial-year values in different formats,
+    // so trimester matching is primary and FY matching is applied only when it finds rows.
     const matchingRecords = suppNutritionData.filter(rec => {
-      const qty = parseInt(rec[fieldName], 10) || 0;
-      if (qty <= 0) return false;
-      const recMonth = rec._monthKeys || normalizeSuppMonth(rec.month);
-      return recMonth && monthsArray.includes(recMonth);
+      if (normalizeTrimester(rec.quarter) !== selectedTrimester) return false;
+      const rawValue = rec[fieldName];
+      return rawValue !== null && rawValue !== undefined && String(rawValue).trim() !== '' && Number.isFinite(Number(rawValue));
     });
-    if (matchingRecords.length === 0) return 0;
-    if (finYear) {
-      const yearMatched = matchingRecords.filter(rec => rec.financial_year === finYear);
-      if (yearMatched.length > 0) {
-        return yearMatched.reduce((sum, rec) => sum + (parseInt(rec[fieldName], 10) || 0), 0);
-      }
-    }
-    return matchingRecords.reduce((sum, rec) => sum + (parseInt(rec[fieldName], 10) || 0), 0);
+
+    if (!matchingRecords.length) return 0;
+
+    const normalizeFY = (value) => {
+      const str = String(value || '').trim();
+      const match = str.match(/(\d{4})\s*[-–/]\s*(\d{2,4})/);
+      if (!match) return str.toLowerCase();
+      const start = Number(match[1]);
+      const end = String(match[2]).length === 2 ? String(start + 1).slice(-2) : String(Number(match[2])).slice(-2);
+      return `${start}-${end}`;
+    };
+    const normalizedSelectedFY = normalizeFY(finYear);
+    const yearMatched = normalizedSelectedFY
+      ? matchingRecords.filter(rec => normalizeFY(rec.financial_year || rec.fin_year) === normalizedSelectedFY)
+      : [];
+
+    // Important: do not return zero just because the FY text differs (e.g. 2026-27 vs 2026-27).
+    // If no rows match the FY format, sum all records for the selected trimester, as the old
+    // month-based implementation did when it could not find an FY match.
+    const recordsToSum = yearMatched.length ? yearMatched : matchingRecords;
+    return recordsToSum.reduce((sum, rec) => sum + (Number(rec[fieldName]) || 0), 0);
   };
+
+  // Remaining allocation = Supplementary Nutrition allocation for the selected
+  // trimester/food item minus packets already received in this HCM or THR tab.
+  // When editing, exclude the record being edited so its own quantity is not deducted.
+  const getRemainingAllocatedPackets = ({
+    trimester, fieldName, finYear, foodItem, beneCategory, excludeId = null,
+  }) => {
+    const allocated = computePacketsForTrimester(trimester, fieldName, finYear);
+    const records = activeTab === 'thr' ? thrReceivings : hcmReceivings;
+    const normalizeFY = (value) => String(value || '').trim().replace(/[–/]/g, '-').toLowerCase();
+    const alreadyReceived = records.reduce((sum, rec) => {
+      if (excludeId != null && String(rec.id) === String(excludeId)) return sum;
+      if (rec.food_item !== foodItem) return sum;
+      if (normalizeTrimester(rec.quarter) !== normalizeTrimester(trimester)) return sum;
+      if (normalizeFY(rec.fin_year) !== normalizeFY(finYear)) return sum;
+      if (beneCategory && rec.bene_category && String(rec.bene_category) !== String(beneCategory)) return sum;
+      return sum + (Number(rec.quantity) || 0);
+    }, 0);
+    return Math.max(0, allocated - alreadyReceived);
+  };
+
+  const remainingAllocation = useMemo(() => {
+    if (!formData.field_name || !formData.quarter || !formData.food_item) return 0;
+    return getRemainingAllocatedPackets({
+      trimester: formData.quarter,
+      fieldName: formData.field_name,
+      finYear: formData.fin_year || getCurrentFinancialYear(),
+      foodItem: formData.food_item,
+      beneCategory: formData.bene_category,
+      excludeId: editingItem ? editingItem.id : null,
+    });
+  }, [formData.field_name, formData.quarter, formData.food_item, formData.bene_category, formData.fin_year, editingItem, activeTab, suppNutritionData, hcmReceivings, thrReceivings]);
 
   const packetExpiryTotal = useMemo(() => {
     const rows = formData.packet_expiry || [];
@@ -580,8 +663,8 @@ const FoodItemReceiving = () => {
         date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
         max_expirydate: item.max_expirydate ? new Date(item.max_expirydate).toISOString().split('T')[0] : '',
         curr_month: item.curr_month || getCurrentMonth(),
-        months: parsedMonths,
-        quarter: item.quarter || '',
+        months: parsedMonths.filter(month => (trimesterToMonths[normalizeTrimester(item.quarter)] || []).includes(month)),
+        quarter: normalizeTrimester(item.quarter) || item.quarter || '',
         food_item_value: foodItemValue,
         field_name: fieldName,
         quantity: String(item.quantity == null ? '' : item.quantity),
@@ -637,7 +720,18 @@ const FoodItemReceiving = () => {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
 
-    if (name === 'food_item') {
+    if (name === 'quarter') {
+      const trimesterMonths = trimesterToMonths[normalizeTrimester(value)] || [];
+      setFormData(prev => ({
+        ...prev,
+        quarter: value,
+        months: (prev.months || []).filter(month => trimesterMonths.includes(month)),
+        quantity: prev.field_name && prev.food_item
+          ? String(getRemainingAllocatedPackets({ trimester: value, fieldName: prev.field_name, finYear: prev.fin_year || getCurrentFinancialYear(), foodItem: prev.food_item, beneCategory: prev.bene_category, excludeId: editingItem ? editingItem.id : null }))
+          : '',
+        packet_expiry: [['', '', '']],
+      }));
+    } else if (name === 'food_item') {
       const parts = value.split('|||');
       const selectedFoodItem = parts[0] || '';
       const selectedBeneCategory = parts[1] || '';
@@ -647,100 +741,40 @@ const FoodItemReceiving = () => {
           ? String(item.beneficiary_category || FOOD_BENE_CATEGORY_MAP[item.food_item] || '') === selectedBeneCategory
           : true)
       );
-
-      let autoUnit = 'Packets';
-      let autoFieldName = '';
-      let autoBeneCategory = '';
-
-      if (selectedItem) {
-        autoFieldName = selectedItem.field_name || '';
-        autoBeneCategory =
-          selectedItem.beneficiary_category ||
-          FOOD_BENE_CATEGORY_MAP[selectedFoodItem] ||
-          selectedItem.bene_category ||
-          selectedItem.category ||
-          '';
-      }
-
-      setFormData(prev => {
-        const currentFinYear = prev.fin_year || getCurrentFinancialYear();
-
-        const monthSet = new Set();
-        if (autoFieldName && suppNutritionData.length > 0) {
-          suppNutritionData.forEach(rec => {
-            const qty = parseInt(rec[autoFieldName], 10) || 0;
-            if (qty > 0) {
-              const m = rec._monthKeys || normalizeSuppMonth(rec.month);
-              if (m) monthSet.add(m);
-            }
-          });
-        }
-        const autoMonths = monthOptions.filter(m => monthSet.has(m.value)).map(m => m.value);
-
-        const autoQuantity = autoMonths.length > 0
-          ? String(computePacketsForMonths(autoMonths, autoFieldName, currentFinYear))
-          : '';
-
-        let quarterString = '';
-        if (autoMonths.length > 0) {
-          const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
-            const qMonths = quarterToMonths[qKey];
-            return (
-              autoMonths.length === qMonths.length &&
-              autoMonths.every(m => qMonths.includes(m))
-            );
-          });
-          quarterString = matchedQuarter || autoMonths.join(',');
-        }
-
-        return {
-          ...prev,
-          food_item: selectedFoodItem,
-          food_item_value: value,
-          field_name: autoFieldName,
-          unit: autoUnit,
-          quantity: autoQuantity,
-          bene_category: autoBeneCategory,
-          months: autoMonths,
-          quarter: quarterString,
-          packet_expiry: [['', '', '']],
-        };
-      });
+      const autoFieldName = selectedItem ? (selectedItem.field_name || '') : '';
+      const autoBeneCategory = selectedItem
+        ? (selectedItem.beneficiary_category || FOOD_BENE_CATEGORY_MAP[selectedFoodItem] || selectedItem.bene_category || selectedItem.category || '')
+        : '';
+      setFormData(prev => ({
+        ...prev,
+        food_item: selectedFoodItem,
+        food_item_value: value,
+        field_name: autoFieldName,
+        unit: 'Packets',
+        bene_category: autoBeneCategory,
+        quantity: prev.quarter && autoFieldName
+          ? String(getRemainingAllocatedPackets({ trimester: prev.quarter, fieldName: autoFieldName, finYear: prev.fin_year || getCurrentFinancialYear(), foodItem: selectedFoodItem, beneCategory: autoBeneCategory, excludeId: editingItem ? editingItem.id : null }))
+          : '',
+        months: (prev.months || []).filter(month => (trimesterToMonths[normalizeTrimester(prev.quarter)] || []).includes(month)),
+        packet_expiry: [['', '', '']],
+      }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
-    // Clear any previous error when user edits a field
     if (formError) setFormError('');
   };
 
   const handleMonthToggle = (monthValue, isChecked) => {
     setFormData(prev => {
+      const allowedMonths = trimesterToMonths[normalizeTrimester(prev.quarter)] || [];
+      if (!allowedMonths.includes(monthValue)) return prev;
       const currentMonths = prev.months || [];
       const nextMonths = isChecked
         ? Array.from(new Set([...currentMonths, monthValue]))
         : currentMonths.filter(m => m !== monthValue);
-
-      let quarterString = '';
-      if (nextMonths.length > 0) {
-        const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
-          const qMonths = quarterToMonths[qKey];
-          return (
-            nextMonths.length === qMonths.length &&
-            nextMonths.every(m => qMonths.includes(m))
-          );
-        });
-        quarterString = matchedQuarter || nextMonths.join(',');
-      }
-
-      const currentFinYear = prev.fin_year || getCurrentFinancialYear();
-      const recomputedQty = computePacketsForMonths(nextMonths, prev.field_name, currentFinYear);
-
-      return {
-        ...prev,
-        months: nextMonths,
-        quarter: quarterString,
-        quantity: recomputedQty > 0 ? String(recomputedQty) : (prev.quantity || ''),
-      };
+      // Month selection records only the months when receiving occurred.
+      // Packet quantity always comes from the selected trimester in Supplementary Nutrition.
+      return { ...prev, months: nextMonths };
     });
     if (formError) setFormError('');
   };
@@ -803,14 +837,46 @@ const FoodItemReceiving = () => {
     const parsedQuantity = parseFloat(formData.quantity) || 0;
     const selectedMonths = Array.isArray(formData.months) ? formData.months : [];
 
-    let quarterString = formData.quarter || '';
-    if (selectedMonths.length > 0) {
-      const matchedQuarter = Object.keys(quarterToMonths).find(qKey => {
-        const qMonths = quarterToMonths[qKey];
-        return selectedMonths.length === qMonths.length && selectedMonths.every(m => qMonths.includes(m));
-      });
-      if (matchedQuarter) quarterString = matchedQuarter;
-      else quarterString = selectedMonths.join(',');
+    const trimesterValue = normalizeTrimester(formData.quarter) || formData.quarter || '';
+    if (!trimesterValue) {
+      setFormErrorAndScroll('कृपया receiving के लिए trimester चुनें।');
+      setSubmitting(false);
+      return;
+    }
+
+    if (!selectedTrimesterHasData) {
+      setFormErrorAndScroll(`इस trimester (${trimesterValue}) के लिए Supplementary Nutrition में data उपलब्ध नहीं है। कृपया दूसरा trimester चुनें।`);
+      setSubmitting(false);
+      return;
+    }
+
+    const allocationLimit = getRemainingAllocatedPackets({
+      trimester: trimesterValue,
+      fieldName: formData.field_name,
+      finYear: formData.fin_year || getCurrentFinancialYear(),
+      foodItem: formData.food_item,
+      beneCategory: formData.bene_category,
+      excludeId: editingItem ? editingItem.id : null,
+    });
+    // If this allocation has already been fully received in the active HCM/THR
+    // receiving table, block another receiving record even if the user enters 0.
+    if (allocationLimit <= 0 && !editingItem) {
+      const totalAllocated = computePacketsForTrimester(
+        trimesterValue,
+        formData.field_name,
+        formData.fin_year || getCurrentFinancialYear()
+      );
+      setFormErrorAndScroll(
+        `Your receiving limit for ${trimesterValue} is ${totalAllocated} packets. All ${totalAllocated} allocated packets have already been received in ${isThr ? 'THR' : 'HCM'} Receiving. You cannot add more receiving for this food item and trimester.`
+      );
+      setSubmitting(false);
+      return;
+    }
+
+    if (parsedQuantity > allocationLimit) {
+      setFormErrorAndScroll(`Your remaining receiving limit for ${trimesterValue} is ${allocationLimit} packets. You cannot receive more than the allocated quantity.`);
+      setSubmitting(false);
+      return;
     }
 
     const existingRecords = isThr ? thrReceivings : hcmReceivings;
@@ -818,7 +884,8 @@ const FoodItemReceiving = () => {
       if (editingItem && rec.id === editingItem.id) return false;
       const recMonths = getMonthsArray(rec);
       if (rec.food_item !== formData.food_item ||
-          rec.fin_year !== (formData.fin_year || getCurrentFinancialYear())) return false;
+          rec.fin_year !== (formData.fin_year || getCurrentFinancialYear()) ||
+          normalizeTrimester(rec.quarter) !== trimesterValue) return false;
       if (formData.bene_category && rec.bene_category &&
           formData.bene_category !== rec.bene_category) return false;
       return selectedMonths.some(m => recMonths.includes(m));
@@ -878,7 +945,7 @@ const FoodItemReceiving = () => {
       date: formData.date || new Date().toISOString().split('T')[0],
       fin_year: formData.fin_year || getCurrentFinancialYear(),
       months: selectedMonths,
-      quarter: quarterString,
+      quarter: trimesterValue,
       curr_month: formData.curr_month || getCurrentMonth(),
       max_expirydate: formData.max_expirydate || null,
       packet_expiry: cleanedPacketExpiry.length > 0 ? cleanedPacketExpiry : [['', '', '']],
@@ -1029,13 +1096,14 @@ const FoodItemReceiving = () => {
           <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
             <th>#</th>
             <th>Date</th>
-            <th>Quarterly Packets Distribution</th>
+            <th>Trimester Packets Distribution</th>
             <th>Beneficiary Category</th>
             <th>Packets</th>
             <th>Unit</th>
             <th>Fin. Year</th>
             <th>Current Month</th>
             <th>Max Expiry Date</th>
+            <th>Trimester</th>
             <th>Months</th>
             <th>Sector Status</th>
             <th>Actions</th>
@@ -1053,6 +1121,7 @@ const FoodItemReceiving = () => {
               <td>{rec.fin_year}</td>
               <td>{rec.curr_month || '-'}</td>
               <td>{rec.max_expirydate ? new Date(rec.max_expirydate).toLocaleDateString() : '-'}</td>
+              <td>{normalizeTrimester(rec.quarter) || rec.quarter || '-'}</td>
               <td>{formatMonths(getMonthsArray(rec))}</td>
               <td>
                 <Badge bg={getStatusVariant(rec.sector_status)}>{rec.sector_status || 'pending'}</Badge>
@@ -1087,7 +1156,7 @@ const FoodItemReceiving = () => {
               </td>
             </tr>
           )) : (
-            <tr><td colSpan="12" className="text-center">No records found.</td></tr>
+            <tr><td colSpan="13" className="text-center">No records found.</td></tr>
           )}
         </tbody>
         {records.length > 0 && (
@@ -1095,7 +1164,7 @@ const FoodItemReceiving = () => {
             <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
               <td colSpan="4" className="text-end">Total Quantity:</td>
               <td>{totalQuantity}</td>
-              <td colSpan="7"></td>
+              <td colSpan="8"></td>
             </tr>
           </tfoot>
         )}
@@ -1112,11 +1181,11 @@ const FoodItemReceiving = () => {
           <Row className="mb-3 g-2 align-items-end">
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Quarter</Form.Label>
+                <Form.Label>Trimester</Form.Label>
                 <Form.Select name="quarter" value={suppFilters.quarter} onChange={handleSuppFilterChange}>
-                  <option value="">All Quarters</option>
-                  {suppUniqueQuarters.map(quarter => (
-                    <option key={quarter} value={quarter}>{quarter}</option>
+                  <option value="">All Trimesters</option>
+                  {suppUniqueTrimesters.map(trimester => (
+                    <option key={trimester} value={trimester}>{trimester}</option>
                   ))}
                 </Form.Select>
               </Form.Group>
@@ -1361,14 +1430,28 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Quarterly Packets Distribution</Form.Label>
+                    <Form.Label>Select Trimester</Form.Label>
+                    <Form.Select name="quarter" value={normalizeTrimester(formData.quarter) || ''} onChange={handleFormChange} required>
+                      <option value="">Select Trimester</option>
+                      {TRIMESTER_OPTIONS.map(q => <option key={q.value} value={q.value}>{q.label}</option>)}
+                    </Form.Select>
+                    {formData.quarter && !selectedTrimesterHasData && (
+                      <Alert variant="danger" className="mt-2 mb-0 py-2" role="alert">
+                        <strong>Data not available:</strong> Supplementary Nutrition data is not found for this trimester. Please select another trimester.
+                      </Alert>
+                    )}
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Trimester Packets Distribution</Form.Label>
                     <Form.Select
                       name="food_item"
                       value={formData.food_item_value || ''}
                       onChange={handleFormChange}
                       required
                     >
-                      <option value="">Select Quarterly Packets Distribution</option>
+                      <option value="">Select Trimester Packets Distribution</option>
                       {availableFoodItems.map((item, index) => {
                         const itemCategory = item.beneficiary_category || FOOD_BENE_CATEGORY_MAP[item.food_item] || '';
                         const itemValue = itemCategory
@@ -1393,8 +1476,18 @@ const FoodItemReceiving = () => {
                       <Form.Control
                         type="number"
                         name="quantity"
+                        min="0"
+                        max={remainingAllocation}
                         value={formData.quantity || ''}
-                        onChange={handleFormChange}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value !== '' && Number(value) > remainingAllocation) {
+                            setFormData(prev => ({ ...prev, quantity: String(remainingAllocation) }));
+                            setFormError(`Maximum packets available for receiving: ${remainingAllocation}.`);
+                          } else {
+                            handleFormChange(e);
+                          }
+                        }}
                         placeholder="Auto-filled Quantity"
                         required
                       />
@@ -1408,14 +1501,25 @@ const FoodItemReceiving = () => {
                         required
                       />
                     </InputGroup>
+                    {formData.field_name && formData.quarter && remainingAllocation > 0 && (
+                      <small className="text-primary d-block mt-1">
+                        Remaining allocation for this trimester: {remainingAllocation} packets.
+                      </small>
+                    )}
+                    {formData.field_name && formData.food_item && formData.quarter && remainingAllocation <= 0 && !editingItem && (
+                      <Alert variant="danger" className="mt-2 mb-0 py-2" role="alert">
+                        <strong>Receiving limit reached:</strong>{' '}
+                        Your total allocation for {normalizeTrimester(formData.quarter)} is {computePacketsForTrimester(formData.quarter, formData.field_name, formData.fin_year || getCurrentFinancialYear())} packets. All allocated packets have already been received in the {activeTab.toUpperCase()} Receiving table. You cannot add more receiving for this food item and trimester.
+                      </Alert>
+                    )}
                     {formData.field_name && (formData.quantity === '' || formData.quantity === undefined) && (
                       <small className="text-warning d-block mt-1">
-                        No packet data found in Supplementary Nutrition table for the selected months.
+                        No packet data found in Supplementary Nutrition for the selected trimester and food category.
                       </small>
                     )}
                     {formData.field_name && formData.quantity !== '' && formData.quantity !== undefined && Number(formData.quantity) > 0 && (
                       <small className="text-success d-block mt-1">
-                        ✓ Packets auto-fetched for {(formData.months || []).length} selected month(s).
+                        ✓ Total packets auto-fetched for {normalizeTrimester(formData.quarter) || 'selected trimester'} from Supplementary Nutrition.
                       </small>
                     )}
                   </Form.Group>
@@ -1496,10 +1600,11 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={12}>
                   <Form.Group className="mb-3">
-                    <h6 className="mt-2 mb-3">Select Months (All months available — Packets auto-recalculate for months with data)</h6>
+                    <h6 className="mt-2 mb-3">Select Months (Only months in the selected trimester)</h6>
                     <div className="month-checkbox-group d-flex flex-wrap gap-2">
-                      {monthOptions.map((month) => {
-                        const hasData = availableMonthsForSelectedFoodItem.includes(month.value);
+                      {availableMonthsForSelectedFoodItem.map((monthValue) => {
+                        const month = monthOptions.find(m => m.value === monthValue) || { value: monthValue, label: monthValue };
+                        const hasData = true;
                         const isChecked = (formData.months || []).includes(month.value);
                         return (
                           <Form.Check
@@ -1507,7 +1612,7 @@ const FoodItemReceiving = () => {
                             inline
                             type="checkbox"
                             id={`month-${month.value}`}
-                            label={hasData ? `${month.label} ✓` : month.label}
+                            label={month.label}
                             checked={isChecked}
                             onChange={(e) => {
                               handleMonthToggle(month.value, e.target.checked);
@@ -1517,10 +1622,10 @@ const FoodItemReceiving = () => {
                       })}
                     </div>
                     {!formData.field_name ? (
-                      <small className="text-muted">Select a food item first. All months are selectable — months with data will auto-fetch packets.</small>
+                      <small className="text-muted">Select a trimester first. Only the three months in that trimester can be selected for receiving.</small>
                     ) : (
                       <small className="text-muted">
-                        ✓ All 12 months are selectable. Months with Supplementary Nutrition data are marked with ✓ and will auto-fetch/deduct packets. Months without data won't change the packet count.
+                        Select only the months in which receiving is being recorded. Packet total is fetched independently from Supplementary Nutrition using the selected trimester and food category.
                       </small>
                     )}
                   </Form.Group>
@@ -1627,7 +1732,7 @@ const FoodItemReceiving = () => {
                 <Button
                   variant="primary"
                   type="submit"
-                  disabled={submitting || !packetExpiryMatchInfo.ok}
+                  disabled={submitting || !packetExpiryMatchInfo.ok || (!!formData.quarter && !selectedTrimesterHasData) || (!!formData.field_name && !!formData.food_item && !!formData.quarter && remainingAllocation <= 0 && !editingItem)}
                 >
                   {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingItem ? 'Update' : 'Submit')}
                 </Button>
@@ -1645,8 +1750,9 @@ const FoodItemReceiving = () => {
               <ListGroup variant="flush">
                 <ListGroup.Item><FaBuilding className="view-modal-icon" /> <strong>AWC Name:</strong> {viewItem.awc_name}</ListGroup.Item>
                 <ListGroup.Item><FaHashtag className="view-modal-icon" /> <strong>AWC Code:</strong> {viewItem.awc_code}</ListGroup.Item>
-                <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>Quarterly Packets Distribution:</strong> {viewItem.food_item}</ListGroup.Item>
+                <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>Trimester Packets Distribution:</strong> {viewItem.food_item}</ListGroup.Item>
                 <ListGroup.Item><FaWeightHanging className="view-modal-icon" /> <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}</ListGroup.Item>
+                <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Trimester:</strong> {normalizeTrimester(viewItem.quarter) || viewItem.quarter || '-'}</ListGroup.Item>
                 {viewItem.date ? (
                   <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Date:</strong> {new Date(viewItem.date).toLocaleDateString()}</ListGroup.Item>
                 ) : (
@@ -1727,6 +1833,7 @@ const FoodItemReceiving = () => {
                 </ListGroup.Item>
                 <ListGroup.Item>
                   <FaCubes className="view-modal-icon" />
+                  <strong>Trimester:</strong> {normalizeTrimester(expiryViewItem.quarter) || expiryViewItem.quarter || '-'}<br />
                   <strong>Months:</strong> {formatMonths(getMonthsArray(expiryViewItem))}
                 </ListGroup.Item>
                 <ListGroup.Item>

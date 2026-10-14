@@ -103,7 +103,7 @@ const EXCEL_META_COLUMNS = [
   { header: "SECTOR", key: "sector" },
   { header: "AWC NAME", key: "awc_name" },
   { header: "AWC CODE", key: "awc_code" },
-  { header: "QUARTER", key: "quarter" },
+  { header: "TRIMESTER", key: "quarter" },
   { header: "FINANCIAL YEAR", key: "financial_year" },
 ];
 const TABLE_COLUMNS = [
@@ -113,7 +113,7 @@ const TABLE_COLUMNS = [
   { label: "Sector", key: "sector" },
   { label: "AWC Name", key: "awc_name" },
   { label: "AWC Code", key: "awc_code" },
-  { label: "Quarter", key: "quarter", badge: true },
+  { label: "Trimester", key: "quarter", badge: true },
   { label: "Fin. Year", key: "financial_year" },
   { label: "Pregnant/Lactating", key: "pregnant_woman_lactating_mother", num: true },
   { label: "Children 6m-3y", key: "children_6m_3y", num: true },
@@ -717,7 +717,7 @@ const FoodSupplementary = () => {
   const validateForm = (data) => {
     const errors = {};
     if (!data.awc_code) errors.awc_code = "AWC Code is required";
-    if (!data.quarter) errors.quarter = "Quarter is required";
+    if (!data.quarter) errors.quarter = "Trimester is required";
     if (!data.financial_year) errors.financial_year = "Financial year is required";
     return errors;
   };
@@ -934,11 +934,11 @@ const FoodSupplementary = () => {
 
   const exportAggToExcel = () => {
     const dataToExport = aggregatedData.map((row, i) => {
-      const obj = { "S. No.": i + 1, Sector: row.groupKey, Quarter: row.quarters, "Fin. Years": row.fys };
+      const obj = { "S. No.": i + 1, Sector: row.groupKey, Trimester: row.quarters, "Fin. Years": row.fys };
       NUMERIC_AGG_FIELDS.forEach((f) => (obj[f.label] = row[f.key]));
       return obj;
     });
-    const totalObj = { "S. No.": "", Sector: "Total", Quarter: "", "Fin. Years": "" };
+    const totalObj = { "S. No.": "", Sector: "Total", Trimester: "", "Fin. Years": "" };
     NUMERIC_AGG_FIELDS.forEach((f) => (totalObj[f.label] = totalAggregated[f.key]));
     dataToExport.push(totalObj);
 
@@ -962,7 +962,7 @@ const FoodSupplementary = () => {
                 <tr style="background-color:#4f46e5; color:white;">
                   <th style="border:1px solid #ddd; padding:6px 4px;">S. No.</th>
                   <th style="border:1px solid #ddd; padding:6px 4px;">Sector</th>
-                  <th style="border:1px solid #ddd; padding:6px 4px;">Quarter</th>
+                  <th style="border:1px solid #ddd; padding:6px 4px;">Trimester</th>
                   <th style="border:1px solid #ddd; padding:6px 4px;">Fin. Years</th>
                   ${NUMERIC_AGG_FIELDS.map(f => `<th style="border:1px solid #ddd; padding:6px 4px; text-align:right;">${f.label}</th>`).join("")}
                 </tr>
@@ -1145,7 +1145,7 @@ const FoodSupplementary = () => {
                 <>
                   {/* ─── Multi-Select Filter Bar ─── */}
                   <div className="fs-filter-bar">
-                    <MultiSelectDropdown label="Quarter" options={uniqueQuarters} selected={selectedMonths} onChange={setSelectedMonths} />
+                    <MultiSelectDropdown label="Trimester" options={uniqueQuarters} selected={selectedMonths} onChange={setSelectedMonths} />
                     <MultiSelectDropdown label="Financial Year" options={uniqueFYs} selected={selectedFYs} onChange={setSelectedFYs} />
                     <MultiSelectDropdown label="Project" options={uniqueProjects} selected={selectedProjects} onChange={setSelectedProjects} />
                     <MultiSelectDropdown label="Sector" options={uniqueSectors} selected={selectedSectors} onChange={setSelectedSectors} />
@@ -1418,7 +1418,7 @@ const FoodSupplementary = () => {
                                 <tr>
                                   <th>S. No.</th>
                                   <th>Sector</th>
-                                  <th>Quarter</th>
+                                  <th>Trimester</th>
                                   <th>Fin. Years</th>
                                   {NUMERIC_AGG_FIELDS.map((col, idx) => (
                                     <th key={idx} className="text-end">{col.label}</th>
@@ -1634,7 +1634,7 @@ const FoodSupplementary = () => {
                       <h6 className="fs-section-subtitle">Basic Information</h6>
                       <Row>
                         <Col md={6} lg={4}>{renderFormField("AWC Code", "awc_code", "text", "5064010220")}</Col>
-                        <Col md={6} lg={4}>{renderFormField("Quarter", "quarter", "select")}</Col>
+                        <Col md={6} lg={4}>{renderFormField("Trimester", "quarter", "select")}</Col>
                         <Col md={6} lg={4}>{renderFormField("Financial Year", "financial_year", "text", "2026-2027")}</Col>
                       </Row>
                     </div>
@@ -1748,7 +1748,7 @@ const FoodSupplementary = () => {
           {deleteTarget && (
             <div className="fs-delete-detail">
               <strong>AWC Code:</strong> {deleteTarget.awc_code} &nbsp;|&nbsp;
-              <strong>Quarter:</strong> {deleteTarget.quarter} &nbsp;|&nbsp;
+              <strong>Trimester:</strong> {deleteTarget.quarter} &nbsp;|&nbsp;
               <strong>Year:</strong> {deleteTarget.financial_year} &nbsp;|&nbsp;
               <strong>Pregnant/Lactating Count:</strong> {deleteTarget.pregnant_woman_lactating_mother}
             </div>
@@ -1776,7 +1776,7 @@ const FoodSupplementary = () => {
                   <Col md={6}><strong>Sector:</strong> {viewRecord.sector || "—"}</Col>
                   <Col md={6}><strong>AWC Name:</strong> {viewRecord.awc_name || "—"}</Col>
                   <Col md={6}><strong>AWC Code:</strong> {viewRecord.awc_code}</Col>
-                  <Col md={6}><strong>Quarter:</strong> {viewRecord.quarter}</Col>
+                  <Col md={6}><strong>Trimester:</strong> {viewRecord.quarter}</Col>
                   <Col md={6}><strong>Financial Year:</strong> {viewRecord.financial_year}</Col>
                 </Row>
               </div>
