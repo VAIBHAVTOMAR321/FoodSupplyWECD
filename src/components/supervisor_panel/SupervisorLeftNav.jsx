@@ -31,22 +31,23 @@ import {
   FaTruck,
   FaFileAlt,
   FaTruckLoading,
-  FaList
+  FaList,
 } from "react-icons/fa";
 import axios from "axios";
 
 import "../../assets/css/supervisorleftnav.css";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import {
-  FaInfoCircle,
-  FaBullseye,
-  
-} from "react-icons/fa";
+import { FaInfoCircle, FaBullseye } from "react-icons/fa";
 
 import { useAuth } from "../all_login/AuthContext";
 
-
-const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClick }) => {
+const SupervisorLeftNav = ({
+  sidebarOpen,
+  setSidebarOpen,
+  isMobile,
+  isTablet,
+  onNavClick,
+}) => {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,83 +75,74 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
     }
   };
 
- const menuItems = [
-      {
-        icon: <FaTachometerAlt />,
-        label: "DashBoard",
-        path: "/SupervisorDashBoard",
-        active: true,
-      },
+  const menuItems = [
+    {
+      icon: <FaTachometerAlt />,
+      label: "DashBoard",
+      path: "/SupervisorDashBoard",
+      active: true,
+    },
 
-      
-       
+    //   {
+    //    icon: <FaUsers />,
+    //    label: "Beneficiarie Entry",
+    //    path: "/SupervisorBeneficiarieEntry",
+    //    active: true,
+    //  },
 
-      //   {
-      //    icon: <FaUsers />,
-      //    label: "Beneficiarie Entry",
-      //    path: "/SupervisorBeneficiarieEntry",
-      //    active: true,
-      //  },
-       
-     
-         {
-          icon: <FaTruck />,
-          label: "Distributions",
-          submenu: [
-            {
-              label: "HCM Distributions",
-              path: "/HcmSupervisorDistributions",
-              icon: <FaFileAlt />,
-            },
-              {
-              label: "THR Distributions",
-              path: "/thr-supervisor-distributions",
-              icon: <FaFileAlt />,
-            },
-          ],
+    {
+      icon: <FaTruck />,
+      label: "Distributions",
+      submenu: [
+        {
+          label: "HCM Distributions",
+          path: "/HcmSupervisorDistributions",
+          icon: <FaFileAlt />,
         },
         {
-          icon: <FaTruckLoading />,
-          label: "Receiving",
-          submenu: [
-            {
-              label: "THR Receiving",
-              path: "/ThrSupervisorReceiving",
-              icon: <FaFileAlt />,
-            },
-              {
-              label: "HCM Receiving",
-              path: "/HcmSupervisorReceiving",
-              icon: <FaFileAlt />,
-            },
-          ],
-        },{
-        icon: <FaBook />,
-        label: "AWC List",
-        path: "/AwcAganWadi",
-        active: true,
-      },
+          label: "THR Distributions",
+          path: "/thr-supervisor-distributions",
+          icon: <FaFileAlt />,
+        },
+      ],
+    },
+    {
+      icon: <FaTruckLoading />,
+      label: "Receiving",
+      submenu: [
+        {
+          label: "THR Receiving",
+          path: "/ThrSupervisorReceiving",
+          icon: <FaFileAlt />,
+        },
+        {
+          label: "HCM Receiving",
+          path: "/HcmSupervisorReceiving",
+          icon: <FaFileAlt />,
+        },
+      ],
+    },
+    {
+      icon: <FaBook />,
+      label: "AWC List",
+      path: "/AwcAganWadi",
+      active: true,
+    },
 
-       {
-        icon: <FaBook />,
-        label: "Stock Allocation",
-        path: "/StockAllocation",
-        active: true,
-      },
+    {
+      icon: <FaBook />,
+      label: "Stock Allocation",
+      path: "/StockAllocation",
+      active: true,
+    },
 
-{
-         icon: <FaBuilding />,
-         label: "Sector Profile",
-         path: "/SectorProfile",
-         active: true,
-       },
-            
-   
-    
-      
-       
-      
-     ];
+    {
+      icon: <FaBuilding />,
+      label: "Sector Profile",
+      path: "/SectorProfile",
+      active: true,
+    },
+  ];
 
   //  Auto-close sidebar when switching to mobile or tablet
 
@@ -163,68 +155,71 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
         <div className="sidebar-header">
           {sidebarOpen ? (
             <div className="logo-container">
-              <div className="logo">
-                  Supervisor Panel
-              </div>
+              <div className="logo">Supervisor Panel</div>
             </div>
           ) : (
-            <div className="logo-container logo-collapsed">
-            </div>
+            <div className="logo-container logo-collapsed"></div>
           )}
         </div>
 
         <Nav className="sidebar-nav flex-column">
-          
-         {menuItems
-  .filter(item =>
-    item.allowedRoles ? item.allowedRoles.includes(userRole) : true
-  )
-  .map((item, index) => (
-    <div key={index}>
-      {/* If submenu exists */}
-      {item.submenu ? (
-        <Nav.Link
-          className={`nav-item ${item.active ? "active" : ""}`}
-          onClick={() => toggleSubmenu(index)}
-        >
-          <span className="nav-icon">{item.icon}</span>
-          <span className="nav-text">{item.label}</span>
-          <span className="submenu-arrow">
-            {openSubmenu === index ? <FaChevronDown /> : <FaChevronRight />}
-          </span>
-        </Nav.Link>
-      ) : (
-         <Link
-           to={item.path}
-           className={`nav-item nav-link ${item.active ? "active" : ""}`}
-           onClick={(e) => handleItemClick(e, item.path, item.active)}
-         >
-           <span className="nav-icon">{item.icon}</span>
-           <span className="nav-text">{item.label}</span>
-         </Link>
-      )}
+          {menuItems
+            .filter((item) =>
+              item.allowedRoles ? item.allowedRoles.includes(userRole) : true,
+            )
+            .map((item, index) => (
+              <div key={index}>
+                {/* If submenu exists */}
+                {item.submenu ? (
+                  <Nav.Link
+                    className={`nav-item ${item.active ? "active" : ""}`}
+                    onClick={() => toggleSubmenu(index)}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    <span className="nav-text">{item.label}</span>
+                    <span className="submenu-arrow">
+                      {openSubmenu === index ? (
+                        <FaChevronDown />
+                      ) : (
+                        <FaChevronRight />
+                      )}
+                    </span>
+                  </Nav.Link>
+                ) : (
+                  <Link
+                    to={item.path}
+                    className={`nav-item nav-link ${item.active ? "active" : ""}`}
+                    onClick={(e) => handleItemClick(e, item.path, item.active)}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    <span className="nav-text">{item.label}</span>
+                  </Link>
+                )}
 
-      {/* Submenu */}
-      {item.submenu && (
-        <Collapse in={openSubmenu === index}>
-          <div className="submenu-container-user">
-            {item.submenu.map((subItem, subIndex) => (
-                 <Link
-                   key={subIndex}
-                   to={subItem.path}
-                   className="submenu-item-user nav-link"
-                   onClick={(e) => handleItemClick(e, subItem.path, false)}
-                 >
-                   <span className="submenu-icon">{subItem.icon}</span>
-                   <span className="nav-text br-text-sub">{subItem.label}</span>
-                 </Link>
+                {/* Submenu */}
+                {item.submenu && (
+                  <Collapse in={openSubmenu === index}>
+                    <div className="submenu-container-user">
+                      {item.submenu.map((subItem, subIndex) => (
+                        <Link
+                          key={subIndex}
+                          to={subItem.path}
+                          className="submenu-item-user nav-link"
+                          onClick={(e) =>
+                            handleItemClick(e, subItem.path, false)
+                          }
+                        >
+                          <span className="submenu-icon">{subItem.icon}</span>
+                          <span className="nav-text br-text-sub">
+                            {subItem.label}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </Collapse>
+                )}
+              </div>
             ))}
-          </div>
-        </Collapse>
-      )}
-    </div>
-  ))}
-
         </Nav>
 
         <div className="sidebar-footer">
@@ -246,67 +241,76 @@ const SupervisorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, on
       </div>
 
       {/*  Mobile / Tablet Sidebar (Offcanvas) */}
-  <Offcanvas
-  show={(isMobile || isTablet) && sidebarOpen}
-  onHide={() => setSidebarOpen(false)}
-  className="user-mobile-offcanvas"
-  placement="start"
-  backdrop={true}
-  scroll={false}
-  enforceFocus={false} //  ADD THIS LINE — fixes close button focus issue
->
-  <Offcanvas.Header closeButton className="user-offcanvas-header">
-    <Offcanvas.Title className="br-off-title">Menu</Offcanvas.Title>
-  </Offcanvas.Header>
+      <Offcanvas
+        show={(isMobile || isTablet) && sidebarOpen}
+        onHide={() => setSidebarOpen(false)}
+        className="user-mobile-offcanvas"
+        placement="start"
+        backdrop={true}
+        scroll={false}
+        enforceFocus={false} //  ADD THIS LINE — fixes close button focus issue
+      >
+        <Offcanvas.Header closeButton className="user-offcanvas-header">
+          <Offcanvas.Title className="br-off-title">Menu</Offcanvas.Title>
+        </Offcanvas.Header>
 
-  <Offcanvas.Body className="user-offcanvas-body">
-    <Nav className="flex-column">
-      {menuItems.map((item, index) => (
-        <div key={index}>
-          {item.submenu ? (
-            <Nav.Link
-              className={`nav-item ${item.active ? "active" : ""}`}
-              onClick={() => toggleSubmenu(index)}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              <span className="nav-text br-nav-text-mob">{item.label}</span>
-              <span className="submenu-arrow">
-                {openSubmenu === index ? <FaChevronDown /> : <FaChevronRight />}
-              </span>
-            </Nav.Link>
-          ) : (
-             <Link
-               to={item.path}
-               className={`nav-item nav-link ${item.active ? "active" : ""}`}
-               onClick={(e) => handleItemClick(e, item.path, item.active)}
-             >
-               <span className="nav-icon">{item.icon}</span>
-               <span className="nav-text br-nav-text-mob">{item.label}</span>
-             </Link>
-          )}
+        <Offcanvas.Body className="user-offcanvas-body">
+          <Nav className="flex-column">
+            {menuItems.map((item, index) => (
+              <div key={index}>
+                {item.submenu ? (
+                  <Nav.Link
+                    className={`nav-item ${item.active ? "active" : ""}`}
+                    onClick={() => toggleSubmenu(index)}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    <span className="nav-text br-nav-text-mob">
+                      {item.label}
+                    </span>
+                    <span className="submenu-arrow">
+                      {openSubmenu === index ? (
+                        <FaChevronDown />
+                      ) : (
+                        <FaChevronRight />
+                      )}
+                    </span>
+                  </Nav.Link>
+                ) : (
+                  <Link
+                    to={item.path}
+                    className={`nav-item nav-link ${item.active ? "active" : ""}`}
+                    onClick={(e) => handleItemClick(e, item.path, item.active)}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    <span className="nav-text br-nav-text-mob">
+                      {item.label}
+                    </span>
+                  </Link>
+                )}
 
-          {item.submenu && (
-            <Collapse in={openSubmenu === index}>
-              <div className="submenu-container-user">
-                {item.submenu.map((subItem, subIndex) => (
-                   <Link
-                     key={subIndex}
-                     to={subItem.path}
-                     className="submenu-item nav-link"
-                     onClick={(e) => handleItemClick(e, subItem.path, false)}
-                   >
-                     <span className="nav-text">{subItem.label}</span>
-                   </Link>
-                ))}
+                {item.submenu && (
+                  <Collapse in={openSubmenu === index}>
+                    <div className="submenu-container-user">
+                      {item.submenu.map((subItem, subIndex) => (
+                        <Link
+                          key={subIndex}
+                          to={subItem.path}
+                          className="submenu-item nav-link"
+                          onClick={(e) =>
+                            handleItemClick(e, subItem.path, false)
+                          }
+                        >
+                          <span className="nav-text">{subItem.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </Collapse>
+                )}
               </div>
-            </Collapse>
-          )}
-        </div>
-      ))}
-    </Nav>
-  </Offcanvas.Body>
-</Offcanvas>
-
+            ))}
+          </Nav>
+        </Offcanvas.Body>
+      </Offcanvas>
     </>
   );
 };
