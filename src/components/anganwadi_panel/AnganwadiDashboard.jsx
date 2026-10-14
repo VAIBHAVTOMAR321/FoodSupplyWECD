@@ -45,6 +45,9 @@ import {
   FaProjectDiagram,
   FaInfoCircle,
   FaClock,
+  FaWarehouse,
+  FaLayerGroup,
+  FaSyncAlt,
 } from "react-icons/fa";
 
 import "../../assets/css/AnganwadiDashboard.css";
@@ -381,8 +384,6 @@ const AnganwadiDashboard = () => {
 
     date: new Date().toISOString().split("T")[0],
 
-    expired_quantity: "",
-
     anganwadi_remark: "",
   });
 
@@ -395,6 +396,16 @@ const AnganwadiDashboard = () => {
   const [viewItem, setViewItem] = useState(null);
 
   const [selectedFoodItem, setSelectedFoodItem] = useState(null);
+
+  // Supplies Received & Distributed Summary (same reconciliation API used by CDPO panel)
+  const [suppliesTab, setSuppliesTab] = useState("thr");
+  const [suppliesViewMode, setSuppliesViewMode] = useState("awc");
+  const [suppliesRecords, setSuppliesRecords] = useState([]);
+  const [suppliesDetailRecords, setSuppliesDetailRecords] = useState([]);
+  const [suppliesLoading, setSuppliesLoading] = useState(false);
+  const [suppliesError, setSuppliesError] = useState("");
+  const [selectedSupplyMonths, setSelectedSupplyMonths] = useState([]);
+  const [selectedSupplyFYs, setSelectedSupplyFYs] = useState([]);
 
   const { user, api, uniqueId } = useAuth();
 
@@ -458,6 +469,191 @@ const AnganwadiDashboard = () => {
 
     fetchCounts();
   }, [api]);
+
+  // Fetch the same HCM/THR reconciliation response used in FoodSupplementary.jsx.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchSuppliesData = async () => {
+      setSuppliesLoading(true);
+      setSuppliesError("");
+      try {
+        // These are the AWC-specific reconciliation endpoints. The API response
+        // is returned directly as { success, financial_year, awc_code, data }.
+        // Do not use the CDPO endpoint or expect a nested `results` object here.
+        const endpoint =
+          suppliesTab === "thr"
+            ? "/thr-awc-reconciliation/"
+            : "/hcm-awc-reconciliation/";
+        const response = await api.get(endpoint);
+        const reconciliation = response?.data;
+        if (!reconciliation?.success || !Array.isArray(reconciliation.data)) {
+          throw new Error(
+            reconciliation?.message || "Invalid AWC reconciliation response.",
+          );
+        }
+        if (!cancelled) {
+          // The AWC API provides detail rows only, so use those rows as the
+          // source for both sector-wise aggregation and AWC-wise display.
+          setSuppliesRecords(reconciliation.data);
+          setSuppliesDetailRecords(reconciliation.data);
+          setSelectedSupplyFYs((current) =>
+            current.length
+              ? current
+              : reconciliation.financial_year
+                ? [reconciliation.financial_year]
+                : [],
+          );
+        }
+      } catch (err) {
+        console.error(
+          `Failed to fetch ${suppliesTab.toUpperCase()} AWC reconciliation:`,
+          err,
+        );
+        if (!cancelled) {
+          setSuppliesRecords([]);
+          setSuppliesDetailRecords([]);
+          // Keep the user logged in when this table request fails; show the
+          // fetch error locally instead of changing authentication state.
+          setSuppliesError(
+            err?.response?.status === 401 || err?.response?.status === 403
+              ? `You are not authorized to view ${suppliesTab.toUpperCase()} reconciliation data. Please verify the AWC login/session permissions.`
+              : `Failed to fetch ${suppliesTab.toUpperCase()} supplies data. Please retry.`,
+          );
+        }
+      } finally {
+        if (!cancelled) setSuppliesLoading(false);
+      }
+    };
+    fetchSuppliesData();
+    return () => {
+      cancelled = true;
+    };
+  }, [api, suppliesTab]);
+
+  const suppliesMonths = [
+    ...new Set(suppliesRecords.map((r) => r.month).filter(Boolean)),
+  ].sort(
+    (a, b) =>
+      monthOptions.findIndex((m) => m.value === a) -
+      monthOptions.findIndex((m) => m.value === b),
+  );
+  const suppliesFinancialYears = [
+    ...new Set(suppliesRecords.map((r) => r.financial_year).filter(Boolean)),
+  ].sort((a, b) =>
+    String(a).localeCompare(String(b), undefined, { numeric: true }),
+  );
+  const filteredSuppliesRecords = suppliesRecords.filter(
+    (r) =>
+      (selectedSupplyMonths.length === 0 ||
+        selectedSupplyMonths.includes(r.month)) &&
+      (selectedSupplyFYs.length === 0 ||
+        selectedSupplyFYs.includes(r.financial_year)),
+  );
+  const filteredSupplyDetails = suppliesDetailRecords.filter(
+    (r) =>
+      (selectedSupplyMonths.length === 0 ||
+        selectedSupplyMonths.includes(r.month)) &&
+      (selectedSupplyFYs.length === 0 ||
+        selectedSupplyFYs.includes(r.financial_year)),
+  );
+  const suppliesFoodItems = [
+    ...new Set(suppliesRecords.map((r) => r.food_item).filter(Boolean)),
+  ];
+  const suppliesSectorData = (() => {
+    const groups = new Map();
+    filteredSuppliesRecords.forEach((r) => {
+      const sector = r.sector || "—";
+      if (!groups.has(sector)) groups.set(sector, new Map());
+      const items = groups.get(sector);
+      const q = items.get(r.food_item) || {
+        received: 0,
+        distributed: 0,
+        balance: 0,
+      };
+      q.received += Number(r.received_quantity) || 0;
+      q.distributed += Number(r.distributed_quantity) || 0;
+      q.balance += Number(r.balance_quantity) || 0;
+      items.set(r.food_item, q);
+    });
+    return Array.from(groups, ([sector, items]) => ({
+      sector,
+      foodData: Array.from(items, ([food_item, q]) => ({ food_item, ...q })),
+    }));
+  })();
+  const suppliesAwcData = (() => {
+    const groups = new Map();
+    filteredSupplyDetails.forEach((r) => {
+      const key = `${r.awc_code || ""}|${r.awc_name || ""}|${r.sector || ""}`;
+      if (!groups.has(key))
+        groups.set(key, {
+          awc_code: r.awc_code,
+          awc_name: r.awc_name,
+          sector: r.sector,
+          foodMap: new Map(),
+        });
+      const group = groups.get(key);
+      const q = group.foodMap.get(r.food_item) || {
+        received: 0,
+        distributed: 0,
+        balance: 0,
+      };
+      q.received += Number(r.received_quantity) || 0;
+      q.distributed += Number(r.distributed_quantity) || 0;
+      q.balance += Number(r.balance_quantity) || 0;
+      group.foodMap.set(r.food_item, q);
+    });
+    return Array.from(groups.values())
+      .map((r) => ({
+        ...r,
+        foodData: Array.from(r.foodMap, ([food_item, q]) => ({
+          food_item,
+          ...q,
+        })),
+      }))
+      .sort(
+        (a, b) =>
+          String(a.sector || "").localeCompare(String(b.sector || "")) ||
+          String(a.awc_name || "").localeCompare(String(b.awc_name || "")),
+      );
+  })();
+  const suppliesDisplayData = suppliesAwcData;
+  const suppliesTotals = suppliesFoodItems.reduce((acc, item) => {
+    acc[item] = { received: 0, distributed: 0, balance: 0 };
+    suppliesDisplayData.forEach((row) => {
+      const found = row.foodData.find((f) => f.food_item === item);
+      if (found) {
+        acc[item].received += found.received;
+        acc[item].distributed += found.distributed;
+        acc[item].balance += found.balance;
+      }
+    });
+    return acc;
+  }, {});
+
+  // Display units: THR quantities are packet counts; HCM quantities are grams.
+  const formatSupplyQuantity = (value, scheme = suppliesTab) => {
+    const quantity = Number(value) || 0;
+    const formatted = quantity.toLocaleString(undefined, {
+      maximumFractionDigits: 2,
+    });
+    if (scheme === "hcm") {
+      const kg = (quantity / 1000).toLocaleString(undefined, {
+        maximumFractionDigits: 3,
+      });
+      return `${formatted} g (${kg} kg)`;
+    }
+    return `${formatted} packets`;
+  };
+
+  const distributionQuantityUnit =
+    activeScheme === "hcm" ? "g / kg" : "packets";
+  const formatDistributionQuantity = (value) => {
+    const quantity = Number(value) || 0;
+    if (activeScheme === "hcm") {
+      return `${quantity.toLocaleString(undefined, { maximumFractionDigits: 2 })} g (${(quantity / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 })} kg)`;
+    }
+    return `${quantity.toLocaleString(undefined, { maximumFractionDigits: 2 })} packets`;
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -828,7 +1024,11 @@ const AnganwadiDashboard = () => {
         : Array.isArray(existingRecord.quarter)
           ? existingRecord.quarter
           : quarterToMonths[existingRecord.quarter] ||
-            trimesterToMonths[normalizeTrimester(existingRecord.trimester || existingRecord.quarter)] ||
+            trimesterToMonths[
+              normalizeTrimester(
+                existingRecord.trimester || existingRecord.quarter,
+              )
+            ] ||
             [];
 
       // Existing distribution records store the selected trimester in `quarter`,
@@ -852,8 +1052,6 @@ const AnganwadiDashboard = () => {
           ? new Date(existingRecord.date).toISOString().split("T")[0]
           : new Date().toISOString().split("T")[0],
 
-        expired_quantity: existingRecord.expired_quantity || "",
-
         anganwadi_remark: existingRecord.anganwadi_remark || "",
       });
 
@@ -871,8 +1069,6 @@ const AnganwadiDashboard = () => {
         food_item_id: "",
 
         date: new Date().toISOString().split("T")[0],
-
-        expired_quantity: "",
 
         anganwadi_remark: "",
       });
@@ -1268,10 +1464,6 @@ const AnganwadiDashboard = () => {
 
       date: distributionData.date || new Date().toISOString().split("T")[0],
 
-      expired_quantity: distributionData.expired_quantity
-        ? parseInt(distributionData.expired_quantity, 10)
-        : 0,
-
       anganwadi_remark: distributionData.anganwadi_remark || "",
     };
 
@@ -1373,6 +1565,8 @@ const AnganwadiDashboard = () => {
   let perPersonQtyGrams = 0;
   let effectivePerPersonQty = 0;
   let remainingStockForDisplay = null;
+  let receivedStockForDisplay = null;
+  let distributedStockForDisplay = null;
   let plannedQuantityForDisplay = 0;
   let stockFinishedForDisplay = false;
 
@@ -1426,6 +1620,8 @@ const AnganwadiDashboard = () => {
         return sum;
       return sum + getRecordQuantity(rec);
     }, 0);
+    receivedStockForDisplay = receivedForDisplay;
+    distributedStockForDisplay = distributedForDisplay;
     remainingStockForDisplay = Math.max(
       0,
       receivedForDisplay - distributedForDisplay,
@@ -1541,6 +1737,281 @@ const AnganwadiDashboard = () => {
             </div>
           )}
 
+          {/* Supplies summary: shared HCM/THR reconciliation API, like CDPO FoodSupplementary */}
+          <div className="mt-3 mb-4">
+            <Card
+              className="shadow-sm"
+              style={{
+                border: "1px solid #e2e8f0",
+                borderRadius: 12,
+                overflow: "hidden",
+              }}
+            >
+              <Card.Header
+                style={{
+                  background: "#f8fafc",
+                  borderBottom: "1px solid #e2e8f0",
+                }}
+              >
+                <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                  <h5
+                    className="mb-0 fw-bold"
+                    style={{ color: "#12304a", letterSpacing: ".1px" }}
+                  >
+                    <FaWarehouse
+                      className="me-2"
+                      style={{ color: "#0f766e" }}
+                    />
+                    Supplies Received &amp; Distributed Summary{" "}
+                    <span
+                      className="badge rounded-pill ms-2"
+                      style={{
+                        background: "#dbeafe",
+                        color: "#1d4ed8",
+                        fontSize: ".7rem",
+                      }}
+                    >
+                      AWC-wise
+                    </span>
+                  </h5>
+                  <div className="d-flex align-items-center flex-wrap gap-2">
+                    <Form.Group className="mb-0">
+                      <Form.Label className="small mb-1">Trimester</Form.Label>
+                      <Form.Select
+                        size="sm"
+                        value={selectedSupplyMonths[0] || ""}
+                        onChange={(e) =>
+                          setSelectedSupplyMonths(
+                            e.target.value ? [e.target.value] : [],
+                          )
+                        }
+                      >
+                        <option value="">All Trimesters</option>
+                        {suppliesMonths.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                    <Form.Group className="mb-0">
+                      <Form.Label className="small mb-1">
+                        Financial Year
+                      </Form.Label>
+                      <Form.Select
+                        size="sm"
+                        value={selectedSupplyFYs[0] || ""}
+                        onChange={(e) =>
+                          setSelectedSupplyFYs(
+                            e.target.value ? [e.target.value] : [],
+                          )
+                        }
+                      >
+                        <option value="">All Financial Years</option>
+                        {suppliesFinancialYears.map((fy) => (
+                          <option key={fy} value={fy}>
+                            {fy}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                    <div className="d-flex gap-1 align-self-end">
+                      <Button
+                        size="sm"
+                        variant={
+                          suppliesTab === "thr" ? "primary" : "outline-primary"
+                        }
+                        onClick={() => {
+                          setSuppliesTab("thr");
+                          setSelectedSupplyMonths([]);
+                          setSelectedSupplyFYs([]);
+                        }}
+                      >
+                        THR
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={
+                          suppliesTab === "hcm" ? "primary" : "outline-primary"
+                        }
+                        onClick={() => {
+                          setSuppliesTab("hcm");
+                          setSelectedSupplyMonths([]);
+                          setSelectedSupplyFYs([]);
+                        }}
+                      >
+                        HCM
+                      </Button>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline-secondary"
+                      className="align-self-end"
+                      onClick={() => {
+                        setSelectedSupplyMonths([]);
+                        setSelectedSupplyFYs([]);
+                      }}
+                    >
+                      <FaSyncAlt className="me-1" />
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+              </Card.Header>
+              <Card.Body className="p-0">
+                {suppliesLoading ? (
+                  <div className="text-center p-4">
+                    <Spinner animation="border" size="sm" />{" "}
+                    <span className="ms-2">Loading supplies summary...</span>
+                  </div>
+                ) : suppliesError ? (
+                  <Alert variant="danger" className="m-3">
+                    {suppliesError}
+                  </Alert>
+                ) : (
+                  <div style={{ overflowX: "auto", maxHeight: 520 }}>
+                    <Table
+                      bordered
+                      hover
+                      responsive
+                      className="mb-0 align-middle"
+                      size="sm"
+                      style={{ fontSize: ".86rem", minWidth: "900px" }}
+                    >
+                      <thead
+                        style={{
+                          position: "sticky",
+                          top: 0,
+                          zIndex: 1,
+                          background: "#eaf2ff",
+                          color: "#16324f",
+                          borderBottom: "2px solid #b6c9e8",
+                        }}
+                      >
+                        <tr>
+                          <th rowSpan={2}>S. No.</th>
+                          <th rowSpan={2}>Sector</th>
+                          <th rowSpan={2}>AWC Name</th>
+                          <th rowSpan={2}>AWC Code</th>
+                          {suppliesFoodItems.map((fi) => (
+                            <th key={fi} colSpan={3} className="text-center">
+                              {fi}
+                            </th>
+                          ))}
+                        </tr>
+                        <tr>
+                          {suppliesFoodItems.map((fi) => (
+                            <React.Fragment key={`${fi}-sub`}>
+                              <th className="text-end">
+                                Received (
+                                {suppliesTab === "hcm" ? "g / kg" : "packets"})
+                              </th>
+                              <th className="text-end">
+                                Distributed (
+                                {suppliesTab === "hcm" ? "g / kg" : "packets"})
+                              </th>
+                              <th className="text-end">
+                                Remaining (
+                                {suppliesTab === "hcm" ? "g / kg" : "packets"})
+                              </th>
+                            </React.Fragment>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {suppliesDisplayData.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={
+                                2 +
+                                (suppliesViewMode === "awc" ? 2 : 0) +
+                                suppliesFoodItems.length * 3
+                              }
+                              className="text-center text-muted p-4"
+                            >
+                              No supplies data available for the selected
+                              filters.
+                            </td>
+                          </tr>
+                        ) : (
+                          suppliesDisplayData.map((row, index) => (
+                            <tr
+                              key={`${row.sector || "sector"}-${row.awc_code || index}-${index}`}
+                            >
+                              <td>{index + 1}</td>
+                              <td>{row.sector || "—"}</td>
+                              {suppliesViewMode === "awc" && (
+                                <>
+                                  <td>{row.awc_name || "—"}</td>
+                                  <td>{row.awc_code || "—"}</td>
+                                </>
+                              )}
+                              {suppliesFoodItems.map((fi) => {
+                                const fd = row.foodData.find(
+                                  (f) => f.food_item === fi,
+                                );
+                                return (
+                                  <React.Fragment key={`${fi}-${index}`}>
+                                    <td className="text-end">
+                                      {formatSupplyQuantity(fd?.received || 0)}
+                                    </td>
+                                    <td className="text-end">
+                                      {formatSupplyQuantity(
+                                        fd?.distributed || 0,
+                                      )}
+                                    </td>
+                                    <td className="text-end fw-bold text-primary">
+                                      {formatSupplyQuantity(fd?.balance || 0)}
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              })}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      {suppliesDisplayData.length > 0 && (
+                        <tfoot
+                          style={{
+                            background: "#f1f5f9",
+                            borderTop: "2px solid #cbd5e1",
+                          }}
+                        >
+                          <tr>
+                            <th></th>
+                            <th>Total</th>
+                            <th></th>
+                            <th></th>
+                            {suppliesFoodItems.map((fi) => {
+                              const t = suppliesTotals[fi] || {
+                                received: 0,
+                                distributed: 0,
+                                balance: 0,
+                              };
+                              return (
+                                <React.Fragment key={`${fi}-total`}>
+                                  <th className="text-end">
+                                    {formatSupplyQuantity(t.received)}
+                                  </th>
+                                  <th className="text-end">
+                                    {formatSupplyQuantity(t.distributed)}
+                                  </th>
+                                  <th className="text-end">
+                                    {formatSupplyQuantity(t.balance)}
+                                  </th>
+                                </React.Fragment>
+                              );
+                            })}
+                          </tr>
+                        </tfoot>
+                      )}
+                    </Table>
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
+          </div>
+
           {activeScheme && (
             <Row>
               <Col xs={12}>
@@ -1596,8 +2067,6 @@ const AnganwadiDashboard = () => {
                         <th>Quantity</th>
 
                         <th>Unit</th>
-
-                        <th>Expired Qty</th>
 
                         <th>Remark</th>
 
@@ -1658,8 +2127,6 @@ const AnganwadiDashboard = () => {
                           </td>
 
                           <td>{record.unit}</td>
-
-                          <td>{record.expired_quantity || 0}</td>
 
                           <td>{record.anganwadi_remark || "-"}</td>
 
@@ -1838,201 +2305,6 @@ const AnganwadiDashboard = () => {
 
                 <Form onSubmit={handleDistributionSubmit}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Food Item</Form.Label>
-
-                    <Form.Select
-                      required
-                      value={distributionData.food_item_id || ""}
-                      onChange={(e) => {
-                        const newFoodItemId = e.target.value;
-
-                        const selectedFoodItem = foodItems.find(
-                          (fi) => fi.id === parseInt(newFoodItemId, 10),
-                        );
-
-                        const autoTotalBene = computeAutoTotalBeneficiaries(
-                          selectedFoodItem,
-
-                          distributionData.fin_year,
-
-                          distributionData.months,
-
-                          distributionData.trimester,
-                        );
-
-                        setDistributionData((prev) => ({
-                          ...prev,
-
-                          food_item_id: newFoodItemId,
-
-                          total_beneficiaries: autoTotalBene,
-                        }));
-                      }}
-                    >
-                      <option value="">Select a food item...</option>
-
-                      {foodItems.map((item) => [
-                        <option
-                          key={item.id}
-                          value={item.id}
-                          style={{ fontWeight: "bold" }}
-                        >
-                          {item.food_item}
-                        </option>,
-
-                        <option
-                          key={`${item.id}-cat`}
-                          disabled
-                          style={{ color: "#6c757d", paddingLeft: "15px" }}
-                        >
-                          &nbsp;&nbsp;↳ Category: {item.bene_category}
-                        </option>,
-                      ])}
-                    </Form.Select>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Date of Distribution</Form.Label>
-
-                    <Form.Control
-                      type="date"
-                      name="date"
-                      value={distributionData.date || ""}
-                      onChange={(e) =>
-                        setDistributionData({
-                          ...distributionData,
-                          date: e.target.value,
-                        })
-                      }
-                      required
-                    />
-
-                    {activeScheme === "hcm" && (
-                      <Form.Text className="text-muted d-block mt-1">
-                        नोट: एक दिनांक पर केवल एक ही HCM वितरण रिकॉर्ड किया जा
-                        सकता है।
-                      </Form.Text>
-                    )}
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Expired Quantity</Form.Label>
-
-                    <Form.Control
-                      type="number"
-                      name="expired_quantity"
-                      value={distributionData.expired_quantity || ""}
-                      onChange={(e) =>
-                        setDistributionData({
-                          ...distributionData,
-                          expired_quantity: e.target.value,
-                        })
-                      }
-                      placeholder="Enter expired quantity"
-                      min="0"
-                    />
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Anganwadi Remark</Form.Label>
-
-                    <Form.Control
-                      type="text"
-                      name="anganwadi_remark"
-                      value={distributionData.anganwadi_remark || ""}
-                      onChange={(e) =>
-                        setDistributionData({
-                          ...distributionData,
-                          anganwadi_remark: e.target.value,
-                        })
-                      }
-                      placeholder="Enter remark"
-                    />
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Total Beneficiaries</Form.Label>
-
-                    {(!distributionData.months ||
-                      distributionData.months.length === 0) && (
-                      <Form.Text className="text-muted d-block mb-2">
-                        Please select month(s) first to enable this field.
-                      </Form.Text>
-                    )}
-
-                    {distributionData.total_beneficiaries_error && (
-                      <Form.Text className="text-danger d-block mb-2">
-                        {distributionData.total_beneficiaries_error}
-                      </Form.Text>
-                    )}
-
-                    <Form.Control
-                      type="text"
-                      value={distributionData.total_beneficiaries}
-                      onChange={(e) => {
-                        const value = e.target.value;
-
-                        const enteredBeneficiaries = parseInt(value, 10) || 0;
-
-                        let error = "";
-
-                        if (
-                          value &&
-                          distributionData.months?.length > 0 &&
-                          distributionData.food_item_id
-                        ) {
-                          const selectedFoodItem = foodItems.find(
-                            (fi) =>
-                              fi.id ===
-                              parseInt(distributionData.food_item_id, 10),
-                          );
-
-                          const maxAvailable = computeAutoTotalBeneficiaries(
-                            selectedFoodItem,
-
-                            distributionData.fin_year,
-
-                            distributionData.months,
-                          );
-
-                          if (
-                            maxAvailable &&
-                            enteredBeneficiaries > maxAvailable
-                          ) {
-                            error = `कुल लाभार्थी (${enteredBeneficiaries}) उपलब्ध लाभार्थियों (${maxAvailable}) से अधिक नहीं हो सकते।`;
-                          }
-                        }
-
-                        setDistributionData({
-                          ...distributionData,
-
-                          total_beneficiaries: value,
-
-                          total_beneficiaries_error: error,
-                        });
-                      }}
-                      placeholder="पूरक पोषण से स्वतः दर्ज होगा"
-                      required
-                      disabled={
-                        !distributionData.months ||
-                        distributionData.months.length === 0
-                      }
-                    />
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Financial Year</Form.Label>
-
-                    <Form.Control
-                      type="text"
-                      placeholder="e.g., 2025-26"
-                      value={distributionData.fin_year}
-                      readOnly
-                      required
-                    />
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
                     <Form.Label>Select Trimester</Form.Label>
                     <Form.Select
                       value={distributionData.trimester || ""}
@@ -2068,7 +2340,7 @@ const AnganwadiDashboard = () => {
                   </Form.Group>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>Months (within selected trimester)</Form.Label>
+                    <Form.Label>Trimester</Form.Label>
 
                     <div className="month-checkbox-group d-flex flex-wrap gap-2">
                       {monthOptions
@@ -2161,6 +2433,242 @@ const AnganwadiDashboard = () => {
                         रिसीविंग अनुमोदित करवाएं।
                       </Alert>
                     ) : null}
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Food Item</Form.Label>
+
+                    <Form.Select
+                      required
+                      value={distributionData.food_item_id || ""}
+                      onChange={(e) => {
+                        const newFoodItemId = e.target.value;
+
+                        const selectedFoodItem = foodItems.find(
+                          (fi) => fi.id === parseInt(newFoodItemId, 10),
+                        );
+
+                        const autoTotalBene = computeAutoTotalBeneficiaries(
+                          selectedFoodItem,
+
+                          distributionData.fin_year,
+
+                          distributionData.months,
+
+                          distributionData.trimester,
+                        );
+
+                        setDistributionData((prev) => ({
+                          ...prev,
+
+                          food_item_id: newFoodItemId,
+
+                          total_beneficiaries: autoTotalBene,
+                        }));
+                      }}
+                    >
+                      <option value="">Select a food item...</option>
+
+                      {foodItems.map((item) => [
+                        <option
+                          key={item.id}
+                          value={item.id}
+                          style={{ fontWeight: "bold" }}
+                        >
+                          {item.food_item}
+                        </option>,
+
+                        <option
+                          key={`${item.id}-cat`}
+                          disabled
+                          style={{ color: "#6c757d", paddingLeft: "15px" }}
+                        >
+                          &nbsp;&nbsp;↳ Category: {item.bene_category}
+                        </option>,
+                      ])}
+                    </Form.Select>
+                  </Form.Group>
+
+                  {distributionData.food_item_id && (
+                    <div className="row g-3 mb-3">
+                      {[
+                        {
+                          label: "Received",
+                          value: receivedStockForDisplay,
+                          color: "#0f766e",
+                          bg: "#ecfdf5",
+                        },
+                        {
+                          label: "Distributed",
+                          value: distributedStockForDisplay,
+                          color: "#1d4ed8",
+                          bg: "#eff6ff",
+                        },
+                        {
+                          label: "Remaining",
+                          value: remainingStockForDisplay,
+                          color: "#7c3aed",
+                          bg: "#f5f3ff",
+                        },
+                      ].map((item) => (
+                        <div className="col-4" key={item.label}>
+                          <div
+                            style={{
+                              border: `1px solid ${item.color}30`,
+                              background: item.bg,
+                              borderRadius: 12,
+                              padding: "12px 10px",
+                              minHeight: 86,
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: ".78rem",
+                                color: item.color,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {item.label} quantity ({distributionQuantityUnit})
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "1.1rem",
+                                fontWeight: 800,
+                                color: "#172554",
+                                marginTop: 5,
+                              }}
+                            >
+                              {item.value === null
+                                ? "Select trimester and financial year"
+                                : formatDistributionQuantity(item.value)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Date of Distribution</Form.Label>
+
+                    <Form.Control
+                      type="date"
+                      name="date"
+                      value={distributionData.date || ""}
+                      onChange={(e) =>
+                        setDistributionData({
+                          ...distributionData,
+                          date: e.target.value,
+                        })
+                      }
+                      required
+                    />
+
+                    {activeScheme === "hcm" && (
+                      <Form.Text className="text-muted d-block mt-1">
+                        नोट: एक दिनांक पर केवल एक ही HCM वितरण रिकॉर्ड किया जा
+                        सकता है।
+                      </Form.Text>
+                    )}
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Anganwadi Remark</Form.Label>
+
+                    <Form.Control
+                      type="text"
+                      name="anganwadi_remark"
+                      value={distributionData.anganwadi_remark || ""}
+                      onChange={(e) =>
+                        setDistributionData({
+                          ...distributionData,
+                          anganwadi_remark: e.target.value,
+                        })
+                      }
+                      placeholder="Enter remark"
+                    />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Total Beneficiaries</Form.Label>
+
+                    {(!distributionData.months ||
+                      distributionData.months.length === 0) && (
+                      <Form.Text className="text-muted d-block mb-2">
+                        Please select a trimester first to enable this field.
+                      </Form.Text>
+                    )}
+
+                    {distributionData.total_beneficiaries_error && (
+                      <Form.Text className="text-danger d-block mb-2">
+                        {distributionData.total_beneficiaries_error}
+                      </Form.Text>
+                    )}
+
+                    <Form.Control
+                      type="text"
+                      value={distributionData.total_beneficiaries}
+                      onChange={(e) => {
+                        const value = e.target.value;
+
+                        const enteredBeneficiaries = parseInt(value, 10) || 0;
+
+                        let error = "";
+
+                        if (
+                          value &&
+                          distributionData.months?.length > 0 &&
+                          distributionData.food_item_id
+                        ) {
+                          const selectedFoodItem = foodItems.find(
+                            (fi) =>
+                              fi.id ===
+                              parseInt(distributionData.food_item_id, 10),
+                          );
+
+                          const maxAvailable = computeAutoTotalBeneficiaries(
+                            selectedFoodItem,
+
+                            distributionData.fin_year,
+
+                            distributionData.months,
+                          );
+
+                          if (
+                            maxAvailable &&
+                            enteredBeneficiaries > maxAvailable
+                          ) {
+                            error = `कुल लाभार्थी (${enteredBeneficiaries}) उपलब्ध लाभार्थियों (${maxAvailable}) से अधिक नहीं हो सकते।`;
+                          }
+                        }
+
+                        setDistributionData({
+                          ...distributionData,
+
+                          total_beneficiaries: value,
+
+                          total_beneficiaries_error: error,
+                        });
+                      }}
+                      placeholder="पूरक पोषण से स्वतः दर्ज होगा"
+                      required
+                      disabled={
+                        !distributionData.months ||
+                        distributionData.months.length === 0
+                      }
+                    />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Financial Year</Form.Label>
+
+                    <Form.Control
+                      type="text"
+                      placeholder="e.g., 2025-26"
+                      value={distributionData.fin_year}
+                      readOnly
+                      required
+                    />
                   </Form.Group>
 
                   <Form.Group className="mb-3">
@@ -2364,12 +2872,6 @@ const AnganwadiDashboard = () => {
                   </ListGroup.Item>
 
                   <ListGroup.Item>
-                    <FaHashtag className="view-modal-icon" />{" "}
-                    <strong>Expired Quantity:</strong>{" "}
-                    {viewItem.expired_quantity || 0}
-                  </ListGroup.Item>
-
-                  <ListGroup.Item>
                     <FaInfoCircle className="view-modal-icon" />{" "}
                     <strong>Anganwadi Remark:</strong>{" "}
                     {viewItem.anganwadi_remark || "-"}
@@ -2382,7 +2884,7 @@ const AnganwadiDashboard = () => {
 
                   <ListGroup.Item>
                     <FaCubes className="view-modal-icon" />{" "}
-                    <strong>Months:</strong>{" "}
+                    <strong>Trimester:</strong>{" "}
                     {formatMonths(viewItem.months || viewItem.quarter)}
                   </ListGroup.Item>
 
