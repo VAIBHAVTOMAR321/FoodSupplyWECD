@@ -669,33 +669,33 @@ const AnganwadiDashboard = () => {
       return "";
 
     const matchingRecord = suppNutritionData.find((rec) => {
-      const recYearStr = String(rec.financial_year || "");
-
-      const selYearStr = String(finYear || "");
-
+      const recYearStr = String(
+        rec._normalizedFinancialYear || rec.financial_year || rec.fin_year || rec.financialYear || "",
+      ).trim();
+      const selYearStr = String(finYear || "").trim();
       const matchesYear =
-        !selYearStr || recYearStr.includes(selYearStr.substring(0, 4));
-      const recMonthsForTrimester = Array.isArray(rec.months) ? rec.months : [];
-      const recTrimester = normalizeTrimester(
-        rec.trimester || rec.quarter,
+        !selYearStr || !recYearStr || recYearStr === selYearStr ||
+        recYearStr.includes(selYearStr.substring(0, 4));
+
+      const recMonthsForTrimester = rec._normalizedMonths ||
+        (Array.isArray(rec.months) ? rec.months.map(normalizeSuppMonth) : []);
+      const recTrimester = rec._normalizedTrimester || normalizeTrimester(
+        rec.trimester || (typeof rec.quarter === "string" ? rec.quarter : ""),
         recMonthsForTrimester,
       );
       const matchesTrimester = !trimester || recTrimester === trimester;
 
-      const matchesMonth =
-        months && months.length > 0
-          ? months.some((m) => {
-              const recMonthKey =
-                rec._monthKeys ||
-                (rec.month ? normalizeSuppMonth(rec.month) : "");
-              const recMonthStr = String(rec.month || "").toLowerCase();
-              const selMonthStr = String(m || "").toLowerCase();
-              // Some Supplementary Nutrition rows are recorded trimester-wise without a separate month.
-              return !recMonthKey && !recMonthStr
-                ? matchesTrimester
-                : recMonthKey === m || recMonthStr.includes(selMonthStr);
-            })
-          : true;
+      const matchesMonth = !Array.isArray(months) || months.length === 0 ||
+        months.some((m) => {
+          const normalizedSelectedMonth = normalizeSuppMonth(m);
+          const recMonthKey = rec._monthKeys || normalizeSuppMonth(rec.month);
+          const recMonthStr = String(rec.month || "").toLowerCase();
+          return !recMonthKey && !recMonthStr
+            ? matchesTrimester
+            : recMonthKey === normalizedSelectedMonth ||
+              recMonthsForTrimester.includes(normalizedSelectedMonth) ||
+              recMonthStr.includes(String(m || "").toLowerCase());
+        });
 
       return matchesYear && matchesTrimester && matchesMonth;
     });
@@ -712,7 +712,10 @@ const AnganwadiDashboard = () => {
       beneCategory.includes("गर्भवती") ||
       beneCategory.includes("धात्री")
     ) {
-      return matchingRecord.pregnant_woman_lactating_mother || 0;
+      return matchingRecord.pregnant_woman_lactating_mother ??
+        matchingRecord.pregnant_women_lactating_mothers ??
+        matchingRecord.pregnant_lactating_beneficiaries ??
+        matchingRecord.total_beneficiaries ?? 0;
     }
 
     if (
@@ -723,7 +726,10 @@ const AnganwadiDashboard = () => {
       beneCategory.includes("3 वर्ष से 6") ||
       beneCategory.includes("सामान्य")
     ) {
-      return matchingRecord.hcm_beneficiaries_3y_6y || 0;
+      return matchingRecord.hcm_beneficiaries_3y_6y ??
+        matchingRecord.beneficiaries_3y_6y ??
+        matchingRecord.children_3y_6y ??
+        matchingRecord.total_beneficiaries ?? 0;
     }
 
     if (
@@ -732,7 +738,10 @@ const AnganwadiDashboard = () => {
       beneCategory.includes("6 माह से 3") ||
       beneCategory.includes("6 महिने से 3")
     ) {
-      return matchingRecord.children_6m_3y || 0;
+      return matchingRecord.children_6m_3y ??
+        matchingRecord.beneficiaries_6m_3y ??
+        matchingRecord.children_6_months_to_3_years ??
+        matchingRecord.total_beneficiaries ?? 0;
     }
 
     if (beneCategory.includes("sam") || beneCategory.includes("suw")) {
@@ -950,17 +959,45 @@ const AnganwadiDashboard = () => {
 
       setReceivedMonthsStatus(monthsStatus);
 
-      const suppData = suppResponse.data || [];
+      const suppData = suppResponse.data || {};
 
+      // Normalize supported Supplementary Nutrition response shapes.
       const normalizedSupp = Array.isArray(suppData)
         ? suppData
-        : suppData.data || suppData.food_data || [];
+        : Array.isArray(suppData.data)
+          ? suppData.data
+          : Array.isArray(suppData.results)
+            ? suppData.results
+            : Array.isArray(suppData.records)
+              ? suppData.records
+              : Array.isArray(suppData.supplementary_nutrition)
+                ? suppData.supplementary_nutrition
+                : Array.isArray(suppData.food_data)
+                  ? suppData.food_data
+                  : [];
 
-      const normalizedSuppWithMonths = normalizedSupp.map((rec) => ({
-        ...rec,
-
-        _monthKeys: normalizeSuppMonth(rec.month),
-      }));
+      const normalizedSuppWithMonths = normalizedSupp.map((rec) => {
+        const rawMonths = Array.isArray(rec.months)
+          ? rec.months
+          : Array.isArray(rec.quarter)
+            ? rec.quarter
+            : typeof rec.months === "string"
+              ? rec.months.split(",").map((m) => m.trim())
+              : [];
+        const normalizedMonths = rawMonths.map(normalizeSuppMonth).filter(Boolean);
+        return {
+          ...rec,
+          _monthKeys: normalizeSuppMonth(rec.month),
+          _normalizedMonths: normalizedMonths,
+          _normalizedTrimester: normalizeTrimester(
+            rec.trimester || (typeof rec.quarter === "string" ? rec.quarter : ""),
+            normalizedMonths,
+          ),
+          _normalizedFinancialYear: String(
+            rec.financial_year || rec.fin_year || rec.financialYear || "",
+          ).trim(),
+        };
+      });
 
       setSuppNutritionData(normalizedSuppWithMonths);
 
