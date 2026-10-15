@@ -53,7 +53,8 @@ const DUPLICATE_CHECK_FIELDS = [
 const COLUMN_MAPPING = {
   DISTRICT: "district",
   PROJECT: "project",
-  QUARTER: "quarter",
+  TRIMESTER: "quarter",
+  QUARTER: "quarter", // Backward compatibility for older templates
   "FINANCIAL YEAR": "financial_year",
   "Pregnant Woman and Lactating Mother": "pregnant_woman_lactating_mother",
   "Children 6m-3y": "children_6m_3y",
@@ -94,7 +95,7 @@ const QUARTERS = [
 const PREVIEW_COLUMNS = [
   { key: "district", label: "District", isDuplicate: true },
   { key: "project", label: "Project", isDuplicate: true },
-  { key: "quarter", label: "Quarter", isDuplicate: true },
+  { key: "quarter", label: "Trimester", isDuplicate: true },
   { key: "financial_year", label: "Financial Year", isDuplicate: true },
   { key: "pregnant_woman_lactating_mother", label: "PW & LM", isDuplicate: false },
   { key: "poushik_sattu_preg_lat", label: "Poushik Sattu", isDuplicate: false },
@@ -313,7 +314,7 @@ const ITBeneEntry = () => {
       "S. No.",
       "DISTRICT",
       "PROJECT",
-      "QUARTER",
+      "TRIMESTER",
       "FINANCIAL YEAR",
       "Pregnant Woman and Lactating Mother",
       "Children 6m-3y",
@@ -440,8 +441,8 @@ const ITBeneEntry = () => {
             header = h0;
           }
 
-          if (header && COLUMN_MAPPING[header]) {
-            columnMap[c] = COLUMN_MAPPING[header];
+          if (header && (COLUMN_MAPPING[header] || COLUMN_MAPPING[header.toUpperCase()])) {
+            columnMap[c] = COLUMN_MAPPING[header] || COLUMN_MAPPING[header.toUpperCase()];
           }
         }
 
@@ -502,7 +503,7 @@ const ITBeneEntry = () => {
             const dupKey = createDuplicateKey(row.district, row.project, row.quarter, row.financial_year);
 
             if (existingEntriesMap.has(dupKey)) {
-              const dupErrorMsg = `For quarter '${String(row.quarter).trim()}' of financial year '${String(row.financial_year).trim()}', the entry for District '${String(row.district).trim()}' and Project '${String(row.project).trim()}' is already present.`;
+              const dupErrorMsg = `For trimester '${String(row.quarter).trim()}' of financial year '${String(row.financial_year).trim()}', the entry for District '${String(row.district).trim()}' and Project '${String(row.project).trim()}' is already present.`;
               rowErrors["duplicate_server"] = dupErrorMsg;
               DUPLICATE_CHECK_FIELDS.forEach((f) => {
                 rowErrors[`${f}_duplicate`] = dupErrorMsg;
@@ -518,7 +519,7 @@ const ITBeneEntry = () => {
             }
 
             if (seenEntriesInFile.has(dupKey)) {
-              const fileDupMsg = `Duplicate within file: For quarter '${row.quarter}' of financial year '${row.financial_year}', District '${row.district}' and Project '${row.project}' appears multiple times.`;
+              const fileDupMsg = `Duplicate within file: For trimester '${row.quarter}' of financial year '${row.financial_year}', District '${row.district}' and Project '${row.project}' appears multiple times.`;
               rowErrors["duplicate_file"] = fileDupMsg;
               if (!rowErrors.duplicate_server) {
                 DUPLICATE_CHECK_FIELDS.forEach((f) => {
@@ -550,7 +551,7 @@ const ITBeneEntry = () => {
           );
         } else if (duplicateCount > 0) {
           setBulkUploadError(
-            `Found ${duplicateCount} duplicate entry/entries! For the specified quarter(s) of this financial year, the entry for the District/Project combination is already present. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.quarter} - ${d.fin_year})`).join(", ")}. Please remove duplicate rows before uploading.`
+            `Found ${duplicateCount} duplicate entry/entries! For the specified trimester(s) of this financial year, the entry for the District/Project combination is already present. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.quarter} - ${d.fin_year})`).join(", ")}. Please remove duplicate rows before uploading.`
           );
         } else if (hasNonDuplicateErrors) {
           setBulkUploadError("Your file contains validation errors. Please fix them before uploading.");
@@ -759,9 +760,9 @@ const ITBeneEntry = () => {
                     </Col>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Quarter</Form.Label>
+                        <Form.Label>Trimester</Form.Label>
                         <Form.Select name="quarter" value={formData.quarter} onChange={handleFormChange} required>
-                          <option value="">Select Quarter</option>
+                          <option value="">Select Trimester</option>
                           {QUARTERS.map((quarter) => <option key={quarter} value={quarter}>{quarter}</option>)}
                         </Form.Select>
                       </Form.Group>
@@ -883,9 +884,9 @@ const ITBeneEntry = () => {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Quarter</Form.Label>
+                <Form.Label>Filter by Trimester</Form.Label>
                 <Form.Select name="quarter" value={filters.quarter} onChange={handleFilterChange}>
-                  <option value="">All Quarters</option>
+                  <option value="">All Trimesters</option>
                   {uniqueQuarters.map((quarter) => <option key={quarter} value={quarter}>{quarter}</option>)}
                 </Form.Select>
               </Form.Group>
@@ -905,7 +906,7 @@ const ITBeneEntry = () => {
                     <th>#</th>
                     <th>District</th>
                     <th>Project</th>
-                    <th>Quarter</th>
+                    <th>Trimester</th>
                     <th>Financial Year</th>
                     <th>PW & LM</th>
                     <th>Poushik Sattu</th>
@@ -997,7 +998,7 @@ const ITBeneEntry = () => {
                 <strong>Duplicate Check Rule:</strong> An entry is considered duplicate if the combination of{" "}
                 <Badge bg="primary" className="mx-1">District</Badge> +{" "}
                 <Badge bg="primary" className="mx-1">Project</Badge> +{" "}
-                <Badge bg="primary" className="mx-1">Quarter</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">Trimester</Badge> +{" "}
                 <Badge bg="primary" className="mx-1">Financial Year</Badge>{" "}
                 already exists. The numeric count fields are NOT checked for duplicates.
               </div>
@@ -1069,7 +1070,7 @@ const ITBeneEntry = () => {
                       <strong>Duplicate Entries Found - Upload Disabled!</strong>
                       <div className="mt-2 mb-1" style={{ fontSize: "0.8rem" }}>
                         The following rows have the same{" "}
-                        <strong>District + Project + Quarter + Financial Year</strong> combination that already exists:
+                        <strong>District + Project + Trimester + Financial Year</strong> combination that already exists:
                       </div>
                       <ul className="mb-0" style={{ fontSize: "0.8rem" }}>
                         {bulkPreviewData.filter((item) => hasDuplicateError(item.errors)).map((item, idx) => (
@@ -1086,7 +1087,7 @@ const ITBeneEntry = () => {
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onClick={handleCloseBulkUploadModal} disabled={bulkUploading}>Cancel</Button>
-              <Button variant="primary" onClick={handleBulkUpload} disabled={isBulkUploadDisabled} title={isBulkUploadDisabled && bulkFile ? "Fix all duplicate errors (District + Project + Quarter + Financial Year) before uploading" : ""}>
+              <Button variant="primary" onClick={handleBulkUpload} disabled={isBulkUploadDisabled} title={isBulkUploadDisabled && bulkFile ? "Fix all duplicate errors (District + Project + Trimester + Financial Year) before uploading" : ""}>
                 {bulkUploading ? (
                   <><Spinner as="span" animation="border" size="sm" /> Uploading...</>
                 ) : (
