@@ -149,7 +149,9 @@ const downloadPDF = async ({ title, filename, headers, rows, footer, fontSize })
   content.appendChild(heading);
 
   const table = document.createElement("table");
-  table.style.cssText = `width:100%;border-collapse:collapse;table-layout:fixed;font-size:${fontSize}px;line-height:1.35;`;
+  table.style.cssText = `width:100%;border-collapse:collapse;table-layout:fixed;font-size:${fontSize}px;line-height:1.25;`;
+  table.style.pageBreakInside = "auto";
+  table.style.breakInside = "auto";
 
   const createCell = (tagName, cell) => {
     const element = document.createElement(tagName);
@@ -170,14 +172,21 @@ const downloadPDF = async ({ title, filename, headers, rows, footer, fontSize })
       row.appendChild(header);
     });
     row.style.pageBreakInside = "avoid";
+    row.style.breakInside = "avoid";
     thead.appendChild(row);
   });
+  thead.style.display = "table-header-group";
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
+  tbody.style.display = "table-row-group";
   rows.forEach((values) => {
     const row = document.createElement("tr");
     values.forEach((value) => row.appendChild(createCell("td", value)));
+    // Keep each record together on a single PDF page instead of splitting it
+    // between the bottom of one page and the top of the next.
+    row.style.pageBreakInside = "avoid";
+    row.style.breakInside = "avoid";
     tbody.appendChild(row);
   });
   table.appendChild(tbody);
@@ -204,12 +213,22 @@ const downloadPDF = async ({ title, filename, headers, rows, footer, fontSize })
     await loadHindiPdfFont();
     await html2pdf()
       .set({
-        margin: [10, 10, 10, 10],
+        // Safe margins keep rows away from the page edges. A moderate canvas
+        // scale and JPEG quality reduce file size without making text blurry.
+        margin: [12, 8, 12, 8],
         filename,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
-        jsPDF: { unit: "mm", format: "a3", orientation: "landscape" },
-        pagebreak: { mode: ["css", "legacy"] }
+        image: { type: "jpeg", quality: 0.84 },
+        html2canvas: {
+          scale: 1.5,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: Math.max(document.documentElement.clientWidth, content.scrollWidth),
+        },
+        jsPDF: { unit: "mm", format: "a3", orientation: "landscape", compress: true },
+        pagebreak: { mode: ["css", "legacy"], avoid: ["tr", "thead", "tfoot"] }
       })
       .from(content)
       .save();
@@ -678,6 +697,14 @@ const DirectorDashboard = () => {
     data.push(totalRow);
 
     const ws = XLSX.utils.json_to_sheet(data);
+    const supplyHeaders = Object.keys(data[0] || {});
+    ws["!cols"] = supplyHeaders.map((header) => ({
+      wch: Math.min(Math.max(header.length, data.reduce((max, row) => Math.max(max, String(row[header] ?? "").length), 10)) + 2, 32),
+    }));
+    if (data.length) {
+      ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: data.length - 1, c: supplyHeaders.length - 1 } }) };
+      ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+    }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Supplies Summary");
     const viewModeLabel = suppliesViewMode.charAt(0).toUpperCase() + suppliesViewMode.slice(1);
@@ -753,6 +780,14 @@ const DirectorDashboard = () => {
     const data = aggregatedData.map((r, i) => ({ "S. No.": i + 1, [aggregateView]: r.groupKey, Trimesters: r.quarters, "Fin. Years": r.fys, ...NUMERIC_AGG_FIELDS.reduce((o, f) => ({ ...o, [f.label]: r[f.key] }), {}) }));
     data.push({ "S. No.": "", [aggregateView]: "Total", ...NUMERIC_AGG_FIELDS.reduce((o, f) => ({ ...o, [f.label]: totalAggregated[f.key] }), {}) });
     const ws = XLSX.utils.json_to_sheet(data);
+    const summaryHeaders = Object.keys(data[0] || {});
+    ws["!cols"] = summaryHeaders.map((header) => ({
+      wch: Math.min(Math.max(header.length, data.reduce((max, row) => Math.max(max, String(row[header] ?? "").length), 10)) + 2, 32),
+    }));
+    if (data.length) {
+      ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: data.length - 1, c: summaryHeaders.length - 1 } }) };
+      ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+    }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
     XLSX.writeFile(wb, `${aggregateView}_Summary.xlsx`);
@@ -772,71 +807,117 @@ const DirectorDashboard = () => {
     });
   };
 
-  /* ── Detailed Records Export (Grant-wise structure) ── */
-  const exportDetailsToExcel = () => {
-    const cols = TABLE_COLUMNS.filter((c) => c.key !== "_index" && c.key !== "_actions");
-    const dataToExport = searchedRecords.map((row, i) => {
-      const obj = { "S. No.": i + 1 };
-      cols.forEach((c) => (obj[c.label] = row[c.key] || 0));
-      return obj;
-    });
-    const totalObj = { "S. No.": "" };
-    cols.forEach((c) => {
-      if (c.num || c.strong) totalObj[c.label] = totalDetailed[c.key];
-      else totalObj[c.label] = "";
-    });
-    totalObj[cols[0].label] = "Total";
-    dataToExport.push(totalObj);
+  /* ── Detailed Records Export (match the on-screen grant table exactly) ── */
+  const getGrantAmount = (record, grantKey, grantIndex) => {
+    const values = Array.isArray(record?.[grantKey]) ? record[grantKey] : [];
+    const value = values[grantIndex];
+    // The visible table displays the amount at each grant position, not grant IDs.
+    return value === null || value === undefined || value === "" ? 0 : value;
+  };
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Records");
-    XLSX.writeFile(wb, "Supplementary_Records.xlsx");
+  const exportDetailsToExcel = () => {
+    const headers = [
+      "S. No.",
+      ...EXCEL_META_COLUMNS.map((col) => col.header),
+      ...GRANT_CATEGORIES.flatMap((cat) => [
+        `${cat.title} - Grant 15`,
+        `${cat.title} - Grant 30`,
+        `${cat.title} - Grant 31`,
+        `${cat.title} - TOTAL`,
+      ]),
+      ...FOOD_FIELDS.map((field) => field.header),
+    ];
+
+    const dataToExport = searchedRecords.map((record, index) => {
+      const row = { "S. No.": index + 1 };
+      EXCEL_META_COLUMNS.forEach((col) => {
+        row[col.header] = record[col.key] ?? "—";
+      });
+      GRANT_CATEGORIES.forEach((cat) => {
+        row[`${cat.title} - Grant 15`] = getGrantAmount(record, cat.grantKey, 0);
+        row[`${cat.title} - Grant 30`] = getGrantAmount(record, cat.grantKey, 1);
+        row[`${cat.title} - Grant 31`] = getGrantAmount(record, cat.grantKey, 2);
+        row[`${cat.title} - TOTAL`] = Number(record[cat.countKey] ?? 0);
+      });
+      FOOD_FIELDS.forEach((field) => {
+        row[field.header] = Number(record[field.key] ?? 0);
+      });
+      return row;
+    });
+
+    const totalRow = { "S. No.": "", [EXCEL_META_COLUMNS[0].header]: "TOTAL" };
+    EXCEL_META_COLUMNS.slice(1).forEach((col) => { totalRow[col.header] = ""; });
+    GRANT_CATEGORIES.forEach((cat) => {
+      totalRow[`${cat.title} - Grant 15`] = "";
+      totalRow[`${cat.title} - Grant 30`] = "";
+      totalRow[`${cat.title} - Grant 31`] = "";
+      totalRow[`${cat.title} - TOTAL`] = Number(totalDetailed[cat.countKey] ?? 0);
+    });
+    FOOD_FIELDS.forEach((field) => {
+      totalRow[field.header] = Number(totalDetailed[field.key] ?? 0);
+    });
+    dataToExport.push(totalRow);
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport, { header: headers });
+    worksheet["!cols"] = headers.map((header) => {
+      const longest = Math.max(
+        String(header).length,
+        ...dataToExport.map((row) => String(row[header] ?? "").length),
+      );
+      return { wch: Math.min(Math.max(longest + 2, 10), 32) };
+    });
+    if (dataToExport.length) {
+      worksheet["!autofilter"] = {
+        ref: XLSX.utils.encode_range({
+          s: { r: 0, c: 0 },
+          e: { r: dataToExport.length, c: headers.length - 1 },
+        }),
+      };
+    }
+    worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Detailed Records");
+    XLSX.writeFile(workbook, "Supplementary_Records.xlsx", { compression: true });
   };
 
   const exportDetailsToPDF = () => {
     const groupHeaders = [
-      { text: 'S. No.', rowSpan: 2 },
-      ...EXCEL_META_COLUMNS.map(col => ({ text: col.header, rowSpan: 2 })),
-      ...GRANT_CATEGORIES.map(cat => ({ text: cat.title, colSpan: 4 })),
-      { text: 'SUPPLEMENTARY NUTRITION DETAILS', colSpan: FOOD_FIELDS.length }
+      { text: "S. No.", rowSpan: 2 },
+      ...EXCEL_META_COLUMNS.map((col) => ({ text: col.header, rowSpan: 2 })),
+      ...GRANT_CATEGORIES.map((cat) => ({ text: cat.title, colSpan: 4 })),
+      { text: "SUPPLEMENTARY NUTRITION DETAILS", colSpan: FOOD_FIELDS.length },
     ];
     const subHeaders = [
-      ...GRANT_CATEGORIES.flatMap(() => ['Grant 15', 'Grant 30', 'Grant 31', 'TOTAL']),
-      ...FOOD_FIELDS.map(f => f.header)
+      ...GRANT_CATEGORIES.flatMap(() => ["Grant 15", "Grant 30", "Grant 31", "TOTAL"]),
+      ...FOOD_FIELDS.map((field) => field.header),
     ];
-    const headers = [groupHeaders, subHeaders];
-    
-    const rows = searchedRecords.map((r, i) => {
-      const row = [i + 1];
-      EXCEL_META_COLUMNS.forEach(col => row.push(r[col.key] || "—"));
-      GRANT_CATEGORIES.forEach(cat => {
-        const grants = Array.isArray(r[cat.grantKey]) ? r[cat.grantKey].map(Number) : [];
-        [15, 30, 31].forEach(gid => row.push(grants.includes(gid) ? String(gid) : "—"));
-        row.push(Number(r[cat.countKey] || 0).toLocaleString());
+    const rows = searchedRecords.map((record, index) => {
+      const row = [index + 1];
+      EXCEL_META_COLUMNS.forEach((col) => row.push(record[col.key] ?? "—"));
+      GRANT_CATEGORIES.forEach((cat) => {
+        row.push(getGrantAmount(record, cat.grantKey, 0));
+        row.push(getGrantAmount(record, cat.grantKey, 1));
+        row.push(getGrantAmount(record, cat.grantKey, 2));
+        row.push(Number(record[cat.countKey] ?? 0).toLocaleString());
       });
-      FOOD_FIELDS.forEach(f => row.push(Number(r[f.key] || 0).toLocaleString()));
+      FOOD_FIELDS.forEach((field) => row.push(Number(record[field.key] ?? 0).toLocaleString()));
       return row;
     });
-    
     const footer = [[
-      { text: '', colSpan: 1 + EXCEL_META_COLUMNS.length },
-      ...GRANT_CATEGORIES.flatMap(cat => [
-        { text: '' },
-        { text: '' },
-        { text: '' },
-        { text: totalDetailed[cat.countKey]?.toLocaleString() || 0 }
+      { text: "", colSpan: 1 + EXCEL_META_COLUMNS.length },
+      ...GRANT_CATEGORIES.flatMap((cat) => [
+        { text: "" }, { text: "" }, { text: "" },
+        { text: Number(totalDetailed[cat.countKey] ?? 0).toLocaleString() },
       ]),
-      ...FOOD_FIELDS.map(f => ({ text: totalDetailed[f.key]?.toLocaleString() || 0 }))
+      ...FOOD_FIELDS.map((field) => ({ text: Number(totalDetailed[field.key] ?? 0).toLocaleString() })),
     ]];
-    
     return handlePDFExport({
       title: "Supplementary Nutrition Records",
       filename: "Supplementary_Records.pdf",
-      headers,
+      headers: [groupHeaders, subHeaders],
       rows,
       footer,
-      fontSize: 7
+      fontSize: 7,
     });
   };
 
