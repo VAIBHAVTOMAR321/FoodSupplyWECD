@@ -157,7 +157,7 @@ const CDPOFoodSupplementary = () => {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Quarter</Form.Label>
+                <Form.Label>Filter by Trimester</Form.Label>
                 <Form.Select
                   name="quarter"
                   value={filters.quarter}

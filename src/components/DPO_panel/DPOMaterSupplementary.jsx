@@ -154,13 +154,13 @@ const DPOMaterSupplementary = () => {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Quarter</Form.Label>
+                <Form.Label>Filter by Trimester</Form.Label>
                 <Form.Select
                   name="quarter"
                   value={filters.quarter}
                   onChange={handleFilterChange}
                 >
-                  <option value="">All Quarters</option>
+                  <option value="">All Trimester</option>
                   {uniqueQuarters.map((quarter) => (
                     <option key={quarter} value={quarter}>{quarter}</option>
                   ))}
@@ -182,7 +182,7 @@ const DPOMaterSupplementary = () => {
                     <th>#</th>
                     <th>District</th>
                     <th>Project</th>
-                    <th>Quarter</th>
+                    <th>Trimester</th>
                     <th>Financial Year</th>
                     <th>PW &amp; LM</th>
                     <th>Poushik Sattu</th>
