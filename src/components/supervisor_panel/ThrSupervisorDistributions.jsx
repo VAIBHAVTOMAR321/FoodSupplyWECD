@@ -150,13 +150,66 @@ const formatTrimester = (rowOrValue) => {
     if (group.keys.every((m) => rowMonths.includes(m))) return group.label;
   return raw ? String(raw) : "-";
 };
+// API versions may expose the distribution date under different field names.
+const getDistributionDateValue = (row) => {
+  if (!row || typeof row !== "object") return null;
+
+  const dateKeys = [
+    "date",
+    "distribution_date",
+    "distributionDate",
+    "date_of_distribution",
+    "dateOfDistribution",
+    "received_date",
+    "receivedDate",
+    "entry_date",
+    "entryDate",
+    "date_created",
+    "created_on",
+    "created_at",
+    "created",
+    "updated_at",
+  ];
+
+  for (const key of dateKeys) {
+    const value = row[key];
+    if (value !== null && value !== undefined && String(value).trim() !== "") {
+      return value;
+    }
+  }
+
+  // Some APIs nest the original record or metadata.
+  for (const nestedKey of ["distribution", "details", "metadata"]) {
+    const nested = row[nestedKey];
+    if (nested && typeof nested === "object") {
+      const value = getDistributionDateValue(nested);
+      if (value) return value;
+    }
+  }
+
+  return null;
+};
+
 const formatDistributionDate = (value) => {
-  if (!value) return "-";
+  if (value === null || value === undefined || String(value).trim() === "") return "-";
+
   const raw = String(value).trim();
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
-  const parsed = new Date(value);
+
+  // Keep date-only ISO values timezone-safe.
+  const iso = raw.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})/);
+  if (iso) {
+    return `${String(iso[3]).padStart(2, "0")}/${String(iso[2]).padStart(2, "0")}/${iso[1]}`;
+  }
+
+  // Support API values already formatted as DD/MM/YYYY or DD-MM-YYYY.
+  const dmy = raw.match(/^(\\d{1,2})[\\/-](\\d{1,2})[\\/-](\\d{4})$/);
+  if (dmy) {
+    return `${String(dmy[1]).padStart(2, "0")}/${String(dmy[2]).padStart(2, "0")}/${dmy[3]}`;
+  }
+
+  const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return "-";
+
   return `${String(parsed.getDate()).padStart(2, "0")}/${String(parsed.getMonth() + 1).padStart(2, "0")}/${parsed.getFullYear()}`;
 };
 
@@ -862,7 +915,7 @@ const ThrSupervisorDistributions = () => {
         if (col.dataField === "trimester") {
           newRow[col.text] = formatTrimester(row);
         } else if (col.dataField === "date") {
-          newRow[col.text] = formatDistributionDate(row.date);
+          newRow[col.text] = formatDistributionDate(getDistributionDateValue(row));
         } else {
           newRow[col.text] = row[col.dataField];
         }
@@ -1432,7 +1485,7 @@ const ThrSupervisorDistributions = () => {
                                       break;
                                     case "date":
                                       cellContent = formatDistributionDate(
-                                        row.date,
+                                        getDistributionDateValue(row),
                                       );
                                       break;
 
