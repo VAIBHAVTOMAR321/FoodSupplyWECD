@@ -777,174 +777,136 @@ const ThrSupervisorDistributions = () => {
     );
   }, [filteredData]);
 
-  const exportToPDF = () => {
-    setIsPrinting(true);
+  const exportToPDF = async () => {
+    const exportColumns = columns.filter(
+      (col) => col.visible && col.dataField !== "action"
+    );
+    const rowsPerPage = 18;
+    const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 24;
+    const usableWidth = pageWidth - margin * 2;
+    const dataRows = filteredData;
+    const chunks = [];
+    for (let i = 0; i < dataRows.length; i += rowsPerPage) {
+      chunks.push(dataRows.slice(i, i + rowsPerPage));
+    }
+    if (!chunks.length) chunks.push([]);
 
-    setTimeout(() => {
-      const input = tableRef.current;
+    const cellText = (row, col, index) => {
+      if (col.dataField === "#") return String(index + 1);
+      if (col.dataField === "trimester") return formatTrimester(row);
+      if (col.dataField === "date") return formatDistributionDate(getDistributionDateValue(row));
+      const value = row[col.dataField];
+      return value === null || value === undefined || value === "" ? "-" : String(value);
+    };
 
-      const totalsTableContainer = document.createElement("div");
+    try {
+      for (let pageIndex = 0; pageIndex < chunks.length; pageIndex++) {
+        const host = document.createElement("div");
+        host.style.cssText = [
+          "position:fixed", "left:-10000px", "top:0", `width:${Math.round(usableWidth)}px`,
+          "background:#fff", "color:#212529", "padding:12px", "box-sizing:border-box",
+          "font-family:Arial,'Noto Sans Devanagari',sans-serif"
+        ].join(";");
+        const title = document.createElement("div");
+        title.textContent = "THR Supervisor Distributions Report";
+        title.style.cssText = "font-size:16px;font-weight:700;text-align:center;margin-bottom:10px;";
+        host.appendChild(title);
 
-      // Styling for the totals table to ensure it's rendered properly
+        const table = document.createElement("table");
+        table.style.cssText = "width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px;line-height:1.25;";
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        exportColumns.forEach((col) => {
+          const th = document.createElement("th");
+          th.textContent = col.text;
+          th.style.cssText = "border:1px solid #adb5bd;background:#e9eef3;padding:5px 4px;text-align:left;white-space:normal;overflow-wrap:anywhere;";
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
 
-      totalsTableContainer.innerHTML = `
-
-        <div style="padding: 20px; font-family: sans-serif; text-align: center;">
-
-          <h4 style="margin-bottom: 15px;">Total Quantity by Unit</h4>
-
-          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
-
-            <thead style="background-color: #f2f2f2;">
-
-              <tr>
-
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
-
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
-
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              ${Object.entries(totals.quantityByUnit)
-
-                .map(
-                  ([unit, total]) => `
-
-                  <tr>
-
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
-
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
-
-                  </tr>
-
-                `,
-                )
-                .join("")}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      `;
-
-      document.body.appendChild(totalsTableContainer);
-
-      if (!input) {
-        console.error("Table element not found for PDF export.");
-
-        setIsPrinting(false);
-
-        return;
-      }
-
-      Promise.all([
-        html2canvas(input, { scale: 2, useCORS: true }),
-
-        html2canvas(totalsTableContainer, { scale: 2, useCORS: true }),
-      ]).then(([mainCanvas, totalsCanvas]) => {
-        const mainImgData = mainCanvas.toDataURL("image/png");
-
-        const totalsImgData = totalsCanvas.toDataURL("image/png");
-
-        const pdf = new jsPDF({
-          orientation: "landscape",
-          unit: "pt",
-          format: "a2",
+        const tbody = document.createElement("tbody");
+        chunks[pageIndex].forEach((row, localIndex) => {
+          const tr = document.createElement("tr");
+          exportColumns.forEach((col) => {
+            const td = document.createElement("td");
+            td.textContent = cellText(row, col, pageIndex * rowsPerPage + localIndex);
+            td.style.cssText = "border:1px solid #ced4da;padding:4px;vertical-align:top;white-space:normal;overflow-wrap:anywhere;word-break:normal;";
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
         });
 
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-
-        let yPos = 40;
-
-        const mainRatio = mainCanvas.width / mainCanvas.height;
-
-        const mainWidth = pdfWidth - 40;
-
-        const mainHeight = mainWidth / mainRatio;
-
-        pdf.text("THR Supervisor Distributions Report", 20, 30);
-
-        pdf.addImage(mainImgData, "PNG", 20, yPos, mainWidth, mainHeight);
-
-        yPos += mainHeight + 20;
-
-        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
-
-        const totalsWidth = pdfWidth / 2;
-
-        const totalsHeight = totalsWidth / totalsRatio;
-
-        if (yPos + totalsHeight < pdfHeight - 40) {
-          pdf.addImage(
-            totalsImgData,
-            "PNG",
-            20,
-            yPos,
-            totalsWidth,
-            totalsHeight,
-          );
+        if (pageIndex === chunks.length - 1) {
+          const totalRow = document.createElement("tr");
+          exportColumns.forEach((col, index) => {
+            const td = document.createElement("td");
+            let value = "";
+            if (index === 0) value = "Total";
+            if (col.dataField === "total_beneficiaries") value = String(totals.beneficiaries);
+            td.textContent = value;
+            td.style.cssText = "border:1px solid #adb5bd;background:#e9eef3;padding:5px 4px;font-weight:700;vertical-align:top;white-space:normal;overflow-wrap:anywhere;";
+            totalRow.appendChild(td);
+          });
+          tbody.appendChild(totalRow);
         }
+        table.appendChild(tbody);
+        host.appendChild(table);
+        document.body.appendChild(host);
 
-        pdf.save("thr_supervisor_distributions.pdf");
+        const canvas = await html2canvas(host, {
+          scale: 1.5,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false
+        });
+        document.body.removeChild(host);
 
-        document.body.removeChild(totalsTableContainer);
-
-        setIsPrinting(false);
-      });
-    }, 100);
+        if (pageIndex > 0) pdf.addPage();
+        const imageData = canvas.toDataURL("image/jpeg", 0.78);
+        const imageWidth = usableWidth;
+        const imageHeight = (canvas.height / canvas.width) * imageWidth;
+        const maxHeight = pageHeight - margin * 2;
+        const scale = Math.min(1, maxHeight / imageHeight);
+        pdf.addImage(imageData, "JPEG", margin, margin, imageWidth * scale, imageHeight * scale, undefined, "FAST");
+      }
+      pdf.save("thr_supervisor_distributions.pdf");
+    } catch (err) {
+      console.error("Failed to export THR PDF:", err);
+    }
   };
 
   const exportToExcel = () => {
-    const visibleColumns = columns.filter(
-      (c) => c.visible && c.dataField !== "#" && c.dataField !== "action",
+    const exportColumns = columns.filter(
+      (col) => col.visible && col.dataField !== "action"
     );
-
     const dataToExport = filteredData.map((row, index) => {
-      const newRow = { "#": index + 1 };
-
-      visibleColumns.forEach((col) => {
-        if (col.dataField === "trimester") {
-          newRow[col.text] = formatTrimester(row);
-        } else if (col.dataField === "date") {
-          newRow[col.text] = formatDistributionDate(getDistributionDateValue(row));
-        } else {
-          newRow[col.text] = row[col.dataField];
-        }
+      const output = {};
+      exportColumns.forEach((col) => {
+        if (col.dataField === "#") output[col.text] = index + 1;
+        else if (col.dataField === "trimester") output[col.text] = formatTrimester(row);
+        else if (col.dataField === "date") output[col.text] = formatDistributionDate(getDistributionDateValue(row));
+        else output[col.text] = row[col.dataField] ?? "";
       });
-
-      return newRow;
+      return output;
     });
-
-    const totalRow = { "#": "" };
-
-    visibleColumns.forEach((col) => {
-      if (col.dataField === "total_beneficiaries")
-        totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === "quantity") totalRow[col.text] = "";
+    const totalRow = {};
+    exportColumns.forEach((col, index) => {
+      if (index === 0) totalRow[col.text] = "Total";
+      else if (col.dataField === "total_beneficiaries") totalRow[col.text] = totals.beneficiaries;
       else totalRow[col.text] = "";
     });
-
     dataToExport.push(totalRow);
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-
+    worksheet["!cols"] = exportColumns.map((col) => ({
+      wch: Math.min(32, Math.max(col.text.length + 2, 14))
+    }));
     const workbook = XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(
-      workbook,
-      worksheet,
-      "THR Supervisor Distributions",
-    );
-
+    XLSX.utils.book_append_sheet(workbook, worksheet, "THR Distributions");
     XLSX.writeFile(workbook, "thr_supervisor_distributions.xlsx");
   };
 

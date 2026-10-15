@@ -33,8 +33,8 @@ import {
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 
 import jsPDF from "jspdf";
-
 import html2canvas from "html2canvas";
+
 
 import * as XLSX from "xlsx";
 
@@ -669,124 +669,136 @@ const HcmSupervisorDistributions = () => {
     );
   }, [filteredData]);
 
-  const exportToPDF = () => {
-    setIsPrinting(true);
+  const exportToPDF = async () => {
+    // Render the actual Unicode table in the browser first. This preserves Hindi
+    // glyphs (unlike jsPDF's built-in Helvetica font) while JPEG compression
+    // keeps the resulting PDF reasonably small.
+    const exportColumns = columns.filter(
+      (col) => col.visible && col.dataField !== "action",
+    );
+    const headers = exportColumns.map((col) => col.text);
+    const getValue = (row, col, index) => {
+      if (col.dataField === "#") return String(index + 1);
+      if (col.dataField === "date") return formatDistributionDate(row.date);
+      if (col.dataField === "trimester") return formatTrimester(row);
+      if (col.dataField === "sector_status") return row.sector_status || "pending";
+      const value = row[col.dataField];
+      return value === null || value === undefined || value === "" ? "-" : String(value);
+    };
 
-    setTimeout(async () => {
-      const mainTableCanvas = await html2canvas(tableRef.current, {
-        scale: 2,
-
-        useCORS: true,
-      }).catch((e) => {
-        console.error("Table element not found for PDF export.");
-
-        setIsPrinting(false);
-
-        return;
+    const wrapper = document.createElement("div");
+    Object.assign(wrapper.style, {
+      position: "fixed", left: "-100000px", top: "0", width: "1600px",
+      background: "#ffffff", color: "#222222", padding: "12px",
+      fontFamily: '"Noto Sans Devanagari", "Nirmala UI", Mangal, Arial, sans-serif',
+      boxSizing: "border-box",
+    });
+    const table = document.createElement("table");
+    Object.assign(table.style, {
+      width: "100%", borderCollapse: "collapse", tableLayout: "fixed",
+      fontSize: "12px", lineHeight: "1.25", overflowWrap: "anywhere",
+    });
+    const colgroup = document.createElement("colgroup");
+    exportColumns.forEach((col) => {
+      const colEl = document.createElement("col");
+      colEl.style.width = ["awc_name", "food_item", "bene_category"].includes(col.dataField)
+        ? "13%" : ["district", "project", "sector", "anganwadi_remark"].includes(col.dataField)
+          ? "9%" : `${Math.max(5, 100 / exportColumns.length)}%`;
+      colgroup.appendChild(colEl);
+    });
+    table.appendChild(colgroup);
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    headers.forEach((label) => {
+      const th = document.createElement("th");
+      th.textContent = label;
+      Object.assign(th.style, {
+        border: "1px solid #aeb8c2", padding: "5px 4px", textAlign: "left",
+        background: "#e9eef2", fontWeight: "700", verticalAlign: "top",
+        overflowWrap: "anywhere",
       });
-
-      const totalsTableContainer = document.createElement("div");
-
-      totalsTableContainer.innerHTML = `
-
-        <div style="padding: 20px; font-family: sans-serif; text-align: center;">
-
-          <h4 style="margin-bottom: 15px;">Total Quantity by Unit</h4>
-
-          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
-
-            <thead style="background-color: #f2f2f2;">
-
-              <tr>
-
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
-
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
-
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              ${Object.entries(totals.quantityByUnit)
-
-                .map(
-                  ([unit, total]) => `
-
-                  <tr>
-
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
-
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
-
-                  </tr>
-
-                `,
-                )
-                .join("")}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      `;
-
-      document.body.appendChild(totalsTableContainer);
-
-      const totalsCanvas = await html2canvas(totalsTableContainer, {
-        scale: 2,
-        useCORS: true,
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    filteredData.forEach((row, index) => {
+      const tr = document.createElement("tr");
+      exportColumns.forEach((col) => {
+        const td = document.createElement("td");
+        td.textContent = getValue(row, col, index);
+        Object.assign(td.style, {
+          border: "1px solid #c4cbd1", padding: "4px", verticalAlign: "top",
+          overflowWrap: "anywhere", background: index % 2 ? "#f8fafb" : "#ffffff",
+        });
+        tr.appendChild(td);
       });
+      tbody.appendChild(tr);
+    });
+    const totalTr = document.createElement("tr");
+    exportColumns.forEach((col) => {
+      const td = document.createElement("td");
+      td.textContent = col.dataField === "#" ? "Total" : col.dataField === "total_beneficiaries" ? String(totals.beneficiaries) : "";
+      Object.assign(td.style, { border: "1px solid #aeb8c2", padding: "5px 4px", background: "#e9eef2", fontWeight: "700" });
+      totalTr.appendChild(td);
+    });
+    tbody.appendChild(totalTr);
+    table.appendChild(tbody);
+    wrapper.appendChild(table);
+    document.body.appendChild(wrapper);
 
-      document.body.removeChild(totalsTableContainer);
-
-      const mainImgData = mainTableCanvas.toDataURL("image/png");
-
-      const totalsImgData = totalsCanvas.toDataURL("image/png");
-
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "pt",
-        format: "a2",
+    try {
+      // Wait for browser font shaping before rasterizing Devanagari text.
+      if (document.fonts?.ready) await document.fonts.ready;
+      const canvas = await html2canvas(wrapper, {
+        scale: 1.15, backgroundColor: "#ffffff", useCORS: true,
+        logging: false, imageTimeout: 10000,
       });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-
-      pdf.text("HCM Supervisor Distributions Report", 20, 30);
-
-      let yPos = 40;
-
-      const mainRatio = mainTableCanvas.width / mainTableCanvas.height;
-
-      const mainWidth = pdfWidth - 40;
-
-      const mainHeight = mainWidth / mainRatio;
-
-      pdf.addImage(mainImgData, "PNG", 20, yPos, mainWidth, mainHeight);
-
-      yPos += mainHeight + 20;
-
-      const totalsRatio = totalsCanvas.width / totalsCanvas.height;
-
-      const totalsWidth = pdfWidth / 2; // Make it half the page width
-
-      const totalsHeight = totalsWidth / totalsRatio;
-
-      if (yPos + totalsHeight < pdfHeight - 40) {
-        // Check if it fits on the current page
-
-        pdf.addImage(totalsImgData, "PNG", 20, yPos, totalsWidth, totalsHeight);
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a3", compress: true });
+      const margin = 7;
+      const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+      const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
+      // Slice the table into page-sized horizontal strips, repeating the header
+      // on each page. JPEG encoding significantly reduces file size vs PNG.
+      const headerHeight = Math.max(1, Math.ceil(thead.getBoundingClientRect().height * 1.15));
+      const scaleToPdf = pageWidth / canvas.width;
+      const maxSliceHeight = Math.floor(pageHeight / scaleToPdf);
+      let sourceY = 0;
+      let pageIndex = 0;
+      while (sourceY < canvas.height) {
+        if (pageIndex > 0) pdf.addPage();
+        let sliceHeight = Math.min(maxSliceHeight, canvas.height - sourceY);
+        if (pageIndex > 0 && sourceY + sliceHeight < canvas.height) {
+          sliceHeight = Math.max(headerHeight + 1, sliceHeight);
+        }
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+        const ctx = pageCanvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        if (pageIndex === 0) {
+          ctx.drawImage(canvas, 0, sourceY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+        } else {
+          // Repeat the header row at the top of subsequent pages, then continue
+          // from the previous slice's body position.
+          ctx.drawImage(canvas, 0, 0, canvas.width, headerHeight, 0, 0, canvas.width, headerHeight);
+          const bodyAvailable = sliceHeight - headerHeight;
+          const bodyStart = sourceY;
+          ctx.drawImage(canvas, 0, bodyStart, canvas.width, bodyAvailable, 0, headerHeight, canvas.width, bodyAvailable);
+        }
+        const img = pageCanvas.toDataURL("image/jpeg", 0.72);
+        const imgHeight = (pageCanvas.height * pageWidth) / pageCanvas.width;
+        pdf.addImage(img, "JPEG", margin, margin, pageWidth, imgHeight, undefined, "FAST");
+        sourceY += pageIndex === 0 ? sliceHeight : Math.max(1, sliceHeight - headerHeight);
+        pageIndex += 1;
       }
-
       pdf.save("hcm_supervisor_distributions.pdf");
-
-      setIsPrinting(false);
-    }, 100);
+    } catch (error) {
+      console.error("Failed to export HCM distributions PDF:", error);
+    } finally {
+      document.body.removeChild(wrapper);
+    }
   };
 
   const exportToExcel = () => {

@@ -392,102 +392,144 @@ const ThrCdpoDistributions = () => {
     }, { beneficiaries: 0, quantity: 0, quantityByUnit: {} });
   }, [filteredData]);
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     setIsPrinting(true);
-    setTimeout(() => {
-      const input = tableRef.current;
-      const totalsTableContainer = document.createElement('div');
-      // Styling for the totals table to ensure it's rendered properly
-      totalsTableContainer.innerHTML = `
-        <div style="padding: 20px; font-family: sans-serif; text-align: center;">
-          <h4 style="margin-bottom: 15px;">Total Quantity by Unit</h4>
-          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
-            <thead style="background-color: #f2f2f2;">
-              <tr>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Object.entries(totals.quantityByUnit)
-                .map(([unit, total]) => `
-                  <tr>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-      document.body.appendChild(totalsTableContainer);
+    const exportRoot = document.createElement("div");
+    exportRoot.style.cssText = [
+      "position:fixed", "left:-100000px", "top:0", "width:1600px",
+      "background:#fff", "color:#111", "padding:18px",
+      "font-family:Arial,'Noto Sans Devanagari',sans-serif", "box-sizing:border-box"
+    ].join(";");
+    document.body.appendChild(exportRoot);
 
-      if (!input) {
-        console.error("Table element not found for PDF export.");
-        setIsPrinting(false);
-        return;
+    const escapeHtml = (value) => String(value ?? "—")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    const exportColumns = columns.filter(col => col.visible && col.dataField !== "action");
+    const getCellValue = (row, col, index) => {
+      switch (col.dataField) {
+        case "#": return index + 1;
+        case "date": return formatDistributionDate(row);
+        case "fin_year": return row.fin_year ?? row.financial_year ?? row.financialYear ?? "—";
+        case "trimester": return formatTrimester(row);
+        case "months": return formatDistributionMonths(row);
+        case "sector_status": return row.sector_status || "pending";
+        case "bene_category": return row.bene_category || "—";
+        case "anganwadi_remark": return row.anganwadi_remark || "—";
+        default: return row[col.dataField] ?? "—";
       }
-      Promise.all([
-        html2canvas(input, { scale: 2, useCORS: true }),
-        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
-      ]).then(([mainCanvas, totalsCanvas]) => {
-        const mainImgData = mainCanvas.toDataURL('image/png');
-        const totalsImgData = totalsCanvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        pdf.text("THR CDPO Distributions Report", 20, 30);
-        let yPos = 40;
-        const mainRatio = mainCanvas.width / mainCanvas.height;
-        const mainWidth = pdfWidth - 40;
-        const mainHeight = mainWidth / mainRatio;
-        pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
-        yPos += mainHeight + 20;
-        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
-        const totalsWidth = pdfWidth / 2;
-        const totalsHeight = totalsWidth / totalsRatio;
-        if (yPos + totalsHeight < pdfHeight - 40) {
-          pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
-        }
-        pdf.save('thr_cdpo_distributions.pdf');
-        document.body.removeChild(totalsTableContainer);
-        setIsPrinting(false);
-      });
-    }, 100);
+    };
+
+    try {
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3", compress: true });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const margin = 22;
+      const rowsPerPage = 12;
+      const pages = [];
+      for (let offset = 0; offset < filteredData.length; offset += rowsPerPage) {
+        pages.push(filteredData.slice(offset, offset + rowsPerPage));
+      }
+      if (!pages.length) pages.push([]);
+
+      for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+        const pageRows = pages[pageIndex];
+        const headerHtml = `<div style="font-size:22px;font-weight:700;text-align:center;margin:0 0 14px;">THR CDPO Distributions Report</div>`;
+        const tableHead = `<thead><tr>${exportColumns.map(col => `<th>${escapeHtml(col.text)}</th>`).join("")}</tr></thead>`;
+        const bodyRows = pageRows.map((row, rowIndex) => {
+          const absoluteIndex = pageIndex * rowsPerPage + rowIndex;
+          return `<tr>${exportColumns.map(col => `<td>${escapeHtml(getCellValue(row, col, absoluteIndex))}</td>`).join("")}</tr>`;
+        }).join("");
+        const isLastPage = pageIndex === pages.length - 1;
+        const totalRow = isLastPage ? `<tfoot><tr>${exportColumns.map((col, index) => {
+          if (col.dataField === "#") return `<td><strong>Total</strong></td>`;
+          if (col.dataField === "total_beneficiaries") return `<td><strong>${totals.beneficiaries}</strong></td>`;
+          return `<td></td>`;
+        }).join("")}</tr></tfoot>` : "";
+        exportRoot.innerHTML = `${headerHtml}<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;line-height:1.35;">${tableHead}<tbody>${bodyRows}</tbody>${totalRow}</table>
+          <div style="text-align:right;font-size:11px;margin-top:8px;">Page ${pageIndex + 1} of ${pages.length}</div>`;
+        const table = exportRoot.querySelector("table");
+        table.querySelectorAll("th,td").forEach(cell => {
+          cell.style.cssText = "border:1px solid #9aa3ad;padding:7px 6px;text-align:left;vertical-align:top;white-space:normal;overflow-wrap:anywhere;word-break:normal;";
+        });
+        table.querySelectorAll("th").forEach(cell => {
+          cell.style.background = "#e9eef3";
+          cell.style.fontWeight = "700";
+        });
+        table.querySelectorAll("tfoot td").forEach(cell => {
+          cell.style.background = "#e9eef3";
+          cell.style.fontWeight = "700";
+        });
+
+        const canvas = await html2canvas(exportRoot, {
+          scale: 1.25, useCORS: true, backgroundColor: "#ffffff",
+          logging: false, windowWidth: 1640
+        });
+        const imageData = canvas.toDataURL("image/jpeg", 0.78);
+        const availableWidth = pdfWidth - margin * 2;
+        const availableHeight = pdfHeight - margin * 2;
+        const scale = Math.min(availableWidth / canvas.width, availableHeight / canvas.height);
+        const renderWidth = canvas.width * scale;
+        const renderHeight = canvas.height * scale;
+        if (pageIndex > 0) pdf.addPage("a3", "landscape");
+        pdf.addImage(imageData, "JPEG", (pdfWidth - renderWidth) / 2, margin, renderWidth, renderHeight, undefined, "FAST");
+      }
+      pdf.save("thr_cdpo_distributions.pdf");
+    } catch (err) {
+      console.error("Failed to export THR PDF:", err);
+      setError("Failed to export PDF. Please try again.");
+    } finally {
+      exportRoot.remove();
+      setIsPrinting(false);
+    }
   };
 
   const exportToExcel = () => {
-    const visCols = columns.filter(c => c.visible && c.dataField !== '#' && c.dataField !== 'action');
+    const exportColumns = columns.filter(col => col.visible && col.dataField !== "action");
     const dataToExport = filteredData.map((row, index) => {
-      const newRow = { '#': index + 1 };
-      visCols.forEach(col => {
-        if (col.dataField === 'trimester') {
-          newRow[col.text] = formatTrimester(row);
-        } else if (col.dataField === 'months') {
-          newRow[col.text] = formatDistributionMonths(row);
-        } else if (col.dataField === 'date') {
-          newRow[col.text] = formatDistributionDate(row);
-        } else if (col.dataField === 'fin_year') {
-          newRow[col.text] = row.fin_year ?? row.financial_year ?? row.financialYear ?? '';
-        } else if (col.dataField !== '#') {
-          newRow[col.text] = row[col.dataField];
+      const newRow = {};
+      exportColumns.forEach(col => {
+        switch (col.dataField) {
+          case "#":
+            newRow[col.text] = index + 1;
+            break;
+          case "trimester":
+            newRow[col.text] = formatTrimester(row);
+            break;
+          case "months":
+            newRow[col.text] = formatDistributionMonths(row);
+            break;
+          case "date":
+            newRow[col.text] = formatDistributionDate(row);
+            break;
+          case "fin_year":
+            newRow[col.text] = row.fin_year ?? row.financial_year ?? row.financialYear ?? "";
+            break;
+          case "sector_status":
+            newRow[col.text] = row.sector_status || "pending";
+            break;
+          default:
+            newRow[col.text] = row[col.dataField] ?? "";
         }
       });
       return newRow;
     });
 
-    const totalRow = { '#': '' };
-    visCols.forEach(col => {
-      if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'quantity') totalRow[col.text] = '';
-      else totalRow[col.text] = '';
+    const totalRow = {};
+    exportColumns.forEach(col => {
+      if (col.dataField === "#") totalRow[col.text] = "Total";
+      else if (col.dataField === "total_beneficiaries") totalRow[col.text] = totals.beneficiaries;
+      else totalRow[col.text] = "";
     });
     dataToExport.push(totalRow);
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    worksheet["!cols"] = exportColumns.map(col => ({
+      wch: Math.min(32, Math.max(12, String(col.text).length + 4))
+    }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "THR CDPO Distributions");
-    XLSX.writeFile(workbook, "thr_cdpo_distributions.xlsx");
+    XLSX.writeFile(workbook, "thr_cdpo_distributions.xlsx", { compression: true });
   };
 
   const getStatusVariant = (status) => {

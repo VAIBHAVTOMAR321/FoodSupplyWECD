@@ -278,98 +278,177 @@ const HCMDirectorReport = () => {
     });
   }, [filteredData]);
 
-  const exportToPDF = () => {
-    setIsPrinting(true);
-    setTimeout(() => {
-      const mainTable = tableRef.current;
-      const totalsTableContainer = document.createElement('div');
-      totalsTableContainer.innerHTML = `
-        <div style="padding: 20px; font-family: sans-serif;">
-          <h4 style="text-align: center; margin-bottom: 15px;">Total Quantity by Unit</h4>
-          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
-            <thead style="background-color: #f2f2f2;">
-              <tr>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Object.entries(totals.quantityByUnit)
-                .map(([unit, total]) => `
-                  <tr>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-      document.body.appendChild(totalsTableContainer);
+  const exportToPDF = async () => {
+    if (!filteredData.length) {
+      setError("No data available to export.");
+      return;
+    }
 
-      Promise.all([
-        html2canvas(mainTable, { scale: 2, useCORS: true }),
-        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
-      ]).then(([mainCanvas, totalsCanvas]) => {
-        const mainImgData = mainCanvas.toDataURL('image/png');
-        const totalsImgData = totalsCanvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        pdf.text("HCM Distribution Report", 20, 30);
-        let yPos = 40;
-        const mainRatio = mainCanvas.width / mainCanvas.height;
-        const mainWidth = pdfWidth - 40;
-        const mainHeight = mainWidth / mainRatio;
-        pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
-        yPos += mainHeight + 20;
-        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
-        const totalsWidth = pdfWidth / 2;
-        const totalsHeight = totalsWidth / totalsRatio;
-        if (yPos + totalsHeight > pdfHeight - 40) {
-          pdf.addPage();
-          yPos = 40;
-        }
-        pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
-        pdf.save('hcm_director_report.pdf');
-        document.body.removeChild(totalsTableContainer);
-        setIsPrinting(false);
+    setIsPrinting(true);
+    const exportColumns = columns.filter(col => col.visible);
+    const exportContainer = document.createElement("div");
+    Object.assign(exportContainer.style, {
+      position: "fixed",
+      left: "-100000px",
+      top: "0",
+      width: "1600px",
+      background: "#ffffff",
+      color: "#212529",
+      padding: "20px",
+      zIndex: "-1",
+      fontFamily: "Arial, sans-serif"
+    });
+
+    try {
+      const title = document.createElement("h2");
+      title.textContent = "HCM Distribution Report";
+      Object.assign(title.style, { textAlign: "center", margin: "0 0 16px", fontSize: "20px" });
+      exportContainer.appendChild(title);
+
+      const table = document.createElement("table");
+      Object.assign(table.style, {
+        width: "100%",
+        borderCollapse: "collapse",
+        tableLayout: "auto",
+        fontSize: "11px",
+        background: "#ffffff"
       });
-    }, 100);
+
+      const makeCell = (tag, value, isHeader = false) => {
+        const cell = document.createElement(tag);
+        cell.textContent = value === null || value === undefined || value === "" ? "-" : String(value);
+        Object.assign(cell.style, {
+          border: "1px solid #adb5bd",
+          padding: "6px 7px",
+          textAlign: "left",
+          verticalAlign: "top",
+          overflowWrap: "anywhere",
+          whiteSpace: "normal",
+          ...(isHeader ? { background: "#e9ecef", fontWeight: "bold" } : {})
+        });
+        return cell;
+      };
+
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      exportColumns.forEach(col => headerRow.appendChild(makeCell("th", col.text, true)));
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      filteredData.forEach((row, index) => {
+        const tr = document.createElement("tr");
+        exportColumns.forEach(col => {
+          let value;
+          if (col.dataField === "#") value = index + 1;
+          else if (col.dataField === "date") value = formatDistributionDate(getDistributionDateRaw(row));
+          else if (col.dataField === "months") value = formatMonths(row);
+          else if (col.dataField === "trimester") value = formatTrimester(row);
+          else value = getFieldValue(row, col.dataField);
+          tr.appendChild(makeCell("td", value));
+        });
+        tbody.appendChild(tr);
+      });
+
+      const totalRow = document.createElement("tr");
+      totalRow.style.fontWeight = "bold";
+      totalRow.style.background = "#dbeafe";
+      exportColumns.forEach((col, index) => {
+        let value = "";
+        if (col.dataField === "total_beneficiaries") value = totals.beneficiaries;
+        else if (index === 0) value = "Total";
+        totalRow.appendChild(makeCell("td", value));
+      });
+      tbody.appendChild(totalRow);
+      table.appendChild(tbody);
+      exportContainer.appendChild(table);
+      document.body.appendChild(exportContainer);
+
+      const canvas = await html2canvas(exportContainer, {
+        scale: 1.1,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false
+      });
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "pt",
+        format: "a3",
+        compress: true
+      });
+      const margin = 24;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const renderWidth = pageWidth - margin * 2;
+      const renderHeight = pageHeight - margin * 2;
+      const scaledCanvasHeight = canvas.height * (renderWidth / canvas.width);
+      const pageCanvasHeight = renderHeight * (canvas.width / renderWidth);
+      let sourceY = 0;
+      let pageIndex = 0;
+
+      while (sourceY < canvas.height) {
+        const sliceHeight = Math.min(pageCanvasHeight, canvas.height - sourceY);
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = Math.ceil(sliceHeight);
+        const context = pageCanvas.getContext("2d");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        context.drawImage(
+          canvas,
+          0, Math.floor(sourceY), canvas.width, Math.ceil(sliceHeight),
+          0, 0, canvas.width, Math.ceil(sliceHeight)
+        );
+        if (pageIndex > 0) pdf.addPage();
+        const imageData = pageCanvas.toDataURL("image/jpeg", 0.68);
+        const imageHeight = pageCanvas.height * (renderWidth / pageCanvas.width);
+        pdf.addImage(imageData, "JPEG", margin, margin, renderWidth, Math.min(imageHeight, renderHeight), undefined, "FAST");
+        sourceY += sliceHeight;
+        pageIndex += 1;
+      }
+
+      pdf.save("hcm_director_report.pdf");
+    } catch (err) {
+      console.error("Failed to export HCM PDF:", err);
+      setError("Failed to export PDF. Please try again.");
+    } finally {
+      if (exportContainer.parentNode) exportContainer.parentNode.removeChild(exportContainer);
+      setIsPrinting(false);
+    }
   };
 
   const exportToExcel = () => {
-    const visibleColumns = columns.filter(c => c.visible && c.dataField !== '#');
+    const visibleColumns = columns.filter(col => col.visible);
     const dataToExport = filteredData.map((row, index) => {
-      const newRow = { '#': index + 1 };
+      const newRow = {};
       visibleColumns.forEach(col => {
-        if (col.dataField !== '#') {
-          newRow[col.text] = getFieldValue(row, col.dataField) ?? '';
-        }
+        if (col.dataField === "#") newRow[col.text] = index + 1;
+        else if (col.dataField === "date") newRow[col.text] = formatDistributionDate(getDistributionDateRaw(row));
+        else if (col.dataField === "months") newRow[col.text] = formatMonths(row);
+        else if (col.dataField === "trimester") newRow[col.text] = formatTrimester(row);
+        else newRow[col.text] = getFieldValue(row, col.dataField) ?? "";
       });
       return newRow;
     });
 
-    const totalRow = { '#': 'Total' };
-    visibleColumns.forEach(col => {
-      if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'quantity') totalRow[col.text] = ''; // Keep quantity total empty in main sheet
-      else if (col.text !== '#') totalRow[col.text] = '';
+    const totalRow = {};
+    visibleColumns.forEach((col, index) => {
+      if (col.dataField === "total_beneficiaries") totalRow[col.text] = totals.beneficiaries;
+      else if (index === 0) totalRow[col.text] = "Total";
+      else totalRow[col.text] = "";
     });
     dataToExport.push(totalRow);
 
-    const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
-      'Unit': unit,
-      'Total Quantity': total.toFixed(2)
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport, {
+      header: visibleColumns.map(col => col.text)
+    });
+    worksheet["!cols"] = visibleColumns.map(col => ({
+      wch: Math.min(32, Math.max(12, String(col.text).length + 3))
     }));
-
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const quantityWorksheet = XLSX.utils.json_to_sheet(quantityTotalsData);
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "HCM Director Report");
-    XLSX.utils.book_append_sheet(workbook, quantityWorksheet, "Quantity Totals");
-    XLSX.writeFile(workbook, "hcm_director_report.xlsx");
+    XLSX.writeFile(workbook, "hcm_director_report.xlsx", { compression: true });
   };
 
   const indexOfLastItem = currentPage * itemsPerPage;

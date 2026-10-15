@@ -261,103 +261,209 @@ const THRDirectorReport = () => {
     });
   }, [filteredData]);
 
-  const exportToPDF = () => {
-    setIsPrinting(true);
-    setTimeout(() => {
-      const mainTable = tableRef.current;
-      const totalsTableContainer = document.createElement('div');
-      totalsTableContainer.innerHTML = `
-        <div style="padding: 20px; font-family: sans-serif;">
-          <h4 style="text-align: center; margin-bottom: 15px;">Total Quantity by Unit</h4>
-          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
-            <thead style="background-color: #f2f2f2;">
-              <tr>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Object.entries(totals.quantityByUnit)
-                .map(([unit, total]) => `
-                  <tr>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-      document.body.appendChild(totalsTableContainer);
+  const exportToPDF = async () => {
+    if (!filteredData.length) {
+      window.alert("No data available to export.");
+      return;
+    }
 
-      Promise.all([
-        html2canvas(mainTable, { scale: 2, useCORS: true }),
-        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
-      ]).then(([mainCanvas, totalsCanvas]) => {
-        const mainImgData = mainCanvas.toDataURL('image/png');
-        const totalsImgData = totalsCanvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        pdf.text("THR Distribution Report", 20, 30);
-        let yPos = 40;
-        const mainRatio = mainCanvas.width / mainCanvas.height;
-        const mainWidth = pdfWidth - 40;
-        const mainHeight = mainWidth / mainRatio;
-        pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
-        yPos += mainHeight + 20;
-        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
-        const totalsWidth = pdfWidth / 2;
-        const totalsHeight = totalsWidth / totalsRatio;
-        if (yPos + totalsHeight > pdfHeight - 40) {
-          pdf.addPage();
-          yPos = 40;
-        }
-        pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
-        pdf.save('thr_director_report.pdf');
-        document.body.removeChild(totalsTableContainer);
-        setIsPrinting(false);
+    setIsPrinting(true);
+    let exportContainer;
+
+    try {
+      const visibleColumns = columns.filter(col => col.visible);
+      const escapeHtml = (value) => String(value ?? "-")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+      const getExportValue = (row, col) => {
+        if (col.dataField === "#") return "";
+        if (col.dataField === "months") return formatMonths(row);
+        if (col.dataField === "trimester") return formatMonths(getField(row, "trimester"));
+        return getField(row, col.dataField);
+      };
+
+      exportContainer = document.createElement("div");
+      Object.assign(exportContainer.style, {
+        position: "fixed",
+        left: "-100000px",
+        top: "0",
+        width: "1800px",
+        padding: "18px",
+        background: "#ffffff",
+        color: "#111111",
+        zIndex: "-1",
+        fontFamily: "Arial, sans-serif"
       });
-    }, 100);
+
+      const table = document.createElement("table");
+      Object.assign(table.style, {
+        width: "100%",
+        borderCollapse: "collapse",
+        tableLayout: "auto",
+        fontSize: "10px",
+        background: "#ffffff"
+      });
+
+      const title = document.createElement("h3");
+      title.textContent = "THR Distribution Report";
+      Object.assign(title.style, { textAlign: "center", margin: "0 0 14px", fontSize: "18px" });
+      exportContainer.appendChild(title);
+
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      visibleColumns.forEach(col => {
+        const th = document.createElement("th");
+        th.textContent = col.text;
+        Object.assign(th.style, {
+          border: "1px solid #b8c2cc",
+          padding: "6px",
+          background: "#e9eef3",
+          fontWeight: "bold",
+          textAlign: "left",
+          verticalAlign: "top",
+          overflowWrap: "anywhere"
+        });
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      filteredData.forEach((row, index) => {
+        const tr = document.createElement("tr");
+        visibleColumns.forEach(col => {
+          const td = document.createElement("td");
+          let value;
+          if (col.dataField === "#") value = index + 1;
+          else value = getExportValue(row, col);
+          td.textContent = value === "" || value === null || value === undefined ? "-" : String(value);
+          Object.assign(td.style, {
+            border: "1px solid #cbd2d9",
+            padding: "5px",
+            verticalAlign: "top",
+            overflowWrap: "anywhere",
+            wordBreak: "break-word"
+          });
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+
+      const beneficiaryIndex = visibleColumns.findIndex(col => col.dataField === "total_beneficiaries");
+      const totalRow = document.createElement("tr");
+      visibleColumns.forEach((col, index) => {
+        const td = document.createElement("td");
+        if (index === 0) td.textContent = "Total";
+        else if (col.dataField === "total_beneficiaries") td.textContent = String(totals.beneficiaries);
+        else td.textContent = "";
+        Object.assign(td.style, {
+          border: "1px solid #aab5c0",
+          padding: "6px",
+          background: "#dcecf5",
+          fontWeight: "bold"
+        });
+        totalRow.appendChild(td);
+      });
+      // Keep the Total label aligned with the existing report footer, including if the
+      // beneficiary column is hidden or moved by the user.
+      if (beneficiaryIndex > 0 && visibleColumns[0]?.dataField !== "#") {
+        totalRow.cells[0].textContent = "Total";
+      }
+      const tfoot = document.createElement("tfoot");
+      tfoot.appendChild(totalRow);
+      table.appendChild(tfoot);
+
+      exportContainer.appendChild(table);
+      document.body.appendChild(exportContainer);
+
+      const canvas = await html2canvas(exportContainer, {
+        scale: 1.1,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false
+      });
+      const imageData = canvas.toDataURL("image/jpeg", 0.62);
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "pt",
+        format: "a3",
+        compress: true,
+        putOnlyUsedFonts: true
+      });
+
+      const margin = 18;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const renderWidth = pageWidth - margin * 2;
+      const renderHeight = (canvas.height * renderWidth) / canvas.width;
+      const availableHeight = pageHeight - margin * 2;
+      const sliceHeight = Math.floor((canvas.width * availableHeight) / renderWidth);
+
+      let sourceY = 0;
+      while (sourceY < canvas.height) {
+        if (sourceY > 0) pdf.addPage();
+        const currentSliceHeight = Math.min(sliceHeight, canvas.height - sourceY);
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = currentSliceHeight;
+        const context = pageCanvas.getContext("2d");
+        context.drawImage(
+          canvas,
+          0, sourceY, canvas.width, currentSliceHeight,
+          0, 0, canvas.width, currentSliceHeight
+        );
+        const pageImage = pageCanvas.toDataURL("image/jpeg", 0.62);
+        const pageImageHeight = (currentSliceHeight * renderWidth) / canvas.width;
+        pdf.addImage(pageImage, "JPEG", margin, margin, renderWidth, pageImageHeight, undefined, "FAST");
+        sourceY += currentSliceHeight;
+      }
+
+      pdf.save("thr_director_report.pdf");
+    } catch (err) {
+      console.error("Failed to export THR report PDF:", err);
+      window.alert("Unable to export PDF. Please try again.");
+    } finally {
+      if (exportContainer?.parentNode) exportContainer.parentNode.removeChild(exportContainer);
+      setIsPrinting(false);
+    }
   };
 
   const exportToExcel = () => {
-    const visibleColumns = columns.filter(c => c.visible && c.dataField !== '#');
+    const visibleColumns = columns.filter(col => col.visible);
     const dataToExport = filteredData.map((row, index) => {
-      const newRow = { '#': index + 1 };
+      const newRow = {};
       visibleColumns.forEach(col => {
-        if (col.dataField === 'months') {
-          newRow[col.text] = formatMonths(row);
-        } else if (col.dataField === 'trimester') {
-          newRow[col.text] = formatMonths(getField(row, 'trimester'));
-        } else {
-          newRow[col.text] = getField(row, col.dataField);
-        }
+        if (col.dataField === "#") newRow[col.text] = index + 1;
+        else if (col.dataField === "months") newRow[col.text] = formatMonths(row);
+        else if (col.dataField === "trimester") newRow[col.text] = formatMonths(getField(row, "trimester"));
+        else newRow[col.text] = getField(row, col.dataField) ?? "";
       });
       return newRow;
     });
 
-    const totalRow = { '#': 'Total' };
-    visibleColumns.forEach(col => {
-      if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'quantity') totalRow[col.text] = ''; // Keep quantity total empty in main sheet
-      else totalRow[col.text] = '';
+    const totalRow = {};
+    visibleColumns.forEach((col, index) => {
+      if (index === 0) totalRow[col.text] = "Total";
+      else if (col.dataField === "total_beneficiaries") totalRow[col.text] = totals.beneficiaries;
+      else totalRow[col.text] = "";
     });
     dataToExport.push(totalRow);
 
-    const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
-      'Unit': unit,
-      'Total Quantity': total.toFixed(2)
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport, {
+      header: visibleColumns.map(col => col.text)
+    });
+    worksheet["!cols"] = visibleColumns.map(col => ({
+      wch: Math.min(Math.max(String(col.text).length + 4, 12), 32)
     }));
-
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const quantityWorksheet = XLSX.utils.json_to_sheet(quantityTotalsData);
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "THR Report");
-    XLSX.utils.book_append_sheet(workbook, quantityWorksheet, "Quantity Totals");
-
-    XLSX.writeFile(workbook, "thr_director_report.xlsx");
+    XLSX.writeFile(workbook, "thr_director_report.xlsx", { compression: true });
   };
 
   // Pagination logic

@@ -296,166 +296,62 @@ const ThrDpoDistributions = () => {
     }, { beneficiaries: 0, quantity: 0, quantityByUnit: {} });
   }, [filteredData]);
 
- const exportToPDF = () => {
-  setIsPrinting(true);
-  setTimeout(() => {
-    const input = tableRef.current;
-    if (!input) {
-      console.error("Table element not found for PDF export.");
-      setIsPrinting(false);
-      return;
-    }
+ const exportToPDF = async () => {
+   setIsPrinting(true);
+   let container;
+   try {
+     const cols = columns.filter(c => c.visible && c.dataField !== 'action');
+     const esc = v => String(v ?? '-').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+     container = document.createElement('div');
+     Object.assign(container.style, {position:'fixed',left:'-20000px',top:'0',width:'1500px',padding:'10px',background:'#fff',color:'#212529',fontFamily:'Arial, Noto Sans Devanagari, sans-serif'});
+     const headers = cols.map(c => `<th>${esc(c.text)}</th>`).join('');
+     const rows = filteredData.map((r,i) => `<tr>${cols.map(c => {
+       let v = c.dataField === '#' ? i+1 : c.dataField === 'months' ? formatMonths(r) : c.dataField === 'trimester' ? formatTrimester(r) : c.dataField === 'sector_status' ? (r.sector_status || 'pending') : r[c.dataField];
+       return `<td>${esc(v)}</td>`;
+     }).join('')}</tr>`).join('');
+     const foot = cols.map(c => `<td>${esc(c.dataField === '#' ? 'Total' : c.dataField === 'total_beneficiaries' ? totals.beneficiaries : '')}</td>`).join('');
+     container.innerHTML = `<div style="font-size:15px;font-weight:bold;margin-bottom:8px">THR DPO Distributions Report</div><table style="width:100%;border-collapse:collapse;font-size:10px;line-height:1.2"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody><tfoot><tr>${foot}</tr></tfoot></table>`;
+     const style = document.createElement('style');
+     style.textContent = 'th,td{border:1px solid #cfd4da;padding:4px;vertical-align:top;white-space:normal;overflow-wrap:anywhere}th{background:#eef1f4}tbody tr:nth-child(even){background:#f8f9fa}tfoot td{font-weight:bold;background:#e9ecef}';
+     container.appendChild(style); document.body.appendChild(container);
+     const canvas = await html2canvas(container,{scale:1.1,useCORS:true,backgroundColor:'#fff',logging:false});
+     const pdf = new jsPDF({orientation:'landscape',unit:'pt',format:'a3',compress:true});
+     const margin=20, pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+     const rw=pw-margin*2, maxH=ph-margin*2, sliceH=Math.max(1,Math.floor(maxH*canvas.width/rw));
+     let y=0,page=0;
+     while(y<canvas.height){
+       if(page) pdf.addPage('a3','landscape');
+       const h=Math.min(sliceH,canvas.height-y), part=document.createElement('canvas');
+       part.width=canvas.width; part.height=h;
+       part.getContext('2d').drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h);
+       pdf.addImage(part.toDataURL('image/jpeg',0.65),'JPEG',margin,margin,rw,Math.min(h*rw/canvas.width,maxH),undefined,'FAST');
+       y+=h; page++; part.width=1; part.height=1;
+     }
+     pdf.save('thr_dpo_distributions.pdf'); canvas.width=1; canvas.height=1;
+   } catch(err) { console.error('Failed to export THR PDF:',err); setError('Failed to export PDF. Please try again.'); }
+   finally { if(container?.parentNode) container.parentNode.removeChild(container); setIsPrinting(false); }
+ };
 
-    // Build totals table HTML matching the main report table style
-    const unitRows = Object.entries(totals.quantityByUnit)
-      .map(
-        ([unit, total], idx) => `
-        <tr style="background-color: ${idx % 2 === 0 ? "#f8f9fa" : "#ffffff"};">
-          <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">${idx + 1}</td>
-          <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
-          <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">${total.toFixed(2)}</td>
-        </tr>`
-      )
-      .join("");
-
-    const totalsTableContainer = document.createElement("div");
-    totalsTableContainer.style.position = "absolute";
-    totalsTableContainer.style.left = "-9999px";
-    totalsTableContainer.style.top = "0";
-    totalsTableContainer.style.width = "1400px";
-    totalsTableContainer.innerHTML = `
-      <div style="padding: 24px; font-family: Arial, sans-serif; background:#ffffff;">
-        <h3 style="margin: 0 0 4px 0; text-align: left; color: #212529;">THR DPO Distributions Report</h3>
-        <h4 style="margin: 0 0 16px 0; text-align: left; color: #495057;">Total Quantity by Unit</h4>
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #dee2e6; font-size: 14px;">
-          <thead>
-            <tr style="background-color: #fff; color: #000;">
-              <th style="border: 1px solid #dee2e6; padding: 10px; text-align: center; width: 60px;">#</th>
-              <th style="border: 1px solid #dee2e6; padding: 10px; text-align: left;">Unit</th>
-              <th style="border: 1px solid #dee2e6; padding: 10px; text-align: right;">Total Quantity</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${unitRows}
-           
-          </tbody>
-        </table>
-      </div>
-    `;
-    document.body.appendChild(totalsTableContainer);
-
-    Promise.all([
-      html2canvas(input, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }),
-      html2canvas(totalsTableContainer, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }),
-    ]).then(([mainCanvas, totalsCanvas]) => {
-      const mainImgData = mainCanvas.toDataURL("image/png");
-      const totalsImgData = totalsCanvas.toDataURL("image/png");
-
-      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a2" });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-
-      // ---- Page 1: Main Report ----
-      pdf.setFontSize(16);
-      pdf.setTextColor(33, 37, 41);
-      pdf.text("THR DPO Distributions Report", 20, 30);
-
-      let yPos = 45;
-      const mainRatio = mainCanvas.width / mainCanvas.height;
-      const mainWidth = pdfWidth - 40;
-      const mainHeight = mainWidth / mainRatio;
-
-      // If main content taller than one page, split across pages
-      if (mainHeight <= pdfHeight - 60) {
-        pdf.addImage(mainImgData, "PNG", 20, yPos, mainWidth, mainHeight);
-      } else {
-        // Simple slice: just add and let it overflow to next page via addImage pages
-        let remainingHeight = mainHeight;
-        let position = yPos;
-        const pageContentHeight = pdfHeight - 60;
-        let srcY = 0;
-        while (remainingHeight > 0) {
-          const sliceHeight = Math.min(remainingHeight, pageContentHeight);
-          // create a temp canvas slice
-          const sliceCanvas = document.createElement("canvas");
-          sliceCanvas.width = mainCanvas.width;
-          sliceCanvas.height = Math.floor((sliceHeight / mainHeight) * mainCanvas.height);
-          const ctx = sliceCanvas.getContext("2d");
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-          ctx.drawImage(
-            mainCanvas,
-            0,
-            srcY,
-            mainCanvas.width,
-            sliceCanvas.height,
-            0,
-            0,
-            sliceCanvas.width,
-            sliceCanvas.height
-          );
-          pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", 20, position, mainWidth, sliceHeight);
-          remainingHeight -= sliceHeight;
-          srcY += sliceCanvas.height;
-          if (remainingHeight > 0) {
-            pdf.addPage();
-            position = 40;
-          }
-        }
-      }
-
-      // ---- Page (next): Total Quantity by Unit ----
-      pdf.addPage();
-      pdf.setFontSize(16);
-      pdf.setTextColor(33, 37, 41);
-      // pdf.text("THR DPO Distributions Report", 20, 30);
-      pdf.setFontSize(13);
-      pdf.setTextColor(73, 80, 87);
-      // pdf.text("Total Quantity by Unit", 20, 50);
-
-      const totalsRatio = totalsCanvas.width / totalsCanvas.height;
-      const totalsWidth = pdfWidth - 40;
-      const totalsHeight = totalsWidth / totalsRatio;
-      pdf.addImage(totalsImgData, "PNG", 20, 60, totalsWidth, totalsHeight);
-
-      pdf.save("thr_dpo_distributions.pdf");
-      document.body.removeChild(totalsTableContainer);
-      setIsPrinting(false);
-    });
-  }, 150);
-};
-
-  const exportToExcel = () => {
-    const visCols = columns.filter(c => c.visible && c.dataField !== '#' && c.dataField !== 'action');
-    const dataToExport = filteredData.map((row, index) => {
-      const newRow = { '#': index + 1 };
-      visCols.forEach(col => {
-        if (col.dataField === 'months') {
-          newRow[col.text] = formatMonths(row);
-        } else if (col.dataField !== '#') {
-          newRow[col.text] = row[col.dataField];
-        }
+ const exportToExcel = () => {
+    const cols = columns.filter(c => c.visible && c.dataField !== 'action');
+    const rows = filteredData.map((row, i) => {
+      const result = {};
+      cols.forEach(c => {
+        if (c.dataField === '#') result[c.text] = i + 1;
+        else if (c.dataField === 'months') result[c.text] = formatMonths(row);
+        else if (c.dataField === 'trimester') result[c.text] = formatTrimester(row);
+        else result[c.text] = row[c.dataField] ?? '';
       });
-      if (columns.find(c => c.dataField === 'dpo_remark')?.visible) newRow['DPO Remark'] = row.dpo_remark;
-      if (columns.find(c => c.dataField === 'sector_status')?.visible) newRow['Sector Remark'] = row.sector_remark;
-      return newRow;
+      return result;
     });
-
-    const beneficiaryIndex = visCols.findIndex(c => c.dataField === 'total_beneficiaries');
-    const totalRow = { '#': '' };
-    visCols.forEach(col => {
-      if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'quantity') totalRow[col.text] = '';
-      else totalRow[col.text] = '';
-    });
-    if (columns.find(c => c.dataField === 'dpo_remark')?.visible) totalRow['DPO Remark'] = '';
-    if (columns.find(c => c.dataField === 'sector_status')?.visible) totalRow['Sector Remark'] = '';
-    dataToExport.push(totalRow);
-
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const total = {};
+    cols.forEach(c => { total[c.text] = c.dataField === '#' ? 'Total' : c.dataField === 'total_beneficiaries' ? totals.beneficiaries : ''; });
+    rows.push(total);
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = cols.map(c => ({ wch: Math.max(12, Math.min(28, c.text.length + 3)) }));
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "THR DPO Distributions");
-    XLSX.writeFile(workbook, "thr_dpo_distributions.xlsx");
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'THR DPO Distributions');
+    XLSX.writeFile(workbook, 'thr_dpo_distributions.xlsx', { compression: true });
   };
 
   const getStatusVariant = (status) => {

@@ -291,138 +291,119 @@ const HcmDpoDistributions = () => {
     }, { beneficiaries: 0, quantity: 0, quantityByUnit: {} });
   }, [filteredData]);
 
-  const exportToPDF = () => {
-    setIsPrinting(true);
-    setTimeout(() => {
-      const input = tableRef.current;
-      if (!input) {
-        console.error("Table element not found for PDF export.");
-        setIsPrinting(false);
-        return;
-      }
+  const exportToPDF = async () => {
+    const exportColumns = columns.filter((col) => col.visible && col.dataField !== "action");
+    const exportRoot = document.createElement("div");
+    Object.assign(exportRoot.style, {
+      position: "fixed", left: "-10000px", top: "0", width: "1600px",
+      padding: "12px", background: "#ffffff", color: "#212529",
+      fontFamily: "Arial, Noto Sans Devanagari, sans-serif", zIndex: "-1"
+    });
 
-      // Build totals table HTML without the titles inside the canvas to manage top margins via jsPDF
-      const unitRows = Object.entries(totals.quantityByUnit)
-        .map(
-          ([unit, total], idx) => `
-          <tr style="background-color: ${idx % 2 === 0 ? "#f8f9fa" : "#ffffff"};">
-            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">${idx + 1}</td>
-            <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
-            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">${total.toFixed(2)}</td>
-          </tr>`
-        )
-        .join("");
+    const table = document.createElement("table");
+    Object.assign(table.style, {
+      width: "100%", tableLayout: "auto", borderCollapse: "collapse",
+      fontSize: "10px", lineHeight: "1.25", background: "#ffffff"
+    });
+    const cellStyle = "border:1px solid #adb5bd;padding:4px 5px;vertical-align:top;overflow-wrap:anywhere;white-space:normal;";
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    exportColumns.forEach((col) => {
+      const th = document.createElement("th");
+      th.textContent = col.text;
+      th.setAttribute("style", `${cellStyle}background:#e9ecef;font-weight:700;text-align:center;`);
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
 
-      const totalsTableContainer = document.createElement("div");
-      totalsTableContainer.style.position = "absolute";
-      totalsTableContainer.style.left = "-9999px";
-      totalsTableContainer.style.top = "0";
-      totalsTableContainer.style.width = "1400px";
-      totalsTableContainer.innerHTML = `
-        <div style="padding: 0px; font-family: Arial, sans-serif; background:#ffffff;">
-          <table style="width: 100%; border-collapse: collapse; border: 1px solid #dee2e6; font-size: 14px;">
-            <thead>
-              <tr style="background-color: #f8f9fa; color: #000;">
-                <th style="border: 1px solid #dee2e6; padding: 10px; text-align: center; width: 60px;">#</th>
-                <th style="border: 1px solid #dee2e6; padding: 10px; text-align: left;">Unit</th>
-                <th style="border: 1px solid #dee2e6; padding: 10px; text-align: right;">Total Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${unitRows}
-             
-            </tbody>
-          </table>
-        </div>
-      `;
-      document.body.appendChild(totalsTableContainer);
-
-      Promise.all([
-        html2canvas(input, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }),
-        html2canvas(totalsTableContainer, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }),
-      ]).then(([mainCanvas, totalsCanvas]) => {
-        const mainImgData = mainCanvas.toDataURL("image/png");
-        const totalsImgData = totalsCanvas.toDataURL("image/png");
-
-        const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a2" });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-
-        // ---- Page 1: Main Report ----
-        pdf.setFontSize(16);
-        pdf.setTextColor(33, 37, 41);
-        pdf.text("HCM DPO Distributions Report", 20, 30);
-
-        let yPos = 45;
-        const mainRatio = mainCanvas.width / mainCanvas.height;
-        const mainWidth = pdfWidth - 40;
-        const mainHeight = mainWidth / mainRatio;
-
-        // If main content taller than one page, split across pages
-        if (mainHeight <= pdfHeight - 60) {
-          pdf.addImage(mainImgData, "PNG", 20, yPos, mainWidth, mainHeight);
-        } else {
-          let remainingHeight = mainHeight;
-          let position = yPos;
-          const pageContentHeight = pdfHeight - 60;
-          let srcY = 0;
-          while (remainingHeight > 0) {
-            const sliceHeight = Math.min(remainingHeight, pageContentHeight);
-            const sliceCanvas = document.createElement("canvas");
-            sliceCanvas.width = mainCanvas.width;
-            sliceCanvas.height = Math.floor((sliceHeight / mainHeight) * mainCanvas.height);
-            const ctx = sliceCanvas.getContext("2d");
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-            ctx.drawImage(
-              mainCanvas,
-              0,
-              srcY,
-              mainCanvas.width,
-              sliceCanvas.height,
-              0,
-              0,
-              sliceCanvas.width,
-              sliceCanvas.height
-            );
-            pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", 20, position, mainWidth, sliceHeight);
-            remainingHeight -= sliceHeight;
-            srcY += sliceCanvas.height;
-            if (remainingHeight > 0) {
-              pdf.addPage();
-              position = 40;
-            }
-          }
-        }
-
-        // ---- Page (next): Total Quantity by Unit ----
-        pdf.addPage();
-        
-        // Identical Heading Placement as Page 1
-        pdf.setFontSize(16);
-        pdf.setTextColor(33, 37, 41);
-        pdf.text("HCM DPO Distributions Report", 20, 30);
-        
-        pdf.setFontSize(13);
-        pdf.setTextColor(73, 80, 87);
-        pdf.text("Total Quantity by Unit", 20, 50);
-
-        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
-        const totalsWidth = pdfWidth - 40;
-        const totalsHeight = totalsWidth / totalsRatio;
-        
-        // Table starts exactly at y=60, matching the layout of the first page
-        pdf.addImage(totalsImgData, "PNG", 20, 60, totalsWidth, totalsHeight);
-
-        pdf.save("hcm_dpo_distributions.pdf");
-        document.body.removeChild(totalsTableContainer);
-        setIsPrinting(false);
+    const tbody = document.createElement("tbody");
+    const getExportValue = (row, col, index) => {
+      if (col.dataField === "#") return index + 1;
+      if (col.dataField === "date") return formatDistributionDate(getDistributionDateRaw(row));
+      if (col.dataField === "months") return formatMonths(row);
+      if (col.dataField === "trimester") return formatTrimester(row);
+      if (col.dataField === "sector_status") return row.sector_status || "pending";
+      return row[col.dataField] ?? "";
+    };
+    filteredData.forEach((row, index) => {
+      const tr = document.createElement("tr");
+      exportColumns.forEach((col) => {
+        const td = document.createElement("td");
+        const value = getExportValue(row, col, index);
+        td.textContent = value === null || value === undefined ? "" : String(value);
+        td.setAttribute("style", `${cellStyle}${index % 2 ? "background:#f8f9fa;" : ""}`);
+        tr.appendChild(td);
       });
-    }, 150);
+      tbody.appendChild(tr);
+    });
+
+    const footerRow = document.createElement("tr");
+    exportColumns.forEach((col) => {
+      const td = document.createElement("td");
+      let value = "";
+      if (col.dataField === "#") value = "Total";
+      if (col.dataField === "total_beneficiaries") value = totals.beneficiaries;
+      td.textContent = String(value);
+      td.setAttribute("style", `${cellStyle}background:#e9ecef;font-weight:700;`);
+      footerRow.appendChild(td);
+    });
+    tbody.appendChild(footerRow);
+    table.appendChild(tbody);
+    exportRoot.appendChild(table);
+    document.body.appendChild(exportRoot);
+
+    try {
+      // Browser canvas rendering keeps Hindi/Unicode text readable. JPEG compression
+      // and a smaller A3 page reduce PDF size substantially compared with PNG/A2.
+      const canvas = await html2canvas(exportRoot, {
+        scale: 1.15, useCORS: true, backgroundColor: "#ffffff",
+        logging: false, windowWidth: 1600
+      });
+      const imageData = canvas.toDataURL("image/jpeg", 0.68);
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3", compress: true });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 24;
+      const titleHeight = 24;
+      const contentWidth = pageWidth - margin * 2;
+      const contentHeight = pageHeight - margin * 2 - titleHeight;
+      const scale = contentWidth / canvas.width;
+      const scaledHeight = canvas.height * scale;
+      const pageSliceHeight = contentHeight / scale;
+      let sourceY = 0;
+      let page = 0;
+
+      while (sourceY < canvas.height) {
+        if (page > 0) pdf.addPage("a3", "landscape");
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(12);
+        pdf.setTextColor(33, 37, 41);
+        pdf.text("HCM DPO Distributions Report", margin, 18);
+        const sliceHeight = Math.min(pageSliceHeight, canvas.height - sourceY);
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = Math.ceil(sliceHeight);
+        const context = sliceCanvas.getContext("2d");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        context.drawImage(canvas, 0, sourceY, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
+        pdf.addImage(sliceCanvas.toDataURL("image/jpeg", 0.68), "JPEG", margin, margin + titleHeight, contentWidth, sliceCanvas.height * scale, undefined, "FAST");
+        sourceY += sliceCanvas.height;
+        page += 1;
+      }
+      pdf.save("hcm_dpo_distributions.pdf");
+    } catch (err) {
+      console.error("Failed to export HCM DPO distributions PDF:", err);
+      setError("PDF export failed. Please try again.");
+    } finally {
+      document.body.removeChild(exportRoot);
+      setIsPrinting(false);
+    }
   };
 
   const exportToExcel = () => {
-    const visCols = columns.filter(c => c.visible && c.dataField !== '#');
+    const visCols = columns.filter(c => c.visible && c.dataField !== '#' && c.dataField !== 'action');
     const dataToExport = filteredData.map((row, index) => {
       const newRow = { '#': index + 1 };
       visCols.forEach(col => {

@@ -296,105 +296,143 @@ const HcmCdpoDistributions = () => {
     }, { beneficiaries: 0, quantity: 0, quantityByUnit: {} });
   }, [filteredData]);
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    const sourceTable = tableRef.current;
+    if (!sourceTable) return;
     setIsPrinting(true);
-    setTimeout(() => {
-      const input = tableRef.current;
-      const totalsTableContainer = document.createElement('div');
-      // Styling for the totals table to ensure it's rendered properly
-      totalsTableContainer.innerHTML = `
-        <div style="padding: 20px; font-family: sans-serif; text-align: center;">
-          <h4 style="margin-bottom: 15px;">Total Quantity by Unit</h4>
-          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
-            <thead style="background-color: #f2f2f2;">
-              <tr>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Object.entries(totals.quantityByUnit)
-                .map(([unit, total]) => `
-                  <tr>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-      document.body.appendChild(totalsTableContainer);
-
-      if (!input) {
-        console.error("Table element not found for PDF export.");
-        setIsPrinting(false);
-        return;
-      }
-      Promise.all([
-        html2canvas(input, { scale: 2, useCORS: true }),
-        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
-      ]).then(([mainCanvas, totalsCanvas]) => {
-        const mainImgData = mainCanvas.toDataURL('image/png');
-        const totalsImgData = totalsCanvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        pdf.text("HCM CDPO Distributions Report", 20, 30);
-        let yPos = 40;
-        const mainRatio = mainCanvas.width / mainCanvas.height;
-        const mainWidth = pdfWidth - 40;
-        const mainHeight = mainWidth / mainRatio;
-        pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
-        yPos += mainHeight + 20;
-        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
-        const totalsWidth = pdfWidth / 2;
-        const totalsHeight = totalsWidth / totalsRatio;
-        if (yPos + totalsHeight < pdfHeight - 40) {
-          pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
-        }
-        pdf.save('hcm_cdpo_distributions.pdf');
-        document.body.removeChild(totalsTableContainer);
-        setIsPrinting(false);
+    let exportHost;
+    try {
+      // Build a clean export-only table from all filtered rows. Browser rendering
+      // preserves Hindi Unicode; the compact JPEG keeps the PDF file size small.
+      const exportColumns = visibleColumns.filter((col) => col.dataField !== 'action');
+      exportHost = document.createElement('div');
+      Object.assign(exportHost.style, {
+        position: 'fixed', left: '-100000px', top: '0', width: '1800px',
+        background: '#ffffff', color: '#111111', padding: '12px', zIndex: '-1',
+        fontFamily: 'Arial, Noto Sans Devanagari, sans-serif', boxSizing: 'border-box'
       });
-    }, 100);
+      const table = document.createElement('table');
+      Object.assign(table.style, {
+        width: '100%', borderCollapse: 'collapse', tableLayout: 'auto',
+        fontSize: '10px', lineHeight: '1.25', background: '#fff'
+      });
+      const makeCell = (tag, text, header = false) => {
+        const cell = document.createElement(tag);
+        cell.textContent = text == null ? '' : String(text);
+        Object.assign(cell.style, {
+          border: '1px solid #b8c0c8', padding: '4px 5px',
+          verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere',
+          wordBreak: 'normal', textAlign: 'left',
+          background: header ? '#e9eef3' : '#ffffff',
+          fontWeight: header ? '700' : '400'
+        });
+        return cell;
+      };
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      exportColumns.forEach((col) => headerRow.appendChild(makeCell('th', col.text, true)));
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      filteredData.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        exportColumns.forEach((col) => {
+          let value = '';
+          if (col.dataField === '#') value = index + 1;
+          else if (col.dataField === 'date') value = formatDistributionDate(row);
+          else if (col.dataField === 'trimester') value = formatTrimester(row);
+          else if (col.dataField === 'months') value = formatMonths(row);
+          else if (col.dataField === 'fin_year') value = row.fin_year ?? row.financial_year ?? row.financialYear ?? '—';
+          else if (col.dataField === 'sector_status') value = row.sector_status || 'pending';
+          else if (col.dataField === 'anganwadi_remark') value = row.anganwadi_remark || '—';
+          else value = row[col.dataField] ?? '';
+          tr.appendChild(makeCell('td', value));
+        });
+        tbody.appendChild(tr);
+      });
+      const tfoot = document.createElement('tfoot');
+      const totalTr = document.createElement('tr');
+      exportColumns.forEach((col, index) => {
+        let value = '';
+        if (col.dataField === '#') value = 'Total';
+        if (col.dataField === 'total_beneficiaries') value = totals.beneficiaries;
+        const cell = makeCell('td', value, true);
+        cell.style.background = '#e9eef3';
+        totalTr.appendChild(cell);
+      });
+      tfoot.appendChild(totalTr);
+      table.appendChild(tbody);
+      table.appendChild(tfoot);
+      exportHost.appendChild(table);
+      document.body.appendChild(exportHost);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const canvas = await html2canvas(exportHost, {
+        scale: 1.25, useCORS: true, backgroundColor: '#ffffff',
+        logging: false, windowWidth: 1850, scrollX: 0, scrollY: 0
+      });
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a3', compress: true });
+      const margin = 24;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const printableWidth = pageWidth - margin * 2;
+      const printableHeight = pageHeight - margin * 2;
+      const pxPerPt = canvas.width / printableWidth;
+      const sliceHeightPx = Math.max(1, Math.floor(printableHeight * pxPerPt));
+      let y = 0;
+      let page = 0;
+      while (y < canvas.height) {
+        const chunkHeight = Math.min(sliceHeightPx, canvas.height - y);
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = chunkHeight;
+        const ctx = pageCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(canvas, 0, y, canvas.width, chunkHeight, 0, 0, canvas.width, chunkHeight);
+        if (page > 0) pdf.addPage();
+        const image = pageCanvas.toDataURL('image/jpeg', 0.76);
+        const imageHeightPt = chunkHeight / pxPerPt;
+        pdf.addImage(image, 'JPEG', margin, margin, printableWidth, imageHeightPt, undefined, 'FAST');
+        y += chunkHeight;
+        page += 1;
+      }
+      pdf.save('hcm_cdpo_distributions.pdf');
+    } catch (err) {
+      console.error('Failed to export HCM CDPO PDF:', err);
+    } finally {
+      if (exportHost?.parentNode) exportHost.parentNode.removeChild(exportHost);
+      setIsPrinting(false);
+    }
   };
 
   const exportToExcel = () => {
-    const visCols = columns.filter(c => c.visible && c.dataField !== '#');
+    const exportColumns = columns.filter(c => c.visible && c.dataField !== 'action');
     const dataToExport = filteredData.map((row, index) => {
-      const newRow = { '#': index + 1 };
-      visCols.forEach(col => {
-        if (col.dataField !== '#') {
-          if (col.dataField === 'date') {
-            newRow[col.text] = formatDistributionDate(row);
-          } else if (col.dataField === 'trimester') {
-            newRow[col.text] = formatTrimester(row);
-          } else if (col.dataField === 'months') {
-            newRow[col.text] = formatMonths(row);
-          } else if (col.dataField === 'fin_year') {
-            newRow[col.text] = row.fin_year ?? row.financial_year ?? row.financialYear ?? '';
-          } else {
-            newRow[col.text] = row[col.dataField];
-          }
-        }
+      const newRow = {};
+      exportColumns.forEach(col => {
+        if (col.dataField === '#') newRow[col.text] = index + 1;
+        else if (col.dataField === 'date') newRow[col.text] = formatDistributionDate(row);
+        else if (col.dataField === 'trimester') newRow[col.text] = formatTrimester(row);
+        else if (col.dataField === 'months') newRow[col.text] = formatMonths(row);
+        else if (col.dataField === 'fin_year') newRow[col.text] = row.fin_year ?? row.financial_year ?? row.financialYear ?? '';
+        else if (col.dataField === 'sector_status') newRow[col.text] = row.sector_status || 'pending';
+        else newRow[col.text] = row[col.dataField] ?? '';
       });
       return newRow;
     });
-
-    const beneficiaryIndex = visCols.findIndex(c => c.dataField === 'total_beneficiaries');
-    const totalRow = { '#': '' };
-    visCols.forEach(col => {
-      if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
-      else if (col.dataField === 'quantity') totalRow[col.text] = '';
+    const totalRow = {};
+    exportColumns.forEach(col => {
+      if (col.dataField === '#') totalRow[col.text] = 'Total';
+      else if (col.dataField === 'total_beneficiaries') totalRow[col.text] = totals.beneficiaries;
       else totalRow[col.text] = '';
     });
     dataToExport.push(totalRow);
-
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    worksheet['!cols'] = exportColumns.map(col => ({ wch: Math.max(12, Math.min(32, String(col.text).length + 4)) }));
+    worksheet['!rows'] = dataToExport.map(() => ({ hpt: 22 }));
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "HCM CDPO Distributions");
-    XLSX.writeFile(workbook, "hcm_cdpo_distributions.xlsx");
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'HCM CDPO Distributions');
+    XLSX.writeFile(workbook, 'hcm_cdpo_distributions.xlsx', { compression: true });
   };
 
   const indexOfLast = currentPage * itemsPerPage;
