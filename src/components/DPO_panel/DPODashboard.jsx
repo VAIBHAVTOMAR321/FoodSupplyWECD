@@ -174,16 +174,16 @@ const downloadPDF = async ({
 }) => {
   const content = document.createElement("div");
   content.style.cssText =
-    "box-sizing:border-box;width:100%;padding:12px;background:#fff;color:#1e293b;font-family:'Noto Sans Devanagari','Noto Sans','Nirmala UI',sans-serif;";
+    "box-sizing:border-box;width:100%;padding:8px;background:#fff;color:#1e293b;font-family:'Noto Sans Devanagari','Noto Sans','Nirmala UI',sans-serif;";
 
   const heading = document.createElement("h3");
   heading.textContent = title;
   heading.style.cssText =
-    "margin:0 0 14px;text-align:center;color:#1e3a5f;font-size:16px;font-weight:700;";
+    "margin:0 0 10px;text-align:center;color:#1e3a5f;font-size:15px;font-weight:700;";
   content.appendChild(heading);
 
   const table = document.createElement("table");
-  table.style.cssText = `width:100%;border-collapse:collapse;table-layout:fixed;font-size:${fontSize}px;line-height:1.35;`;
+  table.style.cssText = `width:100%;border-collapse:collapse;table-layout:auto;font-size:${Math.max(7, Math.min(fontSize, 8))}px;line-height:1.3;page-break-inside:auto;`;
 
   const createCell = (tagName, cell) => {
     const element = document.createElement(tagName);
@@ -193,7 +193,7 @@ const downloadPDF = async ({
     if (value.colSpan) element.colSpan = value.colSpan;
     if (value.rowSpan) element.rowSpan = value.rowSpan;
     element.style.cssText =
-      "border:1px solid #cbd5e1;padding:4px;text-align:left;vertical-align:middle;overflow-wrap:anywhere;word-break:normal;";
+      "box-sizing:border-box;border:1px solid #cbd5e1;padding:4px 3px;text-align:left;vertical-align:middle;white-space:normal;overflow-wrap:break-word;word-break:normal;";
     return element;
   };
 
@@ -202,17 +202,27 @@ const downloadPDF = async ({
     const row = document.createElement("tr");
     headerRow.forEach((cell) => {
       const header = createCell("th", cell);
-      header.style.cssText += `;background-color:${rowIndex === 0 ? "#4f46e5" : "#e0e7ff"};color:${rowIndex === 0 ? "#fff" : "#312e81"};border-color:${rowIndex === 0 ? "#4338ca" : "#a5b4fc"};padding:6px 4px;text-align:center;font-weight:700;font-size:${Math.max(fontSize, 8)}px;line-height:1.25;white-space:normal;`;
+      header.style.cssText += `;background-color:${rowIndex === 0 ? "#4f46e5" : "#e0e7ff"};color:${rowIndex === 0 ? "#fff" : "#312e81"};border-color:${rowIndex === 0 ? "#4338ca" : "#a5b4fc"};padding:5px 3px;text-align:center;font-weight:700;font-size:${Math.max(fontSize, 8)}px;line-height:1.3;white-space:normal;`;
       row.appendChild(header);
     });
     row.style.pageBreakInside = "avoid";
     thead.appendChild(row);
   });
+  // Keep the heading and table header attached to the first data rows.
+  // Avoid page-break-before on THEAD; it can produce a header-only page.
+  thead.style.display = "table-header-group";
+  thead.style.breakInside = "avoid";
+  thead.style.pageBreakInside = "avoid";
+  table.style.breakInside = "auto";
+  table.style.pageBreakInside = "auto";
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
   rows.forEach((values) => {
     const row = document.createElement("tr");
+    row.style.pageBreakInside = "avoid";
+    row.style.breakInside = "avoid";
+    row.className = "pdf-no-break";
     values.forEach((value) => row.appendChild(createCell("td", value)));
     tbody.appendChild(row);
   });
@@ -228,6 +238,9 @@ const downloadPDF = async ({
         footerCell.style.fontWeight = "700";
         row.appendChild(footerCell);
       });
+      row.style.pageBreakInside = "avoid";
+      row.style.breakInside = "avoid";
+      row.className = "pdf-no-break";
       tfoot.appendChild(row);
     });
     table.appendChild(tfoot);
@@ -240,17 +253,25 @@ const downloadPDF = async ({
     await loadHindiPdfFont();
     await html2pdf()
       .set({
-        margin: [10, 10, 10, 10],
+        margin: [10, 8, 12, 8],
         filename,
-        image: { type: "jpeg", quality: 0.98 },
+        image: { type: "jpeg", quality: 0.84 },
         html2canvas: {
           scale: 2,
           useCORS: true,
           backgroundColor: "#ffffff",
           logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: Math.max(content.scrollWidth, 1600),
         },
-        jsPDF: { unit: "mm", format: "a3", orientation: "landscape" },
-        pagebreak: { mode: ["css", "legacy"] },
+        jsPDF: { unit: "mm", format: "a3", orientation: "landscape", compress: true },
+        pagebreak: {
+          // Do not force a new page before the table header. That rule caused
+          // the multi-row grant header to be pushed onto a page by itself.
+          mode: ["css"],
+          avoid: ["tr", "tfoot", ".pdf-no-break"],
+        },
       })
       .from(content)
       .save();
@@ -1024,11 +1045,16 @@ const DPODashboard = () => {
     data.push(totalRow);
 
     const ws = XLSX.utils.json_to_sheet(data);
+    ws["!cols"] = Object.keys(data[0] || {}).map((key) => ({
+      wch: Math.min(Math.max(String(key).length + 2, 12), 28),
+    }));
+    ws["!freeze"] = { xSplit: 0, ySplit: 1 };
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Supplies Summary");
     XLSX.writeFile(
       wb,
       `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode.charAt(0).toUpperCase() + suppliesViewMode.slice(1)}_Summary.xlsx`,
+      { compression: true },
     );
   };
 
@@ -1135,9 +1161,13 @@ const DPODashboard = () => {
       ),
     });
     const ws = XLSX.utils.json_to_sheet(data);
+    ws["!cols"] = Object.keys(data[0] || {}).map((key) => ({
+      wch: Math.min(Math.max(String(key).length + 2, 12), 28),
+    }));
+    ws["!freeze"] = { xSplit: 0, ySplit: 1 };
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
-    XLSX.writeFile(wb, `${aggregateView}_Summary.xlsx`);
+    XLSX.writeFile(wb, `${aggregateView}_Summary.xlsx`, { compression: true });
   };
 
   const exportAggToPDF = () => {
@@ -1195,9 +1225,13 @@ const DPODashboard = () => {
     dataToExport.push(totalObj);
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
+    ws["!cols"] = Object.keys(dataToExport[0] || {}).map((key) => ({
+      wch: Math.min(Math.max(String(key).length + 2, 12), 28),
+    }));
+    ws["!freeze"] = { xSplit: 0, ySplit: 1 };
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Records");
-    XLSX.writeFile(wb, "Supplementary_Records.xlsx");
+    XLSX.writeFile(wb, "Supplementary_Records.xlsx", { compression: true });
   };
 
   const exportDetailsToPDF = () => {
