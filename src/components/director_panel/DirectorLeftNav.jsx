@@ -105,6 +105,11 @@ const DirectorLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNa
         label: "Food Items",
         path: "/director/food-items",
       },
+      {
+        icon: <FaCube />,
+        label: "Master Supplementary",
+        path: "/DirectorMaterSupplementary",
+      },
     
      
   {

@@ -92,6 +92,12 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
         path: "/DpoAwcList",
         active: true,
       },
+      {
+        icon: <FaCube />,
+        label: "Master Supplementary",
+        path: "/DPOMaterSupplementary",
+        active: true,
+      },
 // {
 //         icon: <FaTachometerAlt />,
 //         label: "Student Entery Form",
