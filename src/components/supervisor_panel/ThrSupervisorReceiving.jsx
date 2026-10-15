@@ -44,6 +44,79 @@ const monthLabels = {
   mar: 'March',
 };
 
+
+// Packet-expiry helpers: support [packetCount, expiryDate, remarks] and object API records.
+const getPacketExpiryEntries = (record) => {
+  const raw = record?.packet_expiry ?? record?.expiry_details ?? record?.expiry_data ??
+    record?.packets_expiry ?? record?.expiry_records ?? [];
+  if (!Array.isArray(raw)) return [];
+  return raw.map((entry) => {
+    if (Array.isArray(entry)) {
+      return { packets: entry[0] ?? "", date: entry[1] ?? "", remarks: entry[2] ?? "" };
+    }
+    if (entry && typeof entry === "object") {
+      return {
+        packets: entry.expired_packets ?? entry.expired_quantity ?? entry.packet_count ??
+          entry.no_of_packets ?? entry.packets_count ?? entry.quantity ?? entry.qty ??
+          entry.count ?? (typeof entry.packets === "number" ? entry.packets : ""),
+        date: entry.expiry_date ?? entry.expirydate ?? entry.expiryDate ??
+          entry.exp_date ?? entry.date_of_expiry ?? entry.expiry ?? entry.date ?? "",
+        remarks: entry.remarks ?? entry.remark ?? entry.notes ?? "",
+      };
+    }
+    return { packets: "", date: "", remarks: "" };
+  }).filter((entry) => entry.packets !== "" || entry.date || entry.remarks);
+};
+
+const formatDateForReport = (value) => {
+  if (!value) return "-";
+  const raw = String(value).trim();
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? raw :
+    `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+};
+
+const isPacketExpiryPast = (value) => {
+  if (!value) return false;
+  const raw = String(value).trim();
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const date = iso ? new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])) : new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  date.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+};
+
+const getExpirySummary = (record) => {
+  const entries = getPacketExpiryEntries(record);
+  const expiredPackets = entries.reduce((sum, entry) => {
+    const qty = Number(entry.packets);
+    return sum + (isPacketExpiryPast(entry.date) && Number.isFinite(qty) ? qty : 0);
+  }, 0);
+  const details = entries.map((entry) => {
+    const status = entry.date ? (isPacketExpiryPast(entry.date) ? "EXPIRED / समाप्त" : "Not expired / समाप्त नहीं") : "Expiry date unavailable / समाप्ति तिथि उपलब्ध नहीं";
+    return `${formatDateForReport(entry.date)}: ${entry.packets === "" ? "-" : entry.packets} packet(s) [${status}]${entry.remarks ? ` — ${entry.remarks}` : ""}`;
+  }).join("; ");
+  return { entries, expiredPackets, details: details || "No expiry details available / समाप्ति जानकारी उपलब्ध नहीं" };
+};
+
+const exportValue = (item, col, index) => {
+  switch (col.dataField) {
+    case "#": return index + 1;
+    case "date": return formatDateForReport(item.date);
+    case "max_expirydate": return formatDateForReport(item.max_expirydate ?? item.max_expiry_date ?? item.maxExpiryDate);
+    case "expired_packets": return getExpirySummary(item).expiredPackets;
+    case "expiry_breakdown": return getExpirySummary(item).details;
+    case "months": return (item.months || []).map(m => monthLabels[m] || m).join(", ");
+    case "quarter": return item.quarter || "";
+    case "sector_status": return item.sector_status || "pending";
+    default: return item[col.dataField] ?? "";
+  }
+};
+
 const ThrSupervisorReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -102,6 +175,8 @@ const ThrSupervisorReceiving = () => {
     { dataField: "months", text: "Months", visible: true },
     { dataField: "curr_month", text: "Current Month", visible: true },
     { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
+    { dataField: "expired_packets", text: "Expired Packets / समाप्त पैकेट", visible: true },
+    { dataField: "expiry_breakdown", text: "Expiry Details / समाप्ति विवरण", visible: true },
     { dataField: "sector_status", text: "Sector Status", visible: true },
     { dataField: "sector_remark", text: "Sector Remark", visible: true },
     { dataField: "actions", text: "Actions", visible: true },
@@ -383,108 +458,189 @@ const ThrSupervisorReceiving = () => {
     }
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     setIsPrinting(true);
-    setTimeout(() => {
-      const mainTable = tableRef.current;
-      const totalsTableContainer = document.createElement('div');
-      totalsTableContainer.innerHTML = `
-        <div style="padding: 20px; font-family: sans-serif;">
-          <h4 style="text-align: center; margin-bottom: 15px;">Total Quantity by Unit</h4>
-          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
-            <thead style="background-color: #f2f2f2;">
-              <tr>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Object.entries(totals.quantityByUnit)
-                .map(([unit, total]) => `
-                  <tr>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-      document.body.appendChild(totalsTableContainer);
-
-      Promise.all([
-        html2canvas(mainTable, { scale: 2, useCORS: true }),
-        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
-      ]).then(([mainCanvas, totalsCanvas]) => {
-        const mainImgData = mainCanvas.toDataURL('image/png');
-        const totalsImgData = totalsCanvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-
-        pdf.text("THR Supervisor Receiving Report", 20, 30);
-        let yPos = 40;
-
-        const mainRatio = mainCanvas.width / mainCanvas.height;
-        const mainWidth = pdfWidth - 40;
-        const mainHeight = mainWidth / mainRatio;
-        pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
-        yPos += mainHeight + 20;
-
-        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
-        const totalsWidth = pdfWidth / 2;
-        const totalsHeight = totalsWidth / totalsRatio;
-
-        if (yPos + totalsHeight > pdfHeight - 40) {
-          pdf.addPage();
-          yPos = 40;
-        }
-        pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
-
-        pdf.save('thr-supervisor-receiving.pdf');
-        document.body.removeChild(totalsTableContainer);
-        setIsPrinting(false);
+    setError("");
+    let exportRoot;
+    try {
+      const exportColumns = visibleColumns.filter((col) => !["select", "actions"].includes(col.dataField));
+      const reportRows = filteredReceivings.map((item, index) =>
+        exportColumns.map((col) => String(exportValue(item, col, index) ?? "-"))
+      );
+      const expiryRows = filteredReceivings.flatMap((item, index) => {
+        const entries = getExpirySummary(item).entries;
+        return (entries.length ? entries : [{ packets: "", date: "", remarks: "" }]).map((entry) => [
+          index + 1, item.district ?? "-", item.project ?? "-", item.sector ?? "-",
+          item.awc_name ?? "-", item.awc_code ?? "-", item.food_item ?? "-",
+          item.bene_category ?? "-", formatDateForReport(item.date),
+          formatDateForReport(item.max_expirydate ?? item.max_expiry_date ?? item.maxExpiryDate),
+          formatDateForReport(entry.date), entry.packets || "-",
+          entry.date ? (isPacketExpiryPast(entry.date) ? "EXPIRED / समाप्त" : "Not expired / समाप्त नहीं")
+            : "Expiry date unavailable / समाप्ति तिथि उपलब्ध नहीं",
+          entry.remarks || "-",
+        ]);
       });
-    }, 100);
+
+      // Browser-rendered text preserves Hindi/Devanagari; jsPDF's default font does not.
+      exportRoot = document.createElement("div");
+      exportRoot.style.cssText = [
+        "position:fixed", "left:-20000px", "top:0", "width:1800px",
+        "background:#fff", "color:#111", "padding:20px", "z-index:-1",
+        "font-family:Arial,'Noto Sans Devanagari','Nirmala UI',Mangal,sans-serif",
+        "box-sizing:border-box"
+      ].join(";") + ";";
+      document.body.appendChild(exportRoot);
+
+      const makeTitle = (text, level = 2) => {
+        const el = document.createElement(level === 2 ? "h2" : "h3");
+        el.textContent = text;
+        el.style.cssText = `font-size:${level === 2 ? 22 : 17}px;margin:0 0 14px;text-align:center;font-weight:700;`;
+        return el;
+      };
+      const makeTable = (headers, rows) => {
+        const table = document.createElement("table");
+        table.style.cssText = "width:100%;border-collapse:collapse;table-layout:auto;font-size:11px;";
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        headers.forEach((label) => {
+          const th = document.createElement("th");
+          th.textContent = String(label ?? "-");
+          th.style.cssText = "border:1px solid #777;background:#e9eef5;padding:6px;white-space:normal;text-align:left;font-weight:700;";
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+        const tbody = document.createElement("tbody");
+        rows.forEach((values) => {
+          const tr = document.createElement("tr");
+          values.forEach((value) => {
+            const td = document.createElement("td");
+            td.textContent = String(value ?? "-");
+            td.style.cssText = "border:1px solid #999;padding:5px;vertical-align:top;white-space:normal;overflow-wrap:anywhere;word-break:normal;";
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        return table;
+      };
+
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3", compress: true });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const addHtmlPage = async (titleText, headers, rows, pageNumber, totalPages) => {
+        exportRoot.replaceChildren();
+        exportRoot.appendChild(makeTitle(titleText));
+        const subtitle = document.createElement("div");
+        subtitle.textContent = `Page ${pageNumber} of ${totalPages} | Records: ${filteredReceivings.length}`;
+        subtitle.style.cssText = "font-size:10px;margin:0 0 10px;text-align:right;color:#444;";
+        exportRoot.appendChild(subtitle);
+        exportRoot.appendChild(makeTable(headers, rows));
+        const canvas = await html2canvas(exportRoot, {
+          scale: 1.2, useCORS: true, backgroundColor: "#ffffff", logging: false, windowWidth: 1900,
+        });
+        const margin = 18;
+        const scale = Math.min((pageWidth - margin * 2) / canvas.width, (pageHeight - margin * 2) / canvas.height);
+        if (pageNumber > 1) pdf.addPage("a3", "landscape");
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.76), "JPEG", margin, margin,
+          canvas.width * scale, canvas.height * scale, undefined, "FAST");
+        canvas.width = 1;
+        canvas.height = 1;
+      };
+
+      const chunk = (rows, size) => {
+        const result = [];
+        for (let i = 0; i < rows.length; i += size) result.push(rows.slice(i, i + size));
+        return result.length ? result : [[]];
+      };
+      const reportChunks = chunk(reportRows, 22);
+      const expiryChunks = chunk(expiryRows, 24);
+      const totalPages = reportChunks.length + expiryChunks.length + 1;
+      let page = 1;
+      for (const rows of reportChunks) {
+        await addHtmlPage("THR Supervisor Receiving Report / टीएचआर प्राप्ति रिपोर्ट",
+          exportColumns.map((col) => col.text), rows, page++, totalPages);
+      }
+      for (const rows of expiryChunks) {
+        await addHtmlPage("Packet Expiry Details / पैकेट की समाप्ति जानकारी",
+          ["#", "District / जिला", "Project / परियोजना", "Sector / सेक्टर", "AWC Name / आंगनवाड़ी केंद्र",
+            "AWC Code", "Food Item / खाद्य सामग्री", "Beneficiary Category / लाभार्थी श्रेणी",
+            "Date of Receiving / प्राप्ति तिथि", "Max Expiry Date / अधिकतम समाप्ति तिथि",
+            "Expiry Date / समाप्ति तिथि", "Packet Count / पैकेट संख्या", "Status / स्थिति", "Remarks / टिप्पणी"],
+          rows, page++, totalPages);
+      }
+
+      exportRoot.replaceChildren();
+      exportRoot.appendChild(makeTitle("Total Quantity by Unit / इकाई के अनुसार कुल मात्रा"));
+      const totalsRows = Object.entries(totals.quantityByUnit).map(([unit, total]) => [unit, Number(total.toFixed(2))]);
+      exportRoot.appendChild(makeTable(["Unit / इकाई", "Total Quantity / कुल मात्रा"], totalsRows));
+      const totalsCanvas = await html2canvas(exportRoot, {
+        scale: 1.2, useCORS: true, backgroundColor: "#ffffff", logging: false, windowWidth: 1900,
+      });
+      pdf.addPage("a3", "landscape");
+      const totalsScale = Math.min((pageWidth - 36) / totalsCanvas.width, (pageHeight - 36) / totalsCanvas.height);
+      pdf.addImage(totalsCanvas.toDataURL("image/jpeg", 0.76), "JPEG", 18, 18,
+        totalsCanvas.width * totalsScale, totalsCanvas.height * totalsScale, undefined, "FAST");
+      totalsCanvas.width = 1;
+      totalsCanvas.height = 1;
+      pdf.save("thr-supervisor-receiving.pdf");
+    } catch (err) {
+      console.error("THR receiving PDF export failed:", err);
+      setError(`PDF export failed: ${err?.message || "Please try again."}`);
+    } finally {
+      if (exportRoot?.parentNode) exportRoot.parentNode.removeChild(exportRoot);
+      setIsPrinting(false);
+    }
   };
 
   const exportToExcel = () => {
-    const visCols = visibleColumns.filter(c => c.dataField !== '#' && c.dataField !== 'select' && c.dataField !== 'actions' && c.dataField !== 'sector_remark');
-    const dataToExport = filteredReceivings.map((item, index) => {
-      const row = { '#': index + 1 };
-      visCols.forEach(col => {
-        if (col.dataField === 'quantity' && typeof item[col.dataField] === 'number') {
-          row[col.text] = item[col.dataField].toFixed(2);
-          return;
-        }
-        if (col.dataField === 'date') {
-          row[col.text] = new Date(item.date).toLocaleDateString('en-CA');
-        } else if (col.dataField === 'max_expirydate') {
-          row[col.text] = item.max_expirydate ? new Date(item.max_expirydate).toLocaleDateString('en-CA') : '';
-        } else if (col.dataField === 'months') {
-          row[col.text] = (item.months || []).map(m => monthLabels[m] || m).join(', ');
-        } else if (col.dataField === 'quarter') {
-          row[col.text] = item.quarter || '';
-        } else {
-          row[col.text] = item[col.dataField];
-        }
+    try {
+      const exportColumns = visibleColumns.filter((col) => !["select", "actions"].includes(col.dataField));
+      const dataToExport = filteredReceivings.map((item, index) => {
+        const row = {};
+        exportColumns.forEach((col) => { row[col.text] = exportValue(item, col, index); });
+        return row;
       });
-      return row;
-    });
-
-    const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
-      'Unit': unit,
-      'Total Quantity': total.toFixed(2)
-    }));
-
-    const mainWorksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const quantityWorksheet = XLSX.utils.json_to_sheet(quantityTotalsData);
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, mainWorksheet, "THR Receiving Report");
-    XLSX.utils.book_append_sheet(workbook, quantityWorksheet, "Quantity Totals");
-
-    XLSX.writeFile(workbook, "thr-supervisor-receiving.xlsx");
+      const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
+        "Unit / इकाई": unit, "Total Quantity / कुल मात्रा": Number(total.toFixed(2)),
+      }));
+      const expiryData = filteredReceivings.flatMap((item, index) => {
+        const entries = getExpirySummary(item).entries;
+        return (entries.length ? entries : [{ packets: "", date: "", remarks: "" }]).map((entry) => ({
+          "#": index + 1,
+          "District / जिला": item.district ?? "",
+          "Project / परियोजना": item.project ?? "",
+          "Sector / सेक्टर": item.sector ?? "",
+          "AWC Name / आंगनवाड़ी केंद्र": item.awc_name ?? "",
+          "AWC Code": item.awc_code ?? "",
+          "Food Item / खाद्य सामग्री": item.food_item ?? "",
+          "Beneficiary Category / लाभार्थी श्रेणी": item.bene_category ?? "",
+          "Quantity / मात्रा": item.quantity ?? "",
+          "Unit / इकाई": item.unit ?? "",
+          "Date of Receiving / प्राप्ति तिथि": formatDateForReport(item.date),
+          "Max Expiry Date / अधिकतम समाप्ति तिथि": formatDateForReport(item.max_expirydate ?? item.max_expiry_date ?? item.maxExpiryDate),
+          "Expiry Date / समाप्ति तिथि": formatDateForReport(entry.date),
+          "Packet Count / पैकेट संख्या": entry.packets,
+          "Expiry Status / स्थिति": entry.date ? (isPacketExpiryPast(entry.date) ? "EXPIRED / समाप्त" : "Not expired / समाप्त नहीं") : "Expiry date unavailable / समाप्ति तिथि उपलब्ध नहीं",
+          "Remarks / टिप्पणी": entry.remarks ?? "",
+          "Sector Status": item.sector_status || "pending",
+          "Sector Remark / सेक्टर टिप्पणी": item.sector_remark ?? "",
+        }));
+      });
+      const workbook = XLSX.utils.book_new();
+      const addSheet = (rows, name) => {
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        if (worksheet["!ref"]) worksheet["!autofilter"] = { ref: worksheet["!ref"] };
+        XLSX.utils.book_append_sheet(workbook, worksheet, name);
+      };
+      addSheet(dataToExport, "THR Receiving Report");
+      addSheet(expiryData, "Packet Expiry Details");
+      addSheet(quantityTotalsData, "Quantity Totals");
+      XLSX.writeFile(workbook, "thr-supervisor-receiving.xlsx", { bookType: "xlsx", compression: true });
+    } catch (err) {
+      console.error("THR receiving Excel export failed:", err);
+      setError(`Excel export failed: ${err?.message || "Please try again."}`);
+    }
   };
 
   const renderColumnModal = () => (
@@ -647,10 +803,16 @@ const ThrSupervisorReceiving = () => {
                               cellContent = indexOfFirstItem + index + 1;
                               break;
                             case "date":
-                              cellContent = new Date(item.date).toLocaleDateString();
+                              cellContent = formatDateForReport(item.date);
                               break;
                             case "max_expirydate":
-                              cellContent = item.max_expirydate ? new Date(item.max_expirydate).toLocaleDateString() : '-';
+                              cellContent = formatDateForReport(item.max_expirydate ?? item.max_expiry_date ?? item.maxExpiryDate);
+                              break;
+                            case "expired_packets":
+                              cellContent = getExpirySummary(item).expiredPackets;
+                              break;
+                            case "expiry_breakdown":
+                              cellContent = getExpirySummary(item).details;
                               break;
                             case "months":
                               cellContent = (item.months || []).map(m => monthLabels[m] || m).join(', ');

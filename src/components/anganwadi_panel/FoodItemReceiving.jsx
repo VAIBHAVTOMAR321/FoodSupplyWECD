@@ -241,7 +241,7 @@ const downloadGrantWisePDF = async ({ title, filename, records, totalsRow }) => 
   content.appendChild(heading);
 
   const table = document.createElement("table");
-  table.style.cssText = "width:100%;border-collapse:collapse;table-layout:fixed;font-size:7px;line-height:1.35;";
+  table.style.cssText = "width:100%;border-collapse:collapse;table-layout:fixed;font-size:7px;line-height:1.5;break-inside:auto;";
 
   const createCell = (tagName, cell) => {
     const element = document.createElement(tagName);
@@ -249,7 +249,7 @@ const downloadGrantWisePDF = async ({ title, filename, records, totalsRow }) => 
     element.textContent = value.text == null ? "" : String(value.text);
     if (value.colSpan) element.colSpan = value.colSpan;
     if (value.rowSpan) element.rowSpan = value.rowSpan;
-    element.style.cssText = "border:1px solid #cbd5e1;padding:4px;text-align:left;vertical-align:middle;overflow-wrap:anywhere;word-break:normal;";
+    element.style.cssText = "border:1px solid #cbd5e1;padding:5px 4px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:normal;white-space:normal;line-height:1.5;height:auto;";
     return element;
   };
 
@@ -1023,6 +1023,75 @@ const FoodItemReceiving = () => {
     });
   };
 
+
+  // Shared packet-expiry helpers for the receiving table and its PDF/Excel exports.
+  const getPacketExpiryRows = (record) => {
+    if (!Array.isArray(record?.packet_expiry)) return [];
+    return record.packet_expiry.filter((entry) => {
+      const count = Array.isArray(entry) ? entry[0] : entry?.count;
+      const date = Array.isArray(entry) ? entry[1] : entry?.date;
+      const remark = Array.isArray(entry) ? entry[2] : (entry?.remark ?? entry?.remarks);
+      return [count, date, remark].some(value => value !== null && value !== undefined && String(value).trim() !== '');
+    });
+  };
+
+  const getExpiryEntry = (entry) => ({
+    count: Array.isArray(entry) ? entry[0] : (entry?.count ?? ''),
+    date: Array.isArray(entry) ? entry[1] : (entry?.date ?? ''),
+    remark: Array.isArray(entry) ? entry[2] : (entry?.remark ?? entry?.remarks ?? ''),
+  });
+
+  const formatExportDate = (value) => {
+    if (!value) return '';
+    const raw = String(value).trim();
+    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? raw : date.toLocaleDateString('en-GB');
+  };
+
+  const getExpiredPacketCount = (record) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return getPacketExpiryRows(record).reduce((total, entry) => {
+      const { count, date } = getExpiryEntry(entry);
+      if (!date) return total;
+      const expiryDate = new Date(date);
+      if (Number.isNaN(expiryDate.getTime())) return total;
+      expiryDate.setHours(0, 0, 0, 0);
+      return expiryDate < today ? total + (Number(count) || 0) : total;
+    }, 0);
+  };
+
+  const getExpiryBreakdown = (record) => getPacketExpiryRows(record).map((entry) => {
+    const { count, date, remark } = getExpiryEntry(entry);
+    const expired = date && !Number.isNaN(new Date(date).getTime()) && new Date(date).setHours(0, 0, 0, 0) < new Date(new Date().setHours(0, 0, 0, 0));
+    return `${count === '' ? '—' : count} packets | Expiry: ${formatExportDate(date) || '—'} | ${expired ? 'EXPIRED / समाप्त' : 'Not expired / समाप्त नहीं'}${remark ? ` | ${remark}` : ''}`;
+  }).join(' ; ');
+
+  const makeReceivingExportRows = (records) => records.map((rec, index) => ({
+    'S. No.': index + 1,
+    'District': rec.district ?? '',
+    'Project': rec.project ?? '',
+    'Sector': rec.sector ?? '',
+    'AWC Name': rec.awc_name ?? '',
+    'AWC Code': rec.awc_code ?? '',
+    'Date': formatExportDate(rec.date),
+    'Trimester Packets Distribution': rec.food_item ?? '',
+    'Beneficiary Category': rec.bene_category ?? '',
+    'Packets': rec.quantity ?? 0,
+    'Unit': rec.unit ?? '',
+    'Fin. Year': rec.fin_year ?? '',
+    'Current Month': rec.curr_month ?? '',
+    'Max Expiry Date': formatExportDate(rec.max_expirydate),
+    'Trimester': normalizeTrimester(rec.quarter) || rec.quarter || '',
+    'Months': formatMonths(getMonthsArray(rec)),
+    'Expired Packets': getExpiredPacketCount(rec),
+    'Expiry Details': getExpiryBreakdown(rec) || 'No expiry details / समाप्ति विवरण उपलब्ध नहीं',
+    'Sector Status': rec.sector_status || 'pending',
+    'Sector Remark': rec.sector_remark ?? '',
+  }));
+
   const filteredHcmReceivings = useMemo(() => {
     return hcmReceivings.filter(item => {
       const itemMonths = getMonthsArray(item).map(m => monthLabels[m] || m);
@@ -1087,11 +1156,163 @@ const FoodItemReceiving = () => {
     }
   };
 
+  const exportReceivingToExcel = () => {
+    const records = activeTab === 'thr' ? filteredThrReceivings : filteredHcmReceivings;
+    if (!records.length) return;
+    try {
+      const mainRows = makeReceivingExportRows(records);
+      const expiryRows = [];
+      records.forEach((rec, index) => {
+        const entries = getPacketExpiryRows(rec);
+        const common = {
+          'S. No.': index + 1,
+          'District': rec.district ?? '',
+          'Project': rec.project ?? '',
+          'Sector': rec.sector ?? '',
+          'AWC Name': rec.awc_name ?? '',
+          'AWC Code': rec.awc_code ?? '',
+          'Food Item': rec.food_item ?? '',
+          'Beneficiary Category': rec.bene_category ?? '',
+          'Receiving Date': formatExportDate(rec.date),
+        };
+        if (entries.length) {
+          entries.forEach((entry) => {
+            const { count, date, remark } = getExpiryEntry(entry);
+            const expiryDate = date ? new Date(date) : null;
+            const expired = expiryDate && !Number.isNaN(expiryDate.getTime()) && expiryDate.setHours(0, 0, 0, 0) < new Date(new Date().setHours(0, 0, 0, 0));
+            expiryRows.push({
+              ...common,
+              'Expiry Date': formatExportDate(date),
+              'Packet Count': count,
+              'Expiry Status': expired ? 'EXPIRED / समाप्त' : 'Not expired / समाप्त नहीं',
+              'Remarks': remark,
+            });
+          });
+        } else {
+          expiryRows.push({ ...common, 'Expiry Date': '', 'Packet Count': '', 'Expiry Status': 'No expiry details / समाप्ति विवरण उपलब्ध नहीं', 'Remarks': '' });
+        }
+      });
+
+      const quantityTotals = Object.entries(records.reduce((acc, rec) => {
+        const unit = rec.unit || 'N/A';
+        acc[unit] = (acc[unit] || 0) + (Number(rec.quantity) || 0);
+        return acc;
+      }, {})).map(([unit, total]) => ({ 'Unit / इकाई': unit, 'Total Quantity / कुल मात्रा': Number(total.toFixed(2)) }));
+
+      const workbook = XLSX.utils.book_new();
+      const mainSheet = XLSX.utils.json_to_sheet(mainRows);
+      const expirySheet = XLSX.utils.json_to_sheet(expiryRows);
+      const totalsSheet = XLSX.utils.json_to_sheet(quantityTotals);
+      [mainSheet, expirySheet, totalsSheet].forEach((sheet) => {
+        if (sheet['!ref']) sheet['!autofilter'] = { ref: sheet['!ref'] };
+      });
+      mainSheet['!cols'] = Object.keys(mainRows[0] || {}).map(key => ({ wch: Math.min(42, Math.max(14, key.length + 2)) }));
+      expirySheet['!cols'] = Object.keys(expiryRows[0] || {}).map(key => ({ wch: Math.min(36, Math.max(14, key.length + 2)) }));
+      XLSX.utils.book_append_sheet(workbook, mainSheet, `${activeTab.toUpperCase()} Receiving`);
+      XLSX.utils.book_append_sheet(workbook, expirySheet, 'Packet Expiry Details');
+      XLSX.utils.book_append_sheet(workbook, totalsSheet, 'Quantity Totals');
+      XLSX.writeFile(workbook, `${activeTab}-anganwadi-receiving.xlsx`, { compression: true });
+    } catch (err) {
+      console.error('Receiving Excel export failed:', err);
+      setError('Excel export failed. Please try again.');
+    }
+  };
+
+  const exportReceivingToPDF = async () => {
+    const records = activeTab === 'thr' ? filteredThrReceivings : filteredHcmReceivings;
+    if (!records.length) return;
+    let content;
+    try {
+      await loadHindiPdfFont();
+      const rows = makeReceivingExportRows(records);
+      content = document.createElement('div');
+      content.style.cssText = "box-sizing:border-box;width:100%;padding:12px;background:#fff;color:#1e293b;font-family:'Noto Sans Devanagari','Noto Sans','Nirmala UI',Mangal,sans-serif;";
+      const heading = document.createElement('h2');
+      heading.textContent = `${activeTab.toUpperCase()} प्राप्ति रिपोर्ट / ${activeTab.toUpperCase()} Receiving Report`;
+      heading.style.cssText = 'text-align:center;margin:0 0 12px;font-size:16px;font-weight:700;';
+      content.appendChild(heading);
+
+      const appendTable = (title, headers, bodyRows) => {
+        if (title) {
+          const h = document.createElement('h3');
+          h.textContent = title;
+          h.style.cssText = 'font-size:12px;margin:14px 0 6px;';
+          content.appendChild(h);
+        }
+        const table = document.createElement('table');
+        table.style.cssText = 'width:100%;border-collapse:collapse;table-layout:auto;font-size:7px;line-height:1.5;break-inside:auto;';
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headers.forEach(label => {
+          const th = document.createElement('th');
+          th.textContent = label;
+          th.style.cssText = 'border:1px solid #94a3b8;background:#e0e7ff;color:#312e81;padding:4px;text-align:left;vertical-align:middle;';
+          headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        bodyRows.forEach(values => {
+          const tr = document.createElement('tr');
+          values.forEach(value => {
+            const td = document.createElement('td');
+            td.textContent = value == null || value === '' ? '—' : String(value);
+            td.style.cssText = 'border:1px solid #cbd5e1;padding:5px 4px;vertical-align:top;overflow-wrap:anywhere;white-space:normal;line-height:1.5;height:auto;';
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        content.appendChild(table);
+      };
+
+      const mainHeaders = Object.keys(rows[0] || {});
+      appendTable('प्राप्ति विवरण / Receiving Details', mainHeaders, rows.map(row => mainHeaders.map(header => row[header])));
+
+      const expiryHeaders = ['S. No.', 'District', 'Project', 'Sector', 'AWC Name', 'Food Item', 'Expiry Date', 'Packet Count', 'Expiry Status', 'Remarks'];
+      const expiryRows = [];
+      records.forEach((rec, index) => {
+        const entries = getPacketExpiryRows(rec);
+        const common = [index + 1, rec.district ?? '—', rec.project ?? '—', rec.sector ?? '—', rec.awc_name ?? '—', rec.food_item ?? '—'];
+        if (entries.length) entries.forEach(entry => {
+          const { count, date, remark } = getExpiryEntry(entry);
+          const expiryDate = date ? new Date(date) : null;
+          const expired = expiryDate && !Number.isNaN(expiryDate.getTime()) && expiryDate.setHours(0, 0, 0, 0) < new Date(new Date().setHours(0, 0, 0, 0));
+          expiryRows.push([...common, formatExportDate(date) || '—', count || '—', expired ? 'EXPIRED / समाप्त' : 'Not expired / समाप्त नहीं', remark || '—']);
+        });
+        else expiryRows.push([...common, '—', '—', 'No expiry details / समाप्ति विवरण उपलब्ध नहीं', '—']);
+      });
+      appendTable('पैकेट की समाप्ति जानकारी / Packet Expiry Details', expiryHeaders, expiryRows);
+
+      const totals = Object.entries(records.reduce((acc, rec) => {
+        const unit = rec.unit || 'N/A';
+        acc[unit] = (acc[unit] || 0) + (Number(rec.quantity) || 0);
+        return acc;
+      }, {}));
+      appendTable('इकाई के अनुसार कुल मात्रा / Quantity Totals', ['Unit / इकाई', 'Total Quantity / कुल मात्रा'], totals.map(([unit, total]) => [unit, total.toFixed(2)]));
+
+      document.body.appendChild(content);
+      await html2pdf().set({
+        margin: [7, 7, 7, 7],
+        filename: `${activeTab}-anganwadi-receiving.pdf`,
+        image: { type: 'jpeg', quality: 0.88 },
+        html2canvas: { scale: 1.5, useCORS: true, backgroundColor: '#ffffff', logging: false },
+        jsPDF: { unit: 'mm', format: 'a3', orientation: 'landscape', compress: true },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'td', 'th'] },
+      }).from(content).save();
+    } catch (err) {
+      console.error('Receiving PDF export failed:', err);
+      setError('PDF export failed. Please try again.');
+    } finally {
+      content?.remove();
+    }
+  };
+
   const renderTable = (records) => {
     const totalQuantity = records.reduce((sum, rec) => sum + (parseFloat(rec.quantity) || 0), 0);
 
     return (
-      <Table striped bordered hover responsive className="mt-4">
+      <Table striped bordered hover responsive className="mt-4 receiving-data-table" style={{ tableLayout: 'auto' }}>
         <thead>
           <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
             <th>#</th>
@@ -1105,6 +1326,8 @@ const FoodItemReceiving = () => {
             <th>Max Expiry Date</th>
             <th>Trimester</th>
             <th>Months</th>
+            <th>Expired Packets / समाप्त पैकेट</th>
+            <th>Expiry Details / समाप्ति विवरण</th>
             <th>Sector Status</th>
             <th>Actions</th>
           </tr>
@@ -1123,6 +1346,8 @@ const FoodItemReceiving = () => {
               <td>{rec.max_expirydate ? new Date(rec.max_expirydate).toLocaleDateString() : '-'}</td>
               <td>{normalizeTrimester(rec.quarter) || rec.quarter || '-'}</td>
               <td>{formatMonths(getMonthsArray(rec))}</td>
+              <td className="text-center">{getExpiredPacketCount(rec).toLocaleString()}</td>
+              <td style={{ minWidth: '260px', whiteSpace: 'normal', verticalAlign: 'top', overflowWrap: 'anywhere', lineHeight: 1.5, height: 'auto' }}>{getExpiryBreakdown(rec) || 'No expiry details / समाप्ति विवरण उपलब्ध नहीं'}</td>
               <td>
                 <Badge bg={getStatusVariant(rec.sector_status)}>{rec.sector_status || 'pending'}</Badge>
               </td>
@@ -1156,7 +1381,7 @@ const FoodItemReceiving = () => {
               </td>
             </tr>
           )) : (
-            <tr><td colSpan="13" className="text-center">No records found.</td></tr>
+            <tr><td colSpan="15" className="text-center">No records found.</td></tr>
           )}
         </tbody>
         {records.length > 0 && (
@@ -1164,7 +1389,7 @@ const FoodItemReceiving = () => {
             <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
               <td colSpan="4" className="text-end">Total Quantity:</td>
               <td>{totalQuantity}</td>
-              <td colSpan="8"></td>
+              <td colSpan="10"></td>
             </tr>
           </tfoot>
         )}
@@ -1341,8 +1566,14 @@ const FoodItemReceiving = () => {
             </Dropdown>
           </Form.Group>
         </Col>
-        <Col md={4} className="d-flex align-items-end">
+        <Col md={4} className="d-flex align-items-end gap-2 flex-wrap">
           <Button variant="secondary" onClick={resetFilters}>Reset</Button>
+          <Button variant="outline-success" onClick={exportReceivingToExcel} disabled={!(activeTab === 'thr' ? filteredThrReceivings : filteredHcmReceivings).length}>
+            <FaFileExcel className="me-1" /> Excel
+          </Button>
+          <Button variant="outline-danger" onClick={exportReceivingToPDF} disabled={!(activeTab === 'thr' ? filteredThrReceivings : filteredHcmReceivings).length}>
+            <FaFilePdf className="me-1" /> PDF
+          </Button>
         </Col>
       </Row>
     );
