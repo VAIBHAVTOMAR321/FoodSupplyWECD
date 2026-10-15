@@ -80,6 +80,23 @@ const quarterOptions = [
   "Jan-Feb-Mar",
 ];
 
+// Reconciliation APIs may return a month instead of the trimester label.
+const getSupplyTrimester = (record = {}) => {
+  const raw = String(
+    record.quarter ?? record.trimester ?? record.quarter_name ??
+    record.month ?? record.month_name ?? record.period_month ?? ""
+  ).trim();
+  if (quarterOptions.includes(raw)) return raw;
+  const month = raw.toLowerCase();
+  const monthToTrimester = {
+    april: "Apr-May-Jun", apr: "Apr-May-Jun", may: "Apr-May-Jun", june: "Apr-May-Jun", jun: "Apr-May-Jun",
+    july: "Jul-Aug-Sep", jul: "Jul-Aug-Sep", august: "Jul-Aug-Sep", aug: "Jul-Aug-Sep", september: "Jul-Aug-Sep", sep: "Jul-Aug-Sep", sept: "Jul-Aug-Sep",
+    october: "Oct-Nov-Dec", oct: "Oct-Nov-Dec", november: "Oct-Nov-Dec", nov: "Oct-Nov-Dec", december: "Oct-Nov-Dec", dec: "Oct-Nov-Dec",
+    january: "Jan-Feb-Mar", jan: "Jan-Feb-Mar", february: "Jan-Feb-Mar", feb: "Jan-Feb-Mar", march: "Jan-Feb-Mar", mar: "Jan-Feb-Mar",
+  };
+  return monthToTrimester[month] || "";
+};
+
 /* ── Grant-wise Excel / API schema ── */
 const GRANT_IDS = [15, 30, 31];
 const GRANT_CATEGORIES = [
@@ -251,7 +268,7 @@ const FoodSupplementary = () => {
   const [suppliesDetailRecords, setSuppliesDetailRecords] = useState([]);
   const [suppliesLoading, setSuppliesLoading] = useState(true);
   const [suppliesError, setSuppliesError] = useState("");
-  const [selectedSupplyMonths, setSelectedSupplyMonths] = useState([]);
+  const [selectedSupplyQuarters, setSelectedSupplyQuarters] = useState([]);
   const [selectedSupplyFYs, setSelectedSupplyFYs] = useState([]);
 
   // Race condition prevention for API calls
@@ -325,54 +342,51 @@ const FoodSupplementary = () => {
     fetchSuppliesData(suppliesTab);
   }, [fetchSuppliesData, suppliesTab]);
 
-  const suppliesMonths = useMemo(
-    () => [...new Set(suppliesRecords.map((record) => record.month).filter(Boolean))]
-      .sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b)),
-    [suppliesRecords]
-  );
+  // Always offer all four trimesters, even if one has no records in the current API response.
+  const suppliesQuarters = useMemo(() => [...quarterOptions], []);
   const suppliesFinancialYears = useMemo(
-    () => [...new Set(suppliesRecords.map((record) => record.financial_year).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    () => [...new Set(suppliesRecords.map((record) => record.financial_year ?? record.financialYear ?? record.fy).filter(Boolean))]
+      .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })),
     [suppliesRecords]
   );
 
   const filteredSuppliesRecords = useMemo(
-    () => suppliesRecords.filter((record) =>
-      (selectedSupplyMonths.length === 0 || selectedSupplyMonths.includes(record.month)) &&
-      (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(record.financial_year))
-    ),
-    [suppliesRecords, selectedSupplyMonths, selectedSupplyFYs]
+    () => suppliesRecords.filter((record) => {
+      const trimester = getSupplyTrimester(record);
+      const fy = record.financial_year ?? record.financialYear ?? record.fy ?? "";
+      return (selectedSupplyQuarters.length === 0 || selectedSupplyQuarters.includes(trimester)) &&
+        (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(fy));
+    }),
+    [suppliesRecords, selectedSupplyQuarters, selectedSupplyFYs]
   );
 
-  // Filtered detail records for AWC-wise view
-  const filteredDetailRecords = useMemo(() => {
-    return suppliesDetailRecords.filter((record) =>
-      (selectedSupplyMonths.length === 0 || selectedSupplyMonths.includes(record.month)) &&
-      (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(record.financial_year))
-    );
-  }, [suppliesDetailRecords, selectedSupplyMonths, selectedSupplyFYs]);
+  // Apply the same trimester/FY filter to AWC detail records.
+  const filteredDetailRecords = useMemo(() => suppliesDetailRecords.filter((record) => {
+    const trimester = getSupplyTrimester(record);
+    const fy = record.financial_year ?? record.financialYear ?? record.fy ?? "";
+    return (selectedSupplyQuarters.length === 0 || selectedSupplyQuarters.includes(trimester)) &&
+      (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(fy));
+  }), [suppliesDetailRecords, selectedSupplyQuarters, selectedSupplyFYs]);
 
-  // Sector-wise aggregation (existing logic)
+  // Sector-wise aggregation uses the filtered records so the trimester selector affects the table.
   const suppliesData = useMemo(() => {
     const sectors = new Map();
-    suppliesRecords.forEach((record) => {
-      if (!sectors.has(record.sector)) {
-        sectors.set(record.sector, new Map());
-      }
-
-      const foodItems = sectors.get(record.sector);
-      const quantities = foodItems.get(record.food_item) || { received: 0, distributed: 0, balance: 0 };
-      quantities.received += Number(record.received_quantity) || 0;
-      quantities.distributed += Number(record.distributed_quantity) || 0;
-      quantities.balance += Number(record.balance_quantity) || 0;
-      foodItems.set(record.food_item, quantities);
+    filteredSuppliesRecords.forEach((record) => {
+      const sectorName = record.sector ?? record.sector_name ?? "—";
+      const foodItem = record.food_item ?? record.foodItem ?? record.food_item_name ?? "";
+      if (!sectors.has(sectorName)) sectors.set(sectorName, new Map());
+      const foodItems = sectors.get(sectorName);
+      const quantities = foodItems.get(foodItem) || { received: 0, distributed: 0, balance: 0 };
+      quantities.received += Number(record.received_quantity ?? record.receivedQuantity ?? record.quantity_received ?? record.received) || 0;
+      quantities.distributed += Number(record.distributed_quantity ?? record.distributedQuantity ?? record.quantity_distributed ?? record.distributed) || 0;
+      quantities.balance += Number(record.balance_quantity ?? record.balanceQuantity ?? record.remaining_quantity ?? record.balance) || 0;
+      foodItems.set(foodItem, quantities);
     });
-
     return Array.from(sectors, ([sector, foodItems]) => ({
       sector,
       foodData: Array.from(foodItems, ([food_item, quantities]) => ({ food_item, ...quantities })),
     }));
-  }, [suppliesRecords]);
+  }, [filteredSuppliesRecords]);
 
   // AWC-wise aggregation
   const awcSuppliesData = useMemo(() => {
@@ -398,8 +412,8 @@ const FoodSupplementary = () => {
 
   // Keep food columns stable while period filters change.
   const suppliesFoodItems = useMemo(() => {
-    return [...new Set(suppliesRecords.map((record) => record.food_item).filter(Boolean))];
-  }, [suppliesRecords]);
+    return [...new Set([...suppliesRecords, ...suppliesDetailRecords].map((record) => record.food_item ?? record.foodItem ?? record.food_item_name).filter(Boolean))];
+  }, [suppliesRecords, suppliesDetailRecords]);
 
   // Display HCM quantities as grams/kilograms and THR quantities as packets.
   // HCM reconciliation API quantities are assumed to be stored in kilograms.
@@ -1215,10 +1229,10 @@ const FoodSupplementary = () => {
                           </h5>
                           <div className="d-flex align-items-end gap-3 flex-wrap">
                             <MultiSelectDropdown
-                              label="Month"
-                              options={suppliesMonths}
-                              selected={selectedSupplyMonths}
-                              onChange={setSelectedSupplyMonths}
+                              label="Trimester"
+                              options={suppliesQuarters}
+                              selected={selectedSupplyQuarters}
+                              onChange={setSelectedSupplyQuarters}
                             />
                             <MultiSelectDropdown
                               label="Financial Year"
@@ -1226,13 +1240,13 @@ const FoodSupplementary = () => {
                               selected={selectedSupplyFYs}
                               onChange={setSelectedSupplyFYs}
                             />
-                            {(selectedSupplyMonths.length > 0 || selectedSupplyFYs.length > 0) && (
+                            {(selectedSupplyQuarters.length > 0 || selectedSupplyFYs.length > 0) && (
                               <Button
                                 variant="outline-secondary"
                                 size="sm"
                                 className="fs-filter-reset"
                                 onClick={() => {
-                                  setSelectedSupplyMonths([]);
+                                  setSelectedSupplyQuarters([]);
                                   setSelectedSupplyFYs([]);
                                 }}
                               >
@@ -1240,8 +1254,8 @@ const FoodSupplementary = () => {
                               </Button>
                             )}
                             <ButtonGroup className="fs-toggle-group" style={{ marginRight: "8px" }}>
-                              <Button className={`fs-toggle-btn ${suppliesTab === "thr" ? "active" : ""}`} onClick={() => { setSuppliesTab("thr"); setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}>THR</Button>
-                              <Button className={`fs-toggle-btn ${suppliesTab === "hcm" ? "active" : ""}`} onClick={() => { setSuppliesTab("hcm"); setSelectedSupplyMonths([]); setSelectedSupplyFYs([]); }}>HCM</Button>
+                              <Button className={`fs-toggle-btn ${suppliesTab === "thr" ? "active" : ""}`} onClick={() => { setSuppliesTab("thr"); setSelectedSupplyQuarters([]); setSelectedSupplyFYs([]); }}>THR</Button>
+                              <Button className={`fs-toggle-btn ${suppliesTab === "hcm" ? "active" : ""}`} onClick={() => { setSuppliesTab("hcm"); setSelectedSupplyQuarters([]); setSelectedSupplyFYs([]); }}>HCM</Button>
                             </ButtonGroup>
                             <ButtonGroup className="fs-toggle-group" style={{ marginRight: "8px" }}>
                               <Button className={`fs-toggle-btn ${suppliesViewMode === "sector" ? "active" : ""}`} onClick={() => setSuppliesViewMode("sector")} title="Sector-wise">
