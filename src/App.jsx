@@ -63,7 +63,7 @@ import CdpoAWCList from "./components/CDPO_panel/CdpoAWCList";
 import DpoAwcList from "./components/DPO_panel/DpoAwcList";
 import DirectorAwcList from "./components/director_panel/DirectorAwcList";
 import FoodSupplementary from "./components/CDPO_panel/FoodSupplementary";
-import CDPOMaterSupplementary from "./components/CDPO_panel/CDPOMaterSupplementary";
+import CDPOFoodSupplementary from "./components/CDPO_panel/CDPOFoodSupplementary";
 import StockAllocation from "./components/supervisor_panel/StockAllocation";
 
 
@@ -131,7 +131,7 @@ const hideFooterRoutes = ["/DirectorHCMReceiving", "/CDPOMaterSupplementary", "/
           } />
             <Route path="/CDPOMaterSupplementary" element={
             <ProtectedRoute>
-              <CDPOMaterSupplementary />
+                <CDPOFoodSupplementary />
             </ProtectedRoute>
           } />
 
