@@ -46,6 +46,63 @@ const formatMonths = (monthsOrQuarter) => {
   return monthsOrQuarter; // Fallback for single month strings or other formats
 };
 
+const formatDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("en-GB");
+};
+
+const getExpiryRows = (payload) => {
+  if (!payload) return [];
+  if (Array.isArray(payload)) {
+    // FoodItemReceiving stores packet expiry rows as [packet_count, expiry_date, remarks].
+    if (payload.length >= 2 && !Array.isArray(payload[0]) && !payload[0]?.count &&
+        (typeof payload[1] === "string" || payload[1] instanceof Date)) {
+      return [{ count: payload[0], date: payload[1], remarks: payload[2] ?? "" }];
+    }
+    return payload.flatMap(getExpiryRows);
+  }
+  if (typeof payload !== "object") return [];
+
+  // Handle common API wrappers without assuming a single response shape.
+  for (const key of ["results", "data", "expiry_details", "expiry_data", "packet_expiry", "packets", "details"]) {
+    if (Array.isArray(payload[key])) return payload[key].flatMap(getExpiryRows);
+  }
+
+  const expiryDate = payload.expiry_date ?? payload.expirydate ?? payload.expiryDate ??
+    payload.exp_date ?? payload.date_of_expiry ?? payload.expiry;
+  const packetQty = payload.expired_packets ?? payload.expired_quantity ?? payload.packet_count ??
+    payload.no_of_packets ?? payload.packets_count ?? payload.quantity ?? payload.qty ?? payload.packets;
+  if (expiryDate || packetQty !== undefined) return [payload];
+
+  // Some APIs group batches by key; recursively collect their rows.
+  return Object.values(payload).flatMap((value) => Array.isArray(value) || (value && typeof value === "object")
+    ? getExpiryRows(value)
+    : []);
+};
+
+const expiryDateOf = (item) => Array.isArray(item) ? (item[1] ?? "") :
+  (item?.expiry_date ?? item?.expirydate ?? item?.expiryDate ?? item?.exp_date ??
+   item?.date_of_expiry ?? item?.expiry ?? item?.date ?? "");
+
+const expiryPacketsOf = (item) => Array.isArray(item) ? (item[0] ?? "") :
+  (item?.expired_packets ?? item?.expired_quantity ?? item?.packet_count ?? item?.no_of_packets ??
+   item?.packets_count ?? item?.quantity ?? item?.qty ?? item?.count ??
+   (typeof item?.packets === "number" ? item.packets : undefined) ?? "");
+
+const expiryRemarksOf = (item) => Array.isArray(item) ? (item[2] ?? "") :
+  (item?.remarks ?? item?.remark ?? item?.notes ?? "");
+
+const isExpiryPast = (value) => {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  date.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+};
+
 const getStatusVariant = (status) => {
   switch (status) {
     case "approved": return "success";
@@ -62,6 +119,8 @@ const CDPOTHRReceiving = () => {
 
   const [summaryData, setSummaryData] = useState(null);
   const [reports, setReports] = useState([]);
+  // Filled when the row's Expiry Details component fetches/displays its data.
+  const [expiryDetailsByRow, setExpiryDetailsByRow] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,6 +148,8 @@ const [columns, setColumns] = useState([
     { dataField: "sector_status", text: "Sector Status", visible: true },
     { dataField: "curr_month", text: "Current Month", visible: true },
     { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
+    { dataField: "expired_packets", text: "Expired Packets", visible: true },
+    { dataField: "expiry_breakdown", text: "Expiry Details (Date / Packets)", visible: true },
     { dataField: "date", text: "Date", visible: true },
     { dataField: "actions", text: "Actions", visible: true },
   ]);
@@ -183,99 +244,227 @@ const [columns, setColumns] = useState([
 
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
   const handleColumnToggle = (i) => {
-    const updated = [...columns];
-    updated[i].visible = !updated[i].visible;
-    setColumns(updated);
+    setColumns((prev) => prev.map((column, index) =>
+      index === i ? { ...column, visible: !column.visible } : column
+    ));
   };
   const visibleColumns = columns.filter((c) => c.visible);
 
-  const exportToExcel = () => {
-    const visCols = columns.filter((c) => c.visible && c.dataField !== "#");
-    const data = filteredReports.map((row, i) => {
-      const r = { "#": i + 1 };
-      visCols.forEach((col) => {
-        if (col.dataField === 'months') {
-          r[col.text] = formatMonths(row.months || row.quarter);
-        } else if (col.dataField === 'quarter') {
-          r[col.text] = row.quarter || '';
-        } else if (col.dataField === 'sector_status') {
-          r[col.text] = row.sector_status || 'pending';
-        } else if (col.dataField === 'max_expirydate') {
-          r[col.text] = row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString('en-CA') : '';
-        } else {
-          r[col.text] = row[col.dataField];
-        }
-      });
-      return r;
-    });
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "THR Receiving");
-    XLSX.writeFile(wb, "thr_receiving.xlsx");
+  const handleExpiryDetailsLoaded = useCallback((row, payload) => {
+    const key = String(row?.id ?? row?.awc_code ?? `${row?.sector ?? ""}-${row?.food_item ?? ""}-${row?.bene_category ?? ""}`);
+    setExpiryDetailsByRow((prev) => ({ ...prev, [key]: getExpiryRows(payload) }));
+  }, []);
+
+  const getRowExpiryRows = (row) => {
+    const key = String(row?.id ?? row?.awc_code ?? `${row?.sector ?? ""}-${row?.food_item ?? ""}-${row?.bene_category ?? ""}`);
+    const cached = expiryDetailsByRow[key];
+    if (cached?.length) return cached;
+    // Also support APIs that include expiry details in the original report row.
+    return getExpiryRows(row?.packet_expiry ?? row?.expiry_details ?? row?.expiry_data ?? row?.packets_expiry ?? row?.expiry_records ?? []);
   };
 
-  const exportToPDF = () => {
-    setIsPrinting(true);
-    setTimeout(() => {
-      const mainTable = tableRef.current;
-      const totalsTableContainer = document.createElement('div');
-      totalsTableContainer.innerHTML = `
-        <div style="padding: 20px; font-family: sans-serif; text-align: center;">
-          <h4 style="margin-bottom: 15px;">Total Quantity by Unit</h4>
-          <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
-            <thead style="background-color: #f2f2f2;">
-              <tr>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Object.entries(totals.quantityByUnit)
-                .map(([unit, total]) => `
-                  <tr>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${unit}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 8px;">${total.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-      document.body.appendChild(totalsTableContainer);
+  const getExpiryExportValues = (row) => {
+    const entries = getRowExpiryRows(row);
+    const expiredEntries = entries.filter((entry) => isExpiryPast(expiryDateOf(entry)));
+    const expiredPackets = expiredEntries.reduce((sum, entry) => {
+      const quantity = Number(expiryPacketsOf(entry));
+      return sum + (Number.isFinite(quantity) ? quantity : 0);
+    }, 0);
+    const breakdown = entries.map((entry) => {
+      const date = formatDate(expiryDateOf(entry)) || "Date not available";
+      const packets = expiryPacketsOf(entry);
+      const status = isExpiryPast(expiryDateOf(entry)) ? "EXPIRED" : "Not expired";
+      const remarks = expiryRemarksOf(entry);
+      return `${date}: ${packets === "" ? "Packet count not available" : packets} packet(s) [${status}]${remarks ? ` — ${remarks}` : ""}`;
+    });
+    return {
+      expiredPackets,
+      breakdown: breakdown.join("; "),
+    };
+  };
 
-      if (!mainTable) {
-        console.error("Table element not found for PDF export.");
-        setIsPrinting(false);
-        return;
-      }
-
-      Promise.all([
-        html2canvas(mainTable, { scale: 2, useCORS: true }),
-        html2canvas(totalsTableContainer, { scale: 2, useCORS: true })
-      ]).then(([mainCanvas, totalsCanvas]) => {
-        const mainImgData = mainCanvas.toDataURL('image/png');
-        const totalsImgData = totalsCanvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a2' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        pdf.text("THR Receiving Report", 20, 30);
-        let yPos = 40;
-        const mainRatio = mainCanvas.width / mainCanvas.height;
-        const mainWidth = pdfWidth - 40;
-        const mainHeight = mainWidth / mainRatio;
-        pdf.addImage(mainImgData, 'PNG', 20, yPos, mainWidth, mainHeight);
-        yPos += mainHeight + 20;
-        const totalsRatio = totalsCanvas.width / totalsCanvas.height;
-        const totalsWidth = pdfWidth / 2;
-        const totalsHeight = totalsWidth / totalsRatio;
-        if (yPos + totalsHeight < pdfHeight - 40) {
-          pdf.addImage(totalsImgData, 'PNG', 20, yPos, totalsWidth, totalsHeight);
-        }
-        pdf.save('thr_receiving_report.pdf');
-        document.body.removeChild(totalsTableContainer);
-        setIsPrinting(false);
+  const fetchLatestExportReports = async () => {
+    try {
+      const response = await api.get("/cdpo/thr-receiving-summary/?page=1");
+      const results = response?.data?.results;
+      const latest = results?.success && Array.isArray(results.data) ? results.data : reports;
+      const byKey = new Map(latest.map((item) => [
+        String(item?.id ?? `${item?.awc_code ?? ""}|${item?.sector ?? ""}|${item?.food_item ?? ""}|${item?.bene_category ?? ""}|${item?.date ?? ""}`), item
+      ]));
+      return filteredReports.map((row) => {
+        const key = String(row?.id ?? `${row?.awc_code ?? ""}|${row?.sector ?? ""}|${row?.food_item ?? ""}|${row?.bene_category ?? ""}|${row?.date ?? ""}`);
+        const latestRow = byKey.get(key);
+        return latestRow ? { ...row, ...latestRow } : row;
       });
-    }, 100);
+    } catch (err) {
+      console.error("Could not refresh report data before export; using currently loaded rows.", err);
+      return filteredReports;
+    }
+  };
+
+  const exportToExcel = async () => {
+    const exportReports = await fetchLatestExportReports();
+    const exportColumns = columns.filter(
+      (col) => col.visible && col.dataField !== "#" && col.dataField !== "actions"
+    );
+
+    const data = exportReports.map((row, index) => {
+      const expiry = getExpiryExportValues(row);
+      const record = { "#": index + 1 };
+      exportColumns.forEach((col) => {
+        const value = row[col.dataField];
+        if (col.dataField === "months") {
+          record[col.text] = formatMonths(row.months || row.quarter) || "";
+        } else if (col.dataField === "quarter") {
+          record[col.text] = row.quarter || "";
+        } else if (col.dataField === "sector_status") {
+          record[col.text] = row.sector_status || "pending";
+        } else if (col.dataField === "max_expirydate" || col.dataField === "date") {
+          record[col.text] = value ? formatDate(value) : "";
+        } else if (col.dataField === "expired_packets") {
+          record[col.text] = expiry.expiredPackets;
+        } else if (col.dataField === "expiry_breakdown") {
+          record[col.text] = expiry.breakdown || "No expiry details loaded";
+        } else {
+          record[col.text] = value ?? "";
+        }
+      });
+      return record;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const headers = Object.keys(data[0] || { "#": "" });
+    worksheet["!cols"] = headers.map((key) => ({
+      wch: Math.min(48, Math.max(key.length + 2, ...data.map((row) => String(row[key] ?? "").length + 2))),
+    }));
+    if (worksheet["!ref"]) worksheet["!autofilter"] = { ref: worksheet["!ref"] };
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "THR Receiving");
+
+    const totalsRows = Object.entries(totals.quantityByUnit).map(([unit, quantity]) => ({
+      Unit: unit,
+      "Total Quantity": Number(quantity.toFixed(2)),
+    }));
+    if (totalsRows.length) {
+      const totalsSheet = XLSX.utils.json_to_sheet(totalsRows);
+      totalsSheet["!cols"] = [{ wch: 24 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(workbook, totalsSheet, "Quantity Totals");
+    }
+
+    XLSX.writeFile(workbook, "thr_receiving_report.xlsx", { bookType: "xlsx", compression: true });
+  };
+
+  const exportToPDF = async () => {
+    setIsPrinting(true);
+    setError("");
+    let exportRoot;
+    try {
+      const exportReports = await fetchLatestExportReports();
+      const exportColumns = columns.filter(
+        (col) => col.visible && col.dataField !== "actions"
+      );
+      const headers = exportColumns.map((col) => col.text);
+      const body = exportReports.map((row, index) => {
+        const expiry = getExpiryExportValues(row);
+        return exportColumns.map((col) => {
+          if (col.dataField === "#") return String(index + 1);
+          if (col.dataField === "months") return String(formatMonths(row.months || row.quarter) || "");
+          if (col.dataField === "quarter") return String(row.quarter || "-");
+          if (col.dataField === "sector_status") return String(row.sector_status || "pending");
+          if (col.dataField === "max_expirydate" || col.dataField === "date") return formatDate(row[col.dataField]) || "-";
+          if (col.dataField === "expired_packets") return String(expiry.expiredPackets);
+          if (col.dataField === "expiry_breakdown") return expiry.breakdown || "No expiry details loaded";
+          const value = row[col.dataField];
+          return value === null || value === undefined || value === "" ? "-" : String(value);
+        });
+      });
+
+      // Render HTML in the browser first: browser fonts support Devanagari/Hindi,
+      // unlike jsPDF's built-in Helvetica font which corrupts Hindi glyphs.
+      exportRoot = document.createElement("div");
+      exportRoot.style.cssText = "position:fixed;left:-10000px;top:0;width:1800px;background:#fff;color:#111;padding:24px;font-family:Arial,'Noto Sans Devanagari',Mangal,sans-serif;z-index:-1;";
+      const title = document.createElement("h2");
+      title.textContent = "THR प्राप्ति रिपोर्ट / THR Receiving Report";
+      title.style.cssText = "font-size:22px;margin:0 0 16px;text-align:center;font-weight:700;";
+      exportRoot.appendChild(title);
+      const htmlTable = document.createElement("table");
+      htmlTable.style.cssText = "width:100%;border-collapse:collapse;table-layout:auto;font-size:12px;word-break:break-word;";
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      headers.forEach((header) => {
+        const th = document.createElement("th");
+        th.textContent = header;
+        th.style.cssText = "border:1px solid #777;background:#eaf1f8;padding:7px;text-align:left;vertical-align:top;";
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      htmlTable.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      body.forEach((row) => {
+        const tr = document.createElement("tr");
+        row.forEach((value) => {
+          const td = document.createElement("td");
+          td.textContent = value == null || value === "" ? "-" : String(value);
+          td.style.cssText = "border:1px solid #aaa;padding:6px;vertical-align:top;white-space:normal;";
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      htmlTable.appendChild(tbody);
+      exportRoot.appendChild(htmlTable);
+      const totalTitle = document.createElement("h3");
+      totalTitle.textContent = "कुल मात्रा / Total Quantity by Unit";
+      totalTitle.style.cssText = "font-size:17px;margin:24px 0 8px;";
+      exportRoot.appendChild(totalTitle);
+      const totalTable = document.createElement("table");
+      totalTable.style.cssText = "border-collapse:collapse;font-size:12px;";
+      [["Unit", "Total Quantity"], ...Object.entries(totals.quantityByUnit).map(([unit, qty]) => [unit, Number(qty).toFixed(2)])].forEach((values) => {
+        const tr = document.createElement("tr");
+        values.forEach((value) => {
+          const td = document.createElement("td");
+          td.textContent = String(value);
+          td.style.cssText = "border:1px solid #aaa;padding:7px 12px;";
+          tr.appendChild(td);
+        });
+        totalTable.appendChild(tr);
+      });
+      exportRoot.appendChild(totalTable);
+      document.body.appendChild(exportRoot);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const canvas = await html2canvas(exportRoot, { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false });
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3", compress: true });
+      const margin = 20;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imageWidth = pageWidth - margin * 2;
+      const imageHeight = (canvas.height * imageWidth) / canvas.width;
+      const pageImageHeight = pageHeight - margin * 2;
+      let offsetY = 0;
+      let page = 0;
+      while (offsetY < imageHeight) {
+        if (page > 0) pdf.addPage();
+        const sliceHeightPt = Math.min(pageImageHeight, imageHeight - offsetY);
+        const sourceY = Math.floor((offsetY / imageHeight) * canvas.height);
+        const sourceHeight = Math.max(1, Math.min(canvas.height - sourceY, Math.ceil((sliceHeightPt / imageHeight) * canvas.height)));
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sourceHeight;
+        const ctx = pageCanvas.getContext("2d");
+        if (!ctx) throw new Error("Unable to render PDF page.");
+        ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceHeight, 0, 0, canvas.width, sourceHeight);
+        pdf.addImage(pageCanvas.toDataURL("image/jpeg", 0.94), "JPEG", margin, margin, imageWidth, (sourceHeight * imageWidth) / canvas.width);
+        offsetY += sliceHeightPt;
+        page += 1;
+      }
+      pdf.save("thr_receiving_report.pdf");
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      setError("Unable to export the report to PDF. Please try again.");
+    } finally {
+      if (exportRoot?.parentNode) exportRoot.parentNode.removeChild(exportRoot);
+      setIsPrinting(false);
+    }
   };
 
   const renderPagination = () => {
@@ -333,7 +522,7 @@ const [columns, setColumns] = useState([
                       </tr>
                     </thead>
                     <tbody>
-                      {summaryData.project_summary.map((row, i) => (
+                      {(summaryData.project_summary || []).map((row, i) => (
                         <tr key={i}>
                           <td>{summaryData.project}</td>
                           <td>{row.food_item}</td>
@@ -359,7 +548,7 @@ const [columns, setColumns] = useState([
                       </tr>
                     </thead>
                     <tbody>
-                      {summaryData.sector_summary.map((row, i) => (
+                      {(summaryData.sector_summary || []).map((row, i) => (
                         <tr key={i}>
                           <td>{row.sector}</td>
                           <td>{row.food_item}</td>
@@ -424,7 +613,7 @@ const [columns, setColumns] = useState([
                           </thead>
                           <tbody>
                             {currentItems.map((row, index) => (
-                              <tr key={row.id}>
+                              <tr key={row.id ?? `${row.awc_code ?? "row"}-${row.food_item ?? index}`}>
 {visibleColumns.map((col) => (
                                     <td key={col.dataField}>
                                       {col.dataField === "#"
@@ -436,10 +625,14 @@ const [columns, setColumns] = useState([
                                         : col.dataField === 'sector_status'
                                         ? <Badge bg={getStatusVariant(row.sector_status)}>{row.sector_status || 'pending'}</Badge>
                                         : col.dataField === 'max_expirydate'
-                                        ? (row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString() : '-')
+                                        ? (row.max_expirydate ? formatDate(row.max_expirydate) : '-')
+                                        : col.dataField === "expired_packets"
+                                        ? getExpiryExportValues(row).expiredPackets
+                                        : col.dataField === "expiry_breakdown"
+                                        ? (getExpiryExportValues(row).breakdown || "Click Expiry Details to load")
                                         : col.dataField === 'actions'
-                                        ? <PacketExpiryDetails record={row} />
-                                        : row[col.dataField]}
+                                        ? <PacketExpiryDetails record={row} onDetailsLoaded={(payload) => handleExpiryDetailsLoaded(row, payload)} />
+                                        : row[col.dataField] ?? "-"}
                                     </td>
                                   ))}
                               </tr>
