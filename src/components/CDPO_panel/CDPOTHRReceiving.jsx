@@ -7,6 +7,7 @@ import {
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
+import PacketExpiryDetails from "../PacketExpiryDetails";
 import { useAuth } from "../all_login/AuthContext";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
@@ -89,6 +90,7 @@ const [columns, setColumns] = useState([
     { dataField: "curr_month", text: "Current Month", visible: true },
     { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
     { dataField: "date", text: "Date", visible: true },
+    { dataField: "actions", text: "Actions", visible: true },
   ]);
 
   useEffect(() => {
@@ -435,6 +437,8 @@ const [columns, setColumns] = useState([
                                         ? <Badge bg={getStatusVariant(row.sector_status)}>{row.sector_status || 'pending'}</Badge>
                                         : col.dataField === 'max_expirydate'
                                         ? (row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString() : '-')
+                                        : col.dataField === 'actions'
+                                        ? <PacketExpiryDetails record={row} />
                                         : row[col.dataField]}
                                     </td>
                                   ))}

@@ -24,6 +24,7 @@ import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 import DPOLeftNav from "./DPOLeftNav";
 import DPOHeader from "./DPOHeader";
+import PacketExpiryDetails from "../PacketExpiryDetails";
 
 const monthLabels = {
   apr: 'April',
@@ -220,7 +221,8 @@ const DPOTHRReceiving = () => {
     { dataField: "quarter", text: "Trimester", visible: true },
     { dataField: "curr_month", text: "Current Month", visible: true },
     { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
-    { dataField: "sector_status", text: "Sector Status", visible: true }
+    { dataField: "sector_status", text: "Sector Status", visible: true },
+    { dataField: "actions", text: "Actions", visible: true }
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQtyModal, setShowQtyModal] = useState(false);
@@ -804,6 +806,8 @@ const DPOTHRReceiving = () => {
                                       ? (getCurrentMonth(report) || '-')
                                       : col.dataField === "max_expirydate"
                                       ? formatDateValue(getMaxExpiryDate(report))
+                                      : col.dataField === "actions"
+                                      ? <PacketExpiryDetails record={report} />
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
                                       ? new Date(report[col.dataField]).toLocaleString()
                                       : (report[col.dataField] ?? '-') }

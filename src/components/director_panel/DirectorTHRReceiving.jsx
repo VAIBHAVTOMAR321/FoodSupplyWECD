@@ -25,6 +25,7 @@ import * as XLSX from "xlsx";
 
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
+import PacketExpiryDetails from "../PacketExpiryDetails";
 
 const monthLabels = {
   apr: 'April',
@@ -242,6 +243,7 @@ const DirectorTHRReceiving = () => {
     { dataField: "curr_month", text: "Current Month", visible: true },
     { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
     { dataField: "sector_status", text: "Sector Status", visible: true },
+    { dataField: "actions", text: "Actions", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
@@ -882,6 +884,8 @@ const DirectorTHRReceiving = () => {
                                       ? (getCurrentMonth(report) || "-")
                                       : col.dataField === "max_expirydate"
                                       ? formatDateValue(getMaxExpiryDate(report))
+                                      : col.dataField === "actions"
+                                      ? <PacketExpiryDetails record={report} />
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
                                       ? (report[col.dataField] ? new Date(report[col.dataField]).toLocaleString() : "-")
                                       : (getReportField(report, col.dataField) || "-")}
