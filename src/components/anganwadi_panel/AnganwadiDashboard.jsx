@@ -52,10 +52,96 @@ import {
   FaFilePdf,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import html2pdf from "html2pdf.js";
 
 import "../../assets/css/AnganwadiDashboard.css";
+
+let hindiPdfFontPromise;
+
+const loadHindiPdfFont = async () => {
+  if (!hindiPdfFontPromise) {
+    hindiPdfFontPromise = new Promise((resolve) => {
+      const fontLink = document.createElement("link");
+      fontLink.rel = "stylesheet";
+      fontLink.href =
+        "https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap";
+      fontLink.onload = () => resolve(true);
+      fontLink.onerror = () => {
+        console.warn("Noto Sans Devanagari could not be loaded; using the system Hindi font.");
+        resolve(false);
+      };
+      document.head.appendChild(fontLink);
+    });
+  }
+
+  if (await hindiPdfFontPromise) {
+    try {
+      await document.fonts.load('400 12px "Noto Sans Devanagari"', "हिंदी");
+    } catch (error) {
+      console.warn("Noto Sans Devanagari could not be prepared; using the system Hindi font.", error);
+    }
+  }
+};
+
+const downloadTablePdf = async ({ title, filename, headers, rows, fontSize = 8 }) => {
+  const content = document.createElement("div");
+  content.style.cssText =
+    "box-sizing:border-box;width:100%;padding:12px;background:#fff;color:#1e293b;font-family:'Noto Sans Devanagari','Noto Sans','Nirmala UI','Mangal',sans-serif;";
+
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  heading.style.cssText =
+    "margin:0 0 14px;text-align:center;color:#1e3a5f;font-size:16px;font-weight:700;";
+  content.appendChild(heading);
+
+  const table = document.createElement("table");
+  table.style.cssText = `width:100%;border-collapse:collapse;table-layout:fixed;font-size:${fontSize}px;line-height:1.35;`;
+  const head = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  headers.forEach((value) => {
+    const cell = document.createElement("th");
+    cell.textContent = String(value ?? "");
+    cell.style.cssText =
+      "border:1px solid #4338ca;background:#4f46e5;color:#fff;padding:6px 4px;text-align:center;vertical-align:middle;font-weight:700;overflow-wrap:anywhere;";
+    headerRow.appendChild(cell);
+  });
+  head.appendChild(headerRow);
+  table.appendChild(head);
+
+  const body = document.createElement("tbody");
+  rows.forEach((values, rowIndex) => {
+    const row = document.createElement("tr");
+    values.forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = String(value ?? "");
+      cell.style.cssText =
+        `border:1px solid #cbd5e1;padding:4px;text-align:left;vertical-align:middle;overflow-wrap:anywhere;${rowIndex % 2 ? "background:#f5f8fb;" : ""}`;
+      row.appendChild(cell);
+    });
+    row.style.pageBreakInside = "avoid";
+    body.appendChild(row);
+  });
+  table.appendChild(body);
+  content.appendChild(table);
+  document.body.appendChild(content);
+
+  try {
+    await loadHindiPdfFont();
+    await html2pdf()
+      .set({
+        margin: [10, 10, 10, 10],
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false },
+        jsPDF: { unit: "mm", format: "a3", orientation: "landscape", compress: true },
+        pagebreak: { mode: ["css", "legacy"], avoid: ["tr"] },
+      })
+      .from(content)
+      .save();
+  } finally {
+    content.remove();
+  }
+};
 
 const API_URLS = {
   categoryandfooditem: "/categoryandfooditem/",
@@ -709,7 +795,7 @@ const AnganwadiDashboard = () => {
     }
   };
 
-  const exportSuppliesToPDF = () => {
+  const exportSuppliesToPDF = async () => {
     setSuppliesExportError("");
     try {
       const headers = [
@@ -754,22 +840,13 @@ const AnganwadiDashboard = () => {
         ]);
       }
 
-      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3" });
-      pdf.setFontSize(16);
-      pdf.text(`Supplies ${suppliesTab.toUpperCase()} Received & Distributed Summary`, 32, 28);
-      autoTable(pdf, {
-        head: [headers],
-        body: rows.map((row) => row.map((value) => String(value ?? ""))),
-        startY: 42,
-        margin: { left: 28, right: 28, bottom: 30 },
-        theme: "grid",
-        styles: { fontSize: 7, cellPadding: 3, overflow: "linebreak" },
-        headStyles: { fillColor: [7, 63, 115], textColor: 255, fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [245, 248, 251] },
-        horizontalPageBreak: true,
-        horizontalPageBreakRepeat: [0, 1, 2, 3],
+      await downloadTablePdf({
+        title: `Supplies ${suppliesTab.toUpperCase()} Received & Distributed Summary`,
+        filename: `Supplies_${suppliesTab.toUpperCase()}_AWC_Summary.pdf`,
+        headers,
+        rows,
+        fontSize: 7,
       });
-      pdf.save(`Supplies_${suppliesTab.toUpperCase()}_AWC_Summary.pdf`);
     } catch (exportError) {
       console.error("Failed to export supplies summary to PDF:", exportError);
       setSuppliesExportError("PDF export failed. Please try again.");
@@ -814,7 +891,7 @@ const AnganwadiDashboard = () => {
     }
   };
 
-  const exportDistributionsToPDF = () => {
+  const exportDistributionsToPDF = async () => {
     setDistributionExportError("");
     try {
       const rows = getDistributionExportRows();
@@ -830,20 +907,12 @@ const AnganwadiDashboard = () => {
         Unit: "",
         Remark: "",
       });
-      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3" });
-      pdf.setFontSize(16);
-      pdf.text(`${activeScheme.toUpperCase()} Distribution Records`, 32, 28);
-      autoTable(pdf, {
-        head: [headers],
-        body: rows.map((row) => headers.map((header) => String(row[header] ?? ""))),
-        startY: 42,
-        margin: { left: 28, right: 28, bottom: 30 },
-        theme: "grid",
-        styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" },
-        headStyles: { fillColor: [7, 63, 115], textColor: 255, fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [245, 248, 251] },
+      await downloadTablePdf({
+        title: `${activeScheme.toUpperCase()} Distribution Records`,
+        filename: `${activeScheme}-anganwadi-distributions.pdf`,
+        headers,
+        rows: rows.map((row) => headers.map((header) => row[header])),
       });
-      pdf.save(`${activeScheme}-anganwadi-distributions.pdf`);
     } catch (exportError) {
       console.error("Failed to export distribution records to PDF:", exportError);
       setDistributionExportError("PDF export failed. Please try again.");
