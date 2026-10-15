@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Container, Card, Spinner, Table, Button, Alert, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
+import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/dpo.css";
 import DPOHeader from "./DPOHeader";
@@ -8,6 +8,109 @@ import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
+
+// Match the date and trimester presentation used by HcmSupervisorDistributions.
+const getDistributionDateRaw = (row) => firstValue(row, [
+  "date", "distribution_date", "distributionDate", "distributed_date", "distributedDate",
+  "date_of_distribution", "dateOfDistribution", "allotment_date", "allotmentDate",
+  "created_at", "createdAt", "timestamp"
+]);
+
+const formatDistributionDate = (value) => {
+  if (!value) return "-";
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+};
+
+const firstValue = (row, keys) => {
+  for (const key of keys) {
+    const value = row?.[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
+};
+
+const getMonthsRaw = (row) => firstValue(row, [
+  "months", "month", "allotted_months", "allottedMonths", "distribution_months",
+  "distributionMonths", "month_name", "monthName", "months_allotted", "monthsAllotted",
+  "allocation_months", "allocationMonths"
+]);
+
+const getTrimesterRaw = (row) => firstValue(row, [
+  "trimester", "trimester_name", "trimesterName", "quarter", "quarter_name", "quarterName",
+  "quarter_months", "quarterMonths", "distribution_quarter", "distributionQuarter",
+  "months", "month", "allocation_trimester", "allocationTrimester"
+]);
+
+const normalizeMonthToken = (value) => String(value ?? "")
+  .trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, "-");
+
+const formatMonths = (row) => {
+  const raw = getMonthsRaw(row);
+  if (raw === "") {
+    const trimester = getTrimesterRaw(row);
+    return formatMonthsValue(trimester);
+  }
+  return formatMonthsValue(raw);
+};
+
+const formatMonthsValue = (value) => {
+  const names = {
+    apr: "April", april: "April", may: "May", jun: "June", june: "June",
+    jul: "July", july: "July", aug: "August", august: "August",
+    sep: "September", sept: "September", september: "September",
+    oct: "October", october: "October", nov: "November", november: "November",
+    dec: "December", december: "December", jan: "January", january: "January",
+    feb: "February", february: "February", mar: "March", march: "March"
+  };
+  const quarterMap = {
+    "apr-may-jun": ["April", "May", "June"], "april-may-june": ["April", "May", "June"],
+    "jul-aug-sep": ["July", "August", "September"], "july-august-september": ["July", "August", "September"],
+    "oct-nov-dec": ["October", "November", "December"], "october-november-december": ["October", "November", "December"],
+    "jan-feb-mar": ["January", "February", "March"], "january-february-march": ["January", "February", "March"]
+  };
+  if (Array.isArray(value)) return value.map(v => names[normalizeMonthToken(v)] || v).join(", ");
+  const token = normalizeMonthToken(value).replace(/_/g, "-");
+  if (quarterMap[token]) return quarterMap[token].join(", ");
+  const parts = token.split(/[,-/]+/).filter(Boolean);
+  if (parts.length > 1) return parts.map(v => names[v] || v).join(", ");
+  return names[token] || (value || "-");
+};
+
+const normalizeTrimesterKey = (row) => {
+  const raw = getTrimesterRaw(row);
+  const token = (Array.isArray(raw) ? raw.join("-") : String(raw))
+    .trim().toLowerCase().replace(/\s+/g, "").replace(/_/g, "-");
+  const aliases = {
+    "april-may-june": "apr-may-jun", "july-august-september": "jul-aug-sep",
+    "october-november-december": "oct-nov-dec", "january-february-march": "jan-feb-mar",
+    "apr-may-jun": "apr-may-jun", "jul-aug-sep": "jul-aug-sep",
+    "oct-nov-dec": "oct-nov-dec", "jan-feb-mar": "jan-feb-mar"
+  };
+  if (aliases[token]) return aliases[token];
+  const months = token.split(/[,-/]+/).filter(Boolean).map((m) => ({
+    april: "apr", june: "jun", july: "jul", august: "aug", september: "sep",
+    october: "oct", november: "nov", december: "dec", january: "jan",
+    february: "feb", march: "mar"
+  })[m] || m);
+  const groups = {
+    "apr-may-jun": ["apr", "may", "jun"], "jul-aug-sep": ["jul", "aug", "sep"],
+    "oct-nov-dec": ["oct", "nov", "dec"], "jan-feb-mar": ["jan", "feb", "mar"]
+  };
+  for (const [key, group] of Object.entries(groups)) {
+    if (group.every((month) => months.includes(month))) return key;
+  }
+  return token || "-";
+};
+
+const formatTrimester = (row) => ({
+  "apr-may-jun": "Apr-May-Jun", "jul-aug-sep": "Jul-Aug-Sep",
+  "oct-nov-dec": "Oct-Nov-Dec", "jan-feb-mar": "Jan-Feb-Mar"
+})[normalizeTrimesterKey(row)] || normalizeTrimesterKey(row);
 
 const HcmDpoDistributions = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -25,19 +128,26 @@ const HcmDpoDistributions = () => {
   const tableRef = useRef(null);
 
   const [columns, setColumns] = useState([
-    { dataField: '#', text: '#', visible: true },
-    { dataField: 'awc_name', text: 'AWC Name', visible: true },
-    { dataField: 'awc_code', text: 'AWC Code', visible: true },
-    { dataField: 'awc_type', text: 'AWC Type', visible: true },
-    { dataField: 'sector', text: 'Sector', visible: true },
-    { dataField: 'project', text: 'Project', visible: true },
-    { dataField: 'district', text: 'District', visible: true },
-    { dataField: 'food_item', text: 'Food Item', visible: true },
-    { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
-    { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
-    { dataField: 'date', text: 'Date', visible: true },
-    { dataField: 'quantity', text: 'Qty', visible: true },
-    { dataField: 'unit', text: 'Unit', visible: true },
+    { dataField: "#", text: "#", visible: true },
+    { dataField: "awc_name", text: "AWC Name", visible: true },
+    { dataField: "awc_code", text: "AWC Code", visible: true },
+    { dataField: "awc_type", text: "AWC Type", visible: false },
+    { dataField: "sector", text: "Sector", visible: true },
+    { dataField: "project", text: "Project", visible: true },
+    { dataField: "district", text: "District", visible: true },
+    { dataField: "food_item", text: "Food Item", visible: true },
+    { dataField: "days_allotted", text: "Days Allotted", visible: true },
+    { dataField: "bene_category", text: "Beneficiary Category", visible: true },
+    { dataField: "date", text: "Date", visible: true },
+    { dataField: "fin_year", text: "Fin Year", visible: true },
+    { dataField: "months", text: "Months", visible: true },
+    { dataField: "trimester", text: "Trimester", visible: true },
+    { dataField: "total_beneficiaries", text: "Beneficiaries", visible: true },
+    { dataField: "quantity", text: "Qty", visible: true },
+    { dataField: "unit", text: "Unit", visible: true },
+    { dataField: "anganwadi_remark", text: "Anganwadi Remark", visible: true },
+    { dataField: "sector_status", text: "Sector Status", visible: true },
+    { dataField: "sector_remark", text: "Sector Remark", visible: false },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
@@ -48,6 +158,7 @@ const HcmDpoDistributions = () => {
     food_item: [],
     bene_category: [],
     awc_type: [],
+    sector_status: [],
     startDate: '',
     endDate: '',
   });
@@ -56,6 +167,7 @@ const HcmDpoDistributions = () => {
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueAwcTypes, setUniqueAwcTypes] = useState([]);
+  const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
   const [beneficiaryCategories, setBeneficiaryCategories] = useState([]);
 
   useEffect(() => {
@@ -76,7 +188,8 @@ const HcmDpoDistributions = () => {
       setUniqueProjects([...new Set(distributions.map(item => item.project))]);
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
-      setUniqueAwcTypes([...new Set(distributions.map(item => item.awc_type))]);
+      setUniqueAwcTypes([...new Set(distributions.map(item => item.awc_type).filter(Boolean))]);
+      setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status).filter(Boolean))]);
     }
   }, [distributions]);
 
@@ -93,13 +206,14 @@ const HcmDpoDistributions = () => {
 
   const filteredData = useMemo(() => {
     return distributions.filter(item => {
-      const { district, project, sector, food_item, awc_type, bene_category, startDate, endDate } = filters;
+      const { district, project, sector, food_item, awc_type, bene_category, sector_status, startDate, endDate } = filters;
       const matchesFilters = (district.length === 0 || district.includes(item.district)) &&
              (project.length === 0 || project.includes(item.project)) &&
              (sector.length === 0 || sector.includes(item.sector)) &&
              (food_item.length === 0 || food_item.includes(item.food_item)) &&
              (bene_category.length === 0 || bene_category.includes(item.bene_category)) &&
-             (awc_type.length === 0 || awc_type.includes(item.awc_type));
+             (awc_type.length === 0 || awc_type.includes(item.awc_type)) &&
+             (sector_status.length === 0 || sector_status.includes(item.sector_status));
 
       const itemDate = item.date ? new Date(item.date) : null;
       const matchesDateRange = (!startDate || (itemDate && itemDate >= new Date(startDate))) &&
@@ -118,12 +232,12 @@ const HcmDpoDistributions = () => {
     setError("");
     try {
       const response = await api.get("/hcm-dpo-distributions/");
-      const raw = response.data?.data || response.data || [];
-      const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
-      setDistributions(items);
+      const raw = response.data?.data ?? response.data?.results ?? response.data ?? [];
+      setDistributions(Array.isArray(raw) ? raw : raw ? [raw] : []);
     } catch (err) {
-      setError("Failed to fetch HCM distributions.");
-      console.error(err);
+      setDistributions([]);
+      setError("Failed to fetch HCM DPO distributions.");
+      console.error("Failed to fetch HCM DPO distributions:", err);
     } finally {
       setLoading(false);
     }
@@ -132,7 +246,7 @@ const HcmDpoDistributions = () => {
   const fetchBeneficiaryCategories = async () => {
     try {
       const response = await api.get("/beneficiary-categories/");
-      const data = response.data?.results || response.data || [];
+      const data = response.data?.results || response.data?.data || response.data || [];
       setBeneficiaryCategories(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch beneficiary categories:", err);
@@ -313,10 +427,14 @@ const HcmDpoDistributions = () => {
       const newRow = { '#': index + 1 };
       visCols.forEach(col => {
         if (col.dataField !== '#') {
-          if (col.dataField === 'date' && row[col.dataField]) {
-            newRow[col.text] = new Date(row[col.dataField]).toLocaleDateString('en-GB');
+          if (col.dataField === "date") {
+            newRow[col.text] = formatDistributionDate(getDistributionDateRaw(row));
+          } else if (col.dataField === "months") {
+            newRow[col.text] = formatMonths(row);
+          } else if (col.dataField === "trimester") {
+            newRow[col.text] = formatTrimester(row);
           } else {
-            newRow[col.text] = row[col.dataField];
+            newRow[col.text] = row[col.dataField] ?? "";
           }
         }
       });
@@ -492,6 +610,28 @@ const HcmDpoDistributions = () => {
           </Row>
 
           <Row className="mb-3">
+            <Col md={3}>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status" className="w-100">
+                  {filters.sector_status.length ? `${filters.sector_status.length} statuses selected` : "All Sector Statuses"}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
+                  {uniqueSectorStatuses.map((status) => (
+                    <Dropdown.Item key={status} as="div">
+                      <Form.Check
+                        type="checkbox"
+                        label={status}
+                        checked={filters.sector_status.includes(status)}
+                        onChange={() => handleMultiSelectChange("sector_status", status)}
+                      />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+          </Row>
+
+          <Row className="mb-3">
             <Col md={2}>
               <Form.Label>Start Date</Form.Label>
               <Form.Control type="date" value={filters.startDate} onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))} />
@@ -501,7 +641,7 @@ const HcmDpoDistributions = () => {
               <Form.Control type="date" value={filters.endDate} onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))} />
             </Col>
             <Col md={3} className="d-flex align-items-end">
-              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ district: [], project: [], sector: [], food_item: [], awc_type: [], bene_category: [], startDate: '', endDate: '' })} className="me-2">
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ district: [], project: [], sector: [], food_item: [], awc_type: [], bene_category: [], sector_status: [], startDate: '', endDate: '' })} className="me-2">
                 Clear Filters
               </Button>
             </Col>
@@ -534,17 +674,25 @@ const HcmDpoDistributions = () => {
                   </thead>
                   <tbody>
                     {currentItems.length > 0 ? currentItems.map((row, index) => (
-                      <tr key={`row-${row.id}`}>
+                      <tr key={`row-${row.id ?? `${row.awc_code}-${row.date}-${index}`}`}>
                         {visibleColumns.map((col) => {
                           let cellContent;
-                          if (col.dataField === '#') {
-                            cellContent = index + 1;
-                          } else if (col.dataField === 'date' && row[col.dataField]) {
-                            cellContent = new Date(row[col.dataField]).toLocaleDateString('en-GB');
+                          if (col.dataField === "#") {
+                            cellContent = indexOfFirst + index + 1;
+                          } else if (col.dataField === "date") {
+                            cellContent = formatDistributionDate(getDistributionDateRaw(row));
+                          } else if (col.dataField === "months") {
+                            cellContent = formatMonths(row);
+                          } else if (col.dataField === "trimester") {
+                            cellContent = formatTrimester(row);
+                          } else if (col.dataField === "sector_status") {
+                            const status = row.sector_status || "pending";
+                            const variant = status === "approved" ? "success" : status === "rejected" ? "danger" : "warning";
+                            cellContent = <Badge bg={variant}>{status}</Badge>;
                           } else {
-                            cellContent = row[col.dataField];
+                            cellContent = row[col.dataField] ?? "";
                           }
-                          return <td key={`td-${row.id}-${col.dataField}`}>{cellContent}</td>;
+                          return <td key={`td-${row.id ?? index}-${col.dataField}`}>{cellContent}</td>;
                         })}
                       </tr>
                     )) : (
@@ -559,6 +707,8 @@ const HcmDpoDistributions = () => {
                         let cellContent = '';
                         if (col.dataField === '#') {
                           cellContent = <strong>Total</strong>;
+                        } else if (col.dataField === "total_beneficiaries") {
+                          cellContent = <strong>{totals.beneficiaries}</strong>;
                         } else if (col.dataField === 'quantity') {
                               cellContent = (
                                 <>

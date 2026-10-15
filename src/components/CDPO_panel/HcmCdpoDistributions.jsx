@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Container, Card, Spinner, Table, Button, Alert, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
+import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
@@ -8,6 +8,113 @@ import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
+
+const getTrimesterRaw = (row) => {
+  if (!row || typeof row !== "object") return "";
+  const candidates = [
+    row.trimester, row.trimester_months, row.trimesterMonths,
+    row.trimester_name, row.trimesterName, row.quarter, row.quarter_name,
+    row.quarterName, row.quarter_months, row.quarterMonths,
+    row.months, row.months_allotted, row.monthsAllotted, row.month,
+    row.distribution_quarter, row.distributionQuarter,
+    row.allocation?.trimester, row.allocation?.quarter,
+    row.food_item_details?.trimester, row.food_item_details?.quarter,
+  ];
+  return candidates.find(value => value !== undefined && value !== null && value !== "") ?? "";
+};
+
+const normalizeTrimesterKey = (row) => {
+  const raw = getTrimesterRaw(row);
+  if (raw === "") return "-";
+  const token = (Array.isArray(raw) ? raw.join("-") : String(raw))
+    .trim().toLowerCase().replace(/\s+/g, "").replace(/_/g, "-");
+  const aliases = {
+    "april-may-june": "apr-may-jun", "april-may-jun": "apr-may-jun",
+    "july-august-september": "jul-aug-sep", "july-aug-sep": "jul-aug-sep",
+    "october-november-december": "oct-nov-dec", "october-nov-dec": "oct-nov-dec",
+    "january-february-march": "jan-feb-mar", "january-feb-mar": "jan-feb-mar",
+    "apr-may-jun": "apr-may-jun", "jul-aug-sep": "jul-aug-sep",
+    "oct-nov-dec": "oct-nov-dec", "jan-feb-mar": "jan-feb-mar",
+  };
+  if (aliases[token]) return aliases[token];
+  const monthAliases = { april:"apr", may:"may", june:"jun", july:"jul", august:"aug", september:"sep", october:"oct", november:"nov", december:"dec", january:"jan", february:"feb", march:"mar" };
+  const months = token.split(/[;,\s/-]+/).filter(Boolean).map(m => monthAliases[m] || m);
+  const groups = { "apr-may-jun":["apr","may","jun"], "jul-aug-sep":["jul","aug","sep"], "oct-nov-dec":["oct","nov","dec"], "jan-feb-mar":["jan","feb","mar"] };
+  for (const [key, group] of Object.entries(groups)) if (group.every(m => months.includes(m))) return key;
+  if (["1", "2", "3", "4"].includes(token)) return ({"1":"Apr-May-Jun", "2":"Jul-Aug-Sep", "3":"Oct-Nov-Dec", "4":"Jan-Feb-Mar"})[token];
+  return token || "-";
+};
+
+const formatTrimester = (row) => {
+  const key = normalizeTrimesterKey(row);
+  return ({"apr-may-jun":"Apr-May-Jun", "jul-aug-sep":"Jul-Aug-Sep", "oct-nov-dec":"Oct-Nov-Dec", "jan-feb-mar":"Jan-Feb-Mar"})[key] || key;
+};
+
+const getMonthsRaw = (row) => {
+  if (!row || typeof row !== "object") return "";
+  const candidates = [
+    row.months, row.month, row.distribution_months, row.distributionMonths,
+    row.month_names, row.monthNames, row.months_allotted, row.monthsAllotted,
+    row.allotted_months, row.allottedMonths, row.selected_months, row.selectedMonths,
+    row.trimester_months, row.trimesterMonths, row.quarter_months, row.quarterMonths,
+    row.allocation?.months, row.food_item_details?.months,
+  ];
+  return candidates.find(value => value !== undefined && value !== null && value !== "") ?? "";
+};
+
+const formatMonths = (row) => {
+  const raw = getMonthsRaw(row);
+  const quarterMonths = {
+    "1": ["April", "May", "June"], "2": ["July", "August", "September"],
+    "3": ["October", "November", "December"], "4": ["January", "February", "March"],
+    "apr-may-jun": ["April", "May", "June"], "jul-aug-sep": ["July", "August", "September"],
+    "oct-nov-dec": ["October", "November", "December"], "jan-feb-mar": ["January", "February", "March"],
+  };
+  const names = {
+    jan:"January", january:"January", feb:"February", february:"February",
+    mar:"March", march:"March", apr:"April", april:"April", may:"May",
+    jun:"June", june:"June", jul:"July", july:"July", aug:"August", august:"August",
+    sep:"September", sept:"September", september:"September", oct:"October", october:"October",
+    nov:"November", november:"November", dec:"December", december:"December",
+  };
+  const source = raw !== "" ? raw : getTrimesterRaw(row);
+  if (source === "" || source == null) return "—";
+  if (Array.isArray(source)) {
+    const values = source.map(v => names[String(v).trim().toLowerCase()] || names[String(v).trim().toLowerCase().slice(0,3)] || String(v));
+    return values.join(", ");
+  }
+  const token = String(source).trim().toLowerCase().replace(/_/g, "-").replace(/\s+/g, "");
+  if (quarterMonths[token]) return quarterMonths[token].join(", ");
+  const split = String(source).split(/[;,|]+/).map(v => v.trim()).filter(Boolean);
+  if (split.length > 1) return split.map(v => names[v.toLowerCase()] || names[v.toLowerCase().slice(0,3)] || v).join(", ");
+  if (names[token] || names[token.slice(0,3)]) return names[token] || names[token.slice(0,3)];
+  // Also accept a quarter written as "April-May-June" or "Apr May Jun".
+  const parts = String(source).split(/[\s,/-]+/).filter(Boolean);
+  if (parts.length > 1 && parts.every(v => names[v.toLowerCase()] || names[v.toLowerCase().slice(0,3)])) {
+    return parts.map(v => names[v.toLowerCase()] || names[v.toLowerCase().slice(0,3)]).join(", ");
+  }
+  return String(source);
+};
+
+const getDistributionDateValue = (row) => {
+  if (!row || typeof row !== "object") return row;
+  const candidates = [row.date, row.distribution_date, row.distributionDate,
+    row.distributed_date, row.distributedDate, row.date_of_distribution,
+    row.dateOfDistribution, row.allotment_date, row.allotmentDate,
+    row.created_at, row.createdAt, row.date_created, row.dateCreated,
+    row.submitted_at, row.submittedAt, row.timestamp];
+  return candidates.find(value => value !== undefined && value !== null && value !== "") ?? "";
+};
+
+const formatDistributionDate = (value) => {
+  const dateValue = getDistributionDateValue(value);
+  if (!dateValue) return "—";
+  const raw = String(dateValue).trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const date = new Date(dateValue);
+  return Number.isNaN(date.getTime()) ? raw : `${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`;
+};
 
 const HcmCdpoDistributions = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -22,6 +129,8 @@ const HcmCdpoDistributions = () => {
   const [itemsPerPage] = useState(20);
   const [isPrinting, setIsPrinting] = useState(false);
   const [showQtyModal, setShowQtyModal] = useState(false);
+  const [showRemarkModal, setShowRemarkModal] = useState(false);
+  const [selectedRemarks, setSelectedRemarks] = useState(null);
   const tableRef = useRef(null);
 
   const [columns, setColumns] = useState([
@@ -36,9 +145,15 @@ const HcmCdpoDistributions = () => {
     { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'date', text: 'Date', visible: true },
+    { dataField: 'fin_year', text: 'Fin Year', visible: true },
+    { dataField: 'trimester', text: 'Trimester', visible: true },
+    { dataField: 'months', text: 'Months', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
+    { dataField: 'sector_status', text: 'Sector Status', visible: true },
+    { dataField: 'anganwadi_remark', text: 'Anganwadi Remark', visible: true },
+    { dataField: 'action', text: 'Remarks', visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
@@ -141,6 +256,23 @@ const HcmCdpoDistributions = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
+  const handleViewRemark = (item) => {
+    setSelectedRemarks(item);
+    setShowRemarkModal(true);
+  };
+
+  const handleCloseRemarkModal = () => {
+    setShowRemarkModal(false);
+    setSelectedRemarks(null);
+  };
+
+  const getStatusVariant = (status) => {
+    const normalized = String(status || "pending").toLowerCase();
+    if (normalized === "approved" || normalized === "complete" || normalized === "completed") return "success";
+    if (normalized === "rejected" || normalized === "failed") return "danger";
+    return "warning";
+  };
+
   const handleColumnToggle = (index) => {
     const newColumns = [...columns];
     newColumns[index].visible = !newColumns[index].visible;
@@ -234,8 +366,14 @@ const HcmCdpoDistributions = () => {
       const newRow = { '#': index + 1 };
       visCols.forEach(col => {
         if (col.dataField !== '#') {
-          if (col.dataField === 'date' && row[col.dataField]) {
-            newRow[col.text] = new Date(row[col.dataField]).toLocaleDateString('en-GB');
+          if (col.dataField === 'date') {
+            newRow[col.text] = formatDistributionDate(row);
+          } else if (col.dataField === 'trimester') {
+            newRow[col.text] = formatTrimester(row);
+          } else if (col.dataField === 'months') {
+            newRow[col.text] = formatMonths(row);
+          } else if (col.dataField === 'fin_year') {
+            newRow[col.text] = row.fin_year ?? row.financial_year ?? row.financialYear ?? '';
           } else {
             newRow[col.text] = row[col.dataField];
           }
@@ -462,10 +600,28 @@ const HcmCdpoDistributions = () => {
                               let cellContent;
                               if (col.dataField === '#') {
                                 cellContent = index + 1;
-                              } else if (col.dataField === 'date' && row[col.dataField]) {
-                                cellContent = new Date(row[col.dataField]).toLocaleDateString('en-GB');
+                              } else if (col.dataField === 'date') {
+                                cellContent = formatDistributionDate(row);
+                              } else if (col.dataField === 'trimester') {
+                                cellContent = formatTrimester(row);
+                              } else if (col.dataField === 'months') {
+                                cellContent = formatMonths(row);
+                              } else if (col.dataField === 'fin_year') {
+                                cellContent = row.fin_year ?? row.financial_year ?? row.financialYear ?? '—';
+                              } else if (col.dataField === 'sector_status') {
+                                cellContent = isPrinting
+                                  ? (row.sector_status || 'pending')
+                                  : <Badge bg={getStatusVariant(row.sector_status)}>{row.sector_status || 'pending'}</Badge>;
+                              } else if (col.dataField === 'anganwadi_remark') {
+                                cellContent = row.anganwadi_remark || '—';
+                              } else if (col.dataField === 'action') {
+                                cellContent = (
+                                  <Button variant="outline-primary" size="sm" onClick={() => handleViewRemark(row)}>
+                                    View Remark
+                                  </Button>
+                                );
                               } else {
-                                cellContent = row[col.dataField];
+                                cellContent = row[col.dataField] ?? '';
                               }
                               return <td key={`td-${row.id}-${col.dataField}`}>{cellContent}</td>;
                             })}
@@ -527,6 +683,35 @@ const HcmCdpoDistributions = () => {
             <Button variant="secondary" onClick={() => setShowColumnModal(false)}>
               Close
             </Button>
+          </Modal.Footer>
+        </Modal>
+
+        <Modal show={showRemarkModal} onHide={handleCloseRemarkModal} centered size="lg">
+          <Modal.Header closeButton>
+            <Modal.Title>Distribution Remarks - {selectedRemarks?.awc_name || "AWC"}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {selectedRemarks && (
+              <div>
+                <div className="mb-3">
+                  <h6>Sector Remark</h6>
+                  <p className="mb-1">
+                    <strong>Status:</strong>{" "}
+                    <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>
+                      {selectedRemarks.sector_status || "pending"}
+                    </Badge>
+                  </p>
+                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.sector_remark || "No remark"}</p>
+                </div>
+                <div>
+                  <h6>Anganwadi Remark</h6>
+                  <p className="mb-0">{selectedRemarks.anganwadi_remark || "No remark"}</p>
+                </div>
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseRemarkModal}>Close</Button>
           </Modal.Footer>
         </Modal>
 
