@@ -401,6 +401,32 @@ const FoodSupplementary = () => {
     return [...new Set(suppliesRecords.map((record) => record.food_item).filter(Boolean))];
   }, [suppliesRecords]);
 
+  // Display HCM quantities as grams/kilograms and THR quantities as packets.
+  // HCM reconciliation API quantities are assumed to be stored in kilograms.
+  const formatSupplyQuantity = (rawValue) => {
+    const value = Number(rawValue) || 0;
+
+    if (suppliesTab === "thr") {
+      const packets = Number.isInteger(value)
+        ? value.toLocaleString()
+        : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      return `${packets} packets`;
+    }
+
+    if (value === 0) return "0 g";
+    if (Math.abs(value) < 1) {
+      const grams = value * 1000;
+      const formattedGrams = Number.isInteger(grams)
+        ? grams.toLocaleString()
+        : grams.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      return `${formattedGrams} g`;
+    }
+
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })} kg`;
+  };
+
+  const supplyQuantityUnit = suppliesTab === "hcm" ? "g / kg" : "Packets";
+
   // Calculate Totals for dynamic supplies table
   const suppliesTotals = useMemo(() => {
     const totals = {};
@@ -803,9 +829,9 @@ const FoodSupplementary = () => {
       }
       suppliesFoodItems.forEach((fi) => {
         const fd = r.foodData.find((f) => f.food_item === fi);
-        row[`${fi} - Received`] = fd ? fd.received : 0;
-        row[`${fi} - Distributed`] = fd ? fd.distributed : 0;
-        row[`${fi} - Remaining`] = fd ? fd.balance : 0;
+        row[`${fi} - Received (${supplyQuantityUnit})`] = formatSupplyQuantity(fd ? fd.received : 0);
+        row[`${fi} - Distributed (${supplyQuantityUnit})`] = formatSupplyQuantity(fd ? fd.distributed : 0);
+        row[`${fi} - Remaining (${supplyQuantityUnit})`] = formatSupplyQuantity(fd ? fd.balance : 0);
       });
       return row;
     });
@@ -820,9 +846,9 @@ const FoodSupplementary = () => {
     }
     suppliesFoodItems.forEach((fi) => {
       const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
-      totalRow[`${fi} - Received`] = t.received.toLocaleString();
-      totalRow[`${fi} - Distributed`] = t.distributed.toLocaleString();
-      totalRow[`${fi} - Remaining`] = t.balance.toLocaleString();
+      totalRow[`${fi} - Received (${supplyQuantityUnit})`] = formatSupplyQuantity(t.received);
+      totalRow[`${fi} - Distributed (${supplyQuantityUnit})`] = formatSupplyQuantity(t.distributed);
+      totalRow[`${fi} - Remaining (${supplyQuantityUnit})`] = formatSupplyQuantity(t.balance);
     });
     data.push(totalRow);
 
@@ -866,9 +892,9 @@ const FoodSupplementary = () => {
                     <th style="border:1px solid #ddd; padding:4px;">AWC Code</th>
                   ` : ""}
                   ${suppliesFoodItems.flatMap(() => [
-                    `<th style="border:1px solid #ddd; padding:4px; text-align:right;">Rec.</th>`,
-                    `<th style="border:1px solid #ddd; padding:4px; text-align:right;">Dist.</th>`,
-                    `<th style="border:1px solid #ddd; padding:4px; text-align:right;">Rem.</th>`
+                    `<th style="border:1px solid #ddd; padding:4px; text-align:right;">Rec. (${supplyQuantityUnit})</th>`,
+                    `<th style="border:1px solid #ddd; padding:4px; text-align:right;">Dist. (${supplyQuantityUnit})</th>`,
+                    `<th style="border:1px solid #ddd; padding:4px; text-align:right;">Rem. (${supplyQuantityUnit})</th>`
                   ]).join("")}
                 </tr>
               </thead>
@@ -884,9 +910,9 @@ const FoodSupplementary = () => {
                     ${suppliesFoodItems.map(fi => {
                       const fd = r.foodData.find(f => f.food_item === fi);
                       return `
-                        <td style="border:1px solid #ddd; padding:4px; text-align:right;">${fd ? fd.received.toLocaleString() : 0}</td>
-                        <td style="border:1px solid #ddd; padding:4px; text-align:right;">${fd ? fd.distributed.toLocaleString() : 0}</td>
-                        <td style="border:1px solid #ddd; padding:4px; text-align:right; color:#2563eb; font-weight:bold;">${fd ? fd.balance.toLocaleString() : 0}</td>
+                        <td style="border:1px solid #ddd; padding:4px; text-align:right;">${formatSupplyQuantity(fd ? fd.received : 0)}</td>
+                        <td style="border:1px solid #ddd; padding:4px; text-align:right;">${formatSupplyQuantity(fd ? fd.distributed : 0)}</td>
+                        <td style="border:1px solid #ddd; padding:4px; text-align:right; color:#2563eb; font-weight:bold;">${formatSupplyQuantity(fd ? fd.balance : 0)}</td>
                       `;
                     }).join("")}
                   </tr>
@@ -903,9 +929,9 @@ const FoodSupplementary = () => {
                   ${suppliesFoodItems.map(fi => {
                     const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
                     return `
-                      <td style="border:1px solid #ddd; padding:4px; text-align:right;">${t.received.toLocaleString()}</td>
-                      <td style="border:1px solid #ddd; padding:4px; text-align:right;">${t.distributed.toLocaleString()}</td>
-                      <td style="border:1px solid #ddd; padding:4px; text-align:right; color:#2563eb;">${t.balance.toLocaleString()}</td>
+                      <td style="border:1px solid #ddd; padding:4px; text-align:right;">${formatSupplyQuantity(t.received)}</td>
+                      <td style="border:1px solid #ddd; padding:4px; text-align:right;">${formatSupplyQuantity(t.distributed)}</td>
+                      <td style="border:1px solid #ddd; padding:4px; text-align:right; color:#2563eb;">${formatSupplyQuantity(t.balance)}</td>
                     `;
                   }).join("")}
                 </tr>
@@ -1259,9 +1285,9 @@ const FoodSupplementary = () => {
                                     <tr>
                                       {suppliesFoodItems.map((fi, idx) => (
                                         <React.Fragment key={`sub-${idx}`}>
-                                          <th className="text-end">Rec.</th>
-                                          <th className="text-end">Dist.</th>
-                                          <th className="text-end">Rem.</th>
+                                          <th className="text-end">Rec. ({supplyQuantityUnit})</th>
+                                          <th className="text-end">Dist. ({supplyQuantityUnit})</th>
+                                          <th className="text-end">Rem. ({supplyQuantityUnit})</th>
                                         </React.Fragment>
                                       ))}
                                     </tr>
@@ -1282,9 +1308,9 @@ const FoodSupplementary = () => {
                                             const fd = row.foodData.find((f) => f.food_item === fi);
                                             return (
                                               <React.Fragment key={`data-${idx}`}>
-                                                <td className="text-end">{fd ? fd.received.toLocaleString() : 0}</td>
-                                                <td className="text-end">{fd ? fd.distributed.toLocaleString() : 0}</td>
-                                                <td className="text-end text-primary"><strong>{fd ? fd.balance.toLocaleString() : 0}</strong></td>
+                                                <td className="text-end">{formatSupplyQuantity(fd ? fd.received : 0)}</td>
+                                                <td className="text-end">{formatSupplyQuantity(fd ? fd.distributed : 0)}</td>
+                                                <td className="text-end text-primary"><strong>{formatSupplyQuantity(fd ? fd.balance : 0)}</strong></td>
                                               </React.Fragment>
                                             );
                                           })}
@@ -1301,9 +1327,9 @@ const FoodSupplementary = () => {
                                           const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
                                           return (
                                             <React.Fragment key={`foot-${idx}`}>
-                                              <th className="text-end">{t.received.toLocaleString()}</th>
-                                              <th className="text-end">{t.distributed.toLocaleString()}</th>
-                                              <th className="text-end">{t.balance.toLocaleString()}</th>
+                                              <th className="text-end">{formatSupplyQuantity(t.received)}</th>
+                                              <th className="text-end">{formatSupplyQuantity(t.distributed)}</th>
+                                              <th className="text-end">{formatSupplyQuantity(t.balance)}</th>
                                             </React.Fragment>
                                           );
                                         })}
@@ -1328,9 +1354,9 @@ const FoodSupplementary = () => {
                                     <tr>
                                       {suppliesFoodItems.map((fi, idx) => (
                                         <React.Fragment key={`sub-awc-${idx}`}>
-                                          <th className="text-end">Rec.</th>
-                                          <th className="text-end">Dist.</th>
-                                          <th className="text-end">Rem.</th>
+                                          <th className="text-end">Rec. ({supplyQuantityUnit})</th>
+                                          <th className="text-end">Dist. ({supplyQuantityUnit})</th>
+                                          <th className="text-end">Rem. ({supplyQuantityUnit})</th>
                                         </React.Fragment>
                                       ))}
                                     </tr>
@@ -1353,9 +1379,9 @@ const FoodSupplementary = () => {
                                             const fd = row.foodData.find((f) => f.food_item === fi);
                                             return (
                                               <React.Fragment key={`data-awc-${idx}`}>
-                                                <td className="text-end">{fd ? fd.received.toLocaleString() : 0}</td>
-                                                <td className="text-end">{fd ? fd.distributed.toLocaleString() : 0}</td>
-                                                <td className="text-end text-primary"><strong>{fd ? fd.balance.toLocaleString() : 0}</strong></td>
+                                                <td className="text-end">{formatSupplyQuantity(fd ? fd.received : 0)}</td>
+                                                <td className="text-end">{formatSupplyQuantity(fd ? fd.distributed : 0)}</td>
+                                                <td className="text-end text-primary"><strong>{formatSupplyQuantity(fd ? fd.balance : 0)}</strong></td>
                                               </React.Fragment>
                                             );
                                           })}
@@ -1374,9 +1400,9 @@ const FoodSupplementary = () => {
                                           const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
                                           return (
                                             <React.Fragment key={`foot-awc-${idx}`}>
-                                              <th className="text-end">{t.received.toLocaleString()}</th>
-                                              <th className="text-end">{t.distributed.toLocaleString()}</th>
-                                              <th className="text-end">{t.balance.toLocaleString()}</th>
+                                              <th className="text-end">{formatSupplyQuantity(t.received)}</th>
+                                              <th className="text-end">{formatSupplyQuantity(t.distributed)}</th>
+                                              <th className="text-end">{formatSupplyQuantity(t.balance)}</th>
                                             </React.Fragment>
                                           );
                                         })}

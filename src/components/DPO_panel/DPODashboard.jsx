@@ -42,20 +42,7 @@ import DPOLeftNav from "./DPOLeftNav";
 import * as XLSX from "xlsx";
 import html2pdf from "html2pdf.js";
 
-const monthNames = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+const quarterOptions = ["Apr-May-Jun", "Jul-Aug-Sep", "Oct-Nov-Dec", "Jan-Feb-Mar"];
 
 /* ── Grant-wise Table schema (mirrors FoodSupplementary) ── */
 const GRANT_IDS = [15, 30, 31];
@@ -106,7 +93,7 @@ const EXCEL_META_COLUMNS = [
   { header: "SECTOR", key: "sector" },
   { header: "AWC NAME", key: "awc_name" },
   { header: "AWC CODE", key: "awc_code" },
-  { header: "MONTH", key: "month" },
+  { header: "TRIMESTER", key: "quarter" },
   { header: "FINANCIAL YEAR", key: "financial_year" },
 ];
 
@@ -116,7 +103,7 @@ const TABLE_COLUMNS = [
   { label: "Sector", key: "sector" },
   { label: "AWC Code", key: "awc_code" },
   { label: "AWC Name", key: "awc_name" },
-  { label: "Month", key: "month" },
+  { label: "Trimester", key: "quarter" },
   { label: "Fin. Year", key: "financial_year" },
   {
     label: "Pregnant/Lactating",
@@ -405,7 +392,7 @@ const DPODashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   // Multi-Select States
-  const [selectedMonths, setSelectedMonths] = useState([]);
+  const [selectedQuarters, setSelectedQuarters] = useState([]);
   const [selectedFYs, setSelectedFYs] = useState([]);
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [selectedSectors, setSelectedSectors] = useState([]);
@@ -427,7 +414,7 @@ const DPODashboard = () => {
   const [suppliesRecords, setSuppliesRecords] = useState([]);
   const [suppliesDetailRecords, setSuppliesDetailRecords] = useState([]);
   const [suppliesLoading, setSuppliesLoading] = useState(true);
-  const [selectedSupplyMonths, setSelectedSupplyMonths] = useState([]);
+  const [selectedSupplyQuarters, setSelectedSupplyQuarters] = useState([]);
   const [selectedSupplyFYs, setSelectedSupplyFYs] = useState([]);
 
   // Race condition prevention for API calls
@@ -443,6 +430,96 @@ const DPODashboard = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Normalize field names returned by both Supplementary Nutrition and the
+  // THR/HCM reconciliation APIs. Some reconciliation endpoints use alternate
+  // keys for financial year and return a month instead of a trimester.
+  const normalizeQuarter = (value) => {
+    if (!value) return "";
+    const text = String(value).trim();
+    if (quarterOptions.includes(text)) return text;
+    const month = text.toLowerCase();
+    const monthToQuarter = {
+      april: "Apr-May-Jun", may: "Apr-May-Jun", june: "Apr-May-Jun", jun: "Apr-May-Jun",
+      july: "Jul-Aug-Sep", jul: "Jul-Aug-Sep", august: "Jul-Aug-Sep", aug: "Jul-Aug-Sep", september: "Jul-Aug-Sep", sep: "Jul-Aug-Sep", sept: "Jul-Aug-Sep",
+      october: "Oct-Nov-Dec", oct: "Oct-Nov-Dec", november: "Oct-Nov-Dec", nov: "Oct-Nov-Dec", december: "Oct-Nov-Dec", dec: "Oct-Nov-Dec",
+      january: "Jan-Feb-Mar", jan: "Jan-Feb-Mar", february: "Jan-Feb-Mar", feb: "Jan-Feb-Mar", march: "Jan-Feb-Mar", mar: "Jan-Feb-Mar",
+    };
+    return monthToQuarter[month] || text;
+  };
+
+  const getFinancialYear = (record = {}) => {
+    const direct = record.financial_year ?? record.financialYear ?? record.financial_year_name ??
+      record.financialYearName ?? record.fin_year ?? record.finYear ?? record.fy ??
+      record.financialyear ?? record.financial_year_label ?? record.fy_name;
+    if (direct !== undefined && direct !== null && String(direct).trim() !== "") {
+      const value = String(direct).trim();
+      const match = value.match(/(20\d{2})\s*[-–/]\s*(20\d{2})/);
+      return match ? `${match[1]}-${match[2]}` : value;
+    }
+
+    const start = record.financial_year_start ?? record.fy_start_year ?? record.start_year;
+    const end = record.financial_year_end ?? record.fy_end_year ?? record.end_year;
+    if (start && end) return `${start}-${end}`;
+
+    // If the API provides a calendar year and month, derive the Indian
+    // April-to-March financial year instead of showing a blank value.
+    const rawYear = record.calendar_year ?? record.year ?? record.record_year;
+    const yearMatch = String(rawYear ?? "").match(/^(20\d{2})$/);
+    const monthValue = String(record.month ?? record.month_name ?? record.period_month ?? "").trim().toLowerCase();
+    if (yearMatch && monthValue) {
+      const year = Number(yearMatch[1]);
+      const janToMar = ["january", "jan", "february", "feb", "march", "mar"];
+      return janToMar.includes(monthValue) ? `${year - 1}-${year}` : `${year}-${year + 1}`;
+    }
+    return "";
+  };
+
+  const normalizeSupplementaryRecord = (record = {}) => ({
+    ...record,
+    district: record.district ?? record.district_name ?? record.districtName ?? "",
+    project: record.project ?? record.project_name ?? record.projectName ?? "",
+    sector: record.sector ?? record.sector_name ?? record.sectorName ?? "",
+    awc_name: record.awc_name ?? record.awcName ?? record.awc ?? record.anganwadi_name ?? "",
+    awc_code: record.awc_code ?? record.awcCode ?? record.awc_id ?? record.awcId ?? "",
+    quarter: normalizeQuarter(record.quarter ?? record.trimester ?? record.quarter_name ?? record.month ?? record.month_name),
+    financial_year: getFinancialYear(record),
+  });
+
+  const normalizeSupplyRecord = (record = {}) => ({
+    ...record,
+    district: record.district ?? record.district_name ?? record.districtName ?? "",
+    project: record.project ?? record.project_name ?? record.projectName ?? "",
+    sector: record.sector ?? record.sector_name ?? record.sectorName ?? "",
+    awc_name: record.awc_name ?? record.awcName ?? record.awc ?? record.anganwadi_name ?? "",
+    awc_code: record.awc_code ?? record.awcCode ?? record.awc_id ?? record.awcId ?? "",
+    quarter: normalizeQuarter(record.quarter ?? record.trimester ?? record.quarter_name ?? record.month ?? record.month_name),
+    financial_year: getFinancialYear(record),
+    food_item: record.food_item ?? record.foodItem ?? record.food_item_name ?? record.item_name ?? "",
+    received_quantity: record.received_quantity ?? record.receivedQuantity ?? record.quantity_received ?? record.received ?? 0,
+    distributed_quantity: record.distributed_quantity ?? record.distributedQuantity ?? record.quantity_distributed ?? record.distributed ?? 0,
+    balance_quantity: record.balance_quantity ?? record.balanceQuantity ?? record.remaining_quantity ?? record.balance ?? 0,
+  });
+
+  // When a reconciliation summary omits financial_year, resolve it from the
+  // saved Supplementary Nutrition Records using the same project/sector/AWC
+  // and trimester. Only use a fallback when it identifies one unambiguous FY.
+  const resolveSupplyFinancialYear = (item, level = "project") => {
+    const ownFY = getFinancialYear(item);
+    if (ownFY) return ownFY;
+    const normalized = normalizeSupplyRecord(item);
+    const candidates = records
+      .map(normalizeSupplementaryRecord)
+      .filter((record) => {
+        if (normalized.quarter && record.quarter !== normalized.quarter) return false;
+        if (level === "project" && normalized.project && record.project !== normalized.project) return false;
+        if ((level === "sector" || level === "awc") && normalized.sector && record.sector !== normalized.sector) return false;
+        if (level === "awc" && normalized.awc_code && record.awc_code !== normalized.awc_code) return false;
+        return Boolean(record.financial_year);
+      });
+    const years = [...new Set(candidates.map((record) => record.financial_year))];
+    return years.length === 1 ? years[0] : "";
+  };
+
   const fetchData = async () => {
     setLoading(true);
     setError("");
@@ -451,7 +528,7 @@ const DPODashboard = () => {
       const data = Array.isArray(response.data)
         ? response.data
         : response.data?.results || response.data?.data || [];
-      setRecords(data);
+      setRecords(Array.isArray(data) ? data.map(normalizeSupplementaryRecord) : []);
     } catch (err) {
       setError("Failed to fetch supplementary nutrition data.");
       console.error(err);
@@ -487,8 +564,11 @@ const DPODashboard = () => {
       const sectorMonthSummary = result.sector_month_summary || [];
 
       if (reqId === suppliesReqId.current) {
-        setSuppliesRecords({ projectMonthSummary, sectorMonthSummary });
-        setSuppliesDetailRecords(result.data || []);
+        setSuppliesRecords({
+          projectMonthSummary: projectMonthSummary.map(normalizeSupplyRecord),
+          sectorMonthSummary: sectorMonthSummary.map(normalizeSupplyRecord),
+        });
+        setSuppliesDetailRecords((result.data || []).map(normalizeSupplyRecord));
       }
     } catch (err) {
       if (reqId === suppliesReqId.current) {
@@ -515,36 +595,35 @@ const DPODashboard = () => {
   }, [suppliesTab]);
 
   // Unique months and financial years from detail records for filtering
-  const suppliesMonths = useMemo(
+  const suppliesQuarters = useMemo(
     () =>
       [
         ...new Set(
-          suppliesDetailRecords.map((record) => record.month).filter(Boolean),
+          suppliesDetailRecords.map((record) => record.quarter || record.trimester || record.month).filter(Boolean),
         ),
-      ].sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b)),
+      ].sort((a, b) => quarterOptions.indexOf(a) - quarterOptions.indexOf(b)),
     [suppliesDetailRecords],
   );
-  const suppliesFinancialYears = useMemo(
-    () =>
-      [
-        ...new Set(
-          suppliesDetailRecords
-            .map((record) => record.financial_year)
-            .filter(Boolean),
-        ),
-      ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
-    [suppliesDetailRecords],
-  );
+  const suppliesFinancialYears = useMemo(() => {
+    const summaryRows = [
+      ...(suppliesRecords.projectMonthSummary || []).map((row) => ({ row, level: "project" })),
+      ...(suppliesRecords.sectorMonthSummary || []).map((row) => ({ row, level: "sector" })),
+    ];
+    const years = [
+      ...suppliesDetailRecords.map((record) => getFinancialYear(record)),
+      ...summaryRows.map(({ row, level }) => resolveSupplyFinancialYear(row, level)),
+    ].filter(Boolean);
+    return [...new Set(years)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [suppliesDetailRecords, suppliesRecords, records]);
 
   const filteredDetailRecords = useMemo(() => {
-    return suppliesDetailRecords.filter(
-      (record) =>
-        (selectedSupplyMonths.length === 0 ||
-          selectedSupplyMonths.includes(record.month)) &&
-        (selectedSupplyFYs.length === 0 ||
-          selectedSupplyFYs.includes(record.financial_year)),
-    );
-  }, [suppliesDetailRecords, selectedSupplyMonths, selectedSupplyFYs]);
+    return suppliesDetailRecords.filter((record) => {
+      const quarter = normalizeQuarter(record.quarter || record.trimester || record.month);
+      const financialYear = resolveSupplyFinancialYear(record, "awc");
+      return (selectedSupplyQuarters.length === 0 || selectedSupplyQuarters.includes(quarter)) &&
+        (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(financialYear));
+    });
+  }, [suppliesDetailRecords, selectedSupplyQuarters, selectedSupplyFYs, records]);
 
   const suppliesFoodItems = useMemo(() => {
     const items = new Set();
@@ -564,10 +643,17 @@ const DPODashboard = () => {
   const projectSuppliesData = useMemo(() => {
     const projects = {};
     if (!suppliesRecords.projectMonthSummary) return [];
-    suppliesRecords.projectMonthSummary.forEach((item) => {
-      const key = item.project;
+    suppliesRecords.projectMonthSummary.filter((item) => {
+      const quarter = normalizeQuarter(item.quarter || item.trimester || item.month);
+      const financialYear = resolveSupplyFinancialYear(item, "project");
+      return (selectedSupplyQuarters.length === 0 || selectedSupplyQuarters.includes(quarter)) &&
+        (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(financialYear));
+    }).forEach((item) => {
+      const quarter = normalizeQuarter(item.quarter || item.trimester || item.month) || "—";
+      const financialYear = resolveSupplyFinancialYear(item, "project");
+      const key = `${item.project}|${quarter}|${financialYear}`;
       if (!projects[key]) {
-        projects[key] = { project: key, foodData: {} };
+        projects[key] = { project: item.project || "—", quarter, financial_year: financialYear || "—", foodData: {} };
         suppliesFoodItems.forEach((fi) => {
           projects[key].foodData[fi] = {
             received: 0,
@@ -594,15 +680,22 @@ const DPODashboard = () => {
         })),
       }))
       .sort((a, b) => a.project.localeCompare(b.project));
-  }, [suppliesRecords, suppliesFoodItems]);
+  }, [suppliesRecords, suppliesFoodItems, selectedSupplyQuarters, selectedSupplyFYs, records]);
 
   const sectorSuppliesData = useMemo(() => {
     const sectors = {};
     if (!suppliesRecords.sectorMonthSummary) return [];
-    suppliesRecords.sectorMonthSummary.forEach((item) => {
-      const key = item.sector;
+    suppliesRecords.sectorMonthSummary.filter((item) => {
+      const quarter = normalizeQuarter(item.quarter || item.trimester || item.month);
+      const financialYear = resolveSupplyFinancialYear(item, "sector");
+      return (selectedSupplyQuarters.length === 0 || selectedSupplyQuarters.includes(quarter)) &&
+        (selectedSupplyFYs.length === 0 || selectedSupplyFYs.includes(financialYear));
+    }).forEach((item) => {
+      const quarter = normalizeQuarter(item.quarter || item.trimester || item.month) || "—";
+      const financialYear = resolveSupplyFinancialYear(item, "sector");
+      const key = `${item.sector}|${quarter}|${financialYear}`;
       if (!sectors[key]) {
-        sectors[key] = { sector: key, foodData: {} };
+        sectors[key] = { sector: item.sector || "—", quarter, financial_year: financialYear || "—", foodData: {} };
         suppliesFoodItems.forEach((fi) => {
           sectors[key].foodData[fi] = {
             received: 0,
@@ -629,18 +722,22 @@ const DPODashboard = () => {
         })),
       }))
       .sort((a, b) => a.sector.localeCompare(b.sector));
-  }, [suppliesRecords, suppliesFoodItems]);
+  }, [suppliesRecords, suppliesFoodItems, selectedSupplyQuarters, selectedSupplyFYs, records]);
 
   const awcSuppliesData = useMemo(() => {
     const awcs = new Map();
     filteredDetailRecords.forEach((record) => {
-      const awcKey = `${record.awc_code}|${record.awc_name}|${record.project}|${record.sector}`;
+      const quarter = normalizeQuarter(record.quarter || record.trimester || record.month) || "—";
+      const financialYear = resolveSupplyFinancialYear(record, "awc");
+      const awcKey = `${record.awc_code}|${record.awc_name}|${record.project}|${record.sector}|${quarter}|${financialYear}`;
       if (!awcs.has(awcKey)) {
         awcs.set(awcKey, {
           awc_code: record.awc_code,
           awc_name: record.awc_name,
           project: record.project,
           sector: record.sector,
+          quarter,
+          financial_year: financialYear || "—",
           foodData: new Map(),
         });
       }
@@ -670,7 +767,7 @@ const DPODashboard = () => {
           a.sector.localeCompare(b.sector) ||
           a.awc_name.localeCompare(b.awc_name),
       );
-  }, [filteredDetailRecords]);
+  }, [filteredDetailRecords, records]);
 
   const currentSuppliesData = useMemo(() => {
     switch (suppliesViewMode) {
@@ -690,6 +787,27 @@ const DPODashboard = () => {
     awcSuppliesData,
   ]);
 
+  // Supply API quantities for HCM are stored in kilograms. Display small
+  // quantities in grams and larger quantities in kilograms. THR quantities
+  // are packet counts and must always be displayed as packets.
+  const formatSupplyQuantity = (rawValue) => {
+    const value = Number(rawValue) || 0;
+    if (suppliesTab === "thr") {
+      const packets = Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      return `${packets} packets`;
+    }
+
+    const kg = Math.abs(value);
+    if (kg === 0) return "0 g";
+    if (kg < 1) {
+      const grams = value * 1000;
+      return `${Number.isInteger(grams) ? grams.toLocaleString() : grams.toLocaleString(undefined, { maximumFractionDigits: 2 })} g`;
+    }
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })} kg`;
+  };
+
+  const suppliesQuantityHeader = suppliesTab === "hcm" ? "g / kg" : "Packets";
+
   const suppliesTotals = useMemo(() => {
     const totals = {};
     suppliesFoodItems.forEach((fi) => {
@@ -707,8 +825,8 @@ const DPODashboard = () => {
     return totals;
   }, [currentSuppliesData, suppliesFoodItems]);
 
-  const uniqueMonths = useMemo(
-    () => [...new Set(records.map((r) => r.month).filter(Boolean))].sort(),
+  const uniqueQuarters = useMemo(
+    () => quarterOptions.filter((q) => records.some((r) => (r.quarter || r.trimester || r.month) === q)),
     [records],
   );
   const uniqueFYs = useMemo(
@@ -728,7 +846,7 @@ const DPODashboard = () => {
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
       const m =
-        selectedMonths.length === 0 ? true : selectedMonths.includes(r.month);
+        selectedQuarters.length === 0 ? true : selectedQuarters.includes(r.quarter || r.trimester || r.month);
       const y =
         selectedFYs.length === 0
           ? true
@@ -743,14 +861,14 @@ const DPODashboard = () => {
           : selectedSectors.includes(r.sector);
       return m && y && p && s;
     });
-  }, [records, selectedMonths, selectedFYs, selectedProjects, selectedSectors]);
+  }, [records, selectedQuarters, selectedFYs, selectedProjects, selectedSectors]);
 
   const searchedRecords = useMemo(() => {
     if (!searchTerm.trim()) return filteredRecords;
     const term = searchTerm.toLowerCase();
     return filteredRecords.filter(
       (r) =>
-        (r.month || "").toLowerCase().includes(term) ||
+        ((r.quarter || r.trimester || r.month) || "").toLowerCase().includes(term) ||
         (r.financial_year || "").toLowerCase().includes(term) ||
         (r.district || "").toLowerCase().includes(term) ||
         (r.project || "").toLowerCase().includes(term) ||
@@ -776,7 +894,7 @@ const DPODashboard = () => {
       if (!grouped[groupKey]) {
         grouped[groupKey] = {
           groupKey,
-          months: new Set(),
+          quarters: new Set(),
           fys: new Set(),
           totals: NUMERIC_AGG_FIELDS.reduce(
             (a, { key }) => ({ ...a, [key]: 0 }),
@@ -784,7 +902,7 @@ const DPODashboard = () => {
           ),
         };
       }
-      if (r.month) grouped[groupKey].months.add(r.month);
+      if (r.quarter || r.trimester || r.month) grouped[groupKey].quarters.add(r.quarter || r.trimester || r.month);
       if (r.financial_year) grouped[groupKey].fys.add(r.financial_year);
       NUMERIC_AGG_FIELDS.forEach(({ key }) => {
         grouped[groupKey].totals[key] += parseInt(r[key]) || 0;
@@ -792,7 +910,7 @@ const DPODashboard = () => {
     });
     return Object.values(grouped).map((g) => ({
       groupKey: g.groupKey,
-      months: Array.from(g.months).join(", "),
+      quarters: quarterOptions.filter((q) => g.quarters.has(q)).concat([...g.quarters].filter((q) => !quarterOptions.includes(q))).join(", "),
       fys: Array.from(g.fys).join(", "),
       ...g.totals,
     }));
@@ -859,19 +977,25 @@ const DPODashboard = () => {
       const row = { "S. No.": i + 1 };
       if (suppliesViewMode === "project") {
         row.Project = r.project;
+        row.Trimester = r.quarter || "—";
+        row["Financial Year"] = r.financial_year || "—";
       } else if (suppliesViewMode === "sector") {
         row.Sector = r.sector;
+        row.Trimester = r.quarter || "—";
+        row["Financial Year"] = r.financial_year || "—";
       } else {
         row.Project = r.project;
         row.Sector = r.sector;
         row["AWC Name"] = r.awc_name;
         row["AWC Code"] = r.awc_code;
+        row.Trimester = r.quarter || "—";
+        row["Financial Year"] = r.financial_year || "—";
       }
       suppliesFoodItems.forEach((fi) => {
         const fd = r.foodData.find((f) => f.food_item === fi);
-        row[`${fi} - Received`] = fd ? fd.received : 0;
-        row[`${fi} - Distributed`] = fd ? fd.distributed : 0;
-        row[`${fi} - Remaining`] = fd ? fd.balance : 0;
+        row[`${fi} - Received (${suppliesQuantityHeader})`] = formatSupplyQuantity(fd ? fd.received : 0);
+        row[`${fi} - Distributed (${suppliesQuantityHeader})`] = formatSupplyQuantity(fd ? fd.distributed : 0);
+        row[`${fi} - Remaining (${suppliesQuantityHeader})`] = formatSupplyQuantity(fd ? fd.balance : 0);
       });
       return row;
     });
@@ -893,9 +1017,9 @@ const DPODashboard = () => {
         distributed: 0,
         balance: 0,
       };
-      totalRow[`${fi} - Received`] = t.received.toLocaleString();
-      totalRow[`${fi} - Distributed`] = t.distributed.toLocaleString();
-      totalRow[`${fi} - Remaining`] = t.balance.toLocaleString();
+      totalRow[`${fi} - Received (${suppliesQuantityHeader})`] = formatSupplyQuantity(t.received);
+      totalRow[`${fi} - Distributed (${suppliesQuantityHeader})`] = formatSupplyQuantity(t.distributed);
+      totalRow[`${fi} - Remaining (${suppliesQuantityHeader})`] = formatSupplyQuantity(t.balance);
     });
     data.push(totalRow);
 
@@ -920,14 +1044,16 @@ const DPODashboard = () => {
   const exportSuppliesToPDF = () => {
     const groupHeaders =
       suppliesViewMode === "project"
-        ? [{ text: "Project", rowSpan: 2 }]
+        ? [{ text: "Project", rowSpan: 2 }, { text: "Trimester", rowSpan: 2 }, { text: "Financial Year", rowSpan: 2 }]
         : suppliesViewMode === "sector"
-          ? [{ text: "Sector", rowSpan: 2 }]
+          ? [{ text: "Sector", rowSpan: 2 }, { text: "Trimester", rowSpan: 2 }, { text: "Financial Year", rowSpan: 2 }]
           : [
               { text: "Project", rowSpan: 2 },
               { text: "Sector", rowSpan: 2 },
               { text: "AWC Name", rowSpan: 2 },
               { text: "AWC Code", rowSpan: 2 },
+              { text: "Trimester", rowSpan: 2 },
+              { text: "Financial Year", rowSpan: 2 },
             ];
 
     const headers = [
@@ -936,23 +1062,25 @@ const DPODashboard = () => {
         ...groupHeaders,
         ...suppliesFoodItems.map((fi) => ({ text: fi, colSpan: 3 })),
       ],
-      [...suppliesFoodItems.flatMap(() => ["Rec.", "Dist.", "Rem."])],
+      [...suppliesFoodItems.flatMap(() => [`Received (${suppliesQuantityHeader})`, `Distributed (${suppliesQuantityHeader})`, `Remaining (${suppliesQuantityHeader})`])],
     ];
 
     const rows = currentSuppliesData.map((r, i) => [
       i + 1,
       ...(suppliesViewMode === "project"
-        ? [r.project]
+        ? [r.project, r.quarter || "—", r.financial_year || "—"]
         : suppliesViewMode === "sector"
-          ? [r.sector]
-          : [r.project, r.sector, r.awc_name, r.awc_code]),
+          ? [r.sector, r.quarter || "—", r.financial_year || "—"]
+          : [r.project, r.sector, r.awc_name, r.awc_code, r.quarter || "—", r.financial_year || "—"]),
       ...suppliesFoodItems.flatMap((fi) => {
         const fd = r.foodData.find((f) => f.food_item === fi);
-        return fd ? [fd.received, fd.distributed, fd.balance] : [0, 0, 0];
+        return fd
+          ? [formatSupplyQuantity(fd.received), formatSupplyQuantity(fd.distributed), formatSupplyQuantity(fd.balance)]
+          : [formatSupplyQuantity(0), formatSupplyQuantity(0), formatSupplyQuantity(0)];
       }),
     ]);
 
-    const groupColSpan = suppliesViewMode === "awc" ? 4 : 1;
+    const groupColSpan = suppliesViewMode === "awc" ? 6 : 3;
     const footer = [
       [
         { text: "Total", colSpan: 1 + groupColSpan },
@@ -963,9 +1091,9 @@ const DPODashboard = () => {
             balance: 0,
           };
           return [
-            { text: t.received.toLocaleString() },
-            { text: t.distributed.toLocaleString() },
-            { text: t.balance.toLocaleString() },
+            { text: formatSupplyQuantity(t.received) },
+            { text: formatSupplyQuantity(t.distributed) },
+            { text: formatSupplyQuantity(t.balance) },
           ];
         }),
       ],
@@ -991,7 +1119,7 @@ const DPODashboard = () => {
     const data = aggregatedData.map((r, i) => ({
       "S. No.": i + 1,
       [aggregateView]: r.groupKey,
-      Months: r.months,
+      Trimester: r.quarters,
       "Fin. Years": r.fys,
       ...NUMERIC_AGG_FIELDS.reduce(
         (o, f) => ({ ...o, [f.label]: r[f.key] }),
@@ -1017,7 +1145,7 @@ const DPODashboard = () => {
       [
         "S. No.",
         aggregateView,
-        "Months",
+        "Trimester",
         "Fin. Years",
         ...NUMERIC_AGG_FIELDS.map((f) => f.label),
       ],
@@ -1025,7 +1153,7 @@ const DPODashboard = () => {
     const rows = aggregatedData.map((r, i) => [
       i + 1,
       r.groupKey,
-      r.months,
+      r.quarters,
       r.fys,
       ...NUMERIC_AGG_FIELDS.map((f) => r[f.key]),
     ]);
@@ -1094,13 +1222,11 @@ const DPODashboard = () => {
       const row = [i + 1];
       EXCEL_META_COLUMNS.forEach((col) => row.push(r[col.key] || "—"));
       GRANT_CATEGORIES.forEach((cat) => {
-        const grants = Array.isArray(r[cat.grantKey])
-          ? r[cat.grantKey].map(Number)
-          : [];
-        [15, 30, 31].forEach((gid) =>
-          row.push(grants.includes(gid) ? String(gid) : "—"),
+        const grantValues = Array.isArray(r[cat.grantKey]) ? r[cat.grantKey] : [];
+        [0, 1, 2].forEach((grantIndex) =>
+          row.push(Number(grantValues[grantIndex] ?? 0).toLocaleString()),
         );
-        row.push(Number(r[cat.countKey] || 0).toLocaleString());
+        row.push(Number(r[cat.countKey] ?? 0).toLocaleString());
       });
       FOOD_FIELDS.forEach((f) =>
         row.push(Number(r[f.key] || 0).toLocaleString()),
@@ -1176,10 +1302,10 @@ const DPODashboard = () => {
           {/* Compact Multi-Select Filter Bar */}
           <div className="dpo-filter-bar">
             <MultiSelectDropdown
-              label="Month"
-              options={uniqueMonths}
-              selected={selectedMonths}
-              onChange={setSelectedMonths}
+              label="Trimester"
+              options={uniqueQuarters}
+              selected={selectedQuarters}
+              onChange={setSelectedQuarters}
             />
             <MultiSelectDropdown
               label="Financial Year"
@@ -1204,7 +1330,7 @@ const DPODashboard = () => {
               size="sm"
               className="dpo-filter-reset"
               onClick={() => {
-                setSelectedMonths([]);
+                setSelectedQuarters([]);
                 setSelectedFYs([]);
                 setSelectedProjects([]);
                 setSelectedSectors([]);
@@ -1247,7 +1373,7 @@ const DPODashboard = () => {
                     className={`dpo-toggle-btn ${suppliesTab === "thr" ? "active" : ""}`}
                     onClick={() => {
                       setSuppliesTab("thr");
-                      setSelectedSupplyMonths([]);
+                      setSelectedSupplyQuarters([]);
                       setSelectedSupplyFYs([]);
                     }}
                   >
@@ -1257,7 +1383,7 @@ const DPODashboard = () => {
                     className={`dpo-toggle-btn ${suppliesTab === "hcm" ? "active" : ""}`}
                     onClick={() => {
                       setSuppliesTab("hcm");
-                      setSelectedSupplyMonths([]);
+                      setSelectedSupplyQuarters([]);
                       setSelectedSupplyFYs([]);
                     }}
                   >
@@ -1291,10 +1417,10 @@ const DPODashboard = () => {
                   </Button>
                 </ButtonGroup>
                 <MultiSelectDropdown
-                  label="Month"
-                  options={suppliesMonths}
-                  selected={selectedSupplyMonths}
-                  onChange={setSelectedSupplyMonths}
+                  label="Trimester"
+                  options={suppliesQuarters}
+                  selected={selectedSupplyQuarters}
+                  onChange={setSelectedSupplyQuarters}
                 />
                 <MultiSelectDropdown
                   label="Financial Year"
@@ -1302,14 +1428,14 @@ const DPODashboard = () => {
                   selected={selectedSupplyFYs}
                   onChange={setSelectedSupplyFYs}
                 />
-                {(selectedSupplyMonths.length > 0 ||
+                {(selectedSupplyQuarters.length > 0 ||
                   selectedSupplyFYs.length > 0) && (
                   <Button
                     variant="outline-secondary"
                     size="sm"
                     className="dpo-filter-reset"
                     onClick={() => {
-                      setSelectedSupplyMonths([]);
+                      setSelectedSupplyQuarters([]);
                       setSelectedSupplyFYs([]);
                     }}
                   >
@@ -1344,15 +1470,25 @@ const DPODashboard = () => {
                       <tr>
                         <th rowSpan="2">S. No.</th>
                         {suppliesViewMode === "project" ? (
-                          <th rowSpan="2">Project</th>
+                          <>
+                            <th rowSpan="2">Project</th>
+                            <th rowSpan="2">Trimester</th>
+                            <th rowSpan="2">Financial Year</th>
+                          </>
                         ) : suppliesViewMode === "sector" ? (
-                          <th rowSpan="2">Sector</th>
+                          <>
+                            <th rowSpan="2">Sector</th>
+                            <th rowSpan="2">Trimester</th>
+                            <th rowSpan="2">Financial Year</th>
+                          </>
                         ) : (
                           <>
                             <th rowSpan="2">Project</th>
                             <th rowSpan="2">Sector</th>
                             <th rowSpan="2">AWC Name</th>
                             <th rowSpan="2">AWC Code</th>
+                            <th rowSpan="2">Trimester</th>
+                            <th rowSpan="2">Financial Year</th>
                           </>
                         )}
                         {suppliesFoodItems.map((fi, idx) => (
@@ -1369,9 +1505,9 @@ const DPODashboard = () => {
                       <tr>
                         {suppliesFoodItems.map((fi, idx) => (
                           <React.Fragment key={`sub-${idx}`}>
-                            <th className="text-end">Rec.</th>
-                            <th className="text-end">Dist.</th>
-                            <th className="text-end">Rem.</th>
+                            <th className="text-end">Received ({suppliesQuantityHeader})</th>
+                            <th className="text-end">Distributed ({suppliesQuantityHeader})</th>
+                            <th className="text-end">Remaining ({suppliesQuantityHeader})</th>
                           </React.Fragment>
                         ))}
                       </tr>
@@ -1382,8 +1518,8 @@ const DPODashboard = () => {
                           <td
                             colSpan={
                               suppliesViewMode === "awc"
-                                ? 5 + suppliesFoodItems.length * 3
-                                : 2 + suppliesFoodItems.length * 3
+                                ? 7 + suppliesFoodItems.length * 3
+                                : 4 + suppliesFoodItems.length * 3
                             }
                             className="text-center p-4 text-muted"
                           >
@@ -1395,13 +1531,15 @@ const DPODashboard = () => {
                           <tr key={i}>
                             <td>{i + 1}</td>
                             {suppliesViewMode === "project" ? (
-                              <td>
-                                <strong>{row.project}</strong>
-                              </td>
+                              <>
+                                <td><strong>{row.project}</strong></td>
+                                <td>{row.quarter || "—"}</td><td>{row.financial_year || "—"}</td>
+                              </>
                             ) : suppliesViewMode === "sector" ? (
-                              <td>
-                                <strong>{row.sector}</strong>
-                              </td>
+                              <>
+                                <td><strong>{row.sector}</strong></td>
+                                <td>{row.quarter || "—"}</td><td>{row.financial_year || "—"}</td>
+                              </>
                             ) : (
                               <>
                                 <td>{row.project}</td>
@@ -1410,6 +1548,7 @@ const DPODashboard = () => {
                                   <strong>{row.awc_name}</strong>
                                 </td>
                                 <td>{row.awc_code}</td>
+                                <td>{row.quarter || "—"}</td><td>{row.financial_year || "—"}</td>
                               </>
                             )}
                             {suppliesFoodItems.map((fi, idx) => {
@@ -1419,14 +1558,14 @@ const DPODashboard = () => {
                               return (
                                 <React.Fragment key={`data-${idx}`}>
                                   <td className="text-end">
-                                    {fd ? fd.received.toLocaleString() : 0}
+                                    {formatSupplyQuantity(fd ? fd.received : 0)}
                                   </td>
                                   <td className="text-end">
-                                    {fd ? fd.distributed.toLocaleString() : 0}
+                                    {formatSupplyQuantity(fd ? fd.distributed : 0)}
                                   </td>
                                   <td className="text-end text-primary">
                                     <strong>
-                                      {fd ? fd.balance.toLocaleString() : 0}
+                                      {formatSupplyQuantity(fd ? fd.balance : 0)}
                                     </strong>
                                   </td>
                                 </React.Fragment>
@@ -1439,19 +1578,9 @@ const DPODashboard = () => {
                     {currentSuppliesData.length > 0 && (
                       <tfoot>
                         <tr>
-                          <th></th>
-                          {suppliesViewMode === "project" ? (
-                            <th>Total</th>
-                          ) : suppliesViewMode === "sector" ? (
-                            <th>Total</th>
-                          ) : (
-                            <>
-                              <th>Total</th>
-                              <th></th>
-                              <th></th>
-                              <th></th>
-                            </>
-                          )}
+                          <th colSpan={suppliesViewMode === "awc" ? 7 : 4} className="text-start">
+                            Total
+                          </th>
                           {suppliesFoodItems.map((fi, idx) => {
                             const t = suppliesTotals[fi] || {
                               received: 0,
@@ -1461,13 +1590,13 @@ const DPODashboard = () => {
                             return (
                               <React.Fragment key={`foot-${idx}`}>
                                 <th className="text-end">
-                                  {t.received.toLocaleString()}
+                                  {formatSupplyQuantity(t.received)}
                                 </th>
                                 <th className="text-end">
-                                  {t.distributed.toLocaleString()}
+                                  {formatSupplyQuantity(t.distributed)}
                                 </th>
                                 <th className="text-end">
-                                  {t.balance.toLocaleString()}
+                                  {formatSupplyQuantity(t.balance)}
                                 </th>
                               </React.Fragment>
                             );
@@ -1598,7 +1727,7 @@ const DPODashboard = () => {
                     <FaSearch />
                   </InputGroup.Text>
                   <Form.Control
-                    placeholder="Search AWC, District..."
+                    placeholder="Search AWC, District, Trimester..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -1717,12 +1846,12 @@ const DPODashboard = () => {
                               <td
                                 key={col.key}
                                 className={
-                                  col.key === "month" ? "text-center" : ""
+                                  col.key === "quarter" ? "text-center" : ""
                                 }
                               >
-                                {col.key === "month" && record[col.key] ? (
+                                {col.key === "quarter" && (record.quarter || record.trimester || record.month) ? (
                                   <Badge className="dpo-month-badge">
-                                    {record[col.key]}
+                                    {record.quarter || record.trimester || record.month}
                                   </Badge>
                                 ) : (
                                   record[col.key] || "—"
@@ -1730,16 +1859,19 @@ const DPODashboard = () => {
                               </td>
                             ))}
                             {GRANT_CATEGORIES.flatMap((cat) => {
-                              const grants = Array.isArray(record[cat.grantKey])
-                                ? record[cat.grantKey].map(Number)
+                              // The API stores the entered amounts in order:
+                              // [Grant 15 amount, Grant 30 amount, Grant 31 amount].
+                              // These are values, not grant IDs; display each by its column index.
+                              const grantValues = Array.isArray(record[cat.grantKey])
+                                ? record[cat.grantKey]
                                 : [];
                               return [15, 30, 31]
-                                .map((grantId) => (
+                                .map((grantId, grantIndex) => (
                                   <td
                                     key={`${cat.countKey}-${grantId}`}
                                     className="text-center dpo-grant-cell"
                                   >
-                                    {grants.includes(grantId) ? grantId : "—"}
+                                    {Number(grantValues[grantIndex] ?? 0).toLocaleString()}
                                   </td>
                                 ))
                                 .concat([
@@ -1747,9 +1879,7 @@ const DPODashboard = () => {
                                     key={`${cat.countKey}-total`}
                                     className="text-end fw-semibold dpo-total-cell"
                                   >
-                                    {Number(
-                                      record[cat.countKey] || 0,
-                                    ).toLocaleString()}
+                                    {Number(record[cat.countKey] ?? 0).toLocaleString()}
                                   </td>,
                                 ]);
                             })}

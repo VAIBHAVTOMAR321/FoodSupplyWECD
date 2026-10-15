@@ -31,15 +31,85 @@ const quarterToMonths = {
   'jan-feb-mar': ['jan', 'feb', 'mar'],
 };
 
-const formatMonths = (monthsOrQuarter) => {
-  if (Array.isArray(monthsOrQuarter)) {
-    return monthsOrQuarter.map((m) => monthLabels[m] || m).join(', ');
+const firstValue = (row, keys) => {
+  for (const key of keys) {
+    const value = row?.[key];
+    if (value !== undefined && value !== null && value !== "") return value;
   }
-  if (typeof monthsOrQuarter === 'string' && quarterToMonths[monthsOrQuarter]) {
-    return quarterToMonths[monthsOrQuarter].map(m => monthLabels[m] || m).join(', ');
-  }
-  return monthsOrQuarter;
+  return "";
 };
+
+const getMonthsRaw = (row) => firstValue(row, [
+  "months", "month", "allotted_months", "allottedMonths", "distribution_months",
+  "distributionMonths", "month_name", "monthName", "months_allotted", "monthsAllotted",
+  "allocation_months", "allocationMonths"
+]);
+
+const getTrimesterRaw = (row) => firstValue(row, [
+  "trimester", "trimester_name", "trimesterName", "quarter", "quarter_name", "quarterName",
+  "quarter_months", "quarterMonths", "distribution_quarter", "distributionQuarter",
+  "months", "month", "allocation_trimester", "allocationTrimester"
+]);
+
+const formatMonthsValue = (value) => {
+  const names = {
+    apr: 'April', april: 'April', may: 'May', jun: 'June', june: 'June',
+    jul: 'July', july: 'July', aug: 'August', august: 'August',
+    sep: 'September', sept: 'September', september: 'September',
+    oct: 'October', october: 'October', nov: 'November', november: 'November',
+    dec: 'December', december: 'December', jan: 'January', january: 'January',
+    feb: 'February', february: 'February', mar: 'March', march: 'March'
+  };
+  const quarters = {
+    'apr-may-jun': ['April', 'May', 'June'], 'april-may-june': ['April', 'May', 'June'],
+    'jul-aug-sep': ['July', 'August', 'September'], 'july-august-september': ['July', 'August', 'September'],
+    'oct-nov-dec': ['October', 'November', 'December'], 'october-november-december': ['October', 'November', 'December'],
+    'jan-feb-mar': ['January', 'February', 'March'], 'january-february-march': ['January', 'February', 'March']
+  };
+  if (Array.isArray(value)) return value.map(m => names[String(m).trim().toLowerCase()] || m).join(', ');
+  const token = String(value ?? '').trim().toLowerCase().replace(/_/g, '-').replace(/\s+/g, '-');
+  if (quarters[token]) return quarters[token].join(', ');
+  const parts = token.split(/[,-/]+/).filter(Boolean);
+  if (parts.length > 1) return parts.map(m => names[m] || m).join(', ');
+  return names[token] || value || '-';
+};
+
+const formatMonths = (row) => {
+  const raw = getMonthsRaw(row);
+  return formatMonthsValue(raw !== "" ? raw : getTrimesterRaw(row));
+};
+
+const normalizeTrimesterKey = (row) => {
+  const raw = getTrimesterRaw(row);
+  const token = (Array.isArray(raw) ? raw.join('-') : String(raw))
+    .trim().toLowerCase().replace(/\s+/g, '').replace(/_/g, '-');
+  const aliases = {
+    'april-may-june': 'apr-may-jun', 'july-august-september': 'jul-aug-sep',
+    'october-november-december': 'oct-nov-dec', 'january-february-march': 'jan-feb-mar',
+    'apr-may-jun': 'apr-may-jun', 'jul-aug-sep': 'jul-aug-sep',
+    'oct-nov-dec': 'oct-nov-dec', 'jan-feb-mar': 'jan-feb-mar'
+  };
+  if (aliases[token]) return aliases[token];
+  const monthAliases = {
+    april: 'apr', june: 'jun', july: 'jul', august: 'aug', september: 'sep',
+    october: 'oct', november: 'nov', december: 'dec', january: 'jan',
+    february: 'feb', march: 'mar'
+  };
+  const months = token.split(/[,-/]+/).filter(Boolean).map(m => monthAliases[m] || m);
+  const groups = {
+    'apr-may-jun': ['apr', 'may', 'jun'], 'jul-aug-sep': ['jul', 'aug', 'sep'],
+    'oct-nov-dec': ['oct', 'nov', 'dec'], 'jan-feb-mar': ['jan', 'feb', 'mar']
+  };
+  for (const [key, group] of Object.entries(groups)) {
+    if (group.every(month => months.includes(month))) return key;
+  }
+  return token || '-';
+};
+
+const formatTrimester = (row) => ({
+  'apr-may-jun': 'Apr-May-Jun', 'jul-aug-sep': 'Jul-Aug-Sep',
+  'oct-nov-dec': 'Oct-Nov-Dec', 'jan-feb-mar': 'Jan-Feb-Mar'
+})[normalizeTrimesterKey(row)] || normalizeTrimesterKey(row);
 
 const ThrDpoDistributions = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -75,9 +145,11 @@ const ThrDpoDistributions = () => {
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin Year', visible: true },
     { dataField: 'months', text: 'Months', visible: true },
+    { dataField: 'trimester', text: 'Trimester', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
+    { dataField: 'anganwadi_remark', text: 'Anganwadi Remark', visible: true },
     { dataField: 'sector_status', text: 'Sector Status', visible: true },
     { dataField: 'action', text: 'Remarks', visible: true },
   ]);
@@ -120,20 +192,16 @@ const ThrDpoDistributions = () => {
   useEffect(() => {
     if (distributions.length > 0) {
       setUniqueFinYears([...new Set(distributions.map(item => item.fin_year))].sort().reverse());
-      const allMonths = distributions.flatMap(item => {
-        const monthData = item.months || item.quarter;
-        if (Array.isArray(monthData)) return monthData;
-        if (typeof monthData === 'string' && quarterToMonths[monthData]) return quarterToMonths[monthData];
-        return [];
-      });
-      setUniqueMonths([...new Set(allMonths)].map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b)));
+      const allMonths = distributions.flatMap(item => formatMonths(item).split(', ').filter(m => m && m !== '-'));
+      const monthOrder = Object.values(monthLabels);
+      setUniqueMonths([...new Set(allMonths)].sort((a, b) => monthOrder.indexOf(a) - monthOrder.indexOf(b)));
 
       setUniqueDistricts([...new Set(distributions.map(item => item.district))]);
       setUniqueProjects([...new Set(distributions.map(item => item.project))]);
       setUniqueSectors([...new Set(distributions.map(item => item.sector))]);
       setUniqueFoodItems([...new Set(distributions.map(item => item.food_item))]);
       setUniqueBeneCategories([...new Set(distributions.map(item => item.bene_category))]);
-      setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status))]);
+      setUniqueSectorStatuses([...new Set(distributions.map(item => item.sector_status).filter(Boolean))]);
       setUniqueCdpoStatuses([...new Set(distributions.map(item => item.cdpo_status))].filter(Boolean));
     }
   }, [distributions]);
@@ -152,7 +220,7 @@ const ThrDpoDistributions = () => {
   const filteredData = useMemo(() => {
     return distributions.filter(item => {
       const { finYear, months, district, project, sector, food_item, bene_category, sector_status, cdpo_status } = filters;
-      const itemMonths = (Array.isArray(item.months) ? item.months : quarterToMonths[item.quarter] || []).map(m => monthLabels[m] || m);
+      const itemMonths = formatMonths(item).split(', ').filter(m => m && m !== '-');
       const monthMatch = months.length === 0 || months.some(filterMonth => itemMonths.includes(filterMonth));
 
       return (finYear.length === 0 || finYear.includes(item.fin_year)) &&
@@ -363,7 +431,7 @@ const ThrDpoDistributions = () => {
       const newRow = { '#': index + 1 };
       visCols.forEach(col => {
         if (col.dataField === 'months') {
-          newRow[col.text] = formatMonths(row.months || row.quarter);
+          newRow[col.text] = formatMonths(row);
         } else if (col.dataField !== '#') {
           newRow[col.text] = row[col.dataField];
         }
@@ -625,13 +693,14 @@ const ThrDpoDistributions = () => {
                   >
                      <thead>
                        <tr>
-                         {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col) => (
-                           <th key={`th-${col.dataField}`}>
-                             {col.dataField === 'bene_category' ? (
-                               <div className="bene-category-cell" style={{ width: '150px' }}>{col.text}</div>
-                             ) : col.text}
-                           </th>
-                         ))}
+                         {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col) => {
+                           const thStyle = {};
+                           if (col.dataField === 'awc_name') thStyle.minWidth = '250px';
+                           if (col.dataField === 'food_item') thStyle.minWidth = '200px';
+                           if (col.dataField === 'bene_category') thStyle.minWidth = '200px';
+                           if (col.dataField === 'anganwadi_remark' || col.dataField === 'action') thStyle.minWidth = '150px';
+                           return <th key={`th-${col.dataField}`} style={thStyle}>{col.text}</th>;
+                         })}
                        </tr>
                      </thead>
                       <tbody>
@@ -644,17 +713,21 @@ const ThrDpoDistributions = () => {
                                   cellContent = index + 1;
                                   break;
                                 case 'bene_category':
-                                  cellContent = (
-                                    <div className="bene-category-cell" style={{ width: '150px' }}>
-                                      {row[col.dataField]}
-                                    </div>
-                                  );
+                                  cellContent = <div>{row[col.dataField] || '-'}</div>;
                                   break;
                                 case 'months':
-                                  cellContent = (Array.isArray(row.months) ? row.months : quarterToMonths[row.quarter] || []).map(m => monthLabels[m] || m).join(', ');
+                                  cellContent = formatMonths(row);
                                   break;
-                                case 'sector_status':
-                                  cellContent = isPrinting ? row[col.dataField] : <Badge bg={getStatusVariant(row[col.dataField])}>{row[col.dataField]}</Badge>;
+                                case 'trimester':
+                                  cellContent = formatTrimester(row);
+                                  break;
+                                case 'sector_status': {
+                                  const status = row[col.dataField] || 'pending';
+                                  cellContent = isPrinting ? status : <Badge bg={getStatusVariant(status)}>{status}</Badge>;
+                                  break;
+                                }
+                                case 'anganwadi_remark':
+                                  cellContent = row.anganwadi_remark || '-';
                                   break;
                                 case 'action':
                                   cellContent = (
@@ -672,12 +745,20 @@ const ThrDpoDistributions = () => {
                                 default:
                                   cellContent = row[col.dataField];
                               }
-                              return <td key={`td-${row.id}-${col.dataField}`}>{cellContent}</td>;
+                              const cellStyle = {};
+                              if (col.dataField === 'awc_name') cellStyle.minWidth = '250px';
+                              if (col.dataField === 'food_item') cellStyle.minWidth = '200px';
+                              if (col.dataField === 'bene_category') cellStyle.minWidth = '200px';
+                              if (['food_item', 'bene_category', 'anganwadi_remark', 'sector_remark'].includes(col.dataField)) {
+                                cellStyle.wordBreak = 'break-word';
+                                cellStyle.whiteSpace = 'normal';
+                              }
+                              return <td key={`td-${row.id}-${col.dataField}`} style={cellStyle}>{cellContent ?? '-'}</td>;
                             })}
                           </tr>
                         )) : (
                           <tr>
-                            <td colSpan={visibleColumns.length} className="text-center">No data available</td>
+                            <td colSpan={visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').length} className="text-center">No data available</td>
                           </tr>
                         )}
                       </tbody>
@@ -722,8 +803,16 @@ const ThrDpoDistributions = () => {
               <div>
                 <div className="mb-3">
                   <h6>Sector Remark</h6>
-                  <p className="mb-1"><strong>Status:</strong> <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>{selectedRemarks.sector_status}</Badge></p>
-                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.sector_remark || "No remark"}</p>
+                  <p className="mb-1"><strong>Status:</strong>{' '}
+                    <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>
+                      {selectedRemarks.sector_status || 'pending'}
+                    </Badge>
+                  </p>
+                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.sector_remark || 'No remark'}</p>
+                </div>
+                <div className="mb-3">
+                  <h6>Anganwadi Details</h6>
+                  <p className="mb-0"><strong>Anganwadi Remark:</strong> {selectedRemarks.anganwadi_remark || 'No remark'}</p>
                 </div>
               </div>
             )}
