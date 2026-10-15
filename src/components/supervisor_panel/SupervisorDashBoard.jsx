@@ -13,6 +13,9 @@ import {
 } from "react-bootstrap";
 
 import { useNavigate } from "react-router-dom";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import * as XLSX from "xlsx";
 
 import { useAuth } from "../all_login/AuthContext";
 
@@ -29,6 +32,8 @@ import {
   FaBoxes,
   FaChartBar,
   FaFileAlt,
+  FaFilePdf,
+  FaFileExcel,
   FaSyncAlt,
   FaTruckLoading,
   FaUserFriends,
@@ -56,6 +61,188 @@ const getTotal = (items, key) =>
     (total, item) => total + (Number(item?.[key]) || 0),
     0,
   );
+
+
+const ExportActions = ({ onPdf, onExcel }) => (
+  <ButtonGroup size="sm" aria-label="Export table">
+    <Button variant="outline-danger" onClick={onPdf} title="Export this table to PDF">
+      <FaFilePdf className="me-1" /> PDF
+    </Button>
+    <Button variant="outline-success" onClick={onExcel} title="Export this table to Excel">
+      <FaFileExcel className="me-1" /> Excel
+    </Button>
+  </ButtonGroup>
+);
+
+const ensureHindiFont = async () => {
+  // Load an actual Devanagari webfont; jsPDF's built-in fonts do not contain Hindi glyphs.
+  const fontId = "supervisor-dashboard-noto-devanagari";
+  let link = document.getElementById(fontId);
+  if (!link) {
+    link = document.createElement("link");
+    link.id = fontId;
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap";
+    document.head.appendChild(link);
+  }
+
+  await new Promise((resolve) => {
+    if (document.fonts?.check('16px "Noto Sans Devanagari"')) return resolve();
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    link.addEventListener("load", finish, { once: true });
+    link.addEventListener("error", finish, { once: true });
+    // Do not block exports indefinitely if the network/font service is unavailable.
+    window.setTimeout(finish, 4000);
+  });
+
+  if (document.fonts?.load) {
+    try {
+      await document.fonts.load('16px "Noto Sans Devanagari"');
+      await document.fonts.ready;
+    } catch (error) {
+      console.warn("Hindi font could not be loaded; using available system fonts.", error);
+    }
+  }
+};
+
+const getRowSafePdfSlices = (root, canvas, maxSliceHeight) => {
+  // Convert DOM row boundaries to canvas pixels so a PDF page break is placed
+  // between rows whenever possible instead of cutting through a row.
+  const rootRect = root.getBoundingClientRect();
+  const scaleY = canvas.height / Math.max(rootRect.height, 1);
+  const rowBottoms = [...root.querySelectorAll("tr")]
+    .map((row) => Math.round((row.getBoundingClientRect().bottom - rootRect.top) * scaleY))
+    .filter((bottom) => bottom > 0 && bottom < canvas.height)
+    .sort((a, b) => a - b);
+
+  const slices = [];
+  let start = 0;
+  while (start < canvas.height) {
+    const limit = Math.min(start + maxSliceHeight, canvas.height);
+    let end = limit;
+    if (limit < canvas.height) {
+      const safeBoundary = rowBottoms.filter((bottom) => bottom > start + 20 && bottom <= limit - 12).pop();
+      if (safeBoundary) end = safeBoundary;
+    }
+    if (end <= start) end = limit;
+    slices.push({ start, end });
+    start = end;
+  }
+  return slices;
+};
+
+const exportRowsToPDF = async (title, headers, rows, filename) => {
+  const exportRoot = document.createElement("div");
+  exportRoot.style.cssText = [
+    "position:fixed", "left:-20000px", "top:0", "z-index:-1",
+    "width:1400px", "padding:28px", "box-sizing:border-box",
+    "background:#ffffff", "color:#172033",
+    'font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",sans-serif'
+  ].join(";");
+
+  const heading = document.createElement("h2");
+  heading.textContent = title;
+  heading.style.cssText = "font-size:22px;margin:0 0 16px;font-weight:700;";
+  exportRoot.appendChild(heading);
+
+  const table = document.createElement("table");
+  table.style.cssText = "width:100%;border-collapse:collapse;table-layout:auto;font-size:12px;";
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  headers.forEach((header) => {
+    const th = document.createElement("th");
+    th.textContent = header;
+    th.style.cssText = `background:#1f4e79;color:#fff;border:1px solid #cbd5e1;padding:5px;text-align:left;font-weight:700;white-space:${header === "#" ? "nowrap" : "normal"};${header === "#" ? "width:34px;min-width:34px;max-width:34px;" : ""}`;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  const exportRows = rows.length
+    ? rows
+    : [Object.fromEntries(headers.map((header, index) => [header, index === 0 ? "No records found" : ""]))];
+
+  exportRows.forEach((row) => {
+    const tr = document.createElement("tr");
+    headers.forEach((header) => {
+      const td = document.createElement("td");
+      const value = row[header];
+      td.textContent = value === null || value === undefined || value === "" ? "—" : String(value);
+      td.style.cssText = `border:1px solid #cbd5e1;padding:4px;white-space:${header === "#" ? "nowrap" : "normal"};overflow-wrap:${header === "#" ? "normal" : "anywhere"};vertical-align:top;${header === "#" ? "width:34px;min-width:34px;max-width:34px;text-align:center;" : ""}`;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  exportRoot.appendChild(table);
+  document.body.appendChild(exportRoot);
+
+  try {
+    await ensureHindiFont();
+    const canvas = await html2canvas(exportRoot, {
+      scale: 1.0,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      windowWidth: Math.max(document.documentElement.clientWidth, 1440),
+    });
+    const pdf = new jsPDF({
+      orientation: headers.length > 6 ? "landscape" : "portrait",
+      unit: "mm",
+      format: "a4",
+      compress: true,
+    });
+    const marginX = 8;
+    const marginTop = 12;
+    const marginBottom = 12;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imageWidth = pageWidth - marginX * 2;
+    const pageContentHeight = pageHeight - marginTop - marginBottom;
+    const maxSliceHeight = Math.floor(canvas.width * pageContentHeight / imageWidth);
+    const pageCanvas = document.createElement("canvas");
+    const ctx = pageCanvas.getContext("2d");
+    pageCanvas.width = canvas.width;
+    const slices = getRowSafePdfSlices(exportRoot, canvas, maxSliceHeight);
+
+    slices.forEach(({ start, end }, pageIndex) => {
+      const sliceHeight = end - start;
+      pageCanvas.height = sliceHeight;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+      ctx.drawImage(canvas, 0, start, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+      if (pageIndex > 0) pdf.addPage();
+      const imageData = pageCanvas.toDataURL("image/jpeg", 0.48);
+      const renderedHeight = sliceHeight * imageWidth / canvas.width;
+      pdf.addImage(imageData, "JPEG", marginX, marginTop, imageWidth, Math.min(renderedHeight, pageContentHeight), undefined, "FAST");
+    });
+    pdf.save(filename);
+  } catch (error) {
+    console.error("Failed to generate PDF:", error);
+    window.alert("Could not generate the PDF. Please try again.");
+  } finally {
+    exportRoot.remove();
+  }
+};
+
+const exportRowsToExcel = (title, headers, rows, filename) => {
+  const data = rows.length
+    ? rows.map(row => Object.fromEntries(headers.map(header => [header, row[header] ?? ""])))
+    : [Object.fromEntries(headers.map(header => [header, ""]))];
+  const worksheet = XLSX.utils.json_to_sheet(data, { header: headers });
+  worksheet["!cols"] = headers.map(header => ({
+    wch: Math.min(34, Math.max(header.length + 2, ...data.map(row => String(row[header] ?? "").length + 2))),
+  }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, title.slice(0, 31));
+  XLSX.writeFile(workbook, filename, { compression: true });
+};
 
 const DistributionSummaryTable = ({ items, loading }) => (
   <div className="dpo-table-wrapper">
@@ -344,6 +531,179 @@ const SupervisorDashBoard = () => {
     },
   ];
 
+
+  const makeDistributionRows = (items) => items.map((item, index) => ({
+    "#": index + 1,
+    "Total Beneficiaries": Number(item.total_beneficiaries) || 0,
+    "Total Quantity": Number(item.total_quantity) || 0,
+    Unit: item.unit || "—",
+  }));
+  const makeReceivingRows = (items) => items.map((item, index) => ({
+    "#": index + 1,
+    "Quantity Received": Number(item.total_quantity) || 0,
+    Unit: item.unit || "—",
+  }));
+  const makeReconciliationRows = (items, scheme) => items.map((row, index) => {
+    const formatQty = (value) => {
+      const n = Number(value) || 0;
+      return scheme === "hcm"
+        ? `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} g (${(n / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 })} kg)`
+        : `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} packets`;
+    };
+    return {
+      "#": index + 1,
+      "AWC Name": row.awc_name || "—",
+      "AWC Code": row.awc_code || "—",
+      Sector: row.sector || "—",
+      Trimester: row.month || "—",
+      "Financial Year": row.financial_year || "—",
+      "Food Item": row.food_item || "—",
+      "Beneficiary Category": row.bene_category || "—",
+      Received: formatQty(row.received_quantity),
+      Distributed: formatQty(row.distributed_quantity),
+      Remaining: formatQty(row.balance_quantity),
+    };
+  });
+  const makeFoodRows = (items) => items.map((item, index) => ({
+    "#": index + 1,
+    "Food Item": item.food_item || "—",
+    "Beneficiary Category": item.beneficiary_category || item.bene_category || "—",
+  }));
+  const exportDistribution = (scheme, items, type) => {
+    const headers = ["#", "Total Beneficiaries", "Total Quantity", "Unit"];
+    const rows = makeDistributionRows(items);
+    const title = `${scheme} Distribution Summary`;
+    const base = `${scheme.toLowerCase()}_distribution_summary`;
+    type === "pdf" ? exportRowsToPDF(title, headers, rows, `${base}.pdf`) : exportRowsToExcel(title, headers, rows, `${base}.xlsx`);
+  };
+  const exportReceiving = (scheme, items, type) => {
+    const headers = ["#", "Quantity Received", "Unit"];
+    const rows = makeReceivingRows(items);
+    const title = `${scheme} Received Summary`;
+    const base = `${scheme.toLowerCase()}_received_summary`;
+    type === "pdf" ? exportRowsToPDF(title, headers, rows, `${base}.pdf`) : exportRowsToExcel(title, headers, rows, `${base}.xlsx`);
+  };
+  const activeReconciliation = reconciliationTab === "hcm" ? hcmReconciliation : thrReconciliation;
+  const exportReconciliation = (type) => {
+    const headers = ["#", "AWC Name", "AWC Code", "Sector", "Trimester", "Financial Year", "Food Item", "Beneficiary Category", "Received", "Distributed", "Remaining"];
+    const rows = makeReconciliationRows(activeReconciliation, reconciliationTab);
+    const title = `${reconciliationTab.toUpperCase()} Supplies Reconciliation`;
+    const base = `${reconciliationTab}_supplies_reconciliation`;
+    type === "pdf" ? exportRowsToPDF(title, headers, rows, `${base}.pdf`) : exportRowsToExcel(title, headers, rows, `${base}.xlsx`);
+  };
+  const exportFoodItems = (type) => {
+    const headers = ["#", "Food Item", "Beneficiary Category"];
+    const rows = makeFoodRows(foodItems);
+    const title = `${foodItemsTab.toUpperCase()} Food Items`;
+    const base = `${foodItemsTab}_food_items`;
+    type === "pdf" ? exportRowsToPDF(title, headers, rows, `${base}.pdf`) : exportRowsToExcel(title, headers, rows, `${base}.xlsx`);
+  };
+
+  // Export all four HCM/THR distribution and receiving summaries into one file.
+  const exportAllDistributionReceiving = (type) => {
+    const sections = [
+      { title: "HCM Distribution Summary", headers: ["#", "Total Beneficiaries", "Total Quantity", "Unit"], rows: makeDistributionRows(hcmDistributions) },
+      { title: "HCM Received Summary", headers: ["#", "Quantity Received", "Unit"], rows: makeReceivingRows(hcmReceipts) },
+      { title: "THR Distribution Summary", headers: ["#", "Total Beneficiaries", "Total Quantity", "Unit"], rows: makeDistributionRows(thrDistributions) },
+      { title: "THR Received Summary", headers: ["#", "Quantity Received", "Unit"], rows: makeReceivingRows(thrReceipts) },
+    ];
+
+    if (type === "pdf") {
+      // Render through the browser so Devanagari/Hindi uses a real system font;
+      // jsPDF's built-in fonts do not support Hindi glyphs and show garbled text.
+      const exportRoot = document.createElement("div");
+      exportRoot.style.cssText = "position:fixed;left:-10000px;top:0;width:1100px;background:#fff;color:#172033;padding:28px;font-family:'Noto Sans Devanagari','Nirmala UI','Mangal',Arial,sans-serif;box-sizing:border-box;";
+      sections.forEach((section) => {
+        const sectionEl = document.createElement("section");
+        sectionEl.style.cssText = "width:100%;margin:0 0 22px 0;page-break-inside:avoid;";
+        const heading = document.createElement("h2");
+        heading.textContent = section.title;
+        heading.style.cssText = "font-size:20px;margin:0 0 12px;padding:0 0 8px;border-bottom:2px solid #5967d6;font-weight:700;";
+        sectionEl.appendChild(heading);
+        const table = document.createElement("table");
+        table.style.cssText = "width:100%;border-collapse:collapse;table-layout:auto;font-size:12px;";
+        const thead = document.createElement("thead");
+        const headerRow = document.createElement("tr");
+        section.headers.forEach((header) => {
+          const th = document.createElement("th");
+          th.textContent = header;
+          th.style.cssText = `background:#5967d6;color:#fff;border:1px solid #d5d9e8;padding:5px;text-align:left;font-weight:700;white-space:${header === "#" ? "nowrap" : "normal"};${header === "#" ? "width:34px;min-width:34px;max-width:34px;" : ""}`;
+          headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        const tbody = document.createElement("tbody");
+        const exportRows = section.rows.length ? section.rows : [Object.fromEntries(section.headers.map((h, i) => [h, i === 0 ? "No records found" : ""]))];
+        exportRows.forEach((row) => {
+          const tr = document.createElement("tr");
+          section.headers.forEach((header) => {
+            const td = document.createElement("td");
+            const value = row[header];
+            td.textContent = value === null || value === undefined || value === "" ? "—" : String(value);
+            td.style.cssText = `border:1px solid #d5d9e8;padding:4px;overflow-wrap:${header === "#" ? "normal" : "anywhere"};white-space:${header === "#" ? "nowrap" : "normal"};${header === "#" ? "width:34px;min-width:34px;max-width:34px;text-align:center;" : ""}`;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        sectionEl.appendChild(table);
+        exportRoot.appendChild(sectionEl);
+      });
+      document.body.appendChild(exportRoot);
+      // Wait for available system fonts before rasterizing the HTML table.
+      const renderPdf = async () => {
+        if (document.fonts?.ready) await document.fonts.ready;
+        return html2canvas(exportRoot, { scale: 1.0, useCORS: true, backgroundColor: "#ffffff", logging: false });
+      };
+      renderPdf().then((canvas) => {
+        const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const marginX = 8;
+        const marginTop = 12;
+        const marginBottom = 12;
+        const imageWidth = pageWidth - marginX * 2;
+        const pageContentHeight = pageHeight - marginTop - marginBottom;
+        const maxSliceHeight = Math.floor(canvas.width * pageContentHeight / imageWidth);
+        const pageCanvas = document.createElement("canvas");
+        const ctx = pageCanvas.getContext("2d");
+        pageCanvas.width = canvas.width;
+        const slices = getRowSafePdfSlices(exportRoot, canvas, maxSliceHeight);
+        slices.forEach(({ start, end }, pageIndex) => {
+          const sliceHeight = end - start;
+          pageCanvas.height = sliceHeight;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+          ctx.drawImage(canvas, 0, start, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+          if (pageIndex > 0) pdf.addPage();
+          const imageData = pageCanvas.toDataURL("image/jpeg", 0.48);
+          const renderedHeight = sliceHeight * imageWidth / canvas.width;
+          pdf.addImage(imageData, "JPEG", marginX, marginTop, imageWidth, Math.min(renderedHeight, pageContentHeight), undefined, "FAST");
+        });
+        pdf.save("hcm_thr_distribution_receiving_summary.pdf");
+      }).catch((err) => {
+        console.error("Failed to generate combined summary PDF:", err);
+        window.alert("Could not generate the PDF. Please try again.");
+      }).finally(() => {
+        exportRoot.remove();
+      });
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    sections.forEach(section => {
+      const data = section.rows.length
+        ? section.rows.map(row => Object.fromEntries(section.headers.map(header => [header, row[header] ?? ""])))
+        : [Object.fromEntries(section.headers.map(header => [header, "No records found"]))];
+      const worksheet = XLSX.utils.json_to_sheet(data, { header: section.headers });
+      worksheet["!cols"] = section.headers.map(header => ({
+        wch: Math.min(34, Math.max(header.length + 2, ...data.map(row => String(row[header] ?? "").length + 2))),
+      }));
+      XLSX.utils.book_append_sheet(workbook, worksheet, section.title.slice(0, 31));
+    });
+    XLSX.writeFile(workbook, "hcm_thr_distribution_receiving_summary.xlsx", { compression: true });
+  };
+
   return (
     <div className="dashboard-container">
       <SupervisorLeftNav
@@ -505,6 +865,25 @@ const SupervisorDashBoard = () => {
             ))}
           </div>
 
+          <div className="d-flex justify-content-end flex-wrap gap-2 mb-2">
+            <Button
+              variant="outline-danger"
+              onClick={() => exportAllDistributionReceiving("pdf")}
+              disabled={loading}
+              title="Export all four HCM and THR summary tables to one PDF"
+            >
+              <FaFilePdf className="me-1" /> Export Summary PDF
+            </Button>
+            <Button
+              variant="outline-success"
+              onClick={() => exportAllDistributionReceiving("excel")}
+              disabled={loading}
+              title="Export all four HCM and THR summary tables to one Excel workbook"
+            >
+              <FaFileExcel className="me-1" /> Export Summary Excel
+            </Button>
+          </div>
+
           <Row className="g-3">
             {[
               {
@@ -563,8 +942,8 @@ const SupervisorDashBoard = () => {
                   </Card.Header>
 
                   <Card.Body className="p-0">
-                    <div className="px-3 pt-3 pb-2 fw-bold text-secondary small text-uppercase">
-                      Distribution Summary
+                    <div className="px-3 pt-3 pb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                      <span className="fw-bold text-secondary small text-uppercase">Distribution Summary</span>
                     </div>
 
                     <DistributionSummaryTable
@@ -572,8 +951,8 @@ const SupervisorDashBoard = () => {
                       loading={loading && !scheme.summary}
                     />
 
-                    <div className="px-3 pt-3 pb-2 fw-bold text-secondary small text-uppercase">
-                      Received Summary
+                    <div className="px-3 pt-3 pb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                      <span className="fw-bold text-secondary small text-uppercase">Received Summary</span>
                     </div>
 
                     <ReceivingSummaryTable
@@ -608,6 +987,10 @@ const SupervisorDashBoard = () => {
                   THR ({formatCount(thrReconciliation.length)})
                 </Button>
               </ButtonGroup>
+              <ExportActions
+                onPdf={() => exportReconciliation("pdf")}
+                onExcel={() => exportReconciliation("excel")}
+              />
             </Card.Header>
             <Card.Body className="p-0">
               <div className="dpo-table-wrapper">
@@ -709,6 +1092,10 @@ const SupervisorDashBoard = () => {
                   THR ({formatCount(thrFoodItems.length)})
                 </Button>
               </ButtonGroup>
+              <ExportActions
+                onPdf={() => exportFoodItems("pdf")}
+                onExcel={() => exportFoodItems("excel")}
+              />
             </Card.Header>
 
             <Card.Body className="p-0">
