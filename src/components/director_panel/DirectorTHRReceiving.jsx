@@ -41,11 +41,152 @@ const monthLabels = {
   mar: 'March',
 };
 
-const formatMonths = (months) => {
-  if (Array.isArray(months)) {
-    return months.map(m => monthLabels[m.toLowerCase()] || m).join(', ');
+const firstAvailableValue = (row, keys) => {
+  for (const key of keys) {
+    const value = row?.[key];
+    if (value !== undefined && value !== null && value !== "") return value;
   }
-  return months; // Fallback for old `quarter` string data
+  return "";
+};
+
+const quarterToMonths = {
+  "apr-may-jun": ["apr", "may", "jun"],
+  "jul-aug-sep": ["jul", "aug", "sep"],
+  "oct-nov-dec": ["oct", "nov", "dec"],
+  "jan-feb-mar": ["jan", "feb", "mar"],
+};
+
+const normalizeMonthToken = (value) => {
+  const token = String(value ?? "").trim().toLowerCase().replace(/\./g, "");
+  const aliases = {
+    april: "apr", apr: "apr", may: "may", june: "jun", jun: "jun",
+    july: "jul", jul: "jul", august: "aug", aug: "aug",
+    september: "sep", sept: "sep", sep: "sep", october: "oct", oct: "oct",
+    november: "nov", nov: "nov", december: "dec", dec: "dec",
+    january: "jan", jan: "jan", february: "feb", feb: "feb",
+    march: "mar", mar: "mar",
+  };
+  return aliases[token] || token;
+};
+
+const getTrimesterValue = (row) => firstAvailableValue(row, [
+  "quarter", "trimester", "trimester_name", "trimesterName",
+  "quarter_name", "quarterName", "distribution_quarter", "distributionQuarter",
+  "quarter_months", "quarterMonths", "trimester_months", "trimesterMonths",
+]);
+
+const getMonthArray = (row) => {
+  const raw = firstAvailableValue(row, [
+    "months", "month", "month_names", "monthNames", "allotted_months",
+    "allottedMonths", "distribution_months", "distributionMonths",
+  ]) || getTrimesterValue(row);
+  if (Array.isArray(raw)) {
+    return raw.flatMap((entry) => {
+      if (entry == null || entry === "") return [];
+      const normalized = normalizeMonthToken(entry);
+      if (quarterToMonths[normalized]) return quarterToMonths[normalized];
+      return normalized.split(/[,\s/|]+/).filter(Boolean).map(normalizeMonthToken);
+    }).filter((month) => Object.prototype.hasOwnProperty.call(monthLabels, month));
+  }
+  if (typeof raw === "number") return [];
+  const value = String(raw ?? "").trim();
+  if (!value) return [];
+  const normalized = value.toLowerCase().replace(/_/g, "-").replace(/\s+/g, "-");
+  const quarterAliases = {
+    "april-may-june": "apr-may-jun",
+    "july-august-september": "jul-aug-sep",
+    "october-november-december": "oct-nov-dec",
+    "january-february-march": "jan-feb-mar",
+  };
+  const quarter = quarterAliases[normalized] || normalized;
+  if (quarterToMonths[quarter]) return quarterToMonths[quarter];
+  const parsed = value.split(/[,\s/|]+|-(?=[A-Za-z])/)
+    .map(normalizeMonthToken)
+    .filter((month) => Object.prototype.hasOwnProperty.call(monthLabels, month));
+  if (parsed.length) return parsed;
+  const single = normalizeMonthToken(value);
+  return Object.prototype.hasOwnProperty.call(monthLabels, single) ? [single] : [];
+};
+
+const formatMonths = (monthsOrRow) => {
+  const months = Array.isArray(monthsOrRow)
+    ? monthsOrRow
+    : (monthsOrRow && typeof monthsOrRow === "object"
+      ? getMonthArray(monthsOrRow)
+      : (Array.isArray(monthsOrRow) ? monthsOrRow : []));
+  if (months.length) {
+    return [...new Set(months.map(normalizeMonthToken))]
+      .map((month) => monthLabels[month] || month)
+      .join(", ");
+  }
+  if (monthsOrRow && typeof monthsOrRow === "object") {
+    const raw = getTrimesterValue(monthsOrRow);
+    return raw || "-";
+  }
+  return monthsOrRow || "-";
+};
+
+const formatRecordTrimester = (row) => {
+  const raw = getTrimesterValue(row);
+  const token = String(raw ?? "").trim().toLowerCase().replace(/_/g, "-").replace(/\s+/g, "-");
+  const aliases = {
+    "april-may-june": "apr-may-jun",
+    "july-august-september": "jul-aug-sep",
+    "october-november-december": "oct-nov-dec",
+    "january-february-march": "jan-feb-mar",
+  };
+  const normalized = aliases[token] || token;
+  if (quarterToMonths[normalized]) {
+    return quarterToMonths[normalized].map((month) => monthLabels[month]).join(" - ");
+  }
+  const months = getMonthArray(row);
+  if (months.length >= 3) {
+    for (const quarterMonths of Object.values(quarterToMonths)) {
+      if (quarterMonths.every((month) => months.includes(month))) {
+        return quarterMonths.map((month) => monthLabels[month]).join(" - ");
+      }
+    }
+  }
+  return raw || "-";
+};
+
+const formatDateValue = (value) => {
+  if (!value) return "-";
+  const raw = String(value).trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? raw
+    : `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+};
+
+const getRecordDate = (row) => firstAvailableValue(row, [
+  "date", "distribution_date", "distributionDate", "received_date",
+  "receivedDate", "created_at", "createdAt",
+]);
+const getCurrentMonth = (row) => firstAvailableValue(row, [
+  "curr_month", "current_month", "currentMonth", "month_current", "monthCurrent",
+]);
+const getMaxExpiryDate = (row) => firstAvailableValue(row, [
+  "max_expirydate", "max_expiry_date", "maxExpiryDate", "expiry_date", "expiryDate",
+]);
+const getReportField = (row, field) => {
+  const aliases = {
+    awc_name: ["awc_name", "awcName", "anganwadi_name", "anganwadiName"],
+    awc_code: ["awc_code", "awcCode", "anganwadi_code", "anganwadiCode"],
+    awc_type: ["awc_type", "awcType", "anganwadi_type", "anganwadiType"],
+    district: ["district", "district_name", "districtName"],
+    project: ["project", "project_name", "projectName"],
+    sector: ["sector", "sector_name", "sectorName"],
+    food_item: ["food_item", "foodItem", "food_item_name", "foodItemName"],
+    bene_category: ["bene_category", "beneCategory", "beneficiary_category", "beneficiaryCategory"],
+    quantity: ["quantity", "received_quantity", "receivedQuantity", "total_quantity", "totalQuantity"],
+    unit: ["unit", "quantity_unit", "quantityUnit"],
+    fin_year: ["fin_year", "financial_year", "financialYear"],
+    sector_status: ["sector_status", "sectorStatus", "status"],
+  };
+  return firstAvailableValue(row, aliases[field] || [field]);
 };
 
 const DirectorTHRReceiving = () => {
@@ -97,8 +238,10 @@ const DirectorTHRReceiving = () => {
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
     { dataField: "months", text: "Months", visible: true },
-    { dataField: "curr_month", text: "Current Month", visible: true }, // New
-    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true }, // New
+    { dataField: "quarter", text: "Trimester", visible: true },
+    { dataField: "curr_month", text: "Current Month", visible: true },
+    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
+    { dataField: "sector_status", text: "Sector Status", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
@@ -122,7 +265,7 @@ const DirectorTHRReceiving = () => {
   useEffect(() => {
     if (reports.length > 0) {
       setUniqueFinYears([...new Set(reports.map((item) => item.fin_year))]);
-      const allMonths = reports.flatMap(item => Array.isArray(item.months) ? item.months.map(m => m.toLowerCase()) : (item.quarter ? [item.quarter] : []));
+      const allMonths = reports.flatMap((item) => getMonthArray(item));
       const uniqueMonthKeys = [...new Set(allMonths)];
       const formattedUniqueMonths = uniqueMonthKeys.map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b));
       setUniqueMonths(formattedUniqueMonths);
@@ -181,7 +324,7 @@ const DirectorTHRReceiving = () => {
   const filteredReports = useMemo(() => {
     return reports.filter((item) => {
       const { fin_year, months, district, project, sector, food_item, bene_category } = filters;
-      const itemMonths = Array.isArray(item.months) ? item.months.map(m => monthLabels[m.toLowerCase()] || m) : [item.quarter];
+      const itemMonths = getMonthArray(item).map((month) => monthLabels[month] || month);
 
       return (
         (fin_year.length === 0 || fin_year.includes(item.fin_year)) &&
@@ -301,16 +444,21 @@ const DirectorTHRReceiving = () => {
     const dataToExport = filteredReports.map((row, index) => {
       const newRow = { "#": index + 1 };
       visCols.forEach((col) => {
-        if (col.dataField === 'quantity' && typeof row[col.dataField] === 'number') {
-          newRow[col.text] = row[col.dataField].toFixed(2);
-          return;
-        }
-        if (col.dataField === 'months') {
-          newRow[col.text] = formatMonths(row.months || row.quarter);
-        } else if (col.dataField === 'max_expirydate') {
-          newRow[col.text] = row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString('en-CA') : '';
+        if (col.dataField === "months") {
+          newRow[col.text] = formatMonths(row);
+        } else if (col.dataField === "quarter") {
+          newRow[col.text] = formatRecordTrimester(row);
+        } else if (col.dataField === "date") {
+          newRow[col.text] = formatDateValue(getRecordDate(row));
+        } else if (col.dataField === "max_expirydate") {
+          newRow[col.text] = formatDateValue(getMaxExpiryDate(row));
+        } else if (col.dataField === "curr_month") {
+          newRow[col.text] = getCurrentMonth(row) || "";
         } else {
-          newRow[col.text] = row[col.dataField];
+          const value = getReportField(row, col.dataField);
+          newRow[col.text] = col.dataField === "quantity" && value !== "" && !Number.isNaN(Number(value))
+            ? Number(value).toFixed(2)
+            : value;
         }
       });
       return newRow;
@@ -724,15 +872,19 @@ const DirectorTHRReceiving = () => {
                                   <td key={col.dataField}>
                                     {col.dataField === "#"
                                       ? (currentPage - 1) * itemsPerPage + index + 1
-                                      : col.dataField === "months" 
-                                      ? formatMonths(report.months || report.quarter)
-                                      : col.dataField === "date" 
-                                      ? new Date(report[col.dataField]).toLocaleDateString()
-                                      : col.dataField === "max_expirydate" 
-                                      ? (report.max_expirydate ? new Date(report.max_expirydate).toLocaleDateString() : '-')
+                                      : col.dataField === "months"
+                                      ? formatMonths(report)
+                                      : col.dataField === "quarter"
+                                      ? formatRecordTrimester(report)
+                                      : col.dataField === "date"
+                                      ? formatDateValue(getRecordDate(report))
+                                      : col.dataField === "curr_month"
+                                      ? (getCurrentMonth(report) || "-")
+                                      : col.dataField === "max_expirydate"
+                                      ? formatDateValue(getMaxExpiryDate(report))
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
-                                      ? new Date(report[col.dataField]).toLocaleString()
-                                      : report[col.dataField]}
+                                      ? (report[col.dataField] ? new Date(report[col.dataField]).toLocaleString() : "-")
+                                      : (getReportField(report, col.dataField) || "-")}
                                   </td>
                                 ))}
                               </tr>

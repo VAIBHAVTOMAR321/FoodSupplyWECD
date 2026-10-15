@@ -41,12 +41,132 @@ const monthLabels = {
   mar: 'March',
 };
 
-const formatMonths = (months) => {
-  if (Array.isArray(months)) {
-    return months.map(m => monthLabels[m.toLowerCase()] || m).join(', ');
-  }
-  return months; // Fallback for old `quarter` string data
+const quarterToMonths = {
+  'apr-may-jun': ['apr', 'may', 'jun'],
+  'jul-aug-sep': ['jul', 'aug', 'sep'],
+  'oct-nov-dec': ['oct', 'nov', 'dec'],
+  'jan-feb-mar': ['jan', 'feb', 'mar'],
 };
+
+const firstAvailableValue = (row, keys) => {
+  for (const key of keys) {
+    const value = row?.[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
+};
+
+const normalizeMonthToken = (value) => {
+  const token = String(value ?? "").trim().toLowerCase().replace(/\./g, "");
+  const aliases = {
+    april: "apr", apr: "apr", may: "may", june: "jun", jun: "jun",
+    july: "jul", jul: "jul", august: "aug", aug: "aug",
+    september: "sep", sept: "sep", sep: "sep", october: "oct", oct: "oct",
+    november: "nov", nov: "nov", december: "dec", dec: "dec",
+    january: "jan", jan: "jan", february: "feb", feb: "feb",
+    march: "mar", mar: "mar",
+  };
+  return aliases[token] || token;
+};
+
+const getTrimesterValue = (row) =>
+  firstAvailableValue(row, [
+    "quarter", "trimester", "trimester_name", "trimesterName",
+    "quarter_name", "quarterName", "distribution_quarter", "distributionQuarter",
+    "quarter_months", "quarterMonths", "trimester_months", "trimesterMonths",
+  ]);
+
+const getMonthArray = (row) => {
+  const raw = firstAvailableValue(row, [
+    "months", "month", "month_names", "monthNames", "allotted_months",
+    "allottedMonths", "distribution_months", "distributionMonths",
+  ]) || getTrimesterValue(row);
+
+  if (Array.isArray(raw)) {
+    return raw.flatMap((entry) => {
+      if (entry == null || entry === "") return [];
+      const normalized = normalizeMonthToken(entry);
+      if (quarterToMonths[normalized]) return quarterToMonths[normalized];
+      return normalized.split(/[,\s/|]+/).filter(Boolean).map(normalizeMonthToken);
+    }).filter(Boolean);
+  }
+
+  if (typeof raw === "number") return [];
+  const text = String(raw ?? "").trim();
+  if (!text) return [];
+
+  const normalizedText = text.toLowerCase().replace(/_/g, "-").replace(/\s+/g, "-");
+  if (quarterToMonths[normalizedText]) return quarterToMonths[normalizedText];
+  const quarterAliases = {
+    "april-may-june": "apr-may-jun",
+    "july-august-september": "jul-aug-sep",
+    "october-november-december": "oct-nov-dec",
+    "january-february-march": "jan-feb-mar",
+  };
+  if (quarterAliases[normalizedText]) return quarterToMonths[quarterAliases[normalizedText]];
+
+  const parts = text.split(/[,\s/|]+|-(?=[A-Za-z])/).filter(Boolean);
+  const parsed = parts.map(normalizeMonthToken).filter((part) => Object.prototype.hasOwnProperty.call(monthLabels, part));
+  if (parsed.length) return parsed;
+
+  const single = normalizeMonthToken(text);
+  return Object.prototype.hasOwnProperty.call(monthLabels, single) ? [single] : [];
+};
+
+const formatRecordMonths = (row) => {
+  const months = getMonthArray(row);
+  return months.length ? [...new Set(months)].map((month) => monthLabels[month] || month).join(", ") : "-";
+};
+
+const formatRecordTrimester = (row) => {
+  const raw = getTrimesterValue(row);
+  if (raw && !Array.isArray(raw) && typeof raw === "string") {
+    const token = raw.trim().toLowerCase().replace(/_/g, "-").replace(/\s+/g, "-");
+    const aliases = {
+      "april-may-june": "apr-may-jun",
+      "july-august-september": "jul-aug-sep",
+      "october-november-december": "oct-nov-dec",
+      "january-february-march": "jan-feb-mar",
+    };
+    const normalized = aliases[token] || token;
+    if (quarterToMonths[normalized]) return quarterToMonths[normalized].map((m) => monthLabels[m]).join(" - ");
+    if (raw.trim()) return raw;
+  }
+  const months = getMonthArray(row);
+  if (months.length >= 3) {
+    const monthSet = new Set(months);
+    for (const [quarter, quarterMonths] of Object.entries(quarterToMonths)) {
+      if (quarterMonths.every((month) => monthSet.has(month))) {
+        return quarterMonths.map((month) => monthLabels[month]).join(" - ");
+      }
+    }
+  }
+  return "-";
+};
+
+const formatDateValue = (value) => {
+  if (!value) return "-";
+  const raw = String(value).trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? raw
+    : `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+};
+
+const getRecordDate = (row) => firstAvailableValue(row, [
+  "date", "distribution_date", "distributionDate", "received_date",
+  "receivedDate", "created_at", "createdAt",
+]);
+
+const getCurrentMonth = (row) => firstAvailableValue(row, [
+  "curr_month", "current_month", "currentMonth", "month_current", "monthCurrent",
+]);
+const getMaxExpiryDate = (row) => firstAvailableValue(row, [
+  "max_expirydate", "max_expiry_date", "maxExpiryDate", "expiry_date", "expiryDate",
+]);
+
 
 const DirectorHCMReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -74,7 +194,6 @@ const DirectorHCMReceiving = () => {
   });
   const [uniqueMonths, setUniqueMonths] = useState([]);
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
-  const [uniqueQuarters, setUniqueQuarters] = useState([]);
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
@@ -97,8 +216,10 @@ const DirectorHCMReceiving = () => {
     { dataField: "unit", text: "Unit", visible: true },
     { dataField: "fin_year", text: "Fin. Year", visible: true },
     { dataField: "months", text: "Months", visible: true },
-    { dataField: "curr_month", text: "Current Month", visible: true }, // New
-    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true }, // New
+    { dataField: "quarter", text: "Trimester", visible: true },
+    { dataField: "curr_month", text: "Current Month", visible: true },
+    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
+    { dataField: "sector_status", text: "Sector Status", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
@@ -122,9 +243,10 @@ const DirectorHCMReceiving = () => {
   useEffect(() => {
     if (reports.length > 0) {
       setUniqueFinYears([...new Set(reports.map((item) => item.fin_year))]);
-      const allMonths = reports.flatMap(item => Array.isArray(item.months) ? item.months.map(m => m.toLowerCase()) : (item.quarter ? [item.quarter] : []));
-      const uniqueMonthKeys = [...new Set(allMonths)];
-      const formattedUniqueMonths = uniqueMonthKeys.map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b));
+      const allMonths = reports.flatMap((item) => getMonthArray(item));
+      const formattedUniqueMonths = [...new Set(allMonths)]
+        .map((month) => monthLabels[month] || month)
+        .sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b));
       setUniqueMonths(formattedUniqueMonths);
       setUniqueDistricts([...new Set(reports.map((item) => item.district))]);
       setUniqueProjects([...new Set(reports.map((item) => item.project))]);
@@ -181,11 +303,12 @@ const DirectorHCMReceiving = () => {
   const filteredReports = useMemo(() => {
     return reports.filter((item) => {
       const { fin_year, months, district, project, sector, food_item, bene_category } = filters;
-      const itemMonths = Array.isArray(item.months) ? item.months.map(m => monthLabels[m.toLowerCase()] || m) : [item.quarter];
+      const itemMonths = getMonthArray(item).map((month) => monthLabels[month] || month);
+      const monthMatch = months.length === 0 || months.some((filterMonth) => itemMonths.includes(filterMonth));
 
       return (
         (fin_year.length === 0 || fin_year.includes(item.fin_year)) &&
-        (months.length === 0 || itemMonths.some(month => months.includes(month))) &&
+        monthMatch &&
         (district.length === 0 || district.includes(item.district)) &&
         (project.length === 0 || project.includes(item.project)) &&
         (sector.length === 0 || sector.includes(item.sector)) &&
@@ -318,16 +441,21 @@ const DirectorHCMReceiving = () => {
     const dataToExport = filteredReports.map((row, index) => {
       const newRow = { "#": index + 1 };
       visCols.forEach((col) => {
-        if (col.dataField === 'quantity' && typeof row[col.dataField] === 'number') {
-          newRow[col.text] = row[col.dataField].toFixed(2);
-          return;
-        }
-        if (col.dataField === 'months') {
-          newRow[col.text] = formatMonths(row.months || row.quarter);
+        if (col.dataField === 'quantity') {
+          const quantity = Number(row.quantity);
+          newRow[col.text] = Number.isFinite(quantity) ? quantity.toFixed(2) : '';
+        } else if (col.dataField === 'months') {
+          newRow[col.text] = formatRecordMonths(row);
+        } else if (col.dataField === 'quarter') {
+          newRow[col.text] = formatRecordTrimester(row);
+        } else if (col.dataField === 'date') {
+          newRow[col.text] = formatDateValue(getRecordDate(row));
         } else if (col.dataField === 'max_expirydate') {
-          newRow[col.text] = row.max_expirydate ? new Date(row.max_expirydate).toLocaleDateString('en-CA') : '';
+          newRow[col.text] = formatDateValue(getMaxExpiryDate(row));
+        } else if (col.dataField === 'curr_month') {
+          newRow[col.text] = getCurrentMonth(row) || '';
         } else {
-          newRow[col.text] = row[col.dataField];
+          newRow[col.text] = row[col.dataField] ?? '';
         }
       });
       return newRow;
@@ -715,15 +843,19 @@ const DirectorHCMReceiving = () => {
                                   <td key={col.dataField}>
                                     {col.dataField === "#"
                                       ? (currentPage - 1) * itemsPerPage + index + 1
-                                      : col.dataField === "months" 
-                                      ? formatMonths(report.months || report.quarter)
-                                      : col.dataField === "date" 
-                                      ? new Date(report[col.dataField]).toLocaleDateString()
-                                      : col.dataField === "max_expirydate" // Added formatting for max_expirydate
-                                      ? (report.max_expirydate ? new Date(report.max_expirydate).toLocaleDateString() : '-')
+                                      : col.dataField === "months"
+                                      ? formatRecordMonths(report)
+                                      : col.dataField === "quarter"
+                                      ? formatRecordTrimester(report)
+                                      : col.dataField === "date"
+                                      ? formatDateValue(getRecordDate(report))
+                                      : col.dataField === "curr_month"
+                                      ? (getCurrentMonth(report) || "-")
+                                      : col.dataField === "max_expirydate"
+                                      ? formatDateValue(getMaxExpiryDate(report))
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
-                                      ? new Date(report[col.dataField]).toLocaleString()
-                                      : report[col.dataField]}
+                                      ? (report[col.dataField] ? new Date(report[col.dataField]).toLocaleString() : "-")
+                                      : (report[col.dataField] ?? "-")}
                                   </td>
                                 ))}
                               </tr>

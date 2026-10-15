@@ -23,14 +23,85 @@ const monthLabels = {
   mar: 'March',
 };
 
-const formatMonths = (monthsArray) => {
-  if (Array.isArray(monthsArray)) {
-    // The month 'june' from input is corrected to 'jun' to match a potential key.
-    return monthsArray.map(m => monthLabels[m.toLowerCase()] || m).join(', ');
-  }
-  return monthsArray; // Fallback for old `quarter` string data
+const quarterToMonths = {
+  'apr-may-jun': ['apr', 'may', 'jun'],
+  'jul-aug-sep': ['jul', 'aug', 'sep'],
+  'oct-nov-dec': ['oct', 'nov', 'dec'],
+  'jan-feb-mar': ['jan', 'feb', 'mar'],
 };
 
+const firstValue = (row, keys) => {
+  for (const key of keys) {
+    const value = row?.[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
+};
+
+const fieldAliases = {
+  district: ["district", "district_name", "districtName"],
+  project: ["project", "project_name", "projectName"],
+  sector: ["sector", "sector_name", "sectorName"],
+  awc_name: ["awc_name", "awcName", "anganwadi_name", "anganwadiName"],
+  awc_code: ["awc_code", "awcCode", "anganwadi_code", "anganwadiCode"],
+  awc_type: ["awc_type", "awcType", "anganwadi_type", "anganwadiType"],
+  food_item: ["food_item", "foodItem", "food_item_name", "foodItemName"],
+  bene_category: ["bene_category", "beneCategory", "beneficiary_category", "beneficiaryCategory"],
+  days_allotted: ["days_allotted", "daysAllotted", "allotted_days", "allottedDays"],
+  fin_year: ["fin_year", "finYear", "financial_year", "financialYear"],
+  months: ["months", "month", "allotted_months", "allottedMonths", "distribution_months", "distributionMonths", "month_name", "monthName", "months_allotted", "monthsAllotted", "allocation_months", "allocationMonths"],
+  trimester: ["trimester", "trimester_name", "trimesterName", "quarter", "quarter_name", "quarterName", "quarter_months", "quarterMonths", "distribution_quarter", "distributionQuarter", "allocation_trimester", "allocationTrimester"],
+  total_beneficiaries: ["total_beneficiaries", "totalBeneficiaries", "beneficiaries", "beneficiary_count", "beneficiaryCount"],
+  quantity: ["quantity", "total_quantity", "totalQuantity", "qty", "distributed_quantity", "distributedQuantity"],
+  unit: ["unit", "quantity_unit", "quantityUnit"],
+  expired_quantity: ["expired_quantity", "expiredQuantity", "expiry_quantity", "expiryQuantity"],
+  anganwadi_remark: ["anganwadi_remark", "anganwadiRemark", "awc_remark", "awcRemark", "remark", "remarks"],
+  sector_status: ["sector_status", "sectorStatus", "status"],
+  cdpo_status: ["cdpo_status", "cdpoStatus", "project_status", "projectStatus"],
+  sector_remark: ["sector_remark", "sectorRemark", "supervisor_remark", "supervisorRemark"],
+};
+
+const getField = (row, field) => firstValue(row, fieldAliases[field] || [field]);
+
+const getMonthsRaw = (row) => getField(row, "months") || getField(row, "trimester");
+
+const formatMonthsValue = (value) => {
+  const names = {
+    apr: 'April', april: 'April', may: 'May', jun: 'June', june: 'June',
+    jul: 'July', july: 'July', aug: 'August', august: 'August',
+    sep: 'September', sept: 'September', september: 'September',
+    oct: 'October', october: 'October', nov: 'November', november: 'November',
+    dec: 'December', december: 'December', jan: 'January', january: 'January',
+    feb: 'February', february: 'February', mar: 'March', march: 'March'
+  };
+  const quarters = {
+    'apr-may-jun': ['April', 'May', 'June'], 'april-may-june': ['April', 'May', 'June'],
+    'jul-aug-sep': ['July', 'August', 'September'], 'july-august-september': ['July', 'August', 'September'],
+    'oct-nov-dec': ['October', 'November', 'December'], 'october-november-december': ['October', 'November', 'December'],
+    'jan-feb-mar': ['January', 'February', 'March'], 'january-february-march': ['January', 'February', 'March']
+  };
+  if (Array.isArray(value)) return value.map(m => names[String(m).trim().toLowerCase()] || m).join(', ');
+  const token = String(value ?? '').trim().toLowerCase().replace(/_/g, '-').replace(/\s+/g, '-');
+  if (quarters[token]) return quarters[token].join(', ');
+  const parts = token.split(/[,-/]+/).filter(Boolean);
+  if (parts.length > 1) return parts.map(m => names[m] || m).join(', ');
+  return names[token] || value || '-';
+};
+
+const formatMonths = (rowOrValue) => {
+  if (rowOrValue && typeof rowOrValue === 'object' && !Array.isArray(rowOrValue)) {
+    return formatMonthsValue(getMonthsRaw(rowOrValue));
+  }
+  return formatMonthsValue(rowOrValue);
+};
+
+const normalizeStatus = (value) => String(value || '').trim().toLowerCase();
+const statusBadgeClass = (value) => {
+  const status = normalizeStatus(value);
+  if (status === 'approved' || status === 'accepted') return 'success';
+  if (status === 'rejected' || status === 'declined') return 'danger';
+  return 'warning';
+};
 
 const THRDirectorReport = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -51,6 +122,7 @@ const THRDirectorReport = () => {
     sector: [],
     food_item: [],
     bene_category: [],
+    sector_status: [],
   });
   const [uniqueFinYears, setUniqueFinYears] = useState([]);
   const [uniqueMonths, setUniqueMonths] = useState([]);
@@ -59,6 +131,7 @@ const THRDirectorReport = () => {
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
+  const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
@@ -77,12 +150,13 @@ const THRDirectorReport = () => {
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
     { dataField: 'fin_year', text: 'Fin. Year', visible: true },
     { dataField: 'months', text: 'Months', visible: true },
+    { dataField: 'trimester', text: 'Trimester', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
     { dataField: 'quantity', text: 'Quantity', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
-    { dataField: 'expired_quantity', text: 'Expired Qty', visible: true },
-    { dataField: 'anganwadi_remark', text: 'Remark', visible: true },
-    { dataField: 'sector_status', text: 'Sector Status', visible: true }
+    { dataField: 'anganwadi_remark', text: 'Anganwadi Remark', visible: true },
+    { dataField: 'sector_status', text: 'Sector Status', visible: true },
+    { dataField: 'sector_remark', text: 'Sector Remark', visible: true }
   ];
 
   const [columns, setColumns] = useState(initialColumns);
@@ -93,21 +167,22 @@ const THRDirectorReport = () => {
     setError("");
     try {
       const response = await api.get("/thr-director-distributions/");
-      const data = response.data.data || [];
+      const raw = response.data?.data || response.data || [];
+      const data = Array.isArray(raw) ? raw : raw ? [raw] : [];
       setReportData(data);
-      setUniqueFinYears([...new Set(data.map((item) => item.fin_year))]);
-
-      // Extract unique individual months for the filter
-      const allMonths = data.flatMap(item => Array.isArray(item.months) ? item.months.map(m => m.toLowerCase()) : (item.quarter ? [item.quarter] : []));
-      const uniqueMonthKeys = [...new Set(allMonths)];
-      const formattedUniqueMonths = uniqueMonthKeys.map(m => monthLabels[m] || m).sort((a, b) => Object.values(monthLabels).indexOf(a) - Object.values(monthLabels).indexOf(b));
-      setUniqueMonths(formattedUniqueMonths);
-
-      setUniqueDistricts([...new Set(data.map((item) => item.district))]);
-      setUniqueProjects([...new Set(data.map((item) => item.project))]);
-      setUniqueSectors([...new Set(data.map((item) => item.sector))]);
-      setUniqueFoodItems([...new Set(data.map((item) => item.food_item))]);
-      setUniqueBeneCategories([...new Set(data.map((item) => item.bene_category))]);
+      setUniqueFinYears([...new Set(data.map(item => getField(item, 'fin_year')).filter(Boolean))].sort().reverse());
+      const allMonths = data.flatMap(item => formatMonths(item).split(', ').filter(m => m && m !== '-'));
+      const monthOrder = Object.values(monthLabels);
+      setUniqueMonths([...new Set(allMonths)].sort((a, b) => {
+        const ai = monthOrder.indexOf(a); const bi = monthOrder.indexOf(b);
+        return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+      }));
+      setUniqueDistricts([...new Set(data.map(item => getField(item, 'district')).filter(Boolean))]);
+      setUniqueProjects([...new Set(data.map(item => getField(item, 'project')).filter(Boolean))]);
+      setUniqueSectors([...new Set(data.map(item => getField(item, 'sector')).filter(Boolean))]);
+      setUniqueFoodItems([...new Set(data.map(item => getField(item, 'food_item')).filter(Boolean))]);
+      setUniqueBeneCategories([...new Set(data.map(item => getField(item, 'bene_category')).filter(Boolean))]);
+      setUniqueSectorStatuses([...new Set(data.map(item => getField(item, 'sector_status')).filter(Boolean))]);
     } catch (err) {
       setError("Failed to fetch THR report data.");
       console.error(err);
@@ -131,18 +206,16 @@ const THRDirectorReport = () => {
 
   useEffect(() => {
     let data = [...reportData];
-    if (filters.finYear.length) data = data.filter((item) => filters.finYear.includes(item.fin_year));
+    if (filters.finYear.length) data = data.filter(item => filters.finYear.includes(getField(item, 'fin_year')));
     if (filters.months.length) {
-      data = data.filter(item => {
-        const itemMonths = Array.isArray(item.months) ? item.months.map(m => monthLabels[m.toLowerCase()] || m) : [item.quarter];
-        return itemMonths.some(month => filters.months.includes(month));
-      });
+      data = data.filter(item => filters.months.some(month => formatMonths(item).split(', ').includes(month)));
     }
-    if (filters.district.length) data = data.filter((item) => filters.district.includes(item.district));
-    if (filters.project.length) data = data.filter((item) => filters.project.includes(item.project));
-    if (filters.sector.length) data = data.filter((item) => filters.sector.includes(item.sector));
-    if (filters.food_item.length) data = data.filter((item) => filters.food_item.includes(item.food_item));
-    if (filters.bene_category.length) data = data.filter((item) => filters.bene_category.includes(item.bene_category));
+    if (filters.district.length) data = data.filter(item => filters.district.includes(getField(item, 'district')));
+    if (filters.project.length) data = data.filter(item => filters.project.includes(getField(item, 'project')));
+    if (filters.sector.length) data = data.filter(item => filters.sector.includes(getField(item, 'sector')));
+    if (filters.food_item.length) data = data.filter(item => filters.food_item.includes(getField(item, 'food_item')));
+    if (filters.bene_category.length) data = data.filter(item => filters.bene_category.includes(getField(item, 'bene_category')));
+    if (filters.sector_status.length) data = data.filter(item => filters.sector_status.includes(getField(item, 'sector_status')));
     setFilteredData(data);
     setCurrentPage(1);
   }, [filters, reportData]);
@@ -172,9 +245,9 @@ const THRDirectorReport = () => {
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
-      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-      const unit = item.unit || 'N/A';
-      const quantity = parseFloat(item.quantity) || 0;
+      acc.beneficiaries += Number(getField(item, 'total_beneficiaries')) || 0;
+      const unit = getField(item, 'unit') || 'N/A';
+      const quantity = parseFloat(getField(item, 'quantity')) || 0;
       if (!acc.quantityByUnit[unit]) {
         acc.quantityByUnit[unit] = 0;
       }
@@ -254,10 +327,11 @@ const THRDirectorReport = () => {
       const newRow = { '#': index + 1 };
       visibleColumns.forEach(col => {
         if (col.dataField === 'months') {
-          newRow[col.text] = formatMonths(row.months || row.quarter || row.months);
-        }
-        else {
-          newRow[col.text] = row[col.dataField];
+          newRow[col.text] = formatMonths(row);
+        } else if (col.dataField === 'trimester') {
+          newRow[col.text] = formatMonths(getField(row, 'trimester'));
+        } else {
+          newRow[col.text] = getField(row, col.dataField);
         }
       });
       return newRow;
@@ -423,6 +497,23 @@ const THRDirectorReport = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
+            <Col md={2} className="mt-2">
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status" className="w-100">
+                  {filters.sector_status.length ? `${filters.sector_status.length} selected` : 'All Sector Status'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueSectorStatuses.map(status => (
+                    <Dropdown.Item key={status} as="div">
+                      <Form.Check type="checkbox" label={status} checked={filters.sector_status.includes(status)} onChange={() => handleMultiSelectChange('sector_status', status)} />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={2} className="mt-2">
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [] })}>Clear Filters</Button>
+            </Col>
           </Row>
 
           {loading ? (
@@ -461,15 +552,20 @@ const THRDirectorReport = () => {
                             );
                             break;
                           case 'months':
-                            cellContent = formatMonths(row.months || row.quarter);
+                            cellContent = formatMonths(row);
                             break;
-                          case 'sector_status':
-                            cellContent = isPrinting 
-                              ? row[col.dataField] 
-                              : <span className={`badge bg-${row[col.dataField] === 'approved' ? 'success' : row[col.dataField] === 'rejected' ? 'danger' : 'warning'}`}>{row[col.dataField]}</span>;
+                          case 'sector_status': {
+                            const status = getField(row, col.dataField);
+                            cellContent = isPrinting || !status
+                              ? (status || '-')
+                              : <span className={`badge bg-${statusBadgeClass(status)}`}>{status}</span>;
+                            break;
+                          }
+                          case 'trimester':
+                            cellContent = formatMonths(getField(row, 'trimester'));
                             break;
                           default:
-                            cellContent = row[col.dataField];
+                            cellContent = getField(row, col.dataField) || '-';
                         }
                         return <td key={i}>{cellContent}</td>;
                       })}

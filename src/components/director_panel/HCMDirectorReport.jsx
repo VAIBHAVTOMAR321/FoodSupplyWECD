@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Container, Row, Col, Form, Spinner, Table, Button, Alert, Pagination, Modal, Dropdown } from "react-bootstrap";
+import { Container, Row, Col, Form, Spinner, Table, Button, Alert, Pagination, Modal, Dropdown, Badge } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
@@ -7,6 +7,121 @@ import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
+
+const firstValue = (row, keys) => {
+  for (const key of keys) {
+    const value = row?.[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
+};
+
+const getDistributionDateRaw = (row) => firstValue(row, [
+  "date", "distribution_date", "distributionDate", "distributed_date", "distributedDate",
+  "date_of_distribution", "dateOfDistribution", "allotment_date", "allotmentDate",
+  "created_at", "createdAt", "timestamp"
+]);
+
+const formatDistributionDate = (value) => {
+  if (!value) return "-";
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return raw;
+  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+};
+
+const getMonthsRaw = (row) => firstValue(row, [
+  "months", "month", "allotted_months", "allottedMonths", "distribution_months",
+  "distributionMonths", "month_name", "monthName", "months_allotted", "monthsAllotted",
+  "allocation_months", "allocationMonths"
+]);
+
+const getTrimesterRaw = (row) => firstValue(row, [
+  "trimester", "trimester_name", "trimesterName", "quarter", "quarter_name", "quarterName",
+  "quarter_months", "quarterMonths", "distribution_quarter", "distributionQuarter",
+  "allocation_trimester", "allocationTrimester"
+]);
+
+const formatMonthsValue = (value) => {
+  const names = {
+    apr: "April", april: "April", may: "May", jun: "June", june: "June",
+    jul: "July", july: "July", aug: "August", august: "August",
+    sep: "September", sept: "September", september: "September", oct: "October", october: "October",
+    nov: "November", november: "November", dec: "December", december: "December",
+    jan: "January", january: "January", feb: "February", february: "February", mar: "March", march: "March"
+  };
+  const quarterMap = {
+    "apr-may-jun": ["April", "May", "June"], "april-may-june": ["April", "May", "June"],
+    "jul-aug-sep": ["July", "August", "September"], "july-august-september": ["July", "August", "September"],
+    "oct-nov-dec": ["October", "November", "December"], "october-november-december": ["October", "November", "December"],
+    "jan-feb-mar": ["January", "February", "March"], "january-february-march": ["January", "February", "March"]
+  };
+  if (Array.isArray(value)) return value.map(v => names[String(v).trim().toLowerCase()] || v).join(", ");
+  const raw = String(value ?? "").trim();
+  if (!raw) return "-";
+  const token = raw.toLowerCase().replace(/_/g, "-").replace(/\s+/g, "-");
+  if (quarterMap[token]) return quarterMap[token].join(", ");
+  const parts = token.split(/[,-/|]+/).filter(Boolean);
+  if (parts.length > 1) return parts.map(v => names[v] || v).join(", ");
+  return names[token] || raw;
+};
+
+const formatMonths = (row) => {
+  const months = getMonthsRaw(row);
+  return formatMonthsValue(months !== "" ? months : getTrimesterRaw(row));
+};
+
+const normalizeTrimesterKey = (row) => {
+  const raw = getTrimesterRaw(row) || getMonthsRaw(row);
+  const token = (Array.isArray(raw) ? raw.join("-") : String(raw ?? ""))
+    .trim().toLowerCase().replace(/\s+/g, "").replace(/_/g, "-");
+  const aliases = {
+    "april-may-june": "apr-may-jun", "july-august-september": "jul-aug-sep",
+    "october-november-december": "oct-nov-dec", "january-february-march": "jan-feb-mar"
+  };
+  const normalized = aliases[token] || token;
+  const groups = {
+    "apr-may-jun": ["apr", "may", "jun"], "jul-aug-sep": ["jul", "aug", "sep"],
+    "oct-nov-dec": ["oct", "nov", "dec"], "jan-feb-mar": ["jan", "feb", "mar"]
+  };
+  if (groups[normalized]) return normalized;
+  const monthAliases = { april: "apr", june: "jun", july: "jul", august: "aug", september: "sep", october: "oct", november: "nov", december: "dec", january: "jan", february: "feb", march: "mar" };
+  const parts = normalized.split(/[,-/|]+/).filter(Boolean).map(m => monthAliases[m] || m);
+  for (const [key, months] of Object.entries(groups)) if (months.every(m => parts.includes(m))) return key;
+  return normalized || "-";
+};
+
+const formatTrimester = (row) => ({
+  "apr-may-jun": "Apr-May-Jun", "jul-aug-sep": "Jul-Aug-Sep",
+  "oct-nov-dec": "Oct-Nov-Dec", "jan-feb-mar": "Jan-Feb-Mar"
+})[normalizeTrimesterKey(row)] || normalizeTrimesterKey(row);
+
+const getFieldValue = (row, field) => {
+  const aliases = {
+    awc_name: ["awc_name", "awcName", "anganwadi_name", "anganwadiName"],
+    awc_code: ["awc_code", "awcCode", "anganwadi_code", "anganwadiCode"],
+    awc_type: ["awc_type", "awcType", "type_of_awc", "typeOfAwc"],
+    days_allotted: ["days_allotted", "daysAllotted", "allotted_days", "allottedDays"],
+    fin_year: ["fin_year", "finYear", "financial_year", "financialYear"],
+    total_beneficiaries: ["total_beneficiaries", "totalBeneficiaries", "beneficiaries", "beneficiary_count"],
+    quantity: ["quantity", "total_quantity", "totalQuantity", "qty"],
+    anganwadi_remark: ["anganwadi_remark", "anganwadiRemark", "awc_remark", "awcRemark", "remark"],
+    sector_status: ["sector_status", "sectorStatus", "status"],
+    sector_remark: ["sector_remark", "sectorRemark"],
+    bene_category: ["bene_category", "beneCategory", "beneficiary_category", "beneficiaryCategory"],
+    food_item: ["food_item", "foodItem"],
+    sector: ["sector", "sector_name", "sectorName"],
+    project: ["project", "project_name", "projectName"],
+    district: ["district", "district_name", "districtName"],
+    unit: ["unit", "quantity_unit", "quantityUnit"]
+  };
+  if (field === "date") return getDistributionDateRaw(row);
+  if (field === "months") return formatMonths(row);
+  if (field === "trimester") return formatTrimester(row);
+  return firstValue(row, aliases[field] || [field]);
+};
 
 const HCMDirectorReport = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -27,12 +142,16 @@ const HCMDirectorReport = () => {
     sector: [],
     food_item: [],
     bene_category: [],
+    awc_type: [],
+    sector_status: [],
   });
   const [uniqueDistricts, setUniqueDistricts] = useState([]);
   const [uniqueProjects, setUniqueProjects] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
+  const [uniqueAwcTypes, setUniqueAwcTypes] = useState([]);
+  const [uniqueSectorStatuses, setUniqueSectorStatuses] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
@@ -40,21 +159,25 @@ const HCMDirectorReport = () => {
 
   const initialColumns = [
     { dataField: '#', text: '#', visible: true },
-    { dataField: 'district', text: 'District', visible: true },
-    { dataField: 'project', text: 'Project', visible: true },
-    { dataField: 'sector', text: 'Sector', visible: true },
     { dataField: 'awc_name', text: 'AWC Name', visible: true },
     { dataField: 'awc_code', text: 'AWC Code', visible: true },
     { dataField: 'awc_type', text: 'AWC Type', visible: true },
+    { dataField: 'sector', text: 'Sector', visible: true },
+    { dataField: 'project', text: 'Project', visible: true },
+    { dataField: 'district', text: 'District', visible: true },
     { dataField: 'food_item', text: 'Food Item', visible: true },
-    { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
     { dataField: 'days_allotted', text: 'Days Allotted', visible: true },
+    { dataField: 'bene_category', text: 'Beneficiary Category', visible: true },
     { dataField: 'date', text: 'Date', visible: true },
+    { dataField: 'fin_year', text: 'Fin Year', visible: true },
+    { dataField: 'months', text: 'Months', visible: true },
+    { dataField: 'trimester', text: 'Trimester', visible: true },
     { dataField: 'total_beneficiaries', text: 'Beneficiaries', visible: true },
-    { dataField: 'quantity', text: 'Quantity', visible: true },
+    { dataField: 'quantity', text: 'Qty', visible: true },
     { dataField: 'unit', text: 'Unit', visible: true },
-    { dataField: 'expired_quantity', text: 'Expired Qty', visible: true },
-    { dataField: 'anganwadi_remark', text: 'Remark', visible: true },
+    { dataField: 'anganwadi_remark', text: 'Anganwadi Remark', visible: true },
+    { dataField: 'sector_status', text: 'Sector Status', visible: true },
+    { dataField: 'sector_remark', text: 'Sector Remark', visible: false },
   ];
 
   const [columns, setColumns] = useState(initialColumns);
@@ -67,11 +190,13 @@ const HCMDirectorReport = () => {
       const response = await api.get("/hcm-director-distributions/");
       const data = response.data.data || [];
       setReportData(data);
-      setUniqueDistricts([...new Set(data.map((item) => item.district))]);
-      setUniqueProjects([...new Set(data.map((item) => item.project))]);
-      setUniqueSectors([...new Set(data.map((item) => item.sector))]);
-      setUniqueFoodItems([...new Set(data.map((item) => item.food_item))]);
-      setUniqueBeneCategories([...new Set(data.map((item) => item.bene_category))]);
+      setUniqueDistricts([...new Set(data.map((item) => getFieldValue(item, 'district')).filter(Boolean))]);
+      setUniqueProjects([...new Set(data.map((item) => getFieldValue(item, 'project')).filter(Boolean))]);
+      setUniqueSectors([...new Set(data.map((item) => getFieldValue(item, 'sector')).filter(Boolean))]);
+      setUniqueFoodItems([...new Set(data.map((item) => getFieldValue(item, 'food_item')).filter(Boolean))]);
+      setUniqueBeneCategories([...new Set(data.map((item) => getFieldValue(item, 'bene_category')).filter(Boolean))]);
+      setUniqueAwcTypes([...new Set(data.map((item) => getFieldValue(item, 'awc_type')).filter(Boolean))]);
+      setUniqueSectorStatuses([...new Set(data.map((item) => getFieldValue(item, 'sector_status')).filter(Boolean))]);
     } catch (err) {
       setError("Failed to fetch HCM report data.");
       console.error(err);
@@ -95,17 +220,21 @@ const HCMDirectorReport = () => {
 
   useEffect(() => {
     let data = [...reportData];
-    if (filters.startDate && filters.endDate) {
-      data = data.filter(item => {
-        const itemDate = new Date(item.date);
-        return itemDate >= new Date(filters.startDate) && itemDate <= new Date(filters.endDate);
-      });
-    }
-    if (filters.district.length) data = data.filter((item) => filters.district.includes(item.district));
-    if (filters.project.length) data = data.filter((item) => filters.project.includes(item.project));
-    if (filters.sector.length) data = data.filter((item) => filters.sector.includes(item.sector));
-    if (filters.food_item.length) data = data.filter((item) => filters.food_item.includes(item.food_item));
-    if (filters.bene_category.length) data = data.filter((item) => filters.bene_category.includes(item.bene_category));
+    const { startDate, endDate, district, project, sector, food_item, bene_category, awc_type, sector_status } = filters;
+    data = data.filter(item => {
+      const rawDate = getDistributionDateRaw(item);
+      const itemDate = rawDate ? new Date(rawDate) : null;
+      const matchesStart = !startDate || (itemDate && !Number.isNaN(itemDate.getTime()) && itemDate >= new Date(`${startDate}T00:00:00`));
+      const matchesEnd = !endDate || (itemDate && !Number.isNaN(itemDate.getTime()) && itemDate <= new Date(`${endDate}T23:59:59`));
+      return matchesStart && matchesEnd &&
+        (!district.length || district.includes(getFieldValue(item, 'district'))) &&
+        (!project.length || project.includes(getFieldValue(item, 'project'))) &&
+        (!sector.length || sector.includes(getFieldValue(item, 'sector'))) &&
+        (!food_item.length || food_item.includes(getFieldValue(item, 'food_item'))) &&
+        (!bene_category.length || bene_category.includes(getFieldValue(item, 'bene_category'))) &&
+        (!awc_type.length || awc_type.includes(getFieldValue(item, 'awc_type'))) &&
+        (!sector_status.length || sector_status.includes(getFieldValue(item, 'sector_status')));
+    });
     setFilteredData(data);
     setCurrentPage(1);
   }, [filters, reportData]);
@@ -135,9 +264,9 @@ const HCMDirectorReport = () => {
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => {
-      acc.beneficiaries += Number(item.total_beneficiaries) || 0;
-      const unit = item.unit || 'N/A';
-      const quantity = parseFloat(item.quantity) || 0;
+      acc.beneficiaries += Number(getFieldValue(item, 'total_beneficiaries')) || 0;
+      const unit = getFieldValue(item, 'unit') || 'N/A';
+      const quantity = parseFloat(getFieldValue(item, 'quantity')) || 0;
       if (!acc.quantityByUnit[unit]) {
         acc.quantityByUnit[unit] = 0;
       }
@@ -215,7 +344,7 @@ const HCMDirectorReport = () => {
       const newRow = { '#': index + 1 };
       visibleColumns.forEach(col => {
         if (col.dataField !== '#') {
-          newRow[col.text] = row[col.dataField];
+          newRow[col.text] = getFieldValue(row, col.dataField) ?? '';
         }
       });
       return newRow;
@@ -326,6 +455,29 @@ const HCMDirectorReport = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
+            <Col md={2} className="mt-2">
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-awc-type-hcm" className="w-100">
+                  {filters.awc_type.length ? `${filters.awc_type.length} types selected` : 'All AWC Types'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueAwcTypes.map(type => <Dropdown.Item key={type} as="div"><Form.Check type="checkbox" label={type} checked={filters.awc_type.includes(type)} onChange={() => handleMultiSelectChange('awc_type', type)} /></Dropdown.Item>)}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={2} className="mt-2">
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status-hcm" className="w-100">
+                  {filters.sector_status.length ? `${filters.sector_status.length} statuses selected` : 'All Sector Statuses'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uniqueSectorStatuses.map(status => <Dropdown.Item key={status} as="div"><Form.Check type="checkbox" label={status} checked={filters.sector_status.includes(status)} onChange={() => handleMultiSelectChange('sector_status', status)} /></Dropdown.Item>)}
+                </Dropdown.Menu>
+              </Dropdown>
+            </Col>
+            <Col md={2} className="mt-2 d-flex align-items-end">
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ startDate: '', endDate: '', district: [], project: [], sector: [], food_item: [], bene_category: [], awc_type: [], sector_status: [] })}>Clear Filters</Button>
+            </Col>
           </Row>
 
           {loading ? <div className="text-center"><Spinner animation="border" /></div> : error ? <Alert variant="danger">{error}</Alert> : (
@@ -346,18 +498,30 @@ const HCMDirectorReport = () => {
                 </thead>
                 <tbody>
                   {currentItems.length > 0 ? currentItems.map((row, index) => (
-                    <tr key={row.id}>
+                    <tr key={row.id ?? `${getFieldValue(row, 'awc_code')}-${getDistributionDateRaw(row)}-${index}`}>
                       {columns.map((col, i) => {
                         if (!col.visible) return null;
                         let cellContent;
                         if (col.dataField === '#') {
                           cellContent = indexOfFirstItem + index + 1;
                         } else if (col.dataField === 'food_item') {
-                          cellContent = <div className="food-item-cell" style={{ width: '180px' }}>{row[col.dataField]}</div>;
+                          cellContent = <div className="food-item-cell" style={{ width: '180px' }}>{getFieldValue(row, col.dataField) || '-'}</div>;
                         } else if (col.dataField === 'bene_category') {
-                          cellContent = <div className="bene-category-cell" style={{ width: '150px' }}>{row[col.dataField]}</div>;
+                          cellContent = <div className="bene-category-cell" style={{ width: '150px' }}>{getFieldValue(row, col.dataField) || '-'}</div>;
+                        } else if (col.dataField === 'date') {
+                          cellContent = formatDistributionDate(getDistributionDateRaw(row));
+                        } else if (col.dataField === 'months') {
+                          cellContent = formatMonths(row);
+                        } else if (col.dataField === 'trimester') {
+                          cellContent = formatTrimester(row);
+                        } else if (col.dataField === 'sector_status') {
+                          const status = getFieldValue(row, 'sector_status') || 'pending';
+                          const normalizedStatus = String(status).toLowerCase();
+                          const variant = normalizedStatus === 'approved' ? 'success' : normalizedStatus === 'rejected' ? 'danger' : 'warning';
+                          cellContent = <Badge bg={variant}>{status}</Badge>;
                         } else {
-                          cellContent = row[col.dataField];
+                          const value = getFieldValue(row, col.dataField);
+                          cellContent = value === '' || value === null || value === undefined ? '-' : value;
                         }
                         return <td key={i}>{cellContent}</td>
                       })}
