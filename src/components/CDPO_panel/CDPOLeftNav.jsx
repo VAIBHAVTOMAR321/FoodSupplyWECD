@@ -43,6 +43,7 @@ import {
 } from "react-icons/fa";
 
 import { useAuth } from "../all_login/AuthContext";
+import { FaBoxesStacked } from "react-icons/fa6";
 
 
 const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClick }) => {
@@ -86,12 +87,12 @@ const CDPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavCli
         path: "/FoodSupplementary",
         active: true,
       },
-      //  {
-      //   icon: <FaTachometerAlt />,
-      //   label: "New FoodSupplementary",
-      //   path: "/CDPOFoodSupplementary",
-      //   active: true,
-      // },
+       {
+        icon: <FaBoxesStacked />,
+        label: "Master Supplementary",
+        path: "/CDPOMaterSupplementary",
+        active: true,
+      },
 //  {
 //         icon: <FaUsers />,
 //         label: "Beneficiary Entry",

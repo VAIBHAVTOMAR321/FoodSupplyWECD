@@ -45,7 +45,7 @@ const API_URL = "/supplementary-nutrition-master/";
 const DUPLICATE_CHECK_FIELDS = [
   "district",
   "project",
-  "month",
+  "quarter",
   "financial_year",
 ];
 
@@ -53,7 +53,7 @@ const DUPLICATE_CHECK_FIELDS = [
 const COLUMN_MAPPING = {
   DISTRICT: "district",
   PROJECT: "project",
-  MONTH: "month",
+  QUARTER: "quarter",
   "FINANCIAL YEAR": "financial_year",
   "Pregnant Woman and Lactating Mother": "pregnant_woman_lactating_mother",
   "Children 6m-3y": "children_6m_3y",
@@ -83,26 +83,18 @@ const NUMERIC_FIELDS = [
   "multi_grain_aata_3y_6y",
 ];
 
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+const QUARTERS = [
+  "Apr-May-Jun",
+  "Jul-Aug-Sep",
+  "Oct-Nov-Dec",
+  "Jan-Feb-Mar",
 ];
 
 // Preview table columns definition
 const PREVIEW_COLUMNS = [
   { key: "district", label: "District", isDuplicate: true },
   { key: "project", label: "Project", isDuplicate: true },
-  { key: "month", label: "Month", isDuplicate: true },
+  { key: "quarter", label: "Quarter", isDuplicate: true },
   { key: "financial_year", label: "Financial Year", isDuplicate: true },
   { key: "pregnant_woman_lactating_mother", label: "PW & LM", isDuplicate: false },
   { key: "poushik_sattu_preg_lat", label: "Poushik Sattu", isDuplicate: false },
@@ -135,7 +127,7 @@ const ITBeneEntry = () => {
   const [itemsPerPage] = useState(10);
   const [filters, setFilters] = useState({
     financial_year: "",
-    month: "",
+    quarter: "",
   });
 
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
@@ -152,7 +144,7 @@ const ITBeneEntry = () => {
   const initialFormData = {
     district: "",
     project: "",
-    month: "",
+    quarter: "",
     financial_year: getCurrentFinancialYear(),
     pregnant_woman_lactating_mother: "",
     poushik_sattu_preg_lat: "",
@@ -249,8 +241,8 @@ const ITBeneEntry = () => {
     return String(str).trim().toLowerCase();
   };
 
-  const createDuplicateKey = (district, project, month, finYear) => {
-    return `${normalizeStr(district)}|||${normalizeStr(project)}|||${normalizeStr(month)}|||${normalizeStr(finYear)}`;
+  const createDuplicateKey = (district, project, quarter, finYear) => {
+    return `${normalizeStr(district)}|||${normalizeStr(project)}|||${normalizeStr(quarter)}|||${normalizeStr(finYear)}`;
   };
 
   const hasDuplicateError = (errors) => {
@@ -321,7 +313,7 @@ const ITBeneEntry = () => {
       "S. No.",
       "DISTRICT",
       "PROJECT",
-      "MONTH",
+      "QUARTER",
       "FINANCIAL YEAR",
       "Pregnant Woman and Lactating Mother",
       "Children 6m-3y",
@@ -357,7 +349,7 @@ const ITBeneEntry = () => {
       1,
       "almora",
       "Bhaisiyachana [0506401]",
-      "September",
+      "Oct-Nov-Dec",
       "2026-2027",
       150,
       200,
@@ -478,7 +470,7 @@ const ITBeneEntry = () => {
 
         const existingEntriesMap = new Map();
         latestReports.forEach((r) => {
-          const key = createDuplicateKey(r.district, r.project, r.month, r.financial_year);
+          const key = createDuplicateKey(r.district, r.project, r.quarter, r.financial_year);
           existingEntriesMap.set(key, r);
         });
 
@@ -507,10 +499,10 @@ const ITBeneEntry = () => {
 
           const keyFieldsValid = DUPLICATE_CHECK_FIELDS.every((f) => !rowErrors[f]);
           if (keyFieldsValid) {
-            const dupKey = createDuplicateKey(row.district, row.project, row.month, row.financial_year);
+            const dupKey = createDuplicateKey(row.district, row.project, row.quarter, row.financial_year);
 
             if (existingEntriesMap.has(dupKey)) {
-              const dupErrorMsg = `For month '${String(row.month).trim()}' of financial year '${String(row.financial_year).trim()}', the entry for District '${String(row.district).trim()}' and Project '${String(row.project).trim()}' is already present.`;
+              const dupErrorMsg = `For quarter '${String(row.quarter).trim()}' of financial year '${String(row.financial_year).trim()}', the entry for District '${String(row.district).trim()}' and Project '${String(row.project).trim()}' is already present.`;
               rowErrors["duplicate_server"] = dupErrorMsg;
               DUPLICATE_CHECK_FIELDS.forEach((f) => {
                 rowErrors[`${f}_duplicate`] = dupErrorMsg;
@@ -520,13 +512,13 @@ const ITBeneEntry = () => {
                 row: index + 3,
                 district: row.district,
                 project: row.project,
-                month: row.month,
+                quarter: row.quarter,
                 fin_year: row.financial_year,
               });
             }
 
             if (seenEntriesInFile.has(dupKey)) {
-              const fileDupMsg = `Duplicate within file: For month '${row.month}' of financial year '${row.financial_year}', District '${row.district}' and Project '${row.project}' appears multiple times.`;
+              const fileDupMsg = `Duplicate within file: For quarter '${row.quarter}' of financial year '${row.financial_year}', District '${row.district}' and Project '${row.project}' appears multiple times.`;
               rowErrors["duplicate_file"] = fileDupMsg;
               if (!rowErrors.duplicate_server) {
                 DUPLICATE_CHECK_FIELDS.forEach((f) => {
@@ -554,11 +546,11 @@ const ITBeneEntry = () => {
 
         if (duplicateCount > 0 && hasNonDuplicateErrors) {
           setBulkUploadError(
-            `Found ${duplicateCount} duplicate entry/entries and rows with validation errors. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.month} - ${d.fin_year})`).join(", ")}. Please fix all errors before uploading.`
+            `Found ${duplicateCount} duplicate entry/entries and rows with validation errors. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.quarter} - ${d.fin_year})`).join(", ")}. Please fix all errors before uploading.`
           );
         } else if (duplicateCount > 0) {
           setBulkUploadError(
-            `Found ${duplicateCount} duplicate entry/entries! For the specified month(s) of this financial year, the entry for the District/Project combination is already present. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.month} - ${d.fin_year})`).join(", ")}. Please remove duplicate rows before uploading.`
+            `Found ${duplicateCount} duplicate entry/entries! For the specified quarter(s) of this financial year, the entry for the District/Project combination is already present. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.quarter} - ${d.fin_year})`).join(", ")}. Please remove duplicate rows before uploading.`
           );
         } else if (hasNonDuplicateErrors) {
           setBulkUploadError("Your file contains validation errors. Please fix them before uploading.");
@@ -587,7 +579,7 @@ const ITBeneEntry = () => {
       const validRows = bulkPreviewData.map((item) => ({
         district: String(item.data.district).trim(),
         project: String(item.data.project).trim(),
-        month: String(item.data.month).trim(),
+        quarter: String(item.data.quarter).trim(),
         financial_year: String(item.data.financial_year).trim(),
         pregnant_woman_lactating_mother: Number(item.data.pregnant_woman_lactating_mother) || 0,
         poushik_sattu_preg_lat: Number(item.data.poushik_sattu_preg_lat) || 0,
@@ -631,7 +623,7 @@ const ITBeneEntry = () => {
       id: editingId,
       district: formData.district,
       project: formData.project,
-      month: formData.month,
+      quarter: formData.quarter,
       financial_year: formData.financial_year,
       pregnant_woman_lactating_mother: Number(formData.pregnant_woman_lactating_mother) || 0,
       poushik_sattu_preg_lat: Number(formData.poushik_sattu_preg_lat) || 0,
@@ -671,16 +663,16 @@ const ITBeneEntry = () => {
     return [...new Set(reports.map((r) => r.financial_year))].sort((a, b) => b.localeCompare(a));
   }, [reports]);
 
-  const uniqueMonths = useMemo(() => {
-    const months = [...new Set(reports.map((r) => r.month))];
-    return months.sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
+  const uniqueQuarters = useMemo(() => {
+    const quarters = [...new Set(reports.map((r) => r.quarter))];
+    return quarters.sort((a, b) => QUARTERS.indexOf(a) - QUARTERS.indexOf(b));
   }, [reports]);
 
   const filteredReports = useMemo(() => {
     return reports.filter((report) => {
       return (
         (filters.financial_year ? report.financial_year === filters.financial_year : true) &&
-        (filters.month ? report.month === filters.month : true)
+        (filters.quarter ? report.quarter === filters.quarter : true)
       );
     });
   }, [reports, filters]);
@@ -767,10 +759,10 @@ const ITBeneEntry = () => {
                     </Col>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Month</Form.Label>
-                        <Form.Select name="month" value={formData.month} onChange={handleFormChange} required>
-                          <option value="">Select Month</option>
-                          {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
+                        <Form.Label>Quarter</Form.Label>
+                        <Form.Select name="quarter" value={formData.quarter} onChange={handleFormChange} required>
+                          <option value="">Select Quarter</option>
+                          {QUARTERS.map((quarter) => <option key={quarter} value={quarter}>{quarter}</option>)}
                         </Form.Select>
                       </Form.Group>
                     </Col>
@@ -891,10 +883,10 @@ const ITBeneEntry = () => {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Month</Form.Label>
-                <Form.Select name="month" value={filters.month} onChange={handleFilterChange}>
-                  <option value="">All Months</option>
-                  {uniqueMonths.map((month) => <option key={month} value={month}>{month}</option>)}
+                <Form.Label>Filter by Quarter</Form.Label>
+                <Form.Select name="quarter" value={filters.quarter} onChange={handleFilterChange}>
+                  <option value="">All Quarters</option>
+                  {uniqueQuarters.map((quarter) => <option key={quarter} value={quarter}>{quarter}</option>)}
                 </Form.Select>
               </Form.Group>
             </Col>
@@ -913,7 +905,7 @@ const ITBeneEntry = () => {
                     <th>#</th>
                     <th>District</th>
                     <th>Project</th>
-                    <th>Month</th>
+                    <th>Quarter</th>
                     <th>Financial Year</th>
                     <th>PW & LM</th>
                     <th>Poushik Sattu</th>
@@ -936,7 +928,7 @@ const ITBeneEntry = () => {
                         <td>{indexOfFirstItem + index + 1}</td>
                         <td>{report.district}</td>
                         <td>{report.project}</td>
-                        <td>{report.month}</td>
+                        <td>{report.quarter}</td>
                         <td>{report.financial_year}</td>
                         <td>{report.pregnant_woman_lactating_mother}</td>
                         <td>{report.poushik_sattu_preg_lat}</td>
@@ -1005,7 +997,7 @@ const ITBeneEntry = () => {
                 <strong>Duplicate Check Rule:</strong> An entry is considered duplicate if the combination of{" "}
                 <Badge bg="primary" className="mx-1">District</Badge> +{" "}
                 <Badge bg="primary" className="mx-1">Project</Badge> +{" "}
-                <Badge bg="primary" className="mx-1">Month</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">Quarter</Badge> +{" "}
                 <Badge bg="primary" className="mx-1">Financial Year</Badge>{" "}
                 already exists. The numeric count fields are NOT checked for duplicates.
               </div>
@@ -1077,7 +1069,7 @@ const ITBeneEntry = () => {
                       <strong>Duplicate Entries Found - Upload Disabled!</strong>
                       <div className="mt-2 mb-1" style={{ fontSize: "0.8rem" }}>
                         The following rows have the same{" "}
-                        <strong>District + Project + Month + Financial Year</strong> combination that already exists:
+                        <strong>District + Project + Quarter + Financial Year</strong> combination that already exists:
                       </div>
                       <ul className="mb-0" style={{ fontSize: "0.8rem" }}>
                         {bulkPreviewData.filter((item) => hasDuplicateError(item.errors)).map((item, idx) => (
@@ -1094,7 +1086,7 @@ const ITBeneEntry = () => {
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onClick={handleCloseBulkUploadModal} disabled={bulkUploading}>Cancel</Button>
-              <Button variant="primary" onClick={handleBulkUpload} disabled={isBulkUploadDisabled} title={isBulkUploadDisabled && bulkFile ? "Fix all duplicate errors (District + Project + Month + Financial Year) before uploading" : ""}>
+              <Button variant="primary" onClick={handleBulkUpload} disabled={isBulkUploadDisabled} title={isBulkUploadDisabled && bulkFile ? "Fix all duplicate errors (District + Project + Quarter + Financial Year) before uploading" : ""}>
                 {bulkUploading ? (
                   <><Spinner as="span" animation="border" size="sm" /> Uploading...</>
                 ) : (
