@@ -1,581 +1,1104 @@
-import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, Badge, Tabs, Tab } from "react-bootstrap";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Spinner,
+  Table,
+  Alert,
+  Button,
+  Form,
+  Collapse,
+  Pagination,
+  Modal,
+  Badge,
+} from "react-bootstrap";
+
 import { useAuth } from "../all_login/AuthContext";
-import CDPOHeader from "./CDPOHeader";
-import CDPOLeftNav from "./CDPOLeftNav";
+import "../../assets/css/itcellLeftnav.css";
+import ITCellLeftNav from "./ITCellLeftNav";
+import ITCellHeader from "./ITCellHeader";
+import "../../assets/css/dashboard.css";
+import {
+  FaEdit,
+  FaTrash,
+  FaUpload,
+  FaFileExcel,
+  FaExclamationTriangle,
+} from "react-icons/fa";
+import "../../assets/css/AnganwadiDashboard.css";
 import * as XLSX from "xlsx";
-import "../../assets/css/supplement.css"; 
 
-const API_BASE_URL = "https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api";
+const getCurrentFinancialYear = () => {
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  return currentMonth >= 3
+    ? `${currentYear}-${currentYear + 1}`
+    : `${currentYear - 1}-${currentYear}`;
+};
 
-function CDPOFoodSupplementary() {
+const API_URL = "/supplementary-nutrition-master/";
+
+// Fields checked for duplicate entries
+const DUPLICATE_CHECK_FIELDS = [
+  "district",
+  "project",
+  "quarter",
+  "financial_year",
+];
+
+// Column mapping from Excel headers to API field names
+const COLUMN_MAPPING = {
+  DISTRICT: "district",
+  PROJECT: "project",
+  QUARTER: "quarter",
+  "FINANCIAL YEAR": "financial_year",
+  "Pregnant Woman and Lactating Mother": "pregnant_woman_lactating_mother",
+  "Children 6m-3y": "children_6m_3y",
+  "SAM 6M-5Y / SUW 6M-6Y": "sam_children_6m_5y_suw_children_6m_6y",
+  "SAM 3Y-5Y / SUW 3Y-6Y": "sam_children_3y_5y_suw_children_3y_6y",
+  "HCM Beneficiaries 3Y-6Y (Normal Children)": "hcm_beneficiaries_3y_6y",
+  POUSHIK_SATTU_PREG_LAT: "poushik_sattu_preg_lat",
+  PANJEERI_6M_3Y: "panjeeri_6m_3y",
+  PANJEERI_SAM_6M_5Y_SUW_6M_6Y: "panjeeri_sam_6m_5y_suw_6m_6y",
+  SATTU_SAM_3Y_5Y_SUW_3Y_6Y: "sattu_sam_3y_5y_suw_3y_6y",
+  MUNG_DAL_KHICHDI_3Y_6Y: "mung_dal_khichdi_3y_6y",
+  MULTI_GRAIN_AATA_3Y_6Y: "multi_grain_aata_3y_6y",
+};
+
+// All numeric fields
+const NUMERIC_FIELDS = [
+  "pregnant_woman_lactating_mother",
+  "poushik_sattu_preg_lat",
+  "children_6m_3y",
+  "panjeeri_6m_3y",
+  "sam_children_6m_5y_suw_children_6m_6y",
+  "panjeeri_sam_6m_5y_suw_6m_6y",
+  "sam_children_3y_5y_suw_children_3y_6y",
+  "sattu_sam_3y_5y_suw_3y_6y",
+  "hcm_beneficiaries_3y_6y",
+  "mung_dal_khichdi_3y_6y",
+  "multi_grain_aata_3y_6y",
+];
+
+const QUARTERS = [
+  "Apr-May-Jun",
+  "Jul-Aug-Sep",
+  "Oct-Nov-Dec",
+  "Jan-Feb-Mar",
+];
+
+// Preview table columns definition
+const PREVIEW_COLUMNS = [
+  { key: "district", label: "District", isDuplicate: true },
+  { key: "project", label: "Project", isDuplicate: true },
+  { key: "quarter", label: "Quarter", isDuplicate: true },
+  { key: "financial_year", label: "Financial Year", isDuplicate: true },
+  { key: "pregnant_woman_lactating_mother", label: "PW & LM", isDuplicate: false },
+  { key: "poushik_sattu_preg_lat", label: "Poushik Sattu", isDuplicate: false },
+  { key: "children_6m_3y", label: "Children 6m-3y", isDuplicate: false },
+  { key: "panjeeri_6m_3y", label: "Panjeeri 6m-3y", isDuplicate: false },
+  { key: "sam_children_6m_5y_suw_children_6m_6y", label: "SAM 6M-5Y/SUW 6M-6Y", isDuplicate: false },
+  { key: "panjeeri_sam_6m_5y_suw_6m_6y", label: "Panjeeri SAM", isDuplicate: false },
+  { key: "sam_children_3y_5y_suw_children_3y_6y", label: "SAM 3Y-5Y/SUW 3Y-6Y", isDuplicate: false },
+  { key: "sattu_sam_3y_5y_suw_3y_6y", label: "Sattu SAM", isDuplicate: false },
+  { key: "hcm_beneficiaries_3y_6y", label: "HCM 3Y-6Y", isDuplicate: false },
+  { key: "mung_dal_khichdi_3y_6y", label: "Mung Dal Khichdi", isDuplicate: false },
+  { key: "multi_grain_aata_3y_6y", label: "Multi Grain Aata", isDuplicate: false },
+];
+
+const CDPOFoodSupplementary = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
-  
-  const { api } = useAuth();
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [thrItems, setThrItems] = useState([]);
-  const [hcmItems, setHcmItems] = useState([]);
-  const [records, setRecords] = useState([]); 
-  const [editingId, setEditingId] = useState(null); 
-  const [selectedIds, setSelectedIds] = useState([]); 
-  const [recordTab, setRecordTab] = useState("all"); 
-
-  const [formData, setFormData] = useState({
-    awc_code: "5064010102",
-    month: "Jan-Feb-Mar",
-    financial_year: "2026-27",
-    active_beneficiaries: 163,
-    children_6m_3y_beneficiaries: 50,
-    sam_children_6m_6y: 10,
-    suw_children_6m_6y: 8,
-    sam_children_3y_6y: 6,
-    suw_children_3y_6y: 5,
-    pregnant_women_lactating_mothers: 20,
-    hcm_beneficiaries_3y_6y: 64,
-    thr_25_days_frs_hcm_beneficiaries_3y_6y: 40,
-    total_beneficiaries: 163,
+  const { api } = useAuth();
+  const [reports, setReports] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [filters, setFilters] = useState({
+    financial_year: "",
+    quarter: "",
   });
 
-  const [foodType, setFoodType] = useState("टीएचआर");
-  const [selectedFoodId, setSelectedFoodId] = useState("");
-  const [autoFilledData, setAutoFilledData] = useState({
-    category: "", food_item: "", allo_quan: 0, qty_per_ben: 0, days_allotted: 0, daily_consumption_qty: 0,
-  });
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkUploadError, setBulkUploadError] = useState("");
+  const [bulkPreviewData, setBulkPreviewData] = useState([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [reportsLoadingForModal, setReportsLoadingForModal] = useState(false);
+  const [bulkFileInputKey, setBulkFileInputKey] = useState(0);
 
-  const [foodItemsList, setFoodItemsList] = useState([]);
+  const reportsRef = useRef([]);
+  const isFetchingRef = useRef(false); // Prevent duplicate fetches
+
+  const initialFormData = {
+    district: "",
+    project: "",
+    quarter: "",
+    financial_year: getCurrentFinancialYear(),
+    pregnant_woman_lactating_mother: "",
+    poushik_sattu_preg_lat: "",
+    children_6m_3y: "",
+    panjeeri_6m_3y: "",
+    sam_children_6m_5y_suw_children_6m_6y: "",
+    panjeeri_sam_6m_5y_suw_6m_6y: "",
+    sam_children_3y_5y_suw_children_3y_6y: "",
+    sattu_sam_3y_5y_suw_3y_6y: "",
+    hcm_beneficiaries_3y_6y: "",
+    mung_dal_khichdi_3y_6y: "",
+    multi_grain_aata_3y_6y: "",
+    sam_children_6m_5y_suw_children_6m_6y_grant: [],
+    sam_children_3y_5y_suw_children_3y_6y_grant: [],
+    hcm_beneficiaries_3y_6y_grant: [],
+  };
+
+  const [formData, setFormData] = useState(initialFormData);
+
+  // ===================== FETCH REPORTS =====================
+  const fetchReports = useCallback(async () => {
+    if (isFetchingRef.current) return; // Prevent double execution
+    isFetchingRef.current = true;
+    
+    setLoading(true);
+    setError("");
+    try {
+      const response = await api.get(API_URL, { timeout: 30000 }); // 30s timeout
+      let data = [];
+      if (Array.isArray(response.data)) {
+        data = response.data;
+      } else if (response.data?.results?.data) {
+        data = response.data.results.data;
+      } else if (response.data?.data) {
+        data = response.data.data;
+      } else if (response.data?.results) {
+        data = Array.isArray(response.data.results) ? response.data.results : [];
+      }
+      setReports(data);
+      reportsRef.current = data;
+    } catch (err) {
+      setError("Failed to fetch supplementary nutrition records. Please try again.");
+      console.error("Fetch reports error:", err.message);
+    } finally {
+      setLoading(false);
+      isFetchingRef.current = false;
+    }
+  }, [api]);
+
+  // Fetch reports specifically for modal
+  const fetchReportsForModal = useCallback(async () => {
+    setReportsLoadingForModal(true);
+    try {
+      const response = await api.get(API_URL, { timeout: 30000 });
+      let data = [];
+      if (Array.isArray(response.data)) {
+        data = response.data;
+      } else if (response.data?.results?.data) {
+        data = response.data.results.data;
+      } else if (response.data?.data) {
+        data = response.data.data;
+      } else if (response.data?.results) {
+        data = Array.isArray(response.data.results) ? response.data.results : [];
+      }
+      setReports(data);
+      reportsRef.current = data;
+      return data;
+    } catch (err) {
+      console.error("Modal fetch error:", err.message);
+      return [];
+    } finally {
+      setReportsLoadingForModal(false);
+    }
+  }, [api]);
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-      setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024);
+      const width = window.innerWidth;
+      setIsMobile(width < 768);
+      setIsTablet(width >= 768 && width < 1024);
     };
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const fetchFoodItems = async () => {
-    try {
-      const [thrRes, hcmRes] = await Promise.all([
-        api.get(`${API_BASE_URL}/thr-food-items/`),
-        api.get(`${API_BASE_URL}/hcm-food-items/`)
-      ]);
-      setThrItems(thrRes.data);
-      setHcmItems(hcmRes.data);
-    } catch (err) {
-      setError("Failed to load food items");
-    }
-  };
-
-  const fetchRecords = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get(`${API_BASE_URL}/supplementary-nutrition-with-food/`);
-      setRecords(res.data);
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchFoodItems();
-    fetchRecords();
-  }, [api]);
+    fetchReports();
+  }, [fetchReports]);
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+  // ===================== HELPERS =====================
+  const normalizeStr = (str) => {
+    if (str === undefined || str === null) return "";
+    return String(str).trim().toLowerCase();
+  };
 
-  const handleInputChange = (e) => {
+  const createDuplicateKey = (district, project, quarter, finYear) => {
+    return `${normalizeStr(district)}|||${normalizeStr(project)}|||${normalizeStr(quarter)}|||${normalizeStr(finYear)}`;
+  };
+
+  const hasDuplicateError = (errors) => {
+    return !!errors.duplicate_server || !!errors.duplicate_file;
+  };
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleFormChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleFoodItemChange = (e) => {
-    const id = e.target.value;
-    setSelectedFoodId(id);
-    if (!id) {
-      setAutoFilledData({ category: "", food_item: "", allo_quan: 0, qty_per_ben: 0, days_allotted: 0, daily_consumption_qty: 0 });
-      return;
-    }
-    const sourceArray = foodType === "टीएचआर" ? thrItems : hcmItems;
-    const selectedItem = sourceArray.find((item) => item.id === parseInt(id));
-    if (selectedItem) {
-      setAutoFilledData({
-        category: selectedItem.bene_category,
-        food_item: selectedItem.food_item,
-        qty_per_ben: selectedItem.qty_per_ben,
-        days_allotted: selectedItem.days_allotted,
-        daily_consumption_qty: selectedItem.daily_consumption_qty,
-        allo_quan: parseFloat(selectedItem.daily_consumption_qty) || 0, 
-      });
-    }
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setCurrentPage(1);
   };
 
-  const addFoodItemToList = () => {
-    if (!selectedFoodId || !autoFilledData.food_item) {
-      alert("कृपया पहले खाद्य आइटम का चयन करें");
-      return;
-    }
-    const newItem = {
-      category: autoFilledData.category,
-      food_item: autoFilledData.food_item,
-      food_type: foodType, 
-      allo_quan: parseFloat(autoFilledData.allo_quan),
-      id: autoFilledData.id || undefined 
-    };
-
-    setFoodItemsList([...foodItemsList, newItem]);
-    setSelectedFoodId("");
-    setAutoFilledData({ category: "", food_item: "", allo_quan: 0, qty_per_ben: 0, days_allotted: 0, daily_consumption_qty: 0 });
-  };
-
-  const removeFoodItem = (index) => {
-    const updatedList = foodItemsList.filter((_, i) => i !== index);
-    setFoodItemsList(updatedList);
-  };
-
-  const resetForm = () => {
+  // ===================== EDIT (PUT) =====================
+  const handleEdit = (report) => {
+    setEditingId(report.id);
     setFormData({
-      awc_code: "", month: "Jan-Feb-Mar", financial_year: "2026-27", active_beneficiaries: 0,
-      children_6m_3y_beneficiaries: 0, sam_children_6m_6y: 0, suw_children_6m_6y: 0, sam_children_3y_6y: 0,
-      suw_children_3y_6y: 0, pregnant_women_lactating_mothers: 0, hcm_beneficiaries_3y_6y: 0,
-      thr_25_days_frs_hcm_beneficiaries_3y_6y: 0, total_beneficiaries: 0,
+      ...initialFormData,
+      ...report,
+      sam_children_6m_5y_suw_children_6m_6y_grant:
+        report.sam_children_6m_5y_suw_children_6m_6y_grant || [],
+      sam_children_3y_5y_suw_children_3y_6y_grant:
+        report.sam_children_3y_5y_suw_children_3y_6y_grant || [],
+      hcm_beneficiaries_3y_6y_grant:
+        report.hcm_beneficiaries_3y_6y_grant || [],
     });
-    setFoodItemsList([]);
-    setEditingId(null);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    setSuccess("");
-
-    const payload = { ...formData, food_items: foodItemsList };
-
-    try {
-      if (editingId) {
-        await api.put(`${API_BASE_URL}/supplementary-nutrition-with-food/`, { ...payload, id: editingId });
-        setSuccess("डेटा सफलतापूर्वक अपडेट हो गया है!");
-      } else {
-        await api.post(`${API_BASE_URL}/supplementary-nutrition-with-food/`, payload);
-        setSuccess("डेटा सफलतापूर्वक सबमिट हो गया है!");
-      }
-      resetForm();
-      fetchRecords(); 
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEdit = (record) => {
-    const { food_items, id, created_at, updated_at, district, project, sector, awc_name, ...rest } = record;
-    setFormData(rest);
-    setFoodItemsList(food_items);
-    setEditingId(id);
+    setShowForm(true);
     window.scrollTo(0, 0);
   };
 
-  const handleSelect = (id) => {
-    setSelectedIds((prev) => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedIds(records.map(r => r.id));
-    } else {
-      setSelectedIds([]);
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedIds.length === 0) return alert("कृपया हटाने के लिए रिकॉर्ड चुनें");
-    if (!window.confirm(`क्या आप वाकई ${selectedIds.length} रिकॉर्ड हटाना चाहते हैं?`)) return;
-
-    setLoading(true);
-    try {
-      await api.delete(`${API_BASE_URL}/supplementary-nutrition-with-food/`, {
-        data: { ids: selectedIds }
-      });
-      setSuccess("चयनित रिकॉर्ड सफलतापूर्वक हटा दिए गए हैं!");
-      setSelectedIds([]);
-      fetchRecords();
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ===================== DELETE =====================
   const handleDelete = async (id) => {
-    if (!window.confirm("क्या आप वाकई इस रिकॉर्ड को हटाना चाहते हैं?")) return;
-
-    setLoading(true);
-    try {
-      await api.delete(`${API_BASE_URL}/supplementary-nutrition-with-food/`, {
-        data: { ids: [id] }
-      });
-      setSuccess("रिकॉर्ड सफलतापूर्वक हटा दिया गया है!");
-      fetchRecords();
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message);
-    } finally {
-      setLoading(false);
+    if (window.confirm("Are you sure you want to delete this record?")) {
+      try {
+        await api.delete(API_URL, { data: { ids: [id] } });
+        setSuccess("Record deleted successfully.");
+        fetchReports();
+      } catch (err) {
+        setError("Failed to delete record.");
+        console.error(err);
+      }
     }
   };
 
-  // ============ BULK EXCEL UPLOAD ============
-  const handleExcelUpload = async (e) => {
-    const file = e.target.files[0];
+  // ===================== BULK UPLOAD MODAL =====================
+  const handleShowBulkUploadModal = async () => {
+    setBulkFile(null);
+    setBulkPreviewData([]);
+    setBulkUploadError("");
+    setBulkFileInputKey((prev) => prev + 1);
+    setShowBulkUploadModal(true);
+    await fetchReportsForModal();
+  };
+
+  const handleCloseBulkUploadModal = () => setShowBulkUploadModal(false);
+
+  // ===================== DOWNLOAD TEMPLATE =====================
+  const downloadSampleFile = () => {
+    const headerRow1 = [
+      "S. No.",
+      "DISTRICT",
+      "PROJECT",
+      "QUARTER",
+      "FINANCIAL YEAR",
+      "Pregnant Woman and Lactating Mother",
+      "Children 6m-3y",
+      "SAM 6M-5Y / SUW 6M-6Y",
+      "SAM 3Y-5Y / SUW 3Y-6Y",
+      "HCM Beneficiaries 3Y-6Y (Normal Children)",
+      "Supplementary Nutrition Details",
+      "",
+      "",
+      "",
+      "",
+      "",
+    ];
+    const headerRow2 = [
+      "", // Removed the "1" to prevent the extra row look
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "POUSHIK_SATTU_PREG_LAT",
+      "PANJEERI_6M_3Y",
+      "PANJEERI_SAM_6M_5Y_SUW_6M_6Y",
+      "SATTU_SAM_3Y_5Y_SUW_3Y_6Y",
+      "MUNG_DAL_KHICHDI_3Y_6Y",
+      "MULTI_GRAIN_AATA_3Y_6Y",
+    ];
+    const sampleRow = [
+      1,
+      "almora",
+      "Bhaisiyachana [0506401]",
+      "Oct-Nov-Dec",
+      "2026-2027",
+      150,
+      200,
+      25,
+      15,
+      300,
+      150,
+      200,
+      25,
+      15,
+      300,
+      300,
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet([headerRow1, headerRow2, sampleRow]);
+
+    // Set column widths
+    ws["!cols"] = [
+      { wch: 8 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 30 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 25 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Grant Wise Master");
+    XLSX.writeFile(wb, "supplementarynutrimaster_template.xlsx");
+  };
+
+  // ===================== FILE SELECT & PARSE =====================
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    setLoading(true);
-    setError("");
-    setSuccess("");
+    const latestReports = await fetchReportsForModal();
+
+    setBulkFile(file);
+    setBulkPreviewData([]);
+    setBulkUploadError("");
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       try {
         const data = new Uint8Array(event.target.result);
         const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet);
 
-        const groupedPayloads = {};
+        const aoa = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
-        json.forEach((row) => {
-          const key = `${row.awc_code}_${row.month}_${row.financial_year}`;
-
-          if (!groupedPayloads[key]) {
-            groupedPayloads[key] = {
-              awc_code: String(row.awc_code),
-              month: row.month,
-              financial_year: row.financial_year,
-              active_beneficiaries: Number(row.active_beneficiaries) || 0,
-              children_6m_3y_beneficiaries: Number(row.children_6m_3y_beneficiaries) || 0,
-              sam_children_6m_6y: Number(row.sam_children_6m_6y) || 0,
-              suw_children_6m_6y: Number(row.suw_children_6m_6y) || 0,
-              sam_children_3y_6y: Number(row.sam_children_3y_6y) || 0,
-              suw_children_3y_6y: Number(row.suw_children_3y_6y) || 0,
-              pregnant_women_lactating_mothers: Number(row.pregnant_women_lactating_mothers) || 0,
-              hcm_beneficiaries_3y_6y: Number(row.hcm_beneficiaries_3y_6y) || 0,
-              thr_25_days_frs_hcm_beneficiaries_3y_6y: Number(row.thr_25_days_frs_hcm_beneficiaries_3y_6y) || 0,
-              total_beneficiaries: Number(row.total_beneficiaries) || 0,
-              food_items: []
-            };
-          }
-
-          if (row.food_item) {
-            groupedPayloads[key].food_items.push({
-              category: row.category || "",
-              food_item: row.food_item,
-              food_type: row.food_type || "टीएचआर",
-              allo_quan: parseFloat(row.allo_quan) || 0
-            });
-          }
-        });
-
-        const payloadsArray = Object.values(groupedPayloads);
-
-        for (const payload of payloadsArray) {
-          await api.post(`${API_BASE_URL}/supplementary-nutrition-with-food/`, payload);
+        if (aoa.length < 3) {
+          setBulkUploadError("The Excel file is empty or has no data rows (minimum 2 header rows + 1 data row required).");
+          return;
         }
 
-        setSuccess(`बल्क एक्सेल डेटा सफलतापूर्वक अपलोड हो गया है! (${payloadsArray.length} रिकॉर्ड्स)`);
+        const row0 = aoa[0] || [];
+        const row1 = aoa[1] || [];
+
+        const columnMap = {};
+        const maxCols = Math.max(row0.length, row1.length);
+        for (let c = 0; c < maxCols; c++) {
+          const h0 = String(row0[c] || "").trim();
+          const h1 = String(row1[c] || "").trim();
+          let header = null;
+          
+          // Updated exclusion logic to match new template
+          if (h1 && h1 !== "*" && h1 !== "1" && h1 !== "") {
+            header = h1;
+          } else if (
+            h0 && 
+            h0 !== "S. No." && 
+            h0 !== "Supplementary Nutrition Details" && 
+            h0 !== "" && 
+            h0 !== "*"
+          ) {
+            header = h0;
+          }
+
+          if (header && COLUMN_MAPPING[header]) {
+            columnMap[c] = COLUMN_MAPPING[header];
+          }
+        }
+
+        const mappedFields = Object.values(columnMap);
+        const missingFields = DUPLICATE_CHECK_FIELDS.filter((f) => !mappedFields.includes(f));
+        if (missingFields.length > 0) {
+          setBulkUploadError(`Missing required columns: ${missingFields.join(", ")}. Please use the downloaded template.`);
+          return;
+        }
+
+        const jsonData = [];
+        for (let r = 2; r < aoa.length; r++) {
+          const row = aoa[r];
+          if (!row || row.every((v) => v === "" || v === null || v === undefined)) continue;
+          const obj = {};
+          for (const [colIdx, fieldName] of Object.entries(columnMap)) {
+            obj[fieldName] = row[colIdx] !== undefined && row[colIdx] !== null ? row[colIdx] : "";
+          }
+          jsonData.push(obj);
+        }
+
+        if (jsonData.length === 0) {
+          setBulkUploadError("No data rows found in the file.");
+          return;
+        }
+
+        const existingEntriesMap = new Map();
+        latestReports.forEach((r) => {
+          const key = createDuplicateKey(r.district, r.project, r.quarter, r.financial_year);
+          existingEntriesMap.set(key, r);
+        });
+
+        const seenEntriesInFile = new Set();
+        let duplicateCount = 0;
+        const duplicateDetails = [];
+
+        const previewData = jsonData.map((row, index) => {
+          const rowErrors = {};
+
+          DUPLICATE_CHECK_FIELDS.forEach((field) => {
+            const value = row[field];
+            if (value === undefined || value === null || String(value).trim() === "") {
+              rowErrors[field] = `'${field}' is missing.`;
+            }
+          });
+
+          NUMERIC_FIELDS.forEach((field) => {
+            const value = row[field];
+            if (value === undefined || value === null || String(value).trim() === "") {
+              rowErrors[field] = `'${field}' is missing.`;
+            } else if (isNaN(Number(value))) {
+              rowErrors[field] = `'${field}' must be a valid number.`;
+            }
+          });
+
+          const keyFieldsValid = DUPLICATE_CHECK_FIELDS.every((f) => !rowErrors[f]);
+          if (keyFieldsValid) {
+            const dupKey = createDuplicateKey(row.district, row.project, row.quarter, row.financial_year);
+
+            if (existingEntriesMap.has(dupKey)) {
+              const dupErrorMsg = `For quarter '${String(row.quarter).trim()}' of financial year '${String(row.financial_year).trim()}', the entry for District '${String(row.district).trim()}' and Project '${String(row.project).trim()}' is already present.`;
+              rowErrors["duplicate_server"] = dupErrorMsg;
+              DUPLICATE_CHECK_FIELDS.forEach((f) => {
+                rowErrors[`${f}_duplicate`] = dupErrorMsg;
+              });
+              duplicateCount++;
+              duplicateDetails.push({
+                row: index + 3,
+                district: row.district,
+                project: row.project,
+                quarter: row.quarter,
+                fin_year: row.financial_year,
+              });
+            }
+
+            if (seenEntriesInFile.has(dupKey)) {
+              const fileDupMsg = `Duplicate within file: For quarter '${row.quarter}' of financial year '${row.financial_year}', District '${row.district}' and Project '${row.project}' appears multiple times.`;
+              rowErrors["duplicate_file"] = fileDupMsg;
+              if (!rowErrors.duplicate_server) {
+                DUPLICATE_CHECK_FIELDS.forEach((f) => {
+                  rowErrors[`${f}_duplicate`] = fileDupMsg;
+                });
+              }
+              duplicateCount++;
+            } else {
+              seenEntriesInFile.add(dupKey);
+            }
+          }
+
+          return { data: row, errors: rowErrors };
+        });
+
+        setBulkPreviewData(previewData);
+
+        const hasNonDuplicateErrors = previewData.some((item) => {
+          const keys = Object.keys(item.errors);
+          const realErrors = keys.filter(
+            (k) => !["duplicate_server", "duplicate_file", ...DUPLICATE_CHECK_FIELDS.map((f) => `${f}_duplicate`)].includes(k)
+          );
+          return realErrors.length > 0;
+        });
+
+        if (duplicateCount > 0 && hasNonDuplicateErrors) {
+          setBulkUploadError(
+            `Found ${duplicateCount} duplicate entry/entries and rows with validation errors. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.quarter} - ${d.fin_year})`).join(", ")}. Please fix all errors before uploading.`
+          );
+        } else if (duplicateCount > 0) {
+          setBulkUploadError(
+            `Found ${duplicateCount} duplicate entry/entries! For the specified quarter(s) of this financial year, the entry for the District/Project combination is already present. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.quarter} - ${d.fin_year})`).join(", ")}. Please remove duplicate rows before uploading.`
+          );
+        } else if (hasNonDuplicateErrors) {
+          setBulkUploadError("Your file contains validation errors. Please fix them before uploading.");
+        }
       } catch (err) {
-        console.error("Excel Upload Error:", err);
-        setError("एक्सेल अपलोड विफल: " + (err.response?.data?.detail || err.message));
-      } finally {
-        setLoading(false);
-        e.target.value = null;
+        setBulkUploadError("Failed to parse the Excel file. Please ensure it's a valid .xlsx or .xls file.");
+        console.error(err);
       }
     };
-
     reader.readAsArrayBuffer(file);
   };
 
-  const currentDropdownItems = foodType === "टीएचआर" ? thrItems : hcmItems;
+  // ===================== BULK UPLOAD (POST) =====================
+  const handleBulkUpload = async () => {
+    const hasErrors = bulkPreviewData.some((item) => Object.keys(item.errors).length > 0);
 
-  const filteredRecords = records.filter((rec) => {
-    if (recordTab === "all") return true;
-    const types = rec.food_items?.map((fi) => fi.food_type) || [];
-    if (recordTab === "thr") return types.includes("टीएचआर");
-    if (recordTab === "hcm") return types.includes("एचसीएम");
-    return true;
-  });
+    if (!bulkFile || hasErrors) {
+      setBulkUploadError("Cannot upload. Please select a valid file and fix all errors including duplicate entries.");
+      return;
+    }
 
-  // ============ DOWNLOAD EXCEL TEMPLATE ============
-  const downloadTemplate = () => {
-    const headers = [
-      "awc_code", "month", "financial_year", "active_beneficiaries",
-      "children_6m_3y_beneficiaries", "sam_children_6m_6y", "suw_children_6m_6y",
-      "sam_children_3y_6y", "suw_children_3y_6y", "pregnant_women_lactating_mothers",
-      "hcm_beneficiaries_3y_6y", "thr_25_days_frs_hcm_beneficiaries_3y_6y",
-      "total_beneficiaries", "category", "food_item", "food_type", "allo_quan"
-    ];
-    const exampleRow = [
-      "5064010102", "Jan-Feb-Mar", "2026-27", 163,
-      50, 10, 8, 6, 5, 20,
-      64, 40, 163,
-      "6 माह से 3 वर्ष के सामान्य बच्चे", "पंजीरी", "टीएचआर", 50.00
-    ];
-    const ws = XLSX.utils.aoa_to_sheet([headers, exampleRow]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "supplementary_nutrition_template.xlsx");
+    setBulkUploading(true);
+    setBulkUploadError("");
+
+    try {
+      const validRows = bulkPreviewData.map((item) => ({
+        district: String(item.data.district).trim(),
+        project: String(item.data.project).trim(),
+        quarter: String(item.data.quarter).trim(),
+        financial_year: String(item.data.financial_year).trim(),
+        pregnant_woman_lactating_mother: Number(item.data.pregnant_woman_lactating_mother) || 0,
+        poushik_sattu_preg_lat: Number(item.data.poushik_sattu_preg_lat) || 0,
+        children_6m_3y: Number(item.data.children_6m_3y) || 0,
+        panjeeri_6m_3y: Number(item.data.panjeeri_6m_3y) || 0,
+        sam_children_6m_5y_suw_children_6m_6y: Number(item.data.sam_children_6m_5y_suw_children_6m_6y) || 0,
+        panjeeri_sam_6m_5y_suw_6m_6y: Number(item.data.panjeeri_sam_6m_5y_suw_6m_6y) || 0,
+        sam_children_3y_5y_suw_children_3y_6y: Number(item.data.sam_children_3y_5y_suw_children_3y_6y) || 0,
+        sattu_sam_3y_5y_suw_3y_6y: Number(item.data.sattu_sam_3y_5y_suw_3y_6y) || 0,
+        hcm_beneficiaries_3y_6y: Number(item.data.hcm_beneficiaries_3y_6y) || 0,
+        mung_dal_khichdi_3y_6y: Number(item.data.mung_dal_khichdi_3y_6y) || 0,
+        multi_grain_aata_3y_6y: Number(item.data.multi_grain_aata_3y_6y) || 0,
+        sam_children_6m_5y_suw_children_6m_6y_grant: [],
+        sam_children_3y_5y_suw_children_3y_6y_grant: [],
+        hcm_beneficiaries_3y_6y_grant: [],
+      }));
+
+      const uploadPromises = validRows.map((payload) => api.post(API_URL, payload));
+      await Promise.all(uploadPromises);
+      
+      setSuccess("Bulk upload successful!");
+      handleCloseBulkUploadModal();
+      fetchReports();
+    } catch (err) {
+      setBulkUploadError("An error occurred during bulk upload. Some records may have failed.");
+      console.error("Bulk upload failed:", err.response || err);
+    } finally {
+      setBulkUploading(false);
+    }
   };
 
+  // ===================== UPDATE (PUT) =====================
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError("");
+    setSuccess("");
+    setFormErrors({});
+
+    const payload = {
+      id: editingId,
+      district: formData.district,
+      project: formData.project,
+      quarter: formData.quarter,
+      financial_year: formData.financial_year,
+      pregnant_woman_lactating_mother: Number(formData.pregnant_woman_lactating_mother) || 0,
+      poushik_sattu_preg_lat: Number(formData.poushik_sattu_preg_lat) || 0,
+      children_6m_3y: Number(formData.children_6m_3y) || 0,
+      panjeeri_6m_3y: Number(formData.panjeeri_6m_3y) || 0,
+      sam_children_6m_5y_suw_children_6m_6y: Number(formData.sam_children_6m_5y_suw_children_6m_6y) || 0,
+      panjeeri_sam_6m_5y_suw_6m_6y: Number(formData.panjeeri_sam_6m_5y_suw_6m_6y) || 0,
+      sam_children_3y_5y_suw_children_3y_6y: Number(formData.sam_children_3y_5y_suw_children_3y_6y) || 0,
+      sattu_sam_3y_5y_suw_3y_6y: Number(formData.sattu_sam_3y_5y_suw_3y_6y) || 0,
+      hcm_beneficiaries_3y_6y: Number(formData.hcm_beneficiaries_3y_6y) || 0,
+      mung_dal_khichdi_3y_6y: Number(formData.mung_dal_khichdi_3y_6y) || 0,
+      multi_grain_aata_3y_6y: Number(formData.multi_grain_aata_3y_6y) || 0,
+      sam_children_6m_5y_suw_children_6m_6y_grant: formData.sam_children_6m_5y_suw_children_6m_6y_grant || [],
+      sam_children_3y_5y_suw_children_3y_6y_grant: formData.sam_children_3y_5y_suw_children_3y_6y_grant || [],
+      hcm_beneficiaries_3y_6y_grant: formData.hcm_beneficiaries_3y_6y_grant || [],
+    };
+
+    try {
+      await api.put(API_URL, payload);
+      setSuccess("Record updated successfully.");
+      setShowForm(false);
+      setFormData(initialFormData);
+      setEditingId(null);
+      fetchReports();
+    } catch (err) {
+      const errors = err.response?.data || {};
+      setFormErrors(errors);
+      setError("Failed to update record.");
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ===================== DERIVED DATA =====================
+  const uniqueFinYears = useMemo(() => {
+    return [...new Set(reports.map((r) => r.financial_year))].sort((a, b) => b.localeCompare(a));
+  }, [reports]);
+
+  const uniqueQuarters = useMemo(() => {
+    const quarters = [...new Set(reports.map((r) => r.quarter))];
+    return quarters.sort((a, b) => QUARTERS.indexOf(a) - QUARTERS.indexOf(b));
+  }, [reports]);
+
+  const filteredReports = useMemo(() => {
+    return reports.filter((report) => {
+      return (
+        (filters.financial_year ? report.financial_year === filters.financial_year : true) &&
+        (filters.quarter ? report.quarter === filters.quarter : true)
+      );
+    });
+  }, [reports, filters]);
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredReports.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+
+  const isBulkUploadDisabled = useMemo(() => {
+    return (
+      bulkUploading ||
+      !bulkFile ||
+      reportsLoadingForModal ||
+      bulkPreviewData.some((item) => Object.keys(item.errors).length > 0)
+    );
+  }, [bulkUploading, bulkFile, bulkPreviewData, reportsLoadingForModal]);
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+    let items = [];
+    for (let number = 1; number <= totalPages; number++) {
+      items.push(
+        <Pagination.Item key={number} active={number === currentPage} onClick={() => setCurrentPage(number)}>
+          {number}
+        </Pagination.Item>
+      );
+    }
+    return <Pagination>{items}</Pagination>;
+  };
+
+  // ===================== PREVIEW TABLE HELPERS =====================
+  const getCellError = (item, key) => {
+    if (item.errors[key]) return item.errors[key];
+    if (DUPLICATE_CHECK_FIELDS.includes(key) && item.errors[`${key}_duplicate`]) return item.errors[`${key}_duplicate`];
+    return null;
+  };
+
+  const getCellClass = (item, key) => {
+    if (item.errors[key]) return "table-danger";
+    if (DUPLICATE_CHECK_FIELDS.includes(key) && item.errors[`${key}_duplicate`]) return "table-danger";
+    return "";
+  };
+
+  // ===================== RENDER =====================
   return (
     <div className="dashboard-container">
-      <CDPOLeftNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} />
+      <ITCellLeftNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} />
+
       <div className="main-content-dash">
-        <CDPOHeader toggleSidebar={toggleSidebar} />
+        <ITCellHeader toggleSidebar={toggleSidebar} />
 
-<Container fluid className="dashboard-box mt-3">
-           <div className="dashboard-section mb-4 d-flex justify-content-between align-items-center">
-             <h4 className="section-title mb-0">पूरक पोषण आहार (Supplementary Nutrition)</h4>
-<div className="d-flex gap-2">
-                <Button variant="outline-secondary" size="sm" onClick={downloadTemplate}>Template डाउनलोड</Button>
-                <input
-                  type="file"
-                  accept=".xlsx, .xls"
-                  style={{ display: "none" }}
-                  id="bulkExcelFile"
-                  onChange={handleExcelUpload}
-                  disabled={loading}
-                />
-                <Button variant="warning" size="sm" onClick={() => document.getElementById("bulkExcelFile").click()} disabled={loading}>बल्क एक्सेल अपलोड</Button>
-              </div>
-           </div>
+        <Container fluid className="dashboard-box mt-3">
+          <div className="main-heading d-flex justify-content-between align-items-center">
+            <h3 className="mb-4 fw-bold">Supplementary Nutrition Master</h3>
+            <div>
+              <Button onClick={handleShowBulkUploadModal} variant="success" className="me-2">
+                <FaUpload className="me-2" /> Bulk Upload
+              </Button>
+            </div>
+          </div>
 
-          {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
           {success && <Alert variant="success" onClose={() => setSuccess("")} dismissible>{success}</Alert>}
+          {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
 
-          {loading && (
-            <div className="text-center my-3">
-              <Spinner animation="border" variant="primary" />
-            </div>
-          )}
+          {/* ===================== EDIT FORM (PUT) ===================== */}
+          <Collapse in={showForm}>
+            <Card className="mb-4">
+              <Card.Header as="h5">Edit Supplementary Nutrition Record</Card.Header>
+              <Card.Body>
+                <Form onSubmit={handleSubmit}>
+                  <Row>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>District</Form.Label>
+                        <Form.Control type="text" name="district" value={formData.district} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Project</Form.Label>
+                        <Form.Control type="text" name="project" value={formData.project} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Quarter</Form.Label>
+                        <Form.Select name="quarter" value={formData.quarter} onChange={handleFormChange} required>
+                          <option value="">Select Quarter</option>
+                          {QUARTERS.map((quarter) => <option key={quarter} value={quarter}>{quarter}</option>)}
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Financial Year</Form.Label>
+                        <Form.Control type="text" name="financial_year" value={formData.financial_year} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                  </Row>
 
-          {/* ================= FORM SECTION ================= */}
-          <Form onSubmit={handleSubmit}>
-            <div className="details mb-3 d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">खाद्य आइटम जोड़ें (Add Food Items)</h5>
-                  {editingId && <Button variant="light" size="sm" onClick={resetForm}>Cancel Edit</Button>}
-            </div>
-            <Card className="mb-4 shadow-sm food-card">
-              
-              
-              
-              
-            
-                <Row className="align-items-end">
-                  <Col md={3}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>खाद्य प्रकार (Food Type)</Form.Label>
-                      <Form.Select value={foodType} onChange={(e) => { setFoodType(e.target.value); setSelectedFoodId(""); }}>
-                        <option value="टीएचआर">टीएचआर (THR)</option>
-                        <option value="एचसीएम">एचसीएम (HCM)</option>
-                      </Form.Select>
-                    </Form.Group>
-                  </Col>
-                  <Col md={4}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>खाद्य आइटम का चयन करें</Form.Label>
-                      <Form.Select value={selectedFoodId} onChange={handleFoodItemChange}>
-                        <option value="">-- चुनें --</option>
-                        {currentDropdownItems.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.food_item} ({item.bene_category})
-                          </option>
-                        ))}
-                      </Form.Select>
-                    </Form.Group>
-                  </Col>
-                  <Col md={3}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>आवंटित मात्रा (Allo Quan)</Form.Label>
-                      <Form.Control type="number" step="0.01" value={autoFilledData.allo_quan} disabled={!selectedFoodId} onChange={(e) => setAutoFilledData({ ...autoFilledData, allo_quan: e.target.value })} />
-                    </Form.Group>
-                  </Col>
-                  <Col md={2}>
-                    <Button variant="primary" onClick={addFoodItemToList} className="w-100" disabled={!selectedFoodId}>+ आइटम जोड़ें</Button>
-                  </Col>
-                </Row>
+                  <hr />
+                  <h6 className="mb-3">Beneficiary Numbers & Supplementary Nutrition Details</h6>
 
-                {foodItemsList.length > 0 && (
-                  <Table striped bordered hover responsive className="mt-3">
+                  <Row>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Pregnant Woman & Lactating Mother</Form.Label>
+                        <Form.Control type="number" name="pregnant_woman_lactating_mother" value={formData.pregnant_woman_lactating_mother} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Poushik Sattu (PW & LM)</Form.Label>
+                        <Form.Control type="number" name="poushik_sattu_preg_lat" value={formData.poushik_sattu_preg_lat} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
+                  <Row>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Children 6m-3y</Form.Label>
+                        <Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Panjeeri 6m-3y</Form.Label>
+                        <Form.Control type="number" name="panjeeri_6m_3y" value={formData.panjeeri_6m_3y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
+                  <Row>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>SAM 6M-5Y / SUW 6M-6Y</Form.Label>
+                        <Form.Control type="number" name="sam_children_6m_5y_suw_children_6m_6y" value={formData.sam_children_6m_5y_suw_children_6m_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Panjeeri SAM 6M-5Y / SUW 6M-6Y</Form.Label>
+                        <Form.Control type="number" name="panjeeri_sam_6m_5y_suw_6m_6y" value={formData.panjeeri_sam_6m_5y_suw_6m_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
+                  <Row>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>SAM 3Y-5Y / SUW 3Y-6Y</Form.Label>
+                        <Form.Control type="number" name="sam_children_3y_5y_suw_children_3y_6y" value={formData.sam_children_3y_5y_suw_children_3y_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Sattu SAM 3Y-5Y / SUW 3Y-6Y</Form.Label>
+                        <Form.Control type="number" name="sattu_sam_3y_5y_suw_3y_6y" value={formData.sattu_sam_3y_5y_suw_3y_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
+                  <Row>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>HCM Beneficiaries 3Y-6Y</Form.Label>
+                        <Form.Control type="number" name="hcm_beneficiaries_3y_6y" value={formData.hcm_beneficiaries_3y_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Mung Dal Khichdi 3Y-6Y</Form.Label>
+                        <Form.Control type="number" name="mung_dal_khichdi_3y_6y" value={formData.mung_dal_khichdi_3y_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Multi Grain Aata 3Y-6Y</Form.Label>
+                        <Form.Control type="number" name="multi_grain_aata_3y_6y" value={formData.multi_grain_aata_3y_6y} onChange={handleFormChange} required />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
+                  <Button variant="secondary" onClick={() => { setShowForm(false); setEditingId(null); setFormData(initialFormData); }} className="me-2">
+                    Cancel
+                  </Button>
+                  <Button variant="primary" type="submit" disabled={submitting}>
+                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : "Update Record"}
+                  </Button>
+                </Form>
+              </Card.Body>
+            </Card>
+          </Collapse>
+
+          {/* ===================== DATA TABLE ===================== */}
+          <h5 className="mt-4">Existing Supplementary Nutrition Records</h5>
+          <Row className="mb-3">
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Filter by Financial Year</Form.Label>
+                <Form.Select name="financial_year" value={filters.financial_year} onChange={handleFilterChange}>
+                  <option value="">All Years</option>
+                  {uniqueFinYears.map((year) => <option key={year} value={year}>{year}</option>)}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Filter by Quarter</Form.Label>
+                <Form.Select name="quarter" value={filters.quarter} onChange={handleFilterChange}>
+                  <option value="">All Quarters</option>
+                  {uniqueQuarters.map((quarter) => <option key={quarter} value={quarter}>{quarter}</option>)}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <div className="table-responsive">
+            {loading ? (
+              <div className="text-center my-5">
+                <Spinner animation="border" variant="primary" />
+                <p className="mt-2 text-muted">Fetching records, please wait...</p>
+              </div>
+            ) : (
+              <Table striped bordered hover responsive size="sm">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>District</th>
+                    <th>Project</th>
+                    <th>Quarter</th>
+                    <th>Financial Year</th>
+                    <th>PW & LM</th>
+                    <th>Poushik Sattu</th>
+                    <th>Children 6m-3y</th>
+                    <th>Panjeeri 6m-3y</th>
+                    <th>SAM 6M-5Y/SUW 6M-6Y</th>
+                    <th>Panjeeri SAM</th>
+                    <th>SAM 3Y-5Y/SUW 3Y-6Y</th>
+                    <th>Sattu SAM</th>
+                    <th>HCM 3Y-6Y</th>
+                    <th>Mung Dal Khichdi</th>
+                    <th>Multi Grain Aata</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentItems.length > 0 ? (
+                    currentItems.map((report, index) => (
+                      <tr key={report.id}>
+                        <td>{indexOfFirstItem + index + 1}</td>
+                        <td>{report.district}</td>
+                        <td>{report.project}</td>
+                        <td>{report.quarter}</td>
+                        <td>{report.financial_year}</td>
+                        <td>{report.pregnant_woman_lactating_mother}</td>
+                        <td>{report.poushik_sattu_preg_lat}</td>
+                        <td>{report.children_6m_3y}</td>
+                        <td>{report.panjeeri_6m_3y}</td>
+                        <td>{report.sam_children_6m_5y_suw_children_6m_6y}</td>
+                        <td>{report.panjeeri_sam_6m_5y_suw_6m_6y}</td>
+                        <td>{report.sam_children_3y_5y_suw_children_3y_6y}</td>
+                        <td>{report.sattu_sam_3y_5y_suw_3y_6y}</td>
+                        <td>{report.hcm_beneficiaries_3y_6y}</td>
+                        <td>{report.mung_dal_khichdi_3y_6y}</td>
+                        <td>{report.multi_grain_aata_3y_6y}</td>
+                        <td>
+                          <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(report)}>
+                            <FaEdit />
+                          </Button>
+                          <Button variant="outline-danger" size="sm" onClick={() => handleDelete(report.id)}>
+                            <FaTrash />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="17" className="text-center">No records found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </Table>
+            )}
+            {renderPagination()}
+          </div>
+
+          {/* ===================== BULK UPLOAD MODAL ===================== */}
+          <Modal show={showBulkUploadModal} onHide={handleCloseBulkUploadModal} centered size="xl">
+            <Modal.Header closeButton>
+              <Modal.Title>Bulk Upload Supplementary Nutrition Records</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              {reportsLoadingForModal && (
+                <Alert variant="info">
+                  <Spinner as="span" animation="border" size="sm" className="me-2" />
+                  Loading existing records for duplicate checking...
+                </Alert>
+              )}
+
+              {bulkUploadError && (
+                <Alert variant="danger">
+                  <FaExclamationTriangle className="me-2" />
+                  {bulkUploadError}
+                </Alert>
+              )}
+
+              <p>Upload an Excel file with the required columns. The column names must match the downloaded template.</p>
+
+              <div className="d-flex align-items-center mb-3">
+                <Button variant="link" onClick={downloadSampleFile} className="p-0 me-3">
+                  <FaFileExcel className="me-1" /> Download Template File
+                </Button>
+                <Badge bg="info" pill>
+                  {reportsRef.current.length} existing records in system
+                </Badge>
+              </div>
+
+              <div className="mb-3 p-2" style={{ backgroundColor: "#f8f9fa", borderRadius: "4px", fontSize: "0.85rem" }}>
+                <strong>Duplicate Check Rule:</strong> An entry is considered duplicate if the combination of{" "}
+                <Badge bg="primary" className="mx-1">District</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">Project</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">Quarter</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">Financial Year</Badge>{" "}
+                already exists. The numeric count fields are NOT checked for duplicates.
+              </div>
+
+              <Form.Group controlId="formFile" className="mb-3">
+                <Form.Label>Select Excel File</Form.Label>
+                <Form.Control key={bulkFileInputKey} type="file" accept=".xlsx, .xls" onChange={handleFileSelect} disabled={reportsLoadingForModal} />
+                {reportsLoadingForModal && (
+                  <Form.Text className="text-muted">
+                    Loading required data... file selection will be enabled shortly.
+                  </Form.Text>
+                )}
+              </Form.Group>
+
+              {bulkPreviewData.length > 0 && (
+                <div className="mt-4" style={{ maxHeight: "400px", overflowY: "auto" }}>
+                  <h6>File Preview</h6>
+                  <Table striped bordered hover responsive size="sm">
                     <thead>
                       <tr>
-                        <th>#</th><th>श्रेणी (Category)</th><th>खाद्य आइटम</th><th>प्रकार (Type)</th><th>आवंटित मात्रा</th><th>कार्य</th>
+                        <th>#</th>
+                        {PREVIEW_COLUMNS.map((col) => (
+                          <th key={col.key} style={{ backgroundColor: col.isDuplicate ? "#cce5ff" : "transparent", fontWeight: col.isDuplicate ? "bold" : "normal" }} title={col.isDuplicate ? "Checked for duplicates" : "Format validated only, not checked for duplicates"}>
+                            {col.label}
+                            {col.isDuplicate && <span style={{ color: "#004085", fontSize: "0.7rem" }}> *</span>}
+                          </th>
+                        ))}
+                        <th>Status / Error</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {foodItemsList.map((item, index) => (
-                        <tr key={index}>
-                          <td>{index + 1}</td>
-                          <td>{item.category}</td>
-                          <td>{item.food_item}</td>
-                          <td><Badge bg={item.food_type === "टीएचआर" ? "info" : "warning"}>{item.food_type}</Badge></td>
-                          <td>{item.allo_quan}</td>
-                          <td><Button variant="danger" size="sm" onClick={() => removeFoodItem(index)}>हटाएं</Button></td>
-                        </tr>
-                      ))}
+                      {bulkPreviewData.map((item, index) => {
+                        const hasErrors = Object.keys(item.errors).length > 0;
+                        const hasDupError = hasDuplicateError(item.errors);
+                        return (
+                          <tr key={index} className={hasErrors ? "table-danger" : ""}>
+                            <td>{index + 1}</td>
+                            {PREVIEW_COLUMNS.map((col) => {
+                              const cellError = getCellError(item, col.key);
+                              const cellClass = getCellClass(item, col.key);
+                              return (
+                                <td key={col.key} className={cellClass} title={cellError || (col.isDuplicate ? "Checked for duplicates" : "Count field - not checked for duplicates")} style={{ cursor: cellError ? "help" : "default", fontSize: "0.85rem", backgroundColor: col.isDuplicate && !cellClass ? "#f0f7ff" : undefined }}>
+                                  {item.data[col.key]}
+                                  {cellError && <div className="text-danger mt-1" style={{ fontSize: "0.65rem", fontWeight: "600" }}>⚠ DUPLICATE</div>}
+                                </td>
+                              );
+                            })}
+                            <td style={{ fontSize: "0.8rem", minWidth: "220px" }}>
+                              {hasErrors ? (
+                                <div>
+                                  <Badge bg="danger" className="mb-1">{hasDupError ? "DUPLICATE" : "ERROR"}</Badge>
+                                  <div className="text-danger" style={{ fontSize: "0.7rem" }}>
+                                    {item.errors.duplicate_server || item.errors.duplicate_file || Object.values(item.errors).filter((e) => e !== item.errors.duplicate_server && e !== item.errors.duplicate_file).join(", ")}
+                                  </div>
+                                </div>
+                              ) : (
+                                <Badge bg="success">OK</Badge>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </Table>
+
+                  {bulkPreviewData.some((item) => hasDuplicateError(item.errors)) && (
+                    <Alert variant="danger" className="mt-3 mb-0">
+                      <FaExclamationTriangle className="me-2" />
+                      <strong>Duplicate Entries Found - Upload Disabled!</strong>
+                      <div className="mt-2 mb-1" style={{ fontSize: "0.8rem" }}>
+                        The following rows have the same{" "}
+                        <strong>District + Project + Quarter + Financial Year</strong> combination that already exists:
+                      </div>
+                      <ul className="mb-0" style={{ fontSize: "0.8rem" }}>
+                        {bulkPreviewData.filter((item) => hasDuplicateError(item.errors)).map((item, idx) => (
+                          <li key={idx}>
+                            <strong>Row {bulkPreviewData.indexOf(item) + 1}:</strong>{" "}
+                            {item.errors.duplicate_server || item.errors.duplicate_file}
+                          </li>
+                        ))}
+                      </ul>
+                    </Alert>
+                  )}
+                </div>
+              )}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={handleCloseBulkUploadModal} disabled={bulkUploading}>Cancel</Button>
+              <Button variant="primary" onClick={handleBulkUpload} disabled={isBulkUploadDisabled} title={isBulkUploadDisabled && bulkFile ? "Fix all duplicate errors (District + Project + Quarter + Financial Year) before uploading" : ""}>
+                {bulkUploading ? (
+                  <><Spinner as="span" animation="border" size="sm" /> Uploading...</>
+                ) : (
+                  "Upload"
                 )}
-           
-            </Card>
-
-            <div className="details mb-3">
-              <h5 className="mb-0">लाभार्थी विवरण (Beneficiary Details)</h5>
-            </div>
-            <Card className="mb-4 shadow-sm food-card">
-             
-                <Row>
-                  <Col md={4}><Form.Group className="mb-3"><Form.Label>AWC Code</Form.Label><Form.Control type="text" name="awc_code" value={formData.awc_code} onChange={handleInputChange} required /></Form.Group></Col>
-                  <Col md={4}><Form.Group className="mb-3"><Form.Label>Month (तिमाही)</Form.Label><Form.Control type="text" name="month" value={formData.month} onChange={handleInputChange} required /></Form.Group></Col>
-                  <Col md={4}><Form.Group className="mb-3"><Form.Label>Financial Year</Form.Label><Form.Control type="text" name="financial_year" value={formData.financial_year} onChange={handleInputChange} required /></Form.Group></Col>
-                  
-                  <Col md={3}><Form.Group className="mb-3"><Form.Label>Active Beneficiaries</Form.Label><Form.Control type="number" name="active_beneficiaries" value={formData.active_beneficiaries} onChange={handleInputChange} /></Form.Group></Col>
-                  <Col md={3}><Form.Group className="mb-3"><Form.Label>Children 6m-3y</Form.Label><Form.Control type="number" name="children_6m_3y_beneficiaries" value={formData.children_6m_3y_beneficiaries} onChange={handleInputChange} /></Form.Group></Col>
-                  <Col md={3}><Form.Group className="mb-3"><Form.Label>SAM Children 6m-6y</Form.Label><Form.Control type="number" name="sam_children_6m_6y" value={formData.sam_children_6m_6y} onChange={handleInputChange} /></Form.Group></Col>
-                  <Col md={3}><Form.Group className="mb-3"><Form.Label>SUW Children 6m-6y</Form.Label><Form.Control type="number" name="suw_children_6m_6y" value={formData.suw_children_6m_6y} onChange={handleInputChange} /></Form.Group></Col>
-
-                  <Col md={3}><Form.Group className="mb-3"><Form.Label>Pregnant/Lactating Women</Form.Label><Form.Control type="number" name="pregnant_women_lactating_mothers" value={formData.pregnant_women_lactating_mothers} onChange={handleInputChange} /></Form.Group></Col>
-                  <Col md={3}><Form.Group className="mb-3"><Form.Label>HCM Beneficiaries 3y-6y</Form.Label><Form.Control type="number" name="hcm_beneficiaries_3y_6y" value={formData.hcm_beneficiaries_3y_6y} onChange={handleInputChange} /></Form.Group></Col>
-                  <Col md={3}><Form.Group className="mb-3"><Form.Label>Total Beneficiaries</Form.Label><Form.Control type="number" name="total_beneficiaries" value={formData.total_beneficiaries} onChange={handleInputChange} /></Form.Group></Col>
-                </Row>
-              
-            </Card>
-
-            <div className=" gap-2 mb-5">
-              <Button variant="success" type="submit" size="lg" disabled={loading || foodItemsList.length === 0}>
-                {loading ? "सबमिट हो रहा है..." : (editingId ? "अपडेट करें (Update Record)" : "डेटा सबमिट करें (Submit Data)")}
               </Button>
-            </div>
-          </Form>
-
-          {/* ================= VIEW RECORDS TABLE (BELOW FORM) ================= */}
-          <div className="details mb-3 d-flex justify-content-between align-items-center">
-             <h5 className="mb-0">सबमिट किए गए रिकॉर्ड्स</h5>
-               <Button variant="danger" size="sm" onClick={handleBulkDelete} disabled={selectedIds.length === 0 || loading}>
-                 हटाएं ({selectedIds.length})
-               </Button>
-          </div>
-          <Card className="mb-4 shadow-sm food-card">
-               <Tabs
-                 activeKey={recordTab}
-                 onSelect={setRecordTab}
-                 className="mb-3"
-               >
-                 <Tab eventKey="all" title="सभी (All)">All</Tab>
-                 <Tab eventKey="thr" title="टीएचआर (THR)">THR</Tab>
-                 <Tab eventKey="hcm" title="एचसीएम (HCM)">HCM</Tab>
-               </Tabs>
-
-
-               <Table striped bordered hover responsive className="record-table">
-                  <thead>
-                    <tr>
-                      <th><Form.Check type="checkbox" onChange={handleSelectAll} checked={selectedIds.length === records.length && records.length > 0} /></th>
-                      <th>ID</th>
-                      <th>District</th>
-                      <th>Project</th>
-                      <th>Sector</th>
-                      <th>AWC Code</th>
-                      <th>AWC Name</th>
-                      <th>Month</th>
-                      <th>Year</th>
-                      <th>Active Ben.</th>
-                      <th>6m-3y</th>
-                      <th>SAM 6m-6y</th>
-                      <th>SUW 6m-6y</th>
-                      <th>SAM 3y-6y</th>
-                      <th>SUW 3y-6y</th>
-                      <th>Preg/Lac</th>
-                      <th>HCM 3y-6y</th>
-                      <th>THR 25d</th>
-                      <th>Total Ben.</th>
-                      <th>Food Items</th>
-                      <th>Created</th>
-                      <th>Updated</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredRecords.length === 0 ? (
-                      <tr><td colSpan="23" className="text-center">No records found.</td></tr>
-                    ) : (
-                      filteredRecords.map((rec) => (
-                        <tr key={rec.id}>
-                          <td><Form.Check type="checkbox" checked={selectedIds.includes(rec.id)} onChange={() => handleSelect(rec.id)} /></td>
-                          <td>{rec.id}</td>
-                          <td>{rec.district}</td>
-                          <td>{rec.project}</td>
-                          <td>{rec.sector}</td>
-                          <td>{rec.awc_code}</td>
-                          <td>{rec.awc_name}</td>
-                          <td>{rec.month}</td>
-                          <td>{rec.financial_year}</td>
-                          <td>{rec.active_beneficiaries}</td>
-                          <td>{rec.children_6m_3y_beneficiaries}</td>
-                          <td>{rec.sam_children_6m_6y}</td>
-                          <td>{rec.suw_children_6m_6y}</td>
-                          <td>{rec.sam_children_3y_6y}</td>
-                          <td>{rec.suw_children_3y_6y}</td>
-                          <td>{rec.pregnant_women_lactating_mothers}</td>
-                          <td>{rec.hcm_beneficiaries_3y_6y}</td>
-                          <td>{rec.thr_25_days_frs_hcm_beneficiaries_3y_6y}</td>
-                          <td>{rec.total_beneficiaries}</td>
-                          <td>
-                            {(() => {
-                              const grouped = {};
-                              (rec.food_items || []).forEach((fi) => {
-                                const cat = fi.category || "अन्य";
-                                if (!grouped[cat]) grouped[cat] = [];
-                                grouped[cat].push(fi);
-                              });
-                              return Object.entries(grouped).map(([cat, items]) => (
-                                <div key={cat} className="mb-2">
-                                  <div className="fw-bold small text-primary">{cat}</div>
-                                  {items.map((fi, i) => (
-                                    <Badge key={i} bg="secondary" className="me-1 mb-1">{fi.food_item} ({fi.allo_quan})</Badge>
-                                  ))}
-                                </div>
-                              ));
-                            })()}
-                          </td>
-                          <td>{rec.created_at?.substring(0, 16)}</td>
-                          <td>{rec.updated_at?.substring(0, 16)}</td>
-                          <td>
-                            <div className="d-flex gap-1">
-                              <Button variant="warning" size="sm" onClick={() => handleEdit(rec)}>Edit</Button>
-                              <Button variant="danger" size="sm" onClick={() => handleDelete(rec.id)} disabled={loading}>Delete</Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-</Table>
-            
-           </Card>
-
+            </Modal.Footer>
+          </Modal>
         </Container>
       </div>
     </div>
   );
-}
+};
 
 export default CDPOFoodSupplementary;
