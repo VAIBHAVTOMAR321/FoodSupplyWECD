@@ -48,7 +48,12 @@ import {
   FaWarehouse,
   FaLayerGroup,
   FaSyncAlt,
+  FaFileExcel,
+  FaFilePdf,
 } from "react-icons/fa";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 import "../../assets/css/AnganwadiDashboard.css";
 
@@ -406,6 +411,8 @@ const AnganwadiDashboard = () => {
   const [suppliesError, setSuppliesError] = useState("");
   const [selectedSupplyMonths, setSelectedSupplyMonths] = useState([]);
   const [selectedSupplyFYs, setSelectedSupplyFYs] = useState([]);
+  const [suppliesExportError, setSuppliesExportError] = useState("");
+  const [distributionExportError, setDistributionExportError] = useState("");
 
   const { user, api, uniqueId } = useAuth();
 
@@ -653,6 +660,194 @@ const AnganwadiDashboard = () => {
       return `${quantity.toLocaleString(undefined, { maximumFractionDigits: 2 })} g (${(quantity / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 })} kg)`;
     }
     return `${quantity.toLocaleString(undefined, { maximumFractionDigits: 2 })} packets`;
+  };
+
+  const exportSuppliesToExcel = () => {
+    setSuppliesExportError("");
+    try {
+      const rows = suppliesDisplayData.map((row, index) => {
+        const exportRow = {
+          "S. No.": index + 1,
+          Sector: row.sector || "—",
+          "AWC Name": row.awc_name || "—",
+          "AWC Code": row.awc_code || "—",
+        };
+        suppliesFoodItems.forEach((foodItem) => {
+          const item = row.foodData.find((food) => food.food_item === foodItem);
+          exportRow[`${foodItem} - Received`] = formatSupplyQuantity(item?.received || 0);
+          exportRow[`${foodItem} - Distributed`] = formatSupplyQuantity(item?.distributed || 0);
+          exportRow[`${foodItem} - Remaining`] = formatSupplyQuantity(item?.balance || 0);
+        });
+        return exportRow;
+      });
+      const totalRow = {
+        "S. No.": "",
+        Sector: "Total",
+        "AWC Name": "",
+        "AWC Code": "",
+      };
+      suppliesFoodItems.forEach((foodItem) => {
+        const total = suppliesTotals[foodItem] || { received: 0, distributed: 0, balance: 0 };
+        totalRow[`${foodItem} - Received`] = formatSupplyQuantity(total.received);
+        totalRow[`${foodItem} - Distributed`] = formatSupplyQuantity(total.distributed);
+        totalRow[`${foodItem} - Remaining`] = formatSupplyQuantity(total.balance);
+      });
+      if (rows.length) rows.push(totalRow);
+
+      const sheet = XLSX.utils.json_to_sheet(rows);
+      if (sheet["!ref"]) sheet["!autofilter"] = { ref: sheet["!ref"] };
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, "Supplies Summary");
+      XLSX.writeFile(
+        workbook,
+        `Supplies_${suppliesTab.toUpperCase()}_AWC_Summary.xlsx`,
+        { compression: true },
+      );
+    } catch (exportError) {
+      console.error("Failed to export supplies summary to Excel:", exportError);
+      setSuppliesExportError("Excel export failed. Please try again.");
+    }
+  };
+
+  const exportSuppliesToPDF = () => {
+    setSuppliesExportError("");
+    try {
+      const headers = [
+        "S. No.",
+        "Sector",
+        "AWC Name",
+        "AWC Code",
+        ...suppliesFoodItems.flatMap((foodItem) => [
+          `${foodItem} - Received`,
+          `${foodItem} - Distributed`,
+          `${foodItem} - Remaining`,
+        ]),
+      ];
+      const rows = suppliesDisplayData.map((row, index) => [
+        index + 1,
+        row.sector || "—",
+        row.awc_name || "—",
+        row.awc_code || "—",
+        ...suppliesFoodItems.flatMap((foodItem) => {
+          const item = row.foodData.find((food) => food.food_item === foodItem);
+          return [
+            formatSupplyQuantity(item?.received || 0),
+            formatSupplyQuantity(item?.distributed || 0),
+            formatSupplyQuantity(item?.balance || 0),
+          ];
+        }),
+      ]);
+      if (rows.length) {
+        rows.push([
+          "",
+          "Total",
+          "",
+          "",
+          ...suppliesFoodItems.flatMap((foodItem) => {
+            const total = suppliesTotals[foodItem] || { received: 0, distributed: 0, balance: 0 };
+            return [
+              formatSupplyQuantity(total.received),
+              formatSupplyQuantity(total.distributed),
+              formatSupplyQuantity(total.balance),
+            ];
+          }),
+        ]);
+      }
+
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3" });
+      pdf.setFontSize(16);
+      pdf.text(`Supplies ${suppliesTab.toUpperCase()} Received & Distributed Summary`, 32, 28);
+      autoTable(pdf, {
+        head: [headers],
+        body: rows.map((row) => row.map((value) => String(value ?? ""))),
+        startY: 42,
+        margin: { left: 28, right: 28, bottom: 30 },
+        theme: "grid",
+        styles: { fontSize: 7, cellPadding: 3, overflow: "linebreak" },
+        headStyles: { fillColor: [7, 63, 115], textColor: 255, fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 248, 251] },
+        horizontalPageBreak: true,
+        horizontalPageBreakRepeat: [0, 1, 2, 3],
+      });
+      pdf.save(`Supplies_${suppliesTab.toUpperCase()}_AWC_Summary.pdf`);
+    } catch (exportError) {
+      console.error("Failed to export supplies summary to PDF:", exportError);
+      setSuppliesExportError("PDF export failed. Please try again.");
+    }
+  };
+
+  const getDistributionExportRows = () =>
+    distributionRecords.map((record, index) => ({
+      "#": index + 1,
+      "Food Item": record.food_item || "",
+      "Beneficiary Category": record.bene_category || "-",
+      Date: record.date ? new Date(record.date).toLocaleDateString() : "-",
+      "Trimester / Months": `${record.trimester || normalizeTrimester(record.quarter, record.months)} (${formatMonths(
+        record.months ||
+          trimesterToMonths[
+            normalizeTrimester(record.trimester || record.quarter)
+          ] ||
+          record.quarter,
+      )})`,
+      Year: record.fin_year || "",
+      "Total Beneficiaries": record.total_beneficiaries ?? "",
+      Quantity: formatDistributionQuantity(record.quantity),
+      Unit: record.unit || "",
+      Remark: record.anganwadi_remark || "-",
+    }));
+
+  const exportDistributionsToExcel = () => {
+    setDistributionExportError("");
+    try {
+      const workbook = XLSX.utils.book_new();
+      const sheet = XLSX.utils.json_to_sheet(getDistributionExportRows());
+      if (sheet["!ref"]) sheet["!autofilter"] = { ref: sheet["!ref"] };
+      XLSX.utils.book_append_sheet(workbook, sheet, "Distribution Records");
+      XLSX.writeFile(
+        workbook,
+        `${activeScheme}-anganwadi-distributions.xlsx`,
+        { compression: true },
+      );
+    } catch (exportError) {
+      console.error("Failed to export distribution records to Excel:", exportError);
+      setDistributionExportError("Excel export failed. Please try again.");
+    }
+  };
+
+  const exportDistributionsToPDF = () => {
+    setDistributionExportError("");
+    try {
+      const rows = getDistributionExportRows();
+      const headers = Object.keys(rows[0] || {
+        "#": "",
+        "Food Item": "",
+        "Beneficiary Category": "",
+        Date: "",
+        "Trimester / Months": "",
+        Year: "",
+        "Total Beneficiaries": "",
+        Quantity: "",
+        Unit: "",
+        Remark: "",
+      });
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3" });
+      pdf.setFontSize(16);
+      pdf.text(`${activeScheme.toUpperCase()} Distribution Records`, 32, 28);
+      autoTable(pdf, {
+        head: [headers],
+        body: rows.map((row) => headers.map((header) => String(row[header] ?? ""))),
+        startY: 42,
+        margin: { left: 28, right: 28, bottom: 30 },
+        theme: "grid",
+        styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" },
+        headStyles: { fillColor: [7, 63, 115], textColor: 255, fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 248, 251] },
+      });
+      pdf.save(`${activeScheme}-anganwadi-distributions.pdf`);
+    } catch (exportError) {
+      console.error("Failed to export distribution records to PDF:", exportError);
+      setDistributionExportError("PDF export failed. Please try again.");
+    }
   };
 
   const toggleSidebar = () => {
@@ -1892,10 +2087,38 @@ const AnganwadiDashboard = () => {
                       <FaSyncAlt className="me-1" />
                       Reset
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline-success"
+                      className="align-self-end"
+                      onClick={exportSuppliesToExcel}
+                      disabled={suppliesLoading || suppliesDisplayData.length === 0}
+                    >
+                      <FaFileExcel className="me-1" /> Excel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline-danger"
+                      className="align-self-end"
+                      onClick={exportSuppliesToPDF}
+                      disabled={suppliesLoading || suppliesDisplayData.length === 0}
+                    >
+                      <FaFilePdf className="me-1" /> PDF
+                    </Button>
                   </div>
                 </div>
               </Card.Header>
               <Card.Body className="p-0">
+                {suppliesExportError && (
+                  <Alert
+                    variant="danger"
+                    className="m-3"
+                    dismissible
+                    onClose={() => setSuppliesExportError("")}
+                  >
+                    {suppliesExportError}
+                  </Alert>
+                )}
                 {suppliesLoading ? (
                   <div className="text-center p-4">
                     <Spinner animation="border" size="sm" />{" "}
@@ -2057,21 +2280,48 @@ const AnganwadiDashboard = () => {
                     {activeScheme.toUpperCase()} Distribution Records
                   </h5>
 
-                  <Button
-                    variant="success"
-                    onClick={() =>
-                      handleOpenDistributionModal(
-                        null,
-                        activeScheme,
-                        null,
-                        true,
-                      )
-                    }
-                  >
-                    <FaDolly className="me-2" /> New Distribution
-                  </Button>
+                  <div className="d-flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline-success"
+                      onClick={exportDistributionsToExcel}
+                      disabled={loading.table || distributionRecords.length === 0}
+                    >
+                      <FaFileExcel className="me-1" /> Excel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline-danger"
+                      onClick={exportDistributionsToPDF}
+                      disabled={loading.table || distributionRecords.length === 0}
+                    >
+                      <FaFilePdf className="me-1" /> PDF
+                    </Button>
+                    <Button
+                      variant="success"
+                      onClick={() =>
+                        handleOpenDistributionModal(
+                          null,
+                          activeScheme,
+                          null,
+                          true,
+                        )
+                      }
+                    >
+                      <FaDolly className="me-2" /> New Distribution
+                    </Button>
+                  </div>
                 </div>
 
+                {distributionExportError && (
+                  <Alert
+                    variant="danger"
+                    dismissible
+                    onClose={() => setDistributionExportError("")}
+                  >
+                    {distributionExportError}
+                  </Alert>
+                )}
                 {loading.table ? (
                   <div className="loading-state">
                     <Spinner animation="border" />
