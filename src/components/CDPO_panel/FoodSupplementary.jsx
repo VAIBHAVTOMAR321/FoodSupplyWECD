@@ -146,6 +146,28 @@ const TABLE_COLUMNS = [
   { label: "Actions", key: "_actions" },
 ];
 const NUMERIC_AGG_FIELDS = TABLE_COLUMNS.filter((c) => c.num).map((c) => ({ label: c.label, key: c.key }));
+
+// Apply readable widths, filters, and a frozen header to every exported worksheet.
+const applyExportWorksheetLayout = (worksheet, rows, headers) => {
+  const headerLabels = headers || (rows.length ? Object.keys(rows[0]) : []);
+  worksheet["!cols"] = headerLabels.map((header) => {
+    const maxValueLength = rows.reduce((max, row) => {
+      const value = row?.[header];
+      return Math.max(max, String(value ?? "").length);
+    }, String(header).length);
+    return { wch: Math.min(Math.max(maxValueLength + 2, 12), 34) };
+  });
+  if (rows.length) {
+    worksheet["!autofilter"] = {
+      ref: XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: rows.length, c: Math.max(headerLabels.length - 1, 0) },
+      }),
+    };
+  }
+  worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+  return worksheet;
+};
 const SUMMARY_PILLS = [
   { key: "pregnant_woman_lactating_mother", label: "Preg/Lact", icon: <FaBaby size={10} /> },
   { key: "children_6m_3y", label: "Children 6m-3y", icon: <FaBaby size={10} /> },
@@ -867,9 +889,14 @@ const FoodSupplementary = () => {
     data.push(totalRow);
 
     const ws = XLSX.utils.json_to_sheet(data);
+    applyExportWorksheetLayout(ws, data, data.length ? Object.keys(data[0]) : []);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Supplies Summary");
-    XLSX.writeFile(wb, `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode === "sector" ? "Sector" : "AWC"}_Summary.xlsx`);
+    XLSX.writeFile(
+      wb,
+      `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode === "sector" ? "Sector" : "AWC"}_Summary.xlsx`,
+      { compression: true },
+    );
   };
 
   const exportSuppliesToPDF = () => {
@@ -959,9 +986,9 @@ const FoodSupplementary = () => {
     const opt = {
       margin: [10, 10, 10, 10],
       filename: `Supplies_${suppliesTab.toUpperCase()}_${suppliesViewMode === "sector" ? "Sector" : "AWC"}_Summary.pdf`,
-      image: { type: "jpeg", quality: 0.98 },
+      image: { type: "jpeg", quality: 0.82 },
       html2canvas: { 
-        scale: 2, 
+        scale: 1.35, 
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
@@ -983,9 +1010,10 @@ const FoodSupplementary = () => {
     dataToExport.push(totalObj);
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
+    applyExportWorksheetLayout(ws, dataToExport, dataToExport.length ? Object.keys(dataToExport[0]) : []);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sector Summary");
-    XLSX.writeFile(wb, "Sector_Summary.xlsx");
+    XLSX.writeFile(wb, "Sector_Summary.xlsx", { compression: true });
   };
 
   const exportAggToPDF = () => {
@@ -1040,9 +1068,9 @@ const FoodSupplementary = () => {
     const opt = {
       margin: [10, 10, 10, 10],
       filename: "Sector_Summary.pdf",
-      image: { type: "jpeg", quality: 0.98 },
+      image: { type: "jpeg", quality: 0.82 },
       html2canvas: { 
-        scale: 2, 
+        scale: 1.35, 
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
@@ -1051,88 +1079,269 @@ const FoodSupplementary = () => {
     };
 
     html2pdf().set(opt).from(html).save();
+  };
+
+  const getDetailedExportColumns = () => {
+    const columns = [
+      { header: "S. No.", key: "_serial", type: "serial" },
+      ...EXCEL_META_COLUMNS.map((col) => ({
+        header: col.header,
+        key: col.key,
+        type: "meta",
+      })),
+      ...GRANT_CATEGORIES.flatMap((category) => [
+        { header: `${category.title} - Grant 15`, key: `${category.countKey}_grant15`, type: "grant", category, grantIndex: 0 },
+        { header: `${category.title} - Grant 30`, key: `${category.countKey}_grant30`, type: "grant", category, grantIndex: 1 },
+        { header: `${category.title} - Grant 31`, key: `${category.countKey}_grant31`, type: "grant", category, grantIndex: 2 },
+        { header: `${category.title} - TOTAL`, key: category.countKey, type: "categoryTotal", category },
+      ]),
+      ...FOOD_FIELDS.map((food) => ({
+        header: food.header,
+        key: food.key,
+        type: "food",
+      })),
+    ];
+    return columns;
+  };
+
+  const getDetailedExportValue = (record, column, index) => {
+    if (column.type === "serial") return index + 1;
+    if (column.type === "grant") {
+      const values = Array.isArray(record[column.category.grantKey])
+        ? record[column.category.grantKey]
+        : [];
+      return Number(values[column.grantIndex]) || 0;
+    }
+    if (column.type === "categoryTotal" || column.type === "food") {
+      return Number(record[column.key]) || 0;
+    }
+    return record[column.key] ?? "";
+  };
+
+  const getDetailedExportRows = () => {
+    const columns = getDetailedExportColumns();
+    const dataRows = searchedRecords.map((record, index) => {
+      const row = {};
+      columns.forEach((column) => {
+        row[column.header] = getDetailedExportValue(record, column, index);
+      });
+      return row;
+    });
+
+    const totalRow = {};
+    columns.forEach((column, columnIndex) => {
+      if (column.type === "serial") {
+        totalRow[column.header] = "Total";
+      } else if (column.type === "grant") {
+        totalRow[column.header] = searchedRecords.reduce((sum, record) => {
+          const values = Array.isArray(record[column.category.grantKey])
+            ? record[column.category.grantKey]
+            : [];
+          return sum + (Number(values[column.grantIndex]) || 0);
+        }, 0);
+      } else if (column.type === "categoryTotal" || column.type === "food") {
+        totalRow[column.header] = searchedRecords.reduce(
+          (sum, record) => sum + (Number(record[column.key]) || 0),
+          0,
+        );
+      } else {
+        totalRow[column.header] = columnIndex === 1 ? "Total" : "";
+      }
+    });
+    return { columns, dataRows, totalRow };
   };
 
   const exportDetailsToExcel = () => {
-    const cols = TABLE_COLUMNS.filter((c) => c.key !== "_index" && c.key !== "_actions");
-    const dataToExport = searchedRecords.map((row, i) => {
-      const obj = { "S. No.": i + 1 };
-      cols.forEach((c) => (obj[c.label] = row[c.key] || 0));
-      return obj;
+    const { columns, dataRows, totalRow } = getDetailedExportRows();
+    const rows = [...dataRows, totalRow];
+    const worksheet = XLSX.utils.json_to_sheet(rows, {
+      header: columns.map((column) => column.header),
     });
-    const totalObj = { "S. No.": "" };
-    cols.forEach((c) => {
-      if (c.num || c.strong) totalObj[c.label] = totalDetailed[c.key];
-      else totalObj[c.label] = "";
+    applyExportWorksheetLayout(worksheet, rows, columns.map((column) => column.header));
+    worksheet["!cols"] = columns.map((column) => {
+      if (column.type === "serial") return { wch: 8 };
+      if (column.type === "grant" || column.type === "categoryTotal" || column.type === "food") {
+        return { wch: Math.min(Math.max(column.header.length + 2, 14), 28) };
+      }
+      if (column.key === "awc_name" || column.key === "project" || column.key === "sector") return { wch: 24 };
+      return { wch: Math.min(Math.max(column.header.length + 2, 14), 26) };
     });
-    totalObj[cols[0].label] = "Total";
-    dataToExport.push(totalObj);
-
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Records");
-    XLSX.writeFile(wb, "Supplementary_Records.xlsx");
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Supplementary Records");
+    XLSX.writeFile(workbook, "Supplementary_Records.xlsx", { compression: true });
   };
 
-  const exportDetailsToPDF = () => {
-    const cols = TABLE_COLUMNS.filter((c) => c.key !== "_index" && c.key !== "_actions");
-    
-    let html = `
-      <div style="font-family: 'Noto Sans Devanagari', 'Noto Sans', Arial, sans-serif; padding: 20px;">
-        <h3 style="text-align:center; margin-bottom:20px; color:#1e3a5f;">Supplementary Nutrition Records</h3>
-        <table style="width:100%; border-collapse:collapse; font-size:8px;">
-          <thead>
-            <tr style="background-color:#4f46e5; color:white;">
-              <th style="border:1px solid #ddd; padding:5px 3px;">S. No.</th>
-              ${cols.map(c => `<th style="border:1px solid #ddd; padding:5px 3px; text-align:${c.num || c.strong ? 'right' : 'center'};">${c.label}</th>`).join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${searchedRecords.map((row, i) => `
-              <tr>
-                <td style="border:1px solid #ddd; padding:3px; text-align:center;">${i + 1}</td>
-                ${cols.map(c => {
-                  const val = row[c.key];
-                  if (c.num || c.strong) {
-                    return `<td style="border:1px solid #ddd; padding:3px; text-align:right;">${val ? Number(val).toLocaleString() : "0"}</td>`;
-                  }
-                  return `<td style="border:1px solid #ddd; padding:3px;">${val || "—"}</td>`;
-                }).join("")}
-              </tr>
-            `).join("")}
-          </tbody>
-          <tfoot>
-            <tr style="background-color:#f1f5f9; font-weight:bold;">
-              <td style="border:1px solid #ddd; padding:3px;"></td>
-              ${cols.map(c => {
-                if (c.num || c.strong) {
-                  return `<td style="border:1px solid #ddd; padding:3px; text-align:right;">${totalDetailed[c.key]?.toLocaleString() || 0}</td>`;
-                }
-                if (c === cols[1]) {
-                  return `<td style="border:1px solid #ddd; padding:3px;">Total</td>`;
-                }
-                return `<td style="border:1px solid #ddd; padding:3px;"></td>`;
-              }).join("")}
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    `;
+  const exportDetailsToPDF = async () => {
+    if (!searchedRecords.length) {
+      window.alert("There are no records to export.");
+      return;
+    }
 
-    const opt = {
-      margin: [10, 10, 10, 10],
-      filename: "Supplementary_Records.pdf",
-      image: { type: "jpeg", quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        logging: false,
-      },
-      jsPDF: { unit: "mm", format: "a3", orientation: "landscape" }
+    const { columns, dataRows, totalRow } = getDetailedExportRows();
+    const root = document.createElement("div");
+    root.style.cssText = [
+      "box-sizing:border-box",
+      "width:100%",
+      "padding:8px",
+      "background:#fff",
+      "color:#111827",
+      'font-family:"Noto Sans Devanagari","Nirmala UI","Mangal","Noto Sans",Arial,sans-serif',
+    ].join(";");
+
+    const title = document.createElement("h3");
+    title.textContent = "Supplementary Nutrition Records";
+    title.style.cssText = "text-align:center;margin:0 0 4px;font-size:15px;color:#1e3a5f;";
+    root.appendChild(title);
+
+    const subtitle = document.createElement("div");
+    subtitle.textContent = `Total records: ${searchedRecords.length}`;
+    subtitle.style.cssText = "text-align:right;margin:0 0 8px;font-size:9px;";
+    root.appendChild(subtitle);
+
+    const table = document.createElement("table");
+    // A2 landscape gives the wide grant template enough physical width. Keep
+    // column widths normalized to 100% so browser layout cannot overflow and
+    // squeeze/overlap the header text.
+    table.style.cssText = "width:100%;border-collapse:collapse;table-layout:fixed;font-size:8px;";
+    const colgroup = document.createElement("colgroup");
+    columns.forEach((column) => {
+      const col = document.createElement("col");
+      let width = "2.15%";
+      if (column.type === "serial") width = "2.5%";
+      else if (column.type === "meta") {
+        width = ({
+          district: "5.2%",
+          project: "6.8%",
+          sector: "5.8%",
+          awc_name: "6.8%",
+          awc_code: "5.0%",
+          quarter: "4.2%",
+          financial_year: "4.2%",
+        })[column.key] || "4.5%";
+      } else if (column.type === "grant" || column.type === "categoryTotal") {
+        width = "2.0%";
+      } else {
+        width = "2.2%";
+      }
+      col.style.width = width;
+      colgroup.appendChild(col);
+    });
+    table.appendChild(colgroup);
+
+    const thead = document.createElement("thead");
+    const groupRow = document.createElement("tr");
+    const addHeader = (row, text, options = {}) => {
+      const th = document.createElement("th");
+      th.textContent = text;
+      if (options.colSpan) th.colSpan = options.colSpan;
+      if (options.rowSpan) th.rowSpan = options.rowSpan;
+      th.style.cssText = [
+        "border:0.5px solid #9ca3af",
+        "padding:5px 3px",
+        "font-size:8px",
+        "line-height:1.25",
+        "background:#4f46e5",
+        "color:#fff",
+        "font-weight:700",
+        "text-align:center",
+        "vertical-align:middle",
+        "white-space:normal",
+        "overflow-wrap:anywhere",
+      ].join(";");
+      row.appendChild(th);
     };
 
-    html2pdf().set(opt).from(html).save();
+    addHeader(groupRow, "S. No.", { rowSpan: 2 });
+    EXCEL_META_COLUMNS.forEach((column) => addHeader(groupRow, column.header, { rowSpan: 2 }));
+    GRANT_CATEGORIES.forEach((category) => addHeader(groupRow, category.title, { colSpan: 4 }));
+    addHeader(groupRow, "SUPPLEMENTARY NUTRITION DETAILS", { colSpan: FOOD_FIELDS.length });
+    thead.appendChild(groupRow);
+
+    const subHeaderRow = document.createElement("tr");
+    GRANT_CATEGORIES.forEach(() => {
+      ["Grant 15", "Grant 30", "Grant 31", "TOTAL"].forEach((label) => addHeader(subHeaderRow, label));
+    });
+    FOOD_FIELDS.forEach((food) => addHeader(subHeaderRow, food.header));
+    thead.appendChild(subHeaderRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    const makeDataRow = (row, isTotal = false) => {
+      const tr = document.createElement("tr");
+      tr.style.pageBreakInside = "avoid";
+      tr.style.breakInside = "avoid";
+      columns.forEach((column) => {
+        const td = document.createElement("td");
+        const value = row[column.header];
+        td.textContent = value === null || value === undefined || value === "" ? "—" : String(value);
+        td.style.cssText = [
+          "border:0.5px solid #cbd5e1",
+          "padding:4px 3px",
+          "font-size:8px",
+          "vertical-align:top",
+          "white-space:normal",
+          "overflow-wrap:break-word",
+          "word-break:normal",
+          "line-height:1.3",
+          column.type === "serial" || column.type === "grant" || column.type === "categoryTotal" || column.type === "food"
+            ? "text-align:right"
+            : "text-align:left",
+          isTotal ? "font-weight:700;background:#eef2ff" : "",
+        ].join(";");
+        tr.appendChild(td);
+      });
+      return tr;
+    };
+
+    dataRows.forEach((row) => tbody.appendChild(makeDataRow(row)));
+    tbody.appendChild(makeDataRow(totalRow, true));
+    table.appendChild(tbody);
+    root.appendChild(table);
+    document.body.appendChild(root);
+
+    try {
+      const fontLinkId = "food-supplementary-pdf-font";
+      if (!document.getElementById(fontLinkId)) {
+        const link = document.createElement("link");
+        link.id = fontLinkId;
+        link.rel = "stylesheet";
+        link.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap";
+        document.head.appendChild(link);
+      }
+      try {
+        await document.fonts?.load('8px "Noto Sans Devanagari"');
+        await document.fonts?.ready;
+      } catch (fontError) {
+        console.warn("Could not load Hindi PDF font; using system fonts.", fontError);
+      }
+
+      const options = {
+        margin: [10, 10, 12, 10],
+        filename: "Supplementary_Records.pdf",
+        image: { type: "jpeg", quality: 0.82 },
+        html2canvas: {
+          scale: 1.5,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+        },
+        jsPDF: { unit: "mm", format: "a2", orientation: "landscape", compress: true },
+        pagebreak: {
+          mode: ["css", "legacy"],
+          before: [],
+          after: [],
+          avoid: ["tr", "thead", "tfoot"],
+        },
+      };
+      await html2pdf().set(options).from(root).save();
+    } catch (error) {
+      console.error("Failed to export supplementary records PDF:", error);
+      window.alert("Failed to export PDF. Please try again.");
+    } finally {
+      root.remove();
+    }
   };
 
   return (
