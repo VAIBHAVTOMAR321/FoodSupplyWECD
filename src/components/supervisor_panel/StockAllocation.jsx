@@ -133,6 +133,21 @@ const FOOD_FIELDS = [
   { header: "Multi Grain Aata - HCM 3Y-6Y", key: "multi_grain_aata_3y_6y" },
 ];
 
+// Food fields are grouped with the matching beneficiary category in the table,
+// Excel export, and PDF export so all three views use the same column order.
+const CATEGORY_FOOD_FIELDS = [
+  ["poushik_sattu_preg_lat"],
+  ["panjeeri_6m_3y"],
+  ["panjeeri_sam_6m_5y_suw_6m_6y"],
+  ["sattu_sam_3y_5y_suw_3y_6y"],
+  ["mung_dal_khichdi_3y_6y", "multi_grain_aata_3y_6y"],
+];
+
+const getFoodForCategory = (categoryIndex) => {
+  const keys = CATEGORY_FOOD_FIELDS[categoryIndex] || [];
+  return keys.map((key) => FOOD_FIELDS.find((food) => food.key === key)).filter(Boolean);
+};
+
 const EXCEL_META_COLUMNS = [
   { header: "DISTRICT", key: "district" },
 
@@ -153,8 +168,7 @@ const EXCEL_META_COLUMNS = [
 
 const EXPORT_FLAT_COLUMNS = [
   ...EXCEL_META_COLUMNS,
-
-  ...GRANT_CATEGORIES.flatMap((cat) => [
+  ...GRANT_CATEGORIES.flatMap((cat, categoryIndex) => [
     {
       header: `${cat.title} - Grant 15`,
       key: `${cat.countKey}_g15`,
@@ -162,7 +176,6 @@ const EXPORT_FLAT_COLUMNS = [
       grantId: 15,
       grantKey: cat.grantKey,
     },
-
     {
       header: `${cat.title} - Grant 30`,
       key: `${cat.countKey}_g30`,
@@ -170,7 +183,6 @@ const EXPORT_FLAT_COLUMNS = [
       grantId: 30,
       grantKey: cat.grantKey,
     },
-
     {
       header: `${cat.title} - Grant 31`,
       key: `${cat.countKey}_g31`,
@@ -178,11 +190,13 @@ const EXPORT_FLAT_COLUMNS = [
       grantId: 31,
       grantKey: cat.grantKey,
     },
-
     { header: `${cat.title} - Total`, key: cat.countKey, num: true },
+    ...getFoodForCategory(categoryIndex).map((food) => ({
+      header: food.header,
+      key: food.key,
+      num: true,
+    })),
   ]),
-
-  ...FOOD_FIELDS.map((f) => ({ header: f.header, key: f.key, num: true })),
 ];
 
 const NUMERIC_TOTAL_KEYS = [
@@ -419,6 +433,11 @@ const StockAllocation = () => {
   const [itemsPerPage] = useState(100);
 
   const tableRef = useRef(null);
+  const stickyScrollRef = useRef(null);
+  const stickyScrollInnerRef = useRef(null);
+  const syncingScrollRef = useRef(false);
+  const [showStickyScrollbar, setShowStickyScrollbar] = useState(false);
+  const [stickyScrollbarWidth, setStickyScrollbarWidth] = useState(0);
 
   const fetchStockAllocation = useCallback(async () => {
     if (!api) return;
@@ -498,6 +517,86 @@ const StockAllocation = () => {
 
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Keep a fixed horizontal scrollbar visible at the bottom of the viewport.
+  // It is a regular React element (not dynamically appended to document.body),
+  // so it remains compatible with React StrictMode and cleans up naturally.
+  useEffect(() => {
+    const tableScroller = tableRef.current;
+    const stickyScroller = stickyScrollRef.current;
+    const stickyInner = stickyScrollInnerRef.current;
+    if (!tableScroller || !stickyScroller || !stickyInner) return undefined;
+
+    let frameId = 0;
+    const measure = () => {
+      if (frameId) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        const table = tableScroller.querySelector("table");
+        // Measure the complete table content, not the visible wrapper width.
+        const contentWidth = Math.max(
+          tableScroller.scrollWidth || 0,
+          table ? table.scrollWidth : 0,
+          table ? Math.ceil(table.getBoundingClientRect().width) : 0,
+        );
+        const hasOverflow = contentWidth > tableScroller.clientWidth + 2;
+        setShowStickyScrollbar(hasOverflow && !loading);
+        setStickyScrollbarWidth(Math.max(contentWidth, stickyScroller.clientWidth));
+
+        // The sticky bar is usually wider than the table viewport. Map positions
+        // by scroll-range ratio so both controls reach the exact far-right edge.
+        const tableMax = Math.max(0, tableScroller.scrollWidth - tableScroller.clientWidth);
+        const stickyMax = Math.max(0, stickyScroller.scrollWidth - stickyScroller.clientWidth);
+        const ratio = tableMax > 0 ? tableScroller.scrollLeft / tableMax : 0;
+        const targetStickyLeft = ratio * stickyMax;
+        if (Math.abs(stickyScroller.scrollLeft - targetStickyLeft) > 1) {
+          stickyScroller.scrollLeft = targetStickyLeft;
+        }
+      });
+    };
+
+    const onTableScroll = () => {
+      if (syncingScrollRef.current) return;
+      syncingScrollRef.current = true;
+      const tableMax = Math.max(0, tableScroller.scrollWidth - tableScroller.clientWidth);
+      const stickyMax = Math.max(0, stickyScroller.scrollWidth - stickyScroller.clientWidth);
+      const ratio = tableMax > 0 ? tableScroller.scrollLeft / tableMax : 0;
+      stickyScroller.scrollLeft = ratio * stickyMax;
+      syncingScrollRef.current = false;
+    };
+    const onStickyScroll = () => {
+      if (syncingScrollRef.current) return;
+      syncingScrollRef.current = true;
+      const tableMax = Math.max(0, tableScroller.scrollWidth - tableScroller.clientWidth);
+      const stickyMax = Math.max(0, stickyScroller.scrollWidth - stickyScroller.clientWidth);
+      const ratio = stickyMax > 0 ? stickyScroller.scrollLeft / stickyMax : 0;
+      tableScroller.scrollLeft = ratio * tableMax;
+      syncingScrollRef.current = false;
+    };
+
+    tableScroller.addEventListener("scroll", onTableScroll, { passive: true });
+    stickyScroller.addEventListener("scroll", onStickyScroll, { passive: true });
+    window.addEventListener("resize", measure, { passive: true });
+    measure();
+
+    let resizeObserver;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(measure);
+      resizeObserver.observe(tableScroller);
+      const table = tableScroller.querySelector("table");
+      if (table) resizeObserver.observe(table);
+    }
+
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId);
+      tableScroller.removeEventListener("scroll", onTableScroll);
+      stickyScroller.removeEventListener("scroll", onStickyScroll);
+      window.removeEventListener("resize", measure);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  // Do not reference filteredAllocations/paginatedRecords here: they are declared
+  // below this effect. Allocation length + loading are sufficient to re-measure
+  // after the data/table changes without triggering a temporal-dead-zone error.
+  }, [loading, allocations.length, currentPage, isMobile, isTablet]);
 
   const uniqueValues = useMemo(() => {
     return {
@@ -649,12 +748,10 @@ const StockAllocation = () => {
         obj[c.header] = row[c.key] ?? "";
       });
 
-      GRANT_CATEGORIES.forEach((cat) => {
+      GRANT_CATEGORIES.forEach((cat, categoryIndex) => {
         [15, 30, 31].forEach((grantId, grantIndex) => {
           const values = row[cat.grantKey];
-
           const value = Array.isArray(values) ? values[grantIndex] : undefined;
-
           obj[`${cat.title} - Grant ${grantId}`] =
             value === null || value === undefined || value === ""
               ? ""
@@ -662,12 +759,10 @@ const StockAllocation = () => {
                 ? Number(value)
                 : value;
         });
-
         obj[`${cat.title} - Total`] = Number(row[cat.countKey] || 0);
-      });
-
-      FOOD_FIELDS.forEach((f) => {
-        obj[f.header] = Number(row[f.key] || 0);
+        getFoodForCategory(categoryIndex).forEach((food) => {
+          obj[food.header] = Number(row[food.key] || 0);
+        });
       });
 
       return obj;
@@ -679,16 +774,14 @@ const StockAllocation = () => {
       totalObj[c.header] = c.key === "district" ? "TOTAL" : "";
     });
 
-    GRANT_CATEGORIES.forEach((cat) => {
+    GRANT_CATEGORIES.forEach((cat, categoryIndex) => {
       [15, 30, 31].forEach((gid) => {
         totalObj[`${cat.title} - Grant ${gid}`] = "";
       });
-
       totalObj[`${cat.title} - Total`] = totalsRow[cat.countKey] || 0;
-    });
-
-    FOOD_FIELDS.forEach((f) => {
-      totalObj[f.header] = totalsRow[f.key] || 0;
+      getFoodForCategory(categoryIndex).forEach((food) => {
+        totalObj[food.header] = totalsRow[food.key] || 0;
+      });
     });
 
     dataToExport.push(totalObj);
@@ -714,21 +807,19 @@ const StockAllocation = () => {
 
       ...EXCEL_META_COLUMNS.map((col) => ({ text: col.header, rowSpan: 2 })),
 
-      ...GRANT_CATEGORIES.map((cat) => ({ text: cat.title, colSpan: 4 })),
-
-      { text: "SUPPLEMENTARY NUTRITION DETAILS", colSpan: FOOD_FIELDS.length },
+      ...GRANT_CATEGORIES.map((cat, categoryIndex) => ({
+        text: cat.title,
+        colSpan: 4 + getFoodForCategory(categoryIndex).length,
+      })),
     ];
 
-    const subHeaders = [
-      ...GRANT_CATEGORIES.flatMap(() => [
-        "Grant 15",
-        "Grant 30",
-        "Grant 31",
-        "TOTAL",
-      ]),
-
-      ...FOOD_FIELDS.map((f) => f.header),
-    ];
+    const subHeaders = GRANT_CATEGORIES.flatMap((cat, categoryIndex) => [
+      "Grant 15",
+      "Grant 30",
+      "Grant 31",
+      "TOTAL",
+      ...getFoodForCategory(categoryIndex).map((food) => food.header),
+    ]);
 
     const headers = [groupHeaders, subHeaders];
 
@@ -737,17 +828,15 @@ const StockAllocation = () => {
 
       EXCEL_META_COLUMNS.forEach((col) => row.push(r[col.key] || "—"));
 
-      GRANT_CATEGORIES.forEach((cat) => {
+      GRANT_CATEGORIES.forEach((cat, categoryIndex) => {
         [15, 30, 31].forEach((grantId, grantIndex) => {
           row.push(getGrantValue(r, cat.grantKey, grantIndex));
         });
-
         row.push(Number(r[cat.countKey] || 0).toLocaleString());
+        getFoodForCategory(categoryIndex).forEach((food) => {
+          row.push(Number(r[food.key] || 0).toLocaleString());
+        });
       });
-
-      FOOD_FIELDS.forEach((f) =>
-        row.push(Number(r[f.key] || 0).toLocaleString()),
-      );
 
       return row;
     });
@@ -756,19 +845,15 @@ const StockAllocation = () => {
       [
         { text: "", colSpan: 1 + EXCEL_META_COLUMNS.length },
 
-        ...GRANT_CATEGORIES.flatMap((cat) => [
+        ...GRANT_CATEGORIES.flatMap((cat, categoryIndex) => [
           { text: "" },
-
           { text: "" },
-
           { text: "" },
-
           { text: totalsRow[cat.countKey]?.toLocaleString() || 0 },
+          ...getFoodForCategory(categoryIndex).map((food) => ({
+            text: totalsRow[food.key]?.toLocaleString() || 0,
+          })),
         ]),
-
-        ...FOOD_FIELDS.map((f) => ({
-          text: totalsRow[f.key]?.toLocaleString() || 0,
-        })),
       ],
     ];
 
@@ -1111,8 +1196,8 @@ const StockAllocation = () => {
 
             <Card.Body className="p-0">
               <div
-                className="dpo-table-wrapper"
-                style={{ overflowX: "auto" }}
+                className="dpo-table-wrapper sa-stock-table-scroll"
+                style={{ overflowX: "scroll", scrollbarGutter: "stable" }}
                 ref={tableRef}
               >
                 {loading ? (
@@ -1147,50 +1232,36 @@ const StockAllocation = () => {
                           </th>
                         ))}
 
-                        {GRANT_CATEGORIES.map((cat) => (
+                        {GRANT_CATEGORIES.map((cat, categoryIndex) => (
                           <th
                             key={cat.countKey}
-                            colSpan={4}
+                            colSpan={4 + getFoodForCategory(categoryIndex).length}
                             className="text-center align-middle sa-grant-group-header"
                           >
                             {cat.title}
                           </th>
                         ))}
-
-                        <th
-                          colSpan={FOOD_FIELDS.length}
-                          className="text-center align-middle sa-food-group-header"
-                        >
-                          SUPPLEMENTARY NUTRITION DETAILS
-                        </th>
                       </tr>
 
                       <tr>
-                        {GRANT_CATEGORIES.flatMap((cat) =>
-                          [15, 30, 31]
-                            .map((grantId) => (
-                              <th
-                                key={`${cat.countKey}-${grantId}`}
-                                className="text-center"
-                              >
-                                Grant {grantId}
-                              </th>
-                            ))
-                            .concat([
-                              <th
-                                key={`${cat.countKey}-total`}
-                                className="text-center"
-                              >
-                                TOTAL
-                              </th>,
-                            ]),
-                        )}
-
-                        {FOOD_FIELDS.map((food) => (
-                          <th key={food.key} className="text-center">
-                            {food.header}
-                          </th>
-                        ))}
+                        {GRANT_CATEGORIES.flatMap((cat, categoryIndex) => [
+                          ...[15, 30, 31].map((grantId) => (
+                            <th
+                              key={`${cat.countKey}-${grantId}`}
+                              className="text-center"
+                            >
+                              Grant {grantId}
+                            </th>
+                          )),
+                          <th key={`${cat.countKey}-total`} className="text-center">
+                            TOTAL
+                          </th>,
+                          ...getFoodForCategory(categoryIndex).map((food) => (
+                            <th key={food.key} className="text-center">
+                              {food.header}
+                            </th>
+                          )),
+                        ])}
                       </tr>
                     </thead>
 
@@ -1201,8 +1272,11 @@ const StockAllocation = () => {
                             colSpan={
                               1 +
                               EXCEL_META_COLUMNS.length +
-                              GRANT_CATEGORIES.length * 4 +
-                              FOOD_FIELDS.length
+                              GRANT_CATEGORIES.reduce(
+                                (sum, cat, categoryIndex) =>
+                                  sum + 4 + getFoodForCategory(categoryIndex).length,
+                                0,
+                              )
                             }
                             className="text-center py-5 text-muted"
                           >
@@ -1233,39 +1307,27 @@ const StockAllocation = () => {
                               </td>
                             ))}
 
-                            {GRANT_CATEGORIES.flatMap((cat) => {
-                              return [15, 30, 31]
-
-                                .map((grantId, grantIndex) => (
-                                  <td
-                                    key={`${cat.countKey}-${grantId}`}
-                                    className="text-center sa-grant-cell"
-                                  >
-                                    {getGrantValue(
-                                      record,
-                                      cat.grantKey,
-                                      grantIndex,
-                                    )}
-                                  </td>
-                                ))
-
-                                .concat([
-                                  <td
-                                    key={`${cat.countKey}-total`}
-                                    className="text-end fw-semibold sa-total-cell"
-                                  >
-                                    {Number(
-                                      record[cat.countKey] || 0,
-                                    ).toLocaleString()}
-                                  </td>,
-                                ]);
-                            })}
-
-                            {FOOD_FIELDS.map((food) => (
-                              <td key={food.key} className="text-end">
-                                {Number(record[food.key] || 0).toLocaleString()}
-                              </td>
-                            ))}
+                            {GRANT_CATEGORIES.flatMap((cat, categoryIndex) => [
+                              ...[15, 30, 31].map((grantId, grantIndex) => (
+                                <td
+                                  key={`${cat.countKey}-${grantId}`}
+                                  className="text-center sa-grant-cell"
+                                >
+                                  {getGrantValue(record, cat.grantKey, grantIndex)}
+                                </td>
+                              )),
+                              <td
+                                key={`${cat.countKey}-total`}
+                                className="text-end fw-semibold sa-total-cell"
+                              >
+                                {Number(record[cat.countKey] || 0).toLocaleString()}
+                              </td>,
+                              ...getFoodForCategory(categoryIndex).map((food) => (
+                                <td key={food.key} className="text-end">
+                                  {Number(record[food.key] || 0).toLocaleString()}
+                                </td>
+                              )),
+                            ])}
                           </tr>
                         ))
                       )}
@@ -1280,26 +1342,19 @@ const StockAllocation = () => {
                             <th key={col.key}>{idx === 0 ? "TOTAL" : ""}</th>
                           ))}
 
-                          {GRANT_CATEGORIES.flatMap((cat) => [
+                          {GRANT_CATEGORIES.flatMap((cat, categoryIndex) => [
                             <th key={`${cat.countKey}-g15`}></th>,
-
                             <th key={`${cat.countKey}-g30`}></th>,
-
                             <th key={`${cat.countKey}-g31`}></th>,
-
-                            <th
-                              key={`${cat.countKey}-total`}
-                              className="text-end"
-                            >
+                            <th key={`${cat.countKey}-total`} className="text-end">
                               {totalsRow[cat.countKey]?.toLocaleString() || 0}
                             </th>,
+                            ...getFoodForCategory(categoryIndex).map((food) => (
+                              <th key={food.key} className="text-end">
+                                {totalsRow[food.key]?.toLocaleString() || 0}
+                              </th>
+                            )),
                           ])}
-
-                          {FOOD_FIELDS.map((food) => (
-                            <th key={food.key} className="text-end">
-                              {totalsRow[food.key]?.toLocaleString() || 0}
-                            </th>
-                          ))}
                         </tr>
                       </tfoot>
                     )}
@@ -1343,6 +1398,37 @@ const StockAllocation = () => {
             )}
           </Card>
         </Container>
+      </div>
+
+      <div
+          ref={stickyScrollRef}
+          className="sa-sticky-horizontal-scrollbar"
+          role="region"
+          aria-label="Scroll Stock Allocation table horizontally"
+          title="Scroll table left or right"
+          style={{
+            display: showStickyScrollbar ? "block" : "none",
+            position: "fixed",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: "100vw",
+            height: 20,
+            overflowX: "auto",
+            overflowY: "hidden",
+            zIndex: 1055,
+            background: "#f1f5f9",
+            borderTop: "1px solid #94a3b8",
+            boxShadow: "0 -2px 8px rgba(15, 23, 42, 0.12)",
+            scrollbarWidth: "auto",
+            overscrollBehaviorX: "contain",
+            touchAction: "pan-x",
+          }}
+        >
+          <div
+            ref={stickyScrollInnerRef}
+            style={{ width: `${Math.max(stickyScrollbarWidth, tableRef.current?.scrollWidth || 0)}px`, minWidth: "100%", height: 1 }}
+          />
       </div>
     </div>
   );
