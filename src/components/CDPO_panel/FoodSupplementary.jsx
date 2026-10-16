@@ -114,6 +114,16 @@ const FOOD_FIELDS = [
   { header: "Mung Dal Khichdi - HCM 3Y-6Y", key: "mung_dal_khichdi_3y_6y" },
   { header: "Multi Grain Aata - HCM 3Y-6Y", key: "multi_grain_aata_3y_6y" },
 ];
+const CATEGORY_FOOD_FIELDS = [
+  ["poushik_sattu_preg_lat"],
+  ["panjeeri_6m_3y"],
+  ["panjeeri_sam_6m_5y_suw_6m_6y"],
+  ["sattu_sam_3y_5y_suw_3y_6y"],
+  ["mung_dal_khichdi_3y_6y", "multi_grain_aata_3y_6y"],
+];
+const getFoodForCategory = (categoryIndex) =>
+  FOOD_FIELDS.filter((food) => CATEGORY_FOOD_FIELDS[categoryIndex]?.includes(food.key));
+
 const EXCEL_META_COLUMNS = [
   { header: "DISTRICT", key: "district" },
   { header: "PROJECT", key: "project" },
@@ -304,6 +314,140 @@ const FoodSupplementary = () => {
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // One viewport-fixed horizontal scrollbar shared by every horizontally scrollable
+  // table in this component. It follows the table while that table is visible and
+  // stays synchronized with the real table scroller in both directions.
+  useEffect(() => {
+    const bar = document.createElement("div");
+    const track = document.createElement("div");
+    bar.className = "fs-viewport-horizontal-scrollbar";
+    bar.setAttribute("role", "region");
+    bar.setAttribute("aria-label", "Scroll visible table horizontally");
+    bar.tabIndex = 0;
+    Object.assign(bar.style, {
+      position: "fixed", left: "0px", bottom: "0px", width: "100vw", height: "18px",
+      overflowX: "auto", overflowY: "hidden", zIndex: "1080", display: "none",
+      background: "#fff", borderTop: "1px solid #cbd5e1", boxShadow: "0 -2px 8px rgba(15,23,42,.12)",
+      scrollbarWidth: "auto", scrollbarColor: "#64748b #e2e8f0", touchAction: "pan-x",
+      overscrollBehaviorX: "contain", WebkitOverflowScrolling: "touch",
+    });
+    Object.assign(track.style, { height: "1px", pointerEvents: "none" });
+    bar.appendChild(track);
+    document.body.appendChild(bar);
+
+    let activeScroller = null;
+    let syncing = false;
+    let rafId = 0;
+    const getCandidates = () => Array.from(document.querySelectorAll(
+      ".fs-table-wrapper, .table-responsive, .fs-records-table-scroll"
+    )).filter((el) => el !== bar && !bar.contains(el) && el.querySelector("table"));
+
+    const hasHorizontalOverflow = (el) => {
+      const table = el.querySelector("table");
+      if (!table) return false;
+      return Math.max(el.scrollWidth, table.scrollWidth, table.getBoundingClientRect().width) > el.clientWidth + 2;
+    };
+
+    const isVisibleInViewport = (el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth;
+    };
+
+    const selectActiveScroller = (preferred = null) => {
+      const candidates = getCandidates().filter((el) => hasHorizontalOverflow(el) && isVisibleInViewport(el));
+      if (preferred && candidates.includes(preferred)) return preferred;
+      if (activeScroller && candidates.includes(activeScroller)) return activeScroller;
+      // Prefer the visible table nearest the viewport bottom, which is usually the
+      // table the user is currently working through.
+      return candidates.sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0] || null;
+    };
+
+    const refresh = (preferred = null) => {
+      rafId = 0;
+      activeScroller = selectActiveScroller(preferred);
+      if (!activeScroller) {
+        bar.style.display = "none";
+        return;
+      }
+      const rect = activeScroller.getBoundingClientRect();
+      const table = activeScroller.querySelector("table");
+      const contentWidth = Math.max(activeScroller.scrollWidth, table?.scrollWidth || 0, activeScroller.clientWidth + 1);
+      bar.style.display = "block";
+      bar.style.left = `${Math.max(0, rect.left)}px`;
+      bar.style.width = `${Math.min(window.innerWidth - Math.max(0, rect.left), rect.width)}px`;
+      track.style.width = `${contentWidth}px`;
+      bar.scrollLeft = activeScroller.scrollLeft;
+    };
+
+    const scheduleRefresh = (preferred = null) => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => refresh(preferred));
+    };
+
+    const onScrollerScroll = (event) => {
+      const scroller = event.currentTarget;
+      if (syncing) return;
+      scheduleRefresh(scroller);
+      if (activeScroller === scroller && bar.scrollLeft !== scroller.scrollLeft) {
+        syncing = true;
+        bar.scrollLeft = scroller.scrollLeft;
+        syncing = false;
+      }
+    };
+
+    let attachListeners = () => {
+      getCandidates().forEach((el) => {
+        if (el.dataset.fsStickyScrollBound === "true") return;
+        el.dataset.fsStickyScrollBound = "true";
+        el.addEventListener("scroll", onScrollerScroll, { passive: true });
+      });
+      scheduleRefresh();
+    };
+
+    const onBarScroll = () => {
+      if (!activeScroller || syncing) return;
+      syncing = true;
+      activeScroller.scrollLeft = bar.scrollLeft;
+      syncing = false;
+    };
+    bar.addEventListener("scroll", onBarScroll, { passive: true });
+
+    const onViewportChange = () => scheduleRefresh();
+    window.addEventListener("scroll", onViewportChange, { passive: true, capture: true });
+    window.addEventListener("resize", onViewportChange, { passive: true });
+    const mutationObserver = typeof MutationObserver !== "undefined"
+      ? new MutationObserver(() => { attachListeners(); scheduleRefresh(); })
+      : null;
+    mutationObserver?.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+
+    let resizeObserver;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => scheduleRefresh());
+      const observeCandidates = () => getCandidates().forEach((el) => {
+        try { resizeObserver.observe(el); const table = el.querySelector("table"); if (table) resizeObserver.observe(table); } catch (_) {}
+      });
+      observeCandidates();
+      const originalAttach = attachListeners;
+      attachListeners = () => { originalAttach(); observeCandidates(); };
+    }
+
+    attachListeners();
+    scheduleRefresh();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      mutationObserver?.disconnect();
+      resizeObserver?.disconnect();
+      window.removeEventListener("scroll", onViewportChange, true);
+      window.removeEventListener("resize", onViewportChange);
+      bar.removeEventListener("scroll", onBarScroll);
+      getCandidates().forEach((el) => {
+        el.removeEventListener("scroll", onScrollerScroll);
+        delete el.dataset.fsStickyScrollBound;
+      });
+      bar.remove();
+    };
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -581,27 +725,25 @@ const FoodSupplementary = () => {
   /* ─── Grant Wise Master Excel Template Download ─── */
   const handleDownloadTemplate = () => {
     const wb = XLSX.utils.book_new();
-    const categoryRow = [...EXCEL_META_COLUMNS.map(() => ""), ...GRANT_CATEGORIES.flatMap((c) => [c.title, "", "", ""]), ...FOOD_FIELDS.map(() => "Supplementary Nutrition Details")];
-    const headerRow = [
-      ...EXCEL_META_COLUMNS.map((c) => c.header),
-      ...GRANT_CATEGORIES.flatMap(() => ["Grant 15", "Grant 30", "Grant 31", "TOTAL"]),
-      ...FOOD_FIELDS.map((f) => f.header),
-    ];
+    const categoryRow = [...EXCEL_META_COLUMNS.map(() => "")];
+    const headerRow = [...EXCEL_META_COLUMNS.map((c) => c.header)];
     const sampleRow = ["Almora", "Bhaisiyachana [0506401]", "SERAGHAT [02]", "HATOLA-02", "5064010220", "Oct-Nov-Dec", "2026-2027"];
     const sampleGrantValues = [[10, 5, 10], [10, 10, 10], [4, 3, 3], [3, 2, 3], [15, 10, 15]];
-    GRANT_CATEGORIES.forEach((c, idx) => {
-      const [grant15, grant30, grant31] = sampleGrantValues[idx];
-      sampleRow.push(grant15, grant30, grant31, grant15 + grant30 + grant31);
-    });
-    sampleRow.push(25, 30, 10, 0, 40, 40);
-    const ws = XLSX.utils.aoa_to_sheet([categoryRow, headerRow, sampleRow, Array(headerRow.length).fill("")]);
     const merges = [];
-    GRANT_CATEGORIES.forEach((_, idx) => {
-      const col = EXCEL_META_COLUMNS.length + idx * 4;
-      merges.push({ s: { r: 0, c: col }, e: { r: 0, c: col + 3 } });
+    GRANT_CATEGORIES.forEach((category, idx) => {
+      const startCol = headerRow.length;
+      categoryRow.push(category.title, "", "", "");
+      headerRow.push("Grant 15", "Grant 30", "Grant 31", "TOTAL");
+      const vals = sampleGrantValues[idx];
+      sampleRow.push(...vals, vals.reduce((a, b) => a + b, 0));
+      merges.push({ s: { r: 0, c: startCol }, e: { r: 0, c: startCol + 3 } });
+      getFoodForCategory(idx).forEach((food) => {
+        categoryRow.push("Supplementary Nutrition Details");
+        headerRow.push(food.header);
+        sampleRow.push(25);
+      });
     });
-    const foodStart = EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4;
-    if (FOOD_FIELDS.length > 1) merges.push({ s: { r: 0, c: foodStart }, e: { r: 0, c: foodStart + FOOD_FIELDS.length - 1 } });
+    const ws = XLSX.utils.aoa_to_sheet([categoryRow, headerRow, sampleRow, Array(headerRow.length).fill("")]);
     ws["!merges"] = merges;
     ws["!cols"] = headerRow.map((h) => ({ wch: Math.max(String(h || "").length + 4, 16) }));
     XLSX.utils.book_append_sheet(wb, ws, "Grant Wise Master");
@@ -655,22 +797,20 @@ const FoodSupplementary = () => {
 
           // Read the actual numeric cell values from Grant 15 / Grant 30 / Grant 31.
           // The API stores these as [grant15Value, grant30Value, grant31Value], not grant IDs.
+          let nextColumn = EXCEL_META_COLUMNS.length;
           GRANT_CATEGORIES.forEach((cat, catIdx) => {
-            const base = EXCEL_META_COLUMNS.length + catIdx * 4;
+            const base = nextColumn;
             const grant15 = Number(row[base]) || 0;
             const grant30 = Number(row[base + 1]) || 0;
             const grant31 = Number(row[base + 2]) || 0;
             const excelTotal = Number(row[base + 3]) || 0;
-
             record[cat.countKey] = excelTotal;
-            // API schema stores the three grant CELL VALUES as an array.
-            // Index 0 = Grant 15, index 1 = Grant 30, index 2 = Grant 31.
             record[cat.grantKey] = [grant15, grant30, grant31];
-          });
-
-          const foodStart = EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4;
-          FOOD_FIELDS.forEach((food, i) => {
-            record[food.key] = Number(row[foodStart + i]) || 0;
+            nextColumn += 4;
+            getFoodForCategory(catIdx).forEach((food) => {
+              record[food.key] = Number(row[nextColumn]) || 0;
+              nextColumn += 1;
+            });
           });
           return record;
         }).filter((r) => r.awc_code || r.quarter || r.financial_year);
@@ -1084,23 +1224,19 @@ const FoodSupplementary = () => {
   const getDetailedExportColumns = () => {
     const columns = [
       { header: "S. No.", key: "_serial", type: "serial" },
-      ...EXCEL_META_COLUMNS.map((col) => ({
-        header: col.header,
-        key: col.key,
-        type: "meta",
-      })),
-      ...GRANT_CATEGORIES.flatMap((category) => [
+      ...EXCEL_META_COLUMNS.map((col) => ({ header: col.header, key: col.key, type: "meta" })),
+    ];
+    GRANT_CATEGORIES.forEach((category, categoryIndex) => {
+      columns.push(
         { header: `${category.title} - Grant 15`, key: `${category.countKey}_grant15`, type: "grant", category, grantIndex: 0 },
         { header: `${category.title} - Grant 30`, key: `${category.countKey}_grant30`, type: "grant", category, grantIndex: 1 },
         { header: `${category.title} - Grant 31`, key: `${category.countKey}_grant31`, type: "grant", category, grantIndex: 2 },
         { header: `${category.title} - TOTAL`, key: category.countKey, type: "categoryTotal", category },
-      ]),
-      ...FOOD_FIELDS.map((food) => ({
-        header: food.header,
-        key: food.key,
-        type: "food",
-      })),
-    ];
+      );
+      getFoodForCategory(categoryIndex).forEach((food) =>
+        columns.push({ header: food.header, key: food.key, type: "food" })
+      );
+    });
     return columns;
   };
 
@@ -1253,15 +1389,16 @@ const FoodSupplementary = () => {
 
     addHeader(groupRow, "S. No.", { rowSpan: 2 });
     EXCEL_META_COLUMNS.forEach((column) => addHeader(groupRow, column.header, { rowSpan: 2 }));
-    GRANT_CATEGORIES.forEach((category) => addHeader(groupRow, category.title, { colSpan: 4 }));
-    addHeader(groupRow, "SUPPLEMENTARY NUTRITION DETAILS", { colSpan: FOOD_FIELDS.length });
+    GRANT_CATEGORIES.forEach((category, index) =>
+      addHeader(groupRow, category.title, { colSpan: 4 + getFoodForCategory(index).length })
+    );
     thead.appendChild(groupRow);
 
     const subHeaderRow = document.createElement("tr");
-    GRANT_CATEGORIES.forEach(() => {
+    GRANT_CATEGORIES.forEach((category, index) => {
       ["Grant 15", "Grant 30", "Grant 31", "TOTAL"].forEach((label) => addHeader(subHeaderRow, label));
+      getFoodForCategory(index).forEach((food) => addHeader(subHeaderRow, food.header));
     });
-    FOOD_FIELDS.forEach((food) => addHeader(subHeaderRow, food.header));
     thead.appendChild(subHeaderRow);
     table.appendChild(thead);
 
@@ -1743,7 +1880,10 @@ const FoodSupplementary = () => {
                         </div>
                       </Card.Header>
                       <Card.Body className="p-0">
-                        <div className="fs-table-wrapper">
+                        <div
+                          className="fs-table-wrapper fs-records-table-scroll"
+                          style={{ overflowX: "auto", width: "100%" }}
+                        >
                           <Table hover className="fs-data-table mb-0 fs-grant-master-table" style={{ minWidth: "2400px", borderCollapse: "separate", borderSpacing: 0 }}>
                             <thead>
                               <tr>
@@ -1751,21 +1891,21 @@ const FoodSupplementary = () => {
                                 {EXCEL_META_COLUMNS.map((col) => (
                                   <th key={col.key} rowSpan={2} className="text-center align-middle">{col.header}</th>
                                 ))}
-                                {GRANT_CATEGORIES.map((cat) => (
-                                  <th key={cat.countKey} colSpan={4} className="text-center align-middle fs-grant-group-header">{cat.title}</th>
+                                {GRANT_CATEGORIES.map((cat, index) => (
+                                  <th key={cat.countKey} colSpan={4 + getFoodForCategory(index).length} className="text-center align-middle fs-grant-group-header">{cat.title}</th>
                                 ))}
-                                <th colSpan={FOOD_FIELDS.length} className="text-center align-middle fs-food-group-header">SUPPLEMENTARY NUTRITION DETAILS</th>
                                 <th rowSpan={2} className="text-center align-middle">Actions</th>
                               </tr>
                               <tr>
-                                {GRANT_CATEGORIES.flatMap((cat) => [15, 30, 31].map((grantId) => (
-                                  <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
-                                )).concat([
-                                  <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>
-                                ]))}
-                                {FOOD_FIELDS.map((food) => (
-                                  <th key={food.key} className="text-center fs-food-subheader">{food.header}</th>
-                                ))}
+                                {GRANT_CATEGORIES.flatMap((cat, index) => [
+                                  ...[15, 30, 31].map((grantId) => (
+                                    <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
+                                  )),
+                                  <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>,
+                                  ...getFoodForCategory(index).map((food) => (
+                                    <th key={food.key} className="text-center fs-food-subheader">{food.header}</th>
+                                  )),
+                                ])}
                               </tr>
                             </thead>
                             <tbody>
@@ -1786,23 +1926,24 @@ const FoodSupplementary = () => {
                                           : (record[col.key] || "—")}
                                       </td>
                                     ))}
-                                    {GRANT_CATEGORIES.flatMap((cat) => {
+                                    {GRANT_CATEGORIES.flatMap((cat, categoryIndex) => {
                                       const grantValues = Array.isArray(record[cat.grantKey])
                                         ? record[cat.grantKey].map((value) => Number(value) || 0)
                                         : [];
-                                      return [15, 30, 31].map((grantId, grantIndex) => (
-                                        <td key={`${cat.countKey}-${grantId}`} className="text-center fs-grant-cell">
-                                          {Number(grantValues[grantIndex] || 0).toLocaleString()}
-                                        </td>
-                                      )).concat([
+                                      return [
+                                        ...[15, 30, 31].map((grantId, grantIndex) => (
+                                          <td key={`${cat.countKey}-${grantId}`} className="text-center fs-grant-cell">
+                                            {Number(grantValues[grantIndex] || 0).toLocaleString()}
+                                          </td>
+                                        )),
                                         <td key={`${cat.countKey}-total`} className="text-end fw-semibold fs-total-cell">
                                           {Number(record[cat.countKey] || 0).toLocaleString()}
-                                        </td>
-                                      ]);
+                                        </td>,
+                                        ...getFoodForCategory(categoryIndex).map((food) => (
+                                          <td key={food.key} className="text-end">{Number(record[food.key] || 0).toLocaleString()}</td>
+                                        )),
+                                      ];
                                     })}
-                                    {FOOD_FIELDS.map((food) => (
-                                      <td key={food.key} className="text-end">{Number(record[food.key] || 0).toLocaleString()}</td>
-                                    ))}
                                     <td className="text-center">
                                       <div className="fs-action-btns">
                                         <Button variant="light" size="sm" className="fs-action-btn" style={{ color: "#0ea5e9", background: "#f0f9ff", borderColor: "#bae6fd" }} onClick={() => handleViewClick(record)} title="View"><FaEye /></Button>
@@ -1821,15 +1962,15 @@ const FoodSupplementary = () => {
                                   {EXCEL_META_COLUMNS.map((col, idx) => (
                                     <th key={col.key}>{idx === 0 ? "TOTAL" : ""}</th>
                                   ))}
-                                  {GRANT_CATEGORIES.flatMap((cat) => [
+                                  {GRANT_CATEGORIES.flatMap((cat, categoryIndex) => [
                                     <th key={`${cat.countKey}-g15`}></th>,
                                     <th key={`${cat.countKey}-g30`}></th>,
                                     <th key={`${cat.countKey}-g31`}></th>,
                                     <th key={`${cat.countKey}-total`} className="text-end">{totalDetailed[cat.countKey]?.toLocaleString() || 0}</th>,
+                                    ...getFoodForCategory(categoryIndex).map((food) => (
+                                      <th key={food.key} className="text-end">{totalDetailed[food.key]?.toLocaleString() || 0}</th>
+                                    )),
                                   ])}
-                                  {FOOD_FIELDS.map((food) => (
-                                    <th key={food.key} className="text-end">{totalDetailed[food.key]?.toLocaleString() || 0}</th>
-                                  ))}
                                   <th></th>
                                 </tr>
                               </tfoot>
