@@ -581,8 +581,9 @@ const FoodSupplementary = () => {
     return [...new Set([...suppliesRecords, ...suppliesDetailRecords].map((record) => record.food_item ?? record.foodItem ?? record.food_item_name).filter(Boolean))];
   }, [suppliesRecords, suppliesDetailRecords]);
 
-  // Display HCM quantities as grams/kilograms and THR quantities as packets.
-  // HCM reconciliation API quantities are assumed to be stored in kilograms.
+  // Display HCM quantities as grams with the kilogram equivalent in brackets.
+  // The HCM reconciliation values are treated as grams; THR values remain packets.
+  // This formatter is shared by on-screen tables and Excel/PDF exports.
   const formatSupplyQuantity = (rawValue) => {
     const value = Number(rawValue) || 0;
 
@@ -593,19 +594,20 @@ const FoodSupplementary = () => {
       return `${packets} packets`;
     }
 
-    if (value === 0) return "0 g";
-    if (Math.abs(value) < 1) {
-      const grams = value * 1000;
-      const formattedGrams = Number.isInteger(grams)
-        ? grams.toLocaleString()
-        : grams.toLocaleString(undefined, { maximumFractionDigits: 2 });
-      return `${formattedGrams} g`;
-    }
+    const grams = value;
+    const kilograms = grams / 1000;
+    const formattedGrams = Number.isInteger(grams)
+      ? grams.toLocaleString()
+      : grams.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const formattedKilograms = kilograms.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 3,
+    });
 
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })} kg`;
+    return `${formattedGrams} g (${formattedKilograms} kg)`;
   };
 
-  const supplyQuantityUnit = suppliesTab === "hcm" ? "g / kg" : "Packets";
+  const supplyQuantityUnit = suppliesTab === "hcm" ? "g (kg)" : "Packets";
 
   // Calculate Totals for dynamic supplies table
   const suppliesTotals = useMemo(() => {

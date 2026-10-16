@@ -666,14 +666,22 @@ const DirectorDashboard = () => {
     }
   }, [suppliesViewMode, districtSuppliesData, projectSuppliesData, sectorSuppliesData, awcSuppliesData]);
 
-  // HCM reconciliation values are kilograms; THR values are packet counts.
+  // THR values are packet counts. HCM API quantities are in grams, so keep
+  // the original gram value visible and show its kilogram equivalent in brackets.
   const formatSupplyQuantity = (raw) => {
     const value = Number(raw) || 0;
-    if (suppliesTab === 'thr') return `${value.toLocaleString(undefined, {maximumFractionDigits: 2})} packets`;
-    if (Math.abs(value) < 1) return `${(value * 1000).toLocaleString(undefined, {maximumFractionDigits: 2})} g`;
-    return `${value.toLocaleString(undefined, {maximumFractionDigits: 3})} kg`;
+    if (suppliesTab === 'thr') {
+      return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} packets`;
+    }
+
+    const grams = value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const kilograms = (value / 1000).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 3,
+    });
+    return `${grams} g (${kilograms} kg)`;
   };
-  const suppliesQuantityHeader = suppliesTab === 'thr' ? 'Packets' : 'g / kg';
+  const suppliesQuantityHeader = suppliesTab === 'thr' ? 'Packets' : 'g (kg equivalent)';
 
   const suppliesTotals = useMemo(() => {
     const totals = {};

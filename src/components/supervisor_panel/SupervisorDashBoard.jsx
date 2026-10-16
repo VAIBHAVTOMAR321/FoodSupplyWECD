@@ -56,6 +56,18 @@ const getArrayPayload = (response) => {
 
 const formatCount = (value) => (Number(value) || 0).toLocaleString();
 
+const formatSupplyQuantity = (value, scheme) => {
+  const quantity = Number(value) || 0;
+  if (scheme === "hcm") {
+    const grams = quantity.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const kilograms = (quantity / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 });
+    return `${grams} g (${kilograms} kg)`;
+  }
+  return `${quantity.toLocaleString(undefined, { maximumFractionDigits: 2 })} packets`;
+};
+
+const getSupplyUnit = (scheme) => (scheme === "hcm" ? "g (kg)" : "packets");
+
 const getTotal = (items, key) =>
   (Array.isArray(items) ? items : []).reduce(
     (total, item) => total + (Number(item?.[key]) || 0),
@@ -244,7 +256,7 @@ const exportRowsToExcel = (title, headers, rows, filename) => {
   XLSX.writeFile(workbook, filename, { compression: true });
 };
 
-const DistributionSummaryTable = ({ items, loading }) => (
+const DistributionSummaryTable = ({ items, loading, scheme }) => (
   <div className="dpo-table-wrapper">
     <Table hover className="dpo-data-table mb-0">
       <thead>
@@ -281,9 +293,9 @@ const DistributionSummaryTable = ({ items, loading }) => (
                 {formatCount(item.total_beneficiaries)}
               </td>
 
-              <td className="text-end">{formatCount(item.total_quantity)}</td>
+              <td className="text-end">{formatSupplyQuantity(item.total_quantity, scheme)}</td>
 
-              <td>{item.unit || "—"}</td>
+              <td>{getSupplyUnit(scheme)}</td>
             </tr>
           ))
         )}
@@ -292,7 +304,7 @@ const DistributionSummaryTable = ({ items, loading }) => (
   </div>
 );
 
-const ReceivingSummaryTable = ({ items, loading }) => (
+const ReceivingSummaryTable = ({ items, loading, scheme }) => (
   <div className="dpo-table-wrapper">
     <Table hover className="dpo-data-table mb-0">
       <thead>
@@ -323,9 +335,9 @@ const ReceivingSummaryTable = ({ items, loading }) => (
             <tr key={`${item.unit || "unit"}-${index}`}>
               <td>{index + 1}</td>
 
-              <td className="text-end">{formatCount(item.total_quantity)}</td>
+              <td className="text-end">{formatSupplyQuantity(item.total_quantity, scheme)}</td>
 
-              <td>{item.unit || "—"}</td>
+              <td>{getSupplyUnit(scheme)}</td>
             </tr>
           ))
         )}
@@ -532,24 +544,19 @@ const SupervisorDashBoard = () => {
   ];
 
 
-  const makeDistributionRows = (items) => items.map((item, index) => ({
+  const makeDistributionRows = (items, scheme) => items.map((item, index) => ({
     "#": index + 1,
     "Total Beneficiaries": Number(item.total_beneficiaries) || 0,
-    "Total Quantity": Number(item.total_quantity) || 0,
-    Unit: item.unit || "—",
+    "Total Quantity": formatSupplyQuantity(item.total_quantity, scheme),
+    Unit: getSupplyUnit(scheme),
   }));
-  const makeReceivingRows = (items) => items.map((item, index) => ({
+  const makeReceivingRows = (items, scheme) => items.map((item, index) => ({
     "#": index + 1,
-    "Quantity Received": Number(item.total_quantity) || 0,
-    Unit: item.unit || "—",
+    "Quantity Received": formatSupplyQuantity(item.total_quantity, scheme),
+    Unit: getSupplyUnit(scheme),
   }));
   const makeReconciliationRows = (items, scheme) => items.map((row, index) => {
-    const formatQty = (value) => {
-      const n = Number(value) || 0;
-      return scheme === "hcm"
-        ? `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} g (${(n / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 })} kg)`
-        : `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} packets`;
-    };
+    const formatQty = (value) => formatSupplyQuantity(value, scheme);
     return {
       "#": index + 1,
       "AWC Name": row.awc_name || "—",
@@ -571,14 +578,14 @@ const SupervisorDashBoard = () => {
   }));
   const exportDistribution = (scheme, items, type) => {
     const headers = ["#", "Total Beneficiaries", "Total Quantity", "Unit"];
-    const rows = makeDistributionRows(items);
+    const rows = makeDistributionRows(items, scheme.toLowerCase());
     const title = `${scheme} Distribution Summary`;
     const base = `${scheme.toLowerCase()}_distribution_summary`;
     type === "pdf" ? exportRowsToPDF(title, headers, rows, `${base}.pdf`) : exportRowsToExcel(title, headers, rows, `${base}.xlsx`);
   };
   const exportReceiving = (scheme, items, type) => {
     const headers = ["#", "Quantity Received", "Unit"];
-    const rows = makeReceivingRows(items);
+    const rows = makeReceivingRows(items, scheme.toLowerCase());
     const title = `${scheme} Received Summary`;
     const base = `${scheme.toLowerCase()}_received_summary`;
     type === "pdf" ? exportRowsToPDF(title, headers, rows, `${base}.pdf`) : exportRowsToExcel(title, headers, rows, `${base}.xlsx`);
@@ -602,10 +609,10 @@ const SupervisorDashBoard = () => {
   // Export all four HCM/THR distribution and receiving summaries into one file.
   const exportAllDistributionReceiving = (type) => {
     const sections = [
-      { title: "HCM Distribution Summary", headers: ["#", "Total Beneficiaries", "Total Quantity", "Unit"], rows: makeDistributionRows(hcmDistributions) },
-      { title: "HCM Received Summary", headers: ["#", "Quantity Received", "Unit"], rows: makeReceivingRows(hcmReceipts) },
-      { title: "THR Distribution Summary", headers: ["#", "Total Beneficiaries", "Total Quantity", "Unit"], rows: makeDistributionRows(thrDistributions) },
-      { title: "THR Received Summary", headers: ["#", "Quantity Received", "Unit"], rows: makeReceivingRows(thrReceipts) },
+      { title: "HCM Distribution Summary", headers: ["#", "Total Beneficiaries", "Total Quantity", "Unit"], rows: makeDistributionRows(hcmDistributions, "hcm") },
+      { title: "HCM Received Summary", headers: ["#", "Quantity Received", "Unit"], rows: makeReceivingRows(hcmReceipts, "hcm") },
+      { title: "THR Distribution Summary", headers: ["#", "Total Beneficiaries", "Total Quantity", "Unit"], rows: makeDistributionRows(thrDistributions, "thr") },
+      { title: "THR Received Summary", headers: ["#", "Quantity Received", "Unit"], rows: makeReceivingRows(thrReceipts, "thr") },
     ];
 
     if (type === "pdf") {
@@ -949,6 +956,7 @@ const SupervisorDashBoard = () => {
                     <DistributionSummaryTable
                       items={scheme.distributions}
                       loading={loading && !scheme.summary}
+                      scheme={scheme.label.toLowerCase()}
                     />
 
                     <div className="px-3 pt-3 pb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -958,6 +966,7 @@ const SupervisorDashBoard = () => {
                     <ReceivingSummaryTable
                       items={scheme.receipts}
                       loading={loading && !scheme.summary}
+                      scheme={scheme.label.toLowerCase()}
                     />
                   </Card.Body>
                 </Card>
@@ -1004,12 +1013,7 @@ const SupervisorDashBoard = () => {
                       reconciliationTab === "hcm"
                         ? hcmReconciliation
                         : thrReconciliation;
-                    const fmtQty = (value) => {
-                      const n = Number(value) || 0;
-                      return reconciliationTab === "hcm"
-                        ? `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} g (${(n / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 })} kg)`
-                        : `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} packets`;
-                    };
+                    const fmtQty = (value) => formatSupplyQuantity(value, reconciliationTab);
                     return rows.length === 0 ? (
                       <div className="text-center p-4 text-muted">
                         No {reconciliationTab.toUpperCase()} reconciliation

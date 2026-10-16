@@ -892,26 +892,30 @@ const DPODashboard = () => {
     awcSuppliesData,
   ]);
 
-  // Supply API quantities for HCM are stored in kilograms. Display small
-  // quantities in grams and larger quantities in kilograms. THR quantities
-  // are packet counts and must always be displayed as packets.
+  // HCM API quantities are supplied in grams. Keep the original gram value
+  // visible and show its kilogram equivalent in brackets. THR quantities are
+  // packet counts and remain displayed as packets.
   const formatSupplyQuantity = (rawValue) => {
     const value = Number(rawValue) || 0;
+
     if (suppliesTab === "thr") {
-      const packets = Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      const packets = Number.isInteger(value)
+        ? value.toLocaleString()
+        : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
       return `${packets} packets`;
     }
 
-    const kg = Math.abs(value);
-    if (kg === 0) return "0 g";
-    if (kg < 1) {
-      const grams = value * 1000;
-      return `${Number.isInteger(grams) ? grams.toLocaleString() : grams.toLocaleString(undefined, { maximumFractionDigits: 2 })} g`;
-    }
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })} kg`;
+    const grams = value.toLocaleString(undefined, {
+      maximumFractionDigits: 2,
+    });
+    const kilograms = (value / 1000).toLocaleString(undefined, {
+      maximumFractionDigits: 3,
+    });
+
+    return `${grams} g (${kilograms} kg)`;
   };
 
-  const suppliesQuantityHeader = suppliesTab === "hcm" ? "g / kg" : "Packets";
+  const suppliesQuantityHeader = suppliesTab === "hcm" ? "Grams (kg)" : "Packets";
 
   const suppliesTotals = useMemo(() => {
     const totals = {};
