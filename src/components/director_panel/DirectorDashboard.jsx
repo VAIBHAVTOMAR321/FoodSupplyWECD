@@ -360,103 +360,138 @@ const DirectorDashboard = () => {
   // Race condition prevention for API calls
   const suppliesReqId = useRef(0);
 
-  // One fixed scrollbar follows the table currently visible in the viewport.
-  // The scrollbar's inner element is a direct child so its scrollWidth exactly
-  // matches the active table's scrollWidth (a nested 1px track caused mismatch).
+  // A single fixed horizontal scrollbar follows whichever Director table is
+  // currently visible. Its scroll range is matched exactly to the active table.
   useEffect(() => {
     const bar = document.createElement("div");
     const inner = document.createElement("div");
     bar.className = "director-sticky-horizontal-scroll";
     bar.setAttribute("aria-label", "Horizontal table scrollbar");
     bar.style.cssText = [
-      "position:fixed", "left:260px", "right:12px", "bottom:8px", "height:18px",
-      "overflow-x:auto", "overflow-y:hidden", "z-index:1050",
-      "background:rgba(248,250,252,.97)", "border:1px solid #cbd5e1",
-      "border-radius:8px", "box-shadow:0 2px 8px rgba(15,23,42,.12)",
-      "display:none", "scrollbar-width:auto", "box-sizing:border-box"
+      "position:fixed", "left:260px", "right:12px", "bottom:4px", "height:22px",
+      "overflow-x:auto", "overflow-y:hidden", "z-index:2000",
+      "background:#f8fafc", "border:1px solid #94a3b8",
+      "border-radius:6px", "box-shadow:0 2px 8px rgba(15,23,42,.22)",
+      "display:none", "scrollbar-width:auto", "box-sizing:border-box",
+      "overscroll-behavior-x:contain", "-webkit-overflow-scrolling:touch"
     ].join(";");
-    inner.style.cssText = "height:1px; min-height:1px; pointer-events:none;";
+    inner.style.cssText = "height:2px;min-height:2px;pointer-events:none;";
     bar.appendChild(inner);
     document.body.appendChild(bar);
 
     let activeWrapper = null;
     let syncing = false;
     let rafId = 0;
-    const wrappers = () => Array.from(document.querySelectorAll(".director-table-wrapper"))
-      .filter((el) => el.querySelector("table"));
+    const boundWrappers = new Set();
+    const observedWrappers = new Set();
+    const resizeObserver = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(() => scheduleChooseActive()) : null;
+
+    const getWrappers = () => Array.from(document.querySelectorAll(
+      ".director-table-wrapper"
+    )).filter((el) => el.querySelector("table"));
+
+    const measure = (wrapper) => {
+      const table = wrapper.querySelector("table");
+      const rect = wrapper.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+      const contentWidth = Math.ceil(Math.max(
+        table?.scrollWidth || 0,
+        table?.offsetWidth || 0,
+        table?.getBoundingClientRect().width || 0,
+        wrapper.scrollWidth || 0
+      ));
+      return {
+        wrapper, rect, visibleHeight, contentWidth,
+        overflow: contentWidth > wrapper.clientWidth + 2
+      };
+    };
 
     const chooseActive = () => {
       rafId = 0;
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-      const candidates = wrappers().map((wrapper) => {
-        const rect = wrapper.getBoundingClientRect();
-        const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
-        const table = wrapper.querySelector("table");
-        const contentWidth = Math.max(wrapper.scrollWidth, table?.scrollWidth || 0, table?.offsetWidth || 0);
-        const overflow = contentWidth > wrapper.clientWidth + 2;
-        // Prefer the table intersecting the middle of the viewport; otherwise use
-        // the visible table with the greatest intersection area.
-        const centerDistance = Math.abs((rect.top + rect.bottom) / 2 - viewportHeight / 2);
-        return { wrapper, visibleHeight, contentWidth, overflow, centerDistance };
-      }).filter((item) => item.visibleHeight > 24 && item.overflow);
+      const candidates = getWrappers().map(measure)
+        .filter((item) => item.visibleHeight > 20 && item.overflow);
 
+      // Prefer the table crossing the viewport centre, otherwise the most
+      // visible table. This also makes the scrollbar switch when reaching table 2.
       candidates.sort((a, b) => {
-        const aContainsCenter = a.wrapper.getBoundingClientRect().top <= viewportHeight / 2 && a.wrapper.getBoundingClientRect().bottom >= viewportHeight / 2;
-        const bContainsCenter = b.wrapper.getBoundingClientRect().top <= viewportHeight / 2 && b.wrapper.getBoundingClientRect().bottom >= viewportHeight / 2;
-        if (aContainsCenter !== bContainsCenter) return aContainsCenter ? -1 : 1;
-        if (b.visibleHeight !== a.visibleHeight) return b.visibleHeight - a.visibleHeight;
-        return a.centerDistance - b.centerDistance;
+        const aCenter = a.rect.top <= viewportHeight / 2 && a.rect.bottom >= viewportHeight / 2;
+        const bCenter = b.rect.top <= viewportHeight / 2 && b.rect.bottom >= viewportHeight / 2;
+        if (aCenter !== bCenter) return aCenter ? -1 : 1;
+        if (a.visibleHeight !== b.visibleHeight) return b.visibleHeight - a.visibleHeight;
+        return Math.abs((a.rect.top + a.rect.bottom) / 2 - viewportHeight / 2) -
+          Math.abs((b.rect.top + b.rect.bottom) / 2 - viewportHeight / 2);
       });
 
-      const next = candidates[0];
-      activeWrapper = next?.wrapper || null;
-      if (!activeWrapper) {
+      const selected = candidates[0];
+      activeWrapper = selected?.wrapper || null;
+      if (!selected) {
         bar.style.display = "none";
         return;
       }
 
-      const table = activeWrapper.querySelector("table");
-      const contentWidth = Math.max(activeWrapper.scrollWidth, table?.scrollWidth || 0, table?.offsetWidth || 0);
-      inner.style.width = `${Math.ceil(contentWidth)}px`;
-      inner.style.minWidth = `${Math.ceil(contentWidth)}px`;
+      // Match the fixed scrollbar's scroll range to the table's scroll range.
+      // Using bar.clientWidth + tableOverflow avoids thumb/track length mismatch
+      // when the dashboard sidebar makes the fixed bar narrower than the table.
+      bar.style.left = window.innerWidth < 768 ? "8px" : "260px";
+      bar.style.right = "8px";
       bar.style.display = "block";
-      bar.style.left = window.innerWidth < 768 ? "12px" : "260px";
-      bar.style.right = "12px";
-      // Keep the sticky thumb and the real table at the same horizontal position.
-      const maxBarScroll = Math.max(0, bar.scrollWidth - bar.clientWidth);
-      const maxTableScroll = Math.max(0, activeWrapper.scrollWidth - activeWrapper.clientWidth);
-      bar.scrollLeft = maxTableScroll ? activeWrapper.scrollLeft * maxBarScroll / maxTableScroll : 0;
+      const tableMaxScroll = Math.max(0, activeWrapper.scrollWidth - activeWrapper.clientWidth);
+      const barContentWidth = Math.ceil(bar.clientWidth + tableMaxScroll);
+      inner.style.width = `${barContentWidth}px`;
+      inner.style.minWidth = `${barContentWidth}px`;
+      const barMaxScroll = Math.max(0, bar.scrollWidth - bar.clientWidth);
+      if (barMaxScroll > 0 && tableMaxScroll > 0) {
+        const target = activeWrapper.scrollLeft * barMaxScroll / tableMaxScroll;
+        if (Math.abs(bar.scrollLeft - target) > 1) bar.scrollLeft = target;
+      } else {
+        bar.scrollLeft = 0;
+      }
     };
 
-    const scheduleChooseActive = () => {
+    function scheduleChooseActive() {
       if (!rafId) rafId = window.requestAnimationFrame(chooseActive);
-    };
+    }
+
     const onBarScroll = () => {
       if (!activeWrapper || syncing) return;
       syncing = true;
-      const maxBarScroll = Math.max(1, bar.scrollWidth - bar.clientWidth);
+      const maxBarScroll = Math.max(0, bar.scrollWidth - bar.clientWidth);
       const maxTableScroll = Math.max(0, activeWrapper.scrollWidth - activeWrapper.clientWidth);
-      activeWrapper.scrollLeft = maxTableScroll * bar.scrollLeft / maxBarScroll;
+      activeWrapper.scrollLeft = maxBarScroll > 0
+        ? bar.scrollLeft * maxTableScroll / maxBarScroll : 0;
       syncing = false;
     };
+
     const onWrapperScroll = (event) => {
-      if (syncing) return;
       const wrapper = event.currentTarget;
+      if (syncing) return;
       if (wrapper !== activeWrapper) {
         scheduleChooseActive();
         return;
       }
       syncing = true;
-      const maxTableScroll = Math.max(1, wrapper.scrollWidth - wrapper.clientWidth);
+      const maxTableScroll = Math.max(0, wrapper.scrollWidth - wrapper.clientWidth);
       const maxBarScroll = Math.max(0, bar.scrollWidth - bar.clientWidth);
-      bar.scrollLeft = wrapper.scrollLeft * maxBarScroll / maxTableScroll;
+      bar.scrollLeft = maxTableScroll > 0
+        ? wrapper.scrollLeft * maxBarScroll / maxTableScroll : 0;
       syncing = false;
     };
+
     const bindWrappers = () => {
-      wrappers().forEach((wrapper) => {
-        if (wrapper.dataset.directorStickyBound === "1") return;
-        wrapper.dataset.directorStickyBound = "1";
-        wrapper.addEventListener("scroll", onWrapperScroll, { passive: true });
+      getWrappers().forEach((wrapper) => {
+        if (!boundWrappers.has(wrapper)) {
+          wrapper.addEventListener("scroll", onWrapperScroll, { passive: true });
+          boundWrappers.add(wrapper);
+        }
+        if (!observedWrappers.has(wrapper)) {
+          resizeObserver?.observe(wrapper);
+          const table = wrapper.querySelector("table");
+          if (table) resizeObserver?.observe(table);
+          observedWrappers.add(wrapper);
+        }
       });
       scheduleChooseActive();
     };
@@ -464,10 +499,8 @@ const DirectorDashboard = () => {
     bar.addEventListener("scroll", onBarScroll, { passive: true });
     window.addEventListener("scroll", scheduleChooseActive, { passive: true });
     window.addEventListener("resize", scheduleChooseActive);
-    const observer = new MutationObserver(() => { bindWrappers(); scheduleChooseActive(); });
-    observer.observe(document.body, { childList: true, subtree: true });
-    const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(scheduleChooseActive) : null;
-    wrappers().forEach((wrapper) => resizeObserver?.observe(wrapper));
+    const mutationObserver = new MutationObserver(() => bindWrappers());
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
     bindWrappers();
 
     return () => {
@@ -475,12 +508,9 @@ const DirectorDashboard = () => {
       bar.removeEventListener("scroll", onBarScroll);
       window.removeEventListener("scroll", scheduleChooseActive);
       window.removeEventListener("resize", scheduleChooseActive);
-      observer.disconnect();
+      mutationObserver.disconnect();
       resizeObserver?.disconnect();
-      wrappers().forEach((wrapper) => {
-        wrapper.removeEventListener("scroll", onWrapperScroll);
-        delete wrapper.dataset.directorStickyBound;
-      });
+      boundWrappers.forEach((wrapper) => wrapper.removeEventListener("scroll", onWrapperScroll));
       bar.remove();
     };
   }, []);
