@@ -87,6 +87,15 @@ const FOOD_FIELDS = [
   { header: "Mung Dal Khichdi - HCM 3Y-6Y", key: "mung_dal_khichdi_3y_6y" },
   { header: "Multi Grain Aata - HCM 3Y-6Y", key: "multi_grain_aata_3y_6y" },
 ];
+const FOOD_FIELDS_BY_CATEGORY = {
+  pregnant_woman_lactating_mother: FOOD_FIELDS.filter((f) => f.key === "poushik_sattu_preg_lat"),
+  children_6m_3y: FOOD_FIELDS.filter((f) => f.key === "panjeeri_6m_3y"),
+  sam_children_6m_5y_suw_children_6m_6y: FOOD_FIELDS.filter((f) => f.key === "panjeeri_sam_6m_5y_suw_6m_6y"),
+  sam_children_3y_5y_suw_children_3y_6y: FOOD_FIELDS.filter((f) => f.key === "sattu_sam_3y_5y_suw_3y_6y"),
+  hcm_beneficiaries_3y_6y: FOOD_FIELDS.filter((f) => ["mung_dal_khichdi_3y_6y", "multi_grain_aata_3y_6y"].includes(f.key)),
+};
+const getCategoryFoods = (category) => FOOD_FIELDS_BY_CATEGORY[category.countKey] || [];
+
 const EXCEL_META_COLUMNS = [
   { header: "DISTRICT", key: "district" },
   { header: "PROJECT", key: "project" },
@@ -402,6 +411,81 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
 };
 
 const DPODashboard = () => {
+  // One fixed horizontal scrollbar follows whichever DPO table is currently visible.
+  // Scroll positions are mapped proportionally because the fixed bar and table may
+  // have different widths / maximum scroll ranges.
+  useEffect(() => {
+    let activeWrapper = null;
+    let syncing = false;
+    const bar = document.createElement("div");
+    const inner = document.createElement("div");
+    bar.className = "dpo-global-sticky-scrollbar";
+    bar.style.cssText = "position:fixed;left:0;right:14px;bottom:0;height:16px;overflow-x:auto;overflow-y:hidden;z-index:1050;background:rgba(245,247,250,.96);border-top:1px solid #cbd5e1;display:none;";
+    inner.style.cssText = "height:1px;";
+    bar.appendChild(inner);
+    document.body.appendChild(bar);
+
+    const findWrapper = () => {
+      const wrappers = [...document.querySelectorAll(".dpo-table-wrapper")];
+      return wrappers.find((el) => {
+        const rect = el.getBoundingClientRect();
+        const table = el.querySelector("table");
+        return table && table.scrollWidth > el.clientWidth + 2 &&
+          rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+      }) || null;
+    };
+    const update = () => {
+      const next = findWrapper();
+      if (activeWrapper !== next) {
+        if (activeWrapper) activeWrapper.removeEventListener("scroll", onTableScroll);
+        activeWrapper = next;
+        if (activeWrapper) activeWrapper.addEventListener("scroll", onTableScroll, { passive: true });
+      }
+      if (!activeWrapper) { bar.style.display = "none"; return; }
+      const table = activeWrapper.querySelector("table");
+      const max = Math.max(0, table.scrollWidth - activeWrapper.clientWidth);
+      if (!max) { bar.style.display = "none"; return; }
+      bar.style.display = "block";
+      inner.style.width = `${table.scrollWidth}px`;
+      const ratio = max ? activeWrapper.scrollLeft / max : 0;
+      syncing = true;
+      bar.scrollLeft = ratio * Math.max(0, bar.scrollWidth - bar.clientWidth);
+      syncing = false;
+    };
+    function onTableScroll() {
+      if (syncing || !activeWrapper) return;
+      const table = activeWrapper.querySelector("table");
+      const max = Math.max(0, table.scrollWidth - activeWrapper.clientWidth);
+      const ratio = max ? activeWrapper.scrollLeft / max : 0;
+      syncing = true;
+      bar.scrollLeft = ratio * Math.max(0, bar.scrollWidth - bar.clientWidth);
+      syncing = false;
+    }
+    const onBarScroll = () => {
+      if (syncing || !activeWrapper) return;
+      const table = activeWrapper.querySelector("table");
+      const tableMax = Math.max(0, table.scrollWidth - activeWrapper.clientWidth);
+      const barMax = Math.max(0, bar.scrollWidth - bar.clientWidth);
+      syncing = true;
+      activeWrapper.scrollLeft = barMax ? (bar.scrollLeft / barMax) * tableMax : 0;
+      syncing = false;
+    };
+    bar.addEventListener("scroll", onBarScroll, { passive: true });
+    window.addEventListener("resize", update);
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { childList: true, subtree: true });
+    const interval = window.setInterval(update, 700);
+    update();
+    return () => {
+      observer.disconnect();
+      window.clearInterval(interval);
+      window.removeEventListener("resize", update);
+      bar.removeEventListener("scroll", onBarScroll);
+      if (activeWrapper) activeWrapper.removeEventListener("scroll", onTableScroll);
+      bar.remove();
+    };
+  }, []);
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -1208,26 +1292,29 @@ const DPODashboard = () => {
 
   /* ── Detailed Records Export (Grant-wise structure) ── */
   const exportDetailsToExcel = () => {
-    const cols = TABLE_COLUMNS.filter(
-      (c) => c.key !== "_index" && c.key !== "_actions",
-    );
-    const dataToExport = searchedRecords.map((row, i) => {
-      const obj = { "S. No.": i + 1 };
-      cols.forEach((c) => (obj[c.label] = row[c.key] || 0));
-      return obj;
+    const meta = EXCEL_META_COLUMNS.map((c) => c.header);
+    const headers = ["S. No.", ...meta];
+    GRANT_CATEGORIES.forEach((cat) => {
+      headers.push(cat.title);
+      headers.push("Grant 15", "Grant 30", "Grant 31", "TOTAL");
+      getCategoryFoods(cat).forEach((food) => headers.push(food.header));
     });
-    const totalObj = { "S. No.": "" };
-    cols.forEach((c) => {
-      if (c.num || c.strong) totalObj[c.label] = totalDetailed[c.key];
-      else totalObj[c.label] = "";
+    const data = searchedRecords.map((row, index) => {
+      const values = [index + 1, ...EXCEL_META_COLUMNS.map((c) => row[c.key] ?? "—")];
+      GRANT_CATEGORIES.forEach((cat) => {
+        const grants = Array.isArray(row[cat.grantKey]) ? row[cat.grantKey] : [];
+        values.push("", Number(grants[0] ?? 0), Number(grants[1] ?? 0), Number(grants[2] ?? 0), Number(row[cat.countKey] ?? 0));
+        getCategoryFoods(cat).forEach((food) => values.push(Number(row[food.key] ?? 0)));
+      });
+      return values;
     });
-    totalObj[cols[0].label] = "Total";
-    dataToExport.push(totalObj);
-
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    ws["!cols"] = Object.keys(dataToExport[0] || {}).map((key) => ({
-      wch: Math.min(Math.max(String(key).length + 2, 12), 28),
-    }));
+    const total = ["", ...EXCEL_META_COLUMNS.map((c, i) => i === 0 ? "TOTAL" : "")];
+    GRANT_CATEGORIES.forEach((cat) => {
+      total.push("", "", "", "", Number(totalDetailed[cat.countKey] || 0));
+      getCategoryFoods(cat).forEach((food) => total.push(Number(totalDetailed[food.key] || 0)));
+    });
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data, total]);
+    ws["!cols"] = headers.map((h) => ({ wch: Math.min(Math.max(String(h).length + 2, 12), 30) }));
     ws["!freeze"] = { xSplit: 0, ySplit: 1 };
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Records");
@@ -1238,58 +1325,35 @@ const DPODashboard = () => {
     const groupHeaders = [
       { text: "S. No.", rowSpan: 2 },
       ...EXCEL_META_COLUMNS.map((col) => ({ text: col.header, rowSpan: 2 })),
-      ...GRANT_CATEGORIES.map((cat) => ({ text: cat.title, colSpan: 4 })),
-      { text: "SUPPLEMENTARY NUTRITION DETAILS", colSpan: FOOD_FIELDS.length },
+      ...GRANT_CATEGORIES.map((cat) => ({ text: cat.title, colSpan: 4 + getCategoryFoods(cat).length })),
     ];
-    const subHeaders = [
-      ...GRANT_CATEGORIES.flatMap(() => [
-        "Grant 15",
-        "Grant 30",
-        "Grant 31",
-        "TOTAL",
-      ]),
-      ...FOOD_FIELDS.map((f) => f.header),
-    ];
+    const subHeaders = [];
+    GRANT_CATEGORIES.forEach((cat) => {
+      subHeaders.push("Grant 15", "Grant 30", "Grant 31", "TOTAL");
+      getCategoryFoods(cat).forEach((food) => subHeaders.push(food.header));
+    });
     const headers = [groupHeaders, subHeaders];
-
     const rows = searchedRecords.map((r, i) => {
-      const row = [i + 1];
-      EXCEL_META_COLUMNS.forEach((col) => row.push(r[col.key] || "—"));
+      const row = [i + 1, ...EXCEL_META_COLUMNS.map((col) => r[col.key] ?? "—")];
       GRANT_CATEGORIES.forEach((cat) => {
-        const grantValues = Array.isArray(r[cat.grantKey]) ? r[cat.grantKey] : [];
-        [0, 1, 2].forEach((grantIndex) =>
-          row.push(Number(grantValues[grantIndex] ?? 0).toLocaleString()),
-        );
-        row.push(Number(r[cat.countKey] ?? 0).toLocaleString());
+        const grants = Array.isArray(r[cat.grantKey]) ? r[cat.grantKey] : [];
+        row.push(Number(grants[0] ?? 0).toLocaleString(), Number(grants[1] ?? 0).toLocaleString(), Number(grants[2] ?? 0).toLocaleString(), Number(r[cat.countKey] ?? 0).toLocaleString());
+        getCategoryFoods(cat).forEach((food) => row.push(Number(r[food.key] ?? 0).toLocaleString()));
       });
-      FOOD_FIELDS.forEach((f) =>
-        row.push(Number(r[f.key] || 0).toLocaleString()),
-      );
       return row;
     });
-
-    const footer = [
-      [
-        { text: "", colSpan: 1 + EXCEL_META_COLUMNS.length },
-        ...GRANT_CATEGORIES.flatMap((cat) => [
-          { text: "" },
-          { text: "" },
-          { text: "" },
-          { text: totalDetailed[cat.countKey]?.toLocaleString() || 0 },
-        ]),
-        ...FOOD_FIELDS.map((f) => ({
-          text: totalDetailed[f.key]?.toLocaleString() || 0,
-        })),
-      ],
-    ];
-
+    const footer = [[
+      { text: "", colSpan: 1 + EXCEL_META_COLUMNS.length },
+      ...GRANT_CATEGORIES.flatMap((cat) => [
+        { text: "" }, { text: "" }, { text: "" },
+        { text: Number(totalDetailed[cat.countKey] || 0).toLocaleString() },
+        ...getCategoryFoods(cat).map((food) => ({ text: Number(totalDetailed[food.key] || 0).toLocaleString() })),
+      ]),
+    ]];
     return handlePDFExport({
-      title: "Supplementary Nutrition Records",
+      title: "Supplementary Nutrition Detailed Records",
       filename: "Supplementary_Records.pdf",
-      headers,
-      rows,
-      footer,
-      fontSize: 7,
+      headers, rows, footer, fontSize: 7,
     });
   };
 
@@ -1815,44 +1879,23 @@ const DPODashboard = () => {
                         {GRANT_CATEGORIES.map((cat) => (
                           <th
                             key={cat.countKey}
-                            colSpan={4}
+                            colSpan={4 + getCategoryFoods(cat).length}
                             className="text-center align-middle dpo-grant-group-header"
                           >
                             {cat.title}
                           </th>
                         ))}
-                        <th
-                          colSpan={FOOD_FIELDS.length}
-                          className="text-center align-middle dpo-food-group-header"
-                        >
-                          SUPPLEMENTARY NUTRITION DETAILS
-                        </th>
                       </tr>
                       <tr>
-                        {GRANT_CATEGORIES.flatMap((cat) =>
-                          [15, 30, 31]
-                            .map((grantId) => (
-                              <th
-                                key={`${cat.countKey}-${grantId}`}
-                                className="text-center"
-                              >
-                                Grant {grantId}
-                              </th>
-                            ))
-                            .concat([
-                              <th
-                                key={`${cat.countKey}-total`}
-                                className="text-center"
-                              >
-                                TOTAL
-                              </th>,
-                            ]),
-                        )}
-                        {FOOD_FIELDS.map((food) => (
-                          <th key={food.key} className="text-center">
-                            {food.header}
-                          </th>
-                        ))}
+                        {GRANT_CATEGORIES.flatMap((cat) => [
+                          ...[15, 30, 31].map((grantId) => (
+                            <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
+                          )),
+                          <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>,
+                          ...getCategoryFoods(cat).map((food) => (
+                            <th key={food.key} className="text-center">{food.header}</th>
+                          )),
+                        ])}
                       </tr>
                     </thead>
                     <tbody>
@@ -1862,8 +1905,7 @@ const DPODashboard = () => {
                             colSpan={
                               1 +
                               EXCEL_META_COLUMNS.length +
-                              GRANT_CATEGORIES.length * 4 +
-                              FOOD_FIELDS.length
+                              GRANT_CATEGORIES.reduce((sum, cat) => sum + 4 + getCategoryFoods(cat).length, 0)
                             }
                             className="text-center py-5 text-muted"
                           >
@@ -1893,35 +1935,21 @@ const DPODashboard = () => {
                               </td>
                             ))}
                             {GRANT_CATEGORIES.flatMap((cat) => {
-                              // The API stores the entered amounts in order:
-                              // [Grant 15 amount, Grant 30 amount, Grant 31 amount].
-                              // These are values, not grant IDs; display each by its column index.
-                              const grantValues = Array.isArray(record[cat.grantKey])
-                                ? record[cat.grantKey]
-                                : [];
-                              return [15, 30, 31]
-                                .map((grantId, grantIndex) => (
-                                  <td
-                                    key={`${cat.countKey}-${grantId}`}
-                                    className="text-center dpo-grant-cell"
-                                  >
+                              const grantValues = Array.isArray(record[cat.grantKey]) ? record[cat.grantKey] : [];
+                              return [
+                                ...[15, 30, 31].map((grantId, grantIndex) => (
+                                  <td key={`${cat.countKey}-${grantId}`} className="text-center dpo-grant-cell">
                                     {Number(grantValues[grantIndex] ?? 0).toLocaleString()}
                                   </td>
-                                ))
-                                .concat([
-                                  <td
-                                    key={`${cat.countKey}-total`}
-                                    className="text-end fw-semibold dpo-total-cell"
-                                  >
-                                    {Number(record[cat.countKey] ?? 0).toLocaleString()}
-                                  </td>,
-                                ]);
+                                )),
+                                <td key={`${cat.countKey}-total`} className="text-end fw-semibold dpo-total-cell">
+                                  {Number(record[cat.countKey] ?? 0).toLocaleString()}
+                                </td>,
+                                ...getCategoryFoods(cat).map((food) => (
+                                  <td key={food.key} className="text-end">{Number(record[food.key] || 0).toLocaleString()}</td>
+                                )),
+                              ];
                             })}
-                            {FOOD_FIELDS.map((food) => (
-                              <td key={food.key} className="text-end">
-                                {Number(record[food.key] || 0).toLocaleString()}
-                              </td>
-                            ))}
                           </tr>
                         ))
                       )}
@@ -1937,19 +1965,11 @@ const DPODashboard = () => {
                             <th key={`${cat.countKey}-g15`}></th>,
                             <th key={`${cat.countKey}-g30`}></th>,
                             <th key={`${cat.countKey}-g31`}></th>,
-                            <th
-                              key={`${cat.countKey}-total`}
-                              className="text-end"
-                            >
-                              {totalDetailed[cat.countKey]?.toLocaleString() ||
-                                0}
-                            </th>,
+                            <th key={`${cat.countKey}-total`} className="text-end">{totalDetailed[cat.countKey]?.toLocaleString() || 0}</th>,
+                            ...getCategoryFoods(cat).map((food) => (
+                              <th key={food.key} className="text-end">{totalDetailed[food.key]?.toLocaleString() || 0}</th>
+                            )),
                           ])}
-                          {FOOD_FIELDS.map((food) => (
-                            <th key={food.key} className="text-end">
-                              {totalDetailed[food.key]?.toLocaleString() || 0}
-                            </th>
-                          ))}
                         </tr>
                       </tfoot>
                     )}

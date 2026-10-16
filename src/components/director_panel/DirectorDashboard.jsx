@@ -80,6 +80,28 @@ const FOOD_FIELDS = [
   { header: "Mung Dal Khichdi - HCM 3Y-6Y", key: "mung_dal_khichdi_3y_6y" },
   { header: "Multi Grain Aata - HCM 3Y-6Y", key: "multi_grain_aata_3y_6y" },
 ];
+const FOOD_FIELDS_BY_CATEGORY = {
+  pregnant_woman_lactating_mother: [
+    FOOD_FIELDS.find((field) => field.key === "poushik_sattu_preg_lat"),
+  ],
+  children_6m_3y: [
+    FOOD_FIELDS.find((field) => field.key === "panjeeri_6m_3y"),
+  ],
+  sam_children_6m_5y_suw_children_6m_6y: [
+    FOOD_FIELDS.find((field) => field.key === "panjeeri_sam_6m_5y_suw_6m_6y"),
+  ],
+  sam_children_3y_5y_suw_children_3y_6y: [
+    FOOD_FIELDS.find((field) => field.key === "sattu_sam_3y_5y_suw_3y_6y"),
+  ],
+  hcm_beneficiaries_3y_6y: [
+    FOOD_FIELDS.find((field) => field.key === "mung_dal_khichdi_3y_6y"),
+    FOOD_FIELDS.find((field) => field.key === "multi_grain_aata_3y_6y"),
+  ],
+};
+
+const getCategoryFoodFields = (category) =>
+  (FOOD_FIELDS_BY_CATEGORY[category.countKey] || []).filter(Boolean);
+
 const EXCEL_META_COLUMNS = [
   { header: "DISTRICT", key: "district" },
   { header: "PROJECT", key: "project" },
@@ -337,6 +359,131 @@ const DirectorDashboard = () => {
 
   // Race condition prevention for API calls
   const suppliesReqId = useRef(0);
+
+  // One fixed scrollbar follows the table currently visible in the viewport.
+  // The scrollbar's inner element is a direct child so its scrollWidth exactly
+  // matches the active table's scrollWidth (a nested 1px track caused mismatch).
+  useEffect(() => {
+    const bar = document.createElement("div");
+    const inner = document.createElement("div");
+    bar.className = "director-sticky-horizontal-scroll";
+    bar.setAttribute("aria-label", "Horizontal table scrollbar");
+    bar.style.cssText = [
+      "position:fixed", "left:260px", "right:12px", "bottom:8px", "height:18px",
+      "overflow-x:auto", "overflow-y:hidden", "z-index:1050",
+      "background:rgba(248,250,252,.97)", "border:1px solid #cbd5e1",
+      "border-radius:8px", "box-shadow:0 2px 8px rgba(15,23,42,.12)",
+      "display:none", "scrollbar-width:auto", "box-sizing:border-box"
+    ].join(";");
+    inner.style.cssText = "height:1px; min-height:1px; pointer-events:none;";
+    bar.appendChild(inner);
+    document.body.appendChild(bar);
+
+    let activeWrapper = null;
+    let syncing = false;
+    let rafId = 0;
+    const wrappers = () => Array.from(document.querySelectorAll(".director-table-wrapper"))
+      .filter((el) => el.querySelector("table"));
+
+    const chooseActive = () => {
+      rafId = 0;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const candidates = wrappers().map((wrapper) => {
+        const rect = wrapper.getBoundingClientRect();
+        const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+        const table = wrapper.querySelector("table");
+        const contentWidth = Math.max(wrapper.scrollWidth, table?.scrollWidth || 0, table?.offsetWidth || 0);
+        const overflow = contentWidth > wrapper.clientWidth + 2;
+        // Prefer the table intersecting the middle of the viewport; otherwise use
+        // the visible table with the greatest intersection area.
+        const centerDistance = Math.abs((rect.top + rect.bottom) / 2 - viewportHeight / 2);
+        return { wrapper, visibleHeight, contentWidth, overflow, centerDistance };
+      }).filter((item) => item.visibleHeight > 24 && item.overflow);
+
+      candidates.sort((a, b) => {
+        const aContainsCenter = a.wrapper.getBoundingClientRect().top <= viewportHeight / 2 && a.wrapper.getBoundingClientRect().bottom >= viewportHeight / 2;
+        const bContainsCenter = b.wrapper.getBoundingClientRect().top <= viewportHeight / 2 && b.wrapper.getBoundingClientRect().bottom >= viewportHeight / 2;
+        if (aContainsCenter !== bContainsCenter) return aContainsCenter ? -1 : 1;
+        if (b.visibleHeight !== a.visibleHeight) return b.visibleHeight - a.visibleHeight;
+        return a.centerDistance - b.centerDistance;
+      });
+
+      const next = candidates[0];
+      activeWrapper = next?.wrapper || null;
+      if (!activeWrapper) {
+        bar.style.display = "none";
+        return;
+      }
+
+      const table = activeWrapper.querySelector("table");
+      const contentWidth = Math.max(activeWrapper.scrollWidth, table?.scrollWidth || 0, table?.offsetWidth || 0);
+      inner.style.width = `${Math.ceil(contentWidth)}px`;
+      inner.style.minWidth = `${Math.ceil(contentWidth)}px`;
+      bar.style.display = "block";
+      bar.style.left = window.innerWidth < 768 ? "12px" : "260px";
+      bar.style.right = "12px";
+      // Keep the sticky thumb and the real table at the same horizontal position.
+      const maxBarScroll = Math.max(0, bar.scrollWidth - bar.clientWidth);
+      const maxTableScroll = Math.max(0, activeWrapper.scrollWidth - activeWrapper.clientWidth);
+      bar.scrollLeft = maxTableScroll ? activeWrapper.scrollLeft * maxBarScroll / maxTableScroll : 0;
+    };
+
+    const scheduleChooseActive = () => {
+      if (!rafId) rafId = window.requestAnimationFrame(chooseActive);
+    };
+    const onBarScroll = () => {
+      if (!activeWrapper || syncing) return;
+      syncing = true;
+      const maxBarScroll = Math.max(1, bar.scrollWidth - bar.clientWidth);
+      const maxTableScroll = Math.max(0, activeWrapper.scrollWidth - activeWrapper.clientWidth);
+      activeWrapper.scrollLeft = maxTableScroll * bar.scrollLeft / maxBarScroll;
+      syncing = false;
+    };
+    const onWrapperScroll = (event) => {
+      if (syncing) return;
+      const wrapper = event.currentTarget;
+      if (wrapper !== activeWrapper) {
+        scheduleChooseActive();
+        return;
+      }
+      syncing = true;
+      const maxTableScroll = Math.max(1, wrapper.scrollWidth - wrapper.clientWidth);
+      const maxBarScroll = Math.max(0, bar.scrollWidth - bar.clientWidth);
+      bar.scrollLeft = wrapper.scrollLeft * maxBarScroll / maxTableScroll;
+      syncing = false;
+    };
+    const bindWrappers = () => {
+      wrappers().forEach((wrapper) => {
+        if (wrapper.dataset.directorStickyBound === "1") return;
+        wrapper.dataset.directorStickyBound = "1";
+        wrapper.addEventListener("scroll", onWrapperScroll, { passive: true });
+      });
+      scheduleChooseActive();
+    };
+
+    bar.addEventListener("scroll", onBarScroll, { passive: true });
+    window.addEventListener("scroll", scheduleChooseActive, { passive: true });
+    window.addEventListener("resize", scheduleChooseActive);
+    const observer = new MutationObserver(() => { bindWrappers(); scheduleChooseActive(); });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(scheduleChooseActive) : null;
+    wrappers().forEach((wrapper) => resizeObserver?.observe(wrapper));
+    bindWrappers();
+
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      bar.removeEventListener("scroll", onBarScroll);
+      window.removeEventListener("scroll", scheduleChooseActive);
+      window.removeEventListener("resize", scheduleChooseActive);
+      observer.disconnect();
+      resizeObserver?.disconnect();
+      wrappers().forEach((wrapper) => {
+        wrapper.removeEventListener("scroll", onWrapperScroll);
+        delete wrapper.dataset.directorStickyBound;
+      });
+      bar.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -824,23 +971,21 @@ const DirectorDashboard = () => {
         `${cat.title} - Grant 30`,
         `${cat.title} - Grant 31`,
         `${cat.title} - TOTAL`,
+        ...getCategoryFoodFields(cat).map((field) => field.header),
       ]),
-      ...FOOD_FIELDS.map((field) => field.header),
     ];
 
     const dataToExport = searchedRecords.map((record, index) => {
       const row = { "S. No.": index + 1 };
-      EXCEL_META_COLUMNS.forEach((col) => {
-        row[col.header] = record[col.key] ?? "—";
-      });
+      EXCEL_META_COLUMNS.forEach((col) => { row[col.header] = record[col.key] ?? "—"; });
       GRANT_CATEGORIES.forEach((cat) => {
         row[`${cat.title} - Grant 15`] = getGrantAmount(record, cat.grantKey, 0);
         row[`${cat.title} - Grant 30`] = getGrantAmount(record, cat.grantKey, 1);
         row[`${cat.title} - Grant 31`] = getGrantAmount(record, cat.grantKey, 2);
         row[`${cat.title} - TOTAL`] = Number(record[cat.countKey] ?? 0);
-      });
-      FOOD_FIELDS.forEach((field) => {
-        row[field.header] = Number(record[field.key] ?? 0);
+        getCategoryFoodFields(cat).forEach((field) => {
+          row[field.header] = Number(record[field.key] ?? 0);
+        });
       });
       return row;
     });
@@ -852,26 +997,20 @@ const DirectorDashboard = () => {
       totalRow[`${cat.title} - Grant 30`] = "";
       totalRow[`${cat.title} - Grant 31`] = "";
       totalRow[`${cat.title} - TOTAL`] = Number(totalDetailed[cat.countKey] ?? 0);
-    });
-    FOOD_FIELDS.forEach((field) => {
-      totalRow[field.header] = Number(totalDetailed[field.key] ?? 0);
+      getCategoryFoodFields(cat).forEach((field) => {
+        totalRow[field.header] = Number(totalDetailed[field.key] ?? 0);
+      });
     });
     dataToExport.push(totalRow);
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport, { header: headers });
     worksheet["!cols"] = headers.map((header) => {
-      const longest = Math.max(
-        String(header).length,
-        ...dataToExport.map((row) => String(row[header] ?? "").length),
-      );
+      const longest = Math.max(String(header).length, ...dataToExport.map((row) => String(row[header] ?? "").length));
       return { wch: Math.min(Math.max(longest + 2, 10), 32) };
     });
     if (dataToExport.length) {
       worksheet["!autofilter"] = {
-        ref: XLSX.utils.encode_range({
-          s: { r: 0, c: 0 },
-          e: { r: dataToExport.length, c: headers.length - 1 },
-        }),
+        ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: dataToExport.length, c: headers.length - 1 } }),
       };
     }
     worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
@@ -884,13 +1023,16 @@ const DirectorDashboard = () => {
     const groupHeaders = [
       { text: "S. No.", rowSpan: 2 },
       ...EXCEL_META_COLUMNS.map((col) => ({ text: col.header, rowSpan: 2 })),
-      ...GRANT_CATEGORIES.map((cat) => ({ text: cat.title, colSpan: 4 })),
-      { text: "SUPPLEMENTARY NUTRITION DETAILS", colSpan: FOOD_FIELDS.length },
+      ...GRANT_CATEGORIES.map((cat) => ({
+        text: cat.title,
+        colSpan: 4 + getCategoryFoodFields(cat).length,
+      })),
     ];
-    const subHeaders = [
-      ...GRANT_CATEGORIES.flatMap(() => ["Grant 15", "Grant 30", "Grant 31", "TOTAL"]),
-      ...FOOD_FIELDS.map((field) => field.header),
-    ];
+    const subHeaders = GRANT_CATEGORIES.flatMap((cat) => [
+      "Grant 15", "Grant 30", "Grant 31", "TOTAL",
+      ...getCategoryFoodFields(cat).map((field) => field.header),
+    ]);
+
     const rows = searchedRecords.map((record, index) => {
       const row = [index + 1];
       EXCEL_META_COLUMNS.forEach((col) => row.push(record[col.key] ?? "—"));
@@ -899,18 +1041,24 @@ const DirectorDashboard = () => {
         row.push(getGrantAmount(record, cat.grantKey, 1));
         row.push(getGrantAmount(record, cat.grantKey, 2));
         row.push(Number(record[cat.countKey] ?? 0).toLocaleString());
+        getCategoryFoodFields(cat).forEach((field) => {
+          row.push(Number(record[field.key] ?? 0).toLocaleString());
+        });
       });
-      FOOD_FIELDS.forEach((field) => row.push(Number(record[field.key] ?? 0).toLocaleString()));
       return row;
     });
+
     const footer = [[
       { text: "", colSpan: 1 + EXCEL_META_COLUMNS.length },
       ...GRANT_CATEGORIES.flatMap((cat) => [
         { text: "" }, { text: "" }, { text: "" },
         { text: Number(totalDetailed[cat.countKey] ?? 0).toLocaleString() },
+        ...getCategoryFoodFields(cat).map((field) => ({
+          text: Number(totalDetailed[field.key] ?? 0).toLocaleString(),
+        })),
       ]),
-      ...FOOD_FIELDS.map((field) => ({ text: Number(totalDetailed[field.key] ?? 0).toLocaleString() })),
     ]];
+
     return handlePDFExport({
       title: "Supplementary Nutrition Records",
       filename: "Supplementary_Records.pdf",
@@ -1052,11 +1200,11 @@ const DirectorDashboard = () => {
               </div>
             </Card.Header>
             <Card.Body className="p-0">
-              <div className="dpo-table-wrapper">
+              <div className="dpo-table-wrapper director-table-wrapper" style={{ overflowX: "auto", maxWidth: "100%" }}>
                 {suppliesLoading ? (
                   <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div>
                 ) : (
-                  <Table hover className="dpo-data-table mb-0">
+                  <Table hover className="dpo-data-table mb-0" style={{ width: "max-content", minWidth: "100%" }}>
                     <thead>
                       <tr>
                         <th rowSpan="2">S. No.</th>
@@ -1191,9 +1339,9 @@ const DirectorDashboard = () => {
               </div>
             </Card.Header>
             <Card.Body className="p-0">
-              <div className="dpo-table-wrapper">
+              <div className="dpo-table-wrapper director-table-wrapper" style={{ overflowX: "auto", maxWidth: "100%" }}>
                 {loading ? <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div> : (
-                  <Table hover className="dpo-data-table mb-0">
+                  <Table hover className="dpo-data-table mb-0" style={{ width: "max-content", minWidth: "100%" }}>
                     <thead>
                       <tr>
                         <th>S. No.</th>
@@ -1254,9 +1402,9 @@ const DirectorDashboard = () => {
               </div>
             </Card.Header>
             <Card.Body className="p-0">
-              <div className="dpo-table-wrapper" style={{ overflowX: "auto" }}>
+              <div className="dpo-table-wrapper director-table-wrapper" style={{ overflowX: "auto" }}>
                 {loading ? <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div> : (
-                  <Table hover className="dpo-data-table mb-0 dpo-grant-master-table" style={{ minWidth: "2400px", borderCollapse: "separate", borderSpacing: 0 }}>
+                  <Table hover className="dpo-data-table mb-0 dpo-grant-master-table" style={{ width: "max-content", minWidth: "2400px", borderCollapse: "separate", borderSpacing: 0 }}>
                     <thead>
                       <tr>
                         <th rowSpan={2} className="text-center align-middle">S. No.</th>
@@ -1264,19 +1412,19 @@ const DirectorDashboard = () => {
                           <th key={col.key} rowSpan={2} className="text-center align-middle">{col.header}</th>
                         ))}
                         {GRANT_CATEGORIES.map((cat) => (
-                          <th key={cat.countKey} colSpan={4} className="text-center align-middle dpo-grant-group-header">{cat.title}</th>
+                          <th key={cat.countKey} colSpan={4 + getCategoryFoodFields(cat).length} className="text-center align-middle dpo-grant-group-header">{cat.title}</th>
                         ))}
-                        <th colSpan={FOOD_FIELDS.length} className="text-center align-middle dpo-food-group-header">SUPPLEMENTARY NUTRITION DETAILS</th>
                       </tr>
                       <tr>
-                        {GRANT_CATEGORIES.flatMap((cat) => [15, 30, 31].map((grantId) => (
-                          <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
-                        )).concat([
-                          <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>
-                        ]))}
-                        {FOOD_FIELDS.map((food) => (
-                          <th key={food.key} className="text-center">{food.header}</th>
-                        ))}
+                        {GRANT_CATEGORIES.flatMap((cat) => [
+                          ...[15, 30, 31].map((grantId) => (
+                            <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
+                          )),
+                          <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>,
+                          ...getCategoryFoodFields(cat).map((food) => (
+                            <th key={`${cat.countKey}-${food.key}`} className="text-center dpo-food-group-header">{food.header}</th>
+                          )),
+                        ])}
                       </tr>
                     </thead>
                     <tbody>
@@ -1297,22 +1445,22 @@ const DirectorDashboard = () => {
                             </td>
                           ))}
                           {GRANT_CATEGORIES.flatMap((cat) => {
-                            // API grant arrays contain entered amounts in order:
-                            // [Grant 15 amount, Grant 30 amount, Grant 31 amount].
+                            // API grant arrays contain amounts in order: Grant 15, Grant 30, Grant 31.
                             const grantValues = Array.isArray(record[cat.grantKey]) ? record[cat.grantKey] : [];
-                            return [15, 30, 31].map((grantId, grantIndex) => (
-                              <td key={`${cat.countKey}-${grantId}`} className="text-center dpo-grant-cell">
-                                {Number(grantValues[grantIndex] ?? 0).toLocaleString()}
-                              </td>
-                            )).concat([
+                            return [
+                              ...[15, 30, 31].map((grantId, grantIndex) => (
+                                <td key={`${cat.countKey}-${grantId}`} className="text-center dpo-grant-cell">
+                                  {Number(grantValues[grantIndex] ?? 0).toLocaleString()}
+                                </td>
+                              )),
                               <td key={`${cat.countKey}-total`} className="text-end fw-semibold dpo-total-cell">
                                 {Number(record[cat.countKey] ?? 0).toLocaleString()}
-                              </td>
-                            ]);
+                              </td>,
+                              ...getCategoryFoodFields(cat).map((food) => (
+                                <td key={`${cat.countKey}-${food.key}`} className="text-end">{Number(record[food.key] ?? 0).toLocaleString()}</td>
+                              )),
+                            ];
                           })}
-                          {FOOD_FIELDS.map((food) => (
-                            <td key={food.key} className="text-end">{Number(record[food.key] || 0).toLocaleString()}</td>
-                          ))}
                         </tr>
                       ))}
                     </tbody>
@@ -1328,10 +1476,10 @@ const DirectorDashboard = () => {
                             <th key={`${cat.countKey}-g30`}></th>,
                             <th key={`${cat.countKey}-g31`}></th>,
                             <th key={`${cat.countKey}-total`} className="text-end">{totalDetailed[cat.countKey]?.toLocaleString() || 0}</th>,
+                            ...getCategoryFoodFields(cat).map((food) => (
+                              <th key={`${cat.countKey}-${food.key}`} className="text-end">{totalDetailed[food.key]?.toLocaleString() || 0}</th>
+                            )),
                           ])}
-                          {FOOD_FIELDS.map((food) => (
-                            <th key={food.key} className="text-end">{totalDetailed[food.key]?.toLocaleString() || 0}</th>
-                          ))}
                         </tr>
                       </tfoot>
                     )}
