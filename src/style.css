@@ -10,12 +10,12 @@
   .food-tem-receving {
     margin-top: 12px;
   }
-  .dashboard-header{
+  /* .dashboard-header{
 width: 100% !important;
-  }
+  } */
 }
-@media (max-width: 956px) {
+/* @media (max-width: 956px) {
    .dashboard-header{
 width: 100% !important;
   }
-}
+} */
