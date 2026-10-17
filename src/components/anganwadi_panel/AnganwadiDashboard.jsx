@@ -1988,7 +1988,7 @@ const AnganwadiDashboard = () => {
                 className={`card-hcm ${activeScheme === "hcm" ? "active" : ""}`}
                 onClick={() => handleCardClick("hcm")}
               >
-                <Card.Body>
+               
                   <FaUtensils className="card-icon" />
 
                   <Card.Title>{t("HCM Food Items", "HCM खाद्य सामग्री")}</Card.Title>
@@ -2007,7 +2007,7 @@ const AnganwadiDashboard = () => {
                       <FaChevronDown className="ms-2" />
                     )}
                   </Card.Text>
-                </Card.Body>
+             
               </Card>
             </Col>
 
@@ -2016,7 +2016,7 @@ const AnganwadiDashboard = () => {
                 className={`card-thr ${activeScheme === "thr" ? "active" : ""}`}
                 onClick={() => handleCardClick("thr")}
               >
-                <Card.Body>
+              
                   <FaBoxOpen className="card-icon" />
 
                   <Card.Title>{t("THR Food Items", "THR खाद्य सामग्री")}</Card.Title>
@@ -2035,7 +2035,7 @@ const AnganwadiDashboard = () => {
                       <FaChevronDown className="ms-2" />
                     )}
                   </Card.Text>
-                </Card.Body>
+            
               </Card>
             </Col>
           </Row>
@@ -2185,7 +2185,7 @@ const AnganwadiDashboard = () => {
                   </div>
                 </div>
               </Card.Header>
-              <Card.Body className="p-0">
+           
                 {suppliesExportError && (
                   <Alert
                     variant="danger"
@@ -2344,7 +2344,7 @@ const AnganwadiDashboard = () => {
                     </Table>
                   </div>
                 )}
-              </Card.Body>
+            
             </Card>
           </div>
 
