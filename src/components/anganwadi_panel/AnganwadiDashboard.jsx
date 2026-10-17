@@ -1999,7 +1999,7 @@ const AnganwadiDashboard = () => {
                     <h2 className="fw-bold">{counts.hcm}</h2>
                   )}
 
-                  <Card.Text className="d-flex align-items-center">
+                  <Card.Text className="">
                     {t("Total Items", "कुल आइटम")}
                     {activeScheme === "hcm" ? (
                       <FaChevronUp className="ms-2" />
@@ -2027,7 +2027,7 @@ const AnganwadiDashboard = () => {
                     <h2 className="fw-bold">{counts.thr}</h2>
                   )}
 
-                  <Card.Text className="d-flex align-items-center">
+                  <Card.Text className="">
                     {t("Total Items", "कुल आइटम")}
                     {activeScheme === "thr" ? (
                       <FaChevronUp className="ms-2" />
