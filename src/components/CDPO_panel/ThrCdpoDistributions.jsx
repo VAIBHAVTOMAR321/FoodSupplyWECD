@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
@@ -8,6 +9,28 @@ import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
+
+const distributionColumnTranslations = {
+  "AWC Name": "आंगनवाड़ी केंद्र का नाम",
+  "AWC Code": "आंगनवाड़ी केंद्र कोड",
+  "AWC Type": "आंगनवाड़ी केंद्र का प्रकार",
+  Sector: "सेक्टर",
+  Project: "परियोजना",
+  District: "जिला",
+  "Food Item": "खाद्य सामग्री",
+  "Beneficiary Category": "लाभार्थी श्रेणी",
+  "Days Allotted": "आवंटित दिन",
+  Date: "तिथि",
+  "Fin Year": "वित्तीय वर्ष",
+  Trimester: "तिमाही",
+  Months: "माह",
+  Beneficiaries: "लाभार्थी",
+  Qty: "मात्रा",
+  Unit: "इकाई",
+  "Sector Status": "सेक्टर स्थिति",
+  "Anganwadi Remark": "आंगनवाड़ी टिप्पणी",
+  Action: "कार्रवाई",
+};
 
 const monthLabels = {
   apr: 'April',
@@ -133,6 +156,8 @@ const formatDistributionDate = (value) => {
 };
 
 const ThrCdpoDistributions = () => {
+  const { t } = useLanguage();
+  const translateColumn = (text) => t(text, distributionColumnTranslations[text] || text);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -278,7 +303,7 @@ const ThrCdpoDistributions = () => {
       const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
       setDistributions(items);
     } catch (err) {
-      setError("Failed to fetch THR distributions.");
+      setError(t("Failed to fetch THR distributions.", "टीएचआर वितरण प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -293,7 +318,7 @@ const ThrCdpoDistributions = () => {
       setBeneficiaryCategories(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch beneficiary categories.", err);
-      setError("Failed to fetch beneficiary categories.");
+      setError(t("Failed to fetch beneficiary categories.", "लाभार्थी श्रेणियां प्राप्त नहीं हो सकीं।"));
     }
   };
 
@@ -477,7 +502,7 @@ const ThrCdpoDistributions = () => {
       pdf.save("thr_cdpo_distributions.pdf");
     } catch (err) {
       console.error("Failed to export THR PDF:", err);
-      setError("Failed to export PDF. Please try again.");
+      setError(t("Failed to export PDF. Please try again.", "पीडीएफ़ निर्यात नहीं हो सका। कृपया पुनः प्रयास करें।"));
     } finally {
       exportRoot.remove();
       setIsPrinting(false);
@@ -593,7 +618,7 @@ const ThrCdpoDistributions = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3 className="mb-0">THR CDPO Distributions</h3>
+            <h3 className="mb-0">{t("THR CDPO Distributions", "टीएचआर सीडीपीओ वितरण")}</h3>
             <div>
               <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
                 <FaFilePdf className="me-1" /> Export PDF
@@ -721,7 +746,7 @@ const ThrCdpoDistributions = () => {
               </Dropdown>
             </Col>
             <Col md={2} className="d-flex align-items-end mt-2">
-              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [] })} className="me-2">Clear Filters</Button>
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [] })} className="me-2">{t("Clear Filters", "फ़िल्टर साफ़ करें")}</Button>
             </Col>
           </Row>
 
@@ -736,7 +761,7 @@ const ThrCdpoDistributions = () => {
                   <Spinner animation="border" />
                 </div>
               ) : filteredData.length === 0 ? (
-                <div className="text-center py-4 text-muted">No THR distributions found.</div>
+                <div className="text-center py-4 text-muted">{t("No THR distributions found.", "टीएचआर वितरण नहीं मिला।")}</div>
               ) : (
                 <div className="table-responsive">
                   <Table 
@@ -753,8 +778,8 @@ const ThrCdpoDistributions = () => {
                          {visibleColumns.map((col) => (
                            <th key={`th-${col.dataField}`}>
                              {col.dataField === 'bene_category' ? (
-                               <div className="bene-category-cell" style={{ width: '150px' }}>{col.text}</div>
-                             ) : col.text}
+                               <div className="bene-category-cell" style={{ width: '150px' }}>{translateColumn(col.text)}</div>
+                               ) : translateColumn(col.text)}
                            </th>
                          ))}
                        </tr>
@@ -856,7 +881,7 @@ const ThrCdpoDistributions = () => {
                           </React.Fragment>
                         )) : (
                           <tr>
-                            <td colSpan={visibleColumns.length} className="text-center">No data available</td>
+                            <td colSpan={visibleColumns.length} className="text-center">{t("No data available", "कोई डेटा उपलब्ध नहीं")}</td>
                           </tr>
                         )}
                       </tbody>
@@ -865,7 +890,7 @@ const ThrCdpoDistributions = () => {
                           {visibleColumns.map((col) => {
                             let cellContent = '';
                             if (col.dataField === '#') {
-                              cellContent = <strong>Total</strong>;
+                              cellContent = <strong>{t("Total", "कुल")}</strong>;
                             } else if (col.dataField === 'total_beneficiaries') {
                               cellContent = <strong>{totals.beneficiaries}</strong>;
                             } else if (col.dataField === 'quantity') {
@@ -902,7 +927,7 @@ const ThrCdpoDistributions = () => {
             {selectedRemarks && (
               <div>
                 <div className="mb-3">
-                  <h6>Sector Remark</h6>
+                  <h6>{t("Sector Remark", "सेक्टर टिप्पणी")}</h6>
                   <p className="mb-1">
                     <strong>Status:</strong>{" "}
                     <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>
@@ -912,7 +937,7 @@ const ThrCdpoDistributions = () => {
                   <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.sector_remark || "No remark"}</p>
                 </div>
                 <div>
-                  <h6>Anganwadi Remark</h6>
+                  <h6>{t("Anganwadi Remark", "आंगनवाड़ी टिप्पणी")}</h6>
                   <p className="mb-0">{selectedRemarks.anganwadi_remark || "No remark"}</p>
                 </div>
               </div>
@@ -927,14 +952,14 @@ const ThrCdpoDistributions = () => {
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
           <Modal.Header closeButton>
-            <Modal.Title>Show/Hide Columns</Modal.Title>
+            <Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएं/छिपाएं")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {columns.map((col, index) => (
               <Form.Check
                 key={index}
                 type="checkbox"
-                label={col.text}
+                label={translateColumn(col.text)}
                 checked={col.visible}
                 onChange={() => handleColumnToggle(index)}
               />
@@ -949,14 +974,14 @@ const ThrCdpoDistributions = () => {
 
         <Modal show={showQtyModal} onHide={() => setShowQtyModal(false)} centered>
           <Modal.Header closeButton>
-            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+            <Modal.Title>{t("Quantity Breakdown by Unit", "इकाई के अनुसार मात्रा विवरण")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             <Table striped bordered hover>
               <thead>
                 <tr>
-                  <th>Unit</th>
-                  <th>Total Quantity</th>
+                  <th>{t("Unit", "इकाई")}</th>
+                  <th>{t("Total Quantity", "कुल मात्रा")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -967,7 +992,7 @@ const ThrCdpoDistributions = () => {
                   </tr>
                 ))}
                 {/* <tr className="table-active">
-                  <td><strong>Grand Total</strong></td>
+                  <td><strong>{t("Grand Total", "कुल योग")}</strong></td>
                   <td><strong>{totals.quantity.toFixed(2)}</strong></td>
                 </tr> */}
               </tbody>

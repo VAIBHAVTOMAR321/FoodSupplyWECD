@@ -19,6 +19,8 @@ import {
   Tab,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
+import dpoHindi from "./DPOTranslations.json";
 import "../../assets/css/dpo.css";
 
 import {
@@ -349,6 +351,8 @@ const SUMMARY_PILLS = [
 
 // Custom Multi-Select Dropdown Component
 const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
+  const { t } = useLanguage();
+  const translateLabel = (text) => t(text, dpoHindi[text] || text);
   const toggleOption = (opt) => {
     if (selected.includes(opt)) {
       onChange(selected.filter((o) => o !== opt));
@@ -358,9 +362,21 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
   };
 
   const getLabel = () => {
-    if (!selected || selected.length === 0) return `All ${label}s`;
+    if (!selected || selected.length === 0) {
+      const allLabels = {
+        Trimester: ["All Trimesters", "सभी त्रैमासिक"],
+        "Financial Year": ["All Financial Years", "सभी वित्तीय वर्ष"],
+        Project: ["All Projects", "सभी परियोजनाएँ"],
+        Sector: ["All Sectors", "सभी सेक्टर"],
+      };
+      const [english, hindi] = allLabels[label] || [`All ${label}s`, `सभी ${label}`];
+      return t(english, hindi);
+    }
     if (selected.length === 1) return selected[0];
-    return `${selected.length} ${label}s selected`;
+    return t(
+      `${selected.length} ${label}s selected`,
+      `${selected.length} ${translateLabel(label)} चयनित`,
+    );
   };
 
   return (
@@ -368,7 +384,7 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
       className="dpo-filter-group"
       style={{ position: "relative", zIndex: 20 }}
     >
-      <Form.Label className="dpo-filter-label">{label}</Form.Label>
+      <Form.Label className="dpo-filter-label">{translateLabel(label)}</Form.Label>
       <Dropdown autoClose="outside">
         <Dropdown.Toggle size="sm" variant="light" className="dpo-multi-toggle">
           <span
@@ -384,7 +400,7 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
         </Dropdown.Toggle>
         <Dropdown.Menu className="dpo-multi-menu">
           {options.length === 0 ? (
-            <Dropdown.Item disabled>No options</Dropdown.Item>
+            <Dropdown.Item disabled>{t("No options", "कोई विकल्प नहीं")}</Dropdown.Item>
           ) : (
             options.map((opt) => (
               <div
@@ -411,6 +427,8 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
 };
 
 const DPODashboard = () => {
+  const { t } = useLanguage();
+  const translateLabel = (text) => t(text, dpoHindi[text] || text);
   // One fixed horizontal scrollbar follows whichever DPO table is currently visible.
   // Scroll positions are mapped proportionally because the fixed bar and table may
   // have different widths / maximum scroll ranges.
@@ -635,7 +653,7 @@ const DPODashboard = () => {
         : response.data?.results || response.data?.data || [];
       setRecords(Array.isArray(data) ? data.map(normalizeSupplementaryRecord) : []);
     } catch (err) {
-      setError("Failed to fetch supplementary nutrition data.");
+      setError(t("Failed to fetch supplementary nutrition data.", "पूरक पोषण डेटा प्राप्त करने में विफल।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -1151,7 +1169,7 @@ const DPODashboard = () => {
       await downloadPDF(options);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
-      setError("Failed to generate PDF. Please try again.");
+      setError(t("Failed to generate PDF. Please try again.", "PDF बनाने में विफल। कृपया पुनः प्रयास करें।"));
     }
   };
 
@@ -1385,7 +1403,7 @@ const DPODashboard = () => {
           <div className="dashboard-header-section">
             <div>
               <h4 className="dashboard-main-title">
-                <FaBoxes /> Supplementary Nutrition Overview
+                <FaBoxes /> {t("Supplementary Nutrition Overview", "पूरक पोषण अवलोकन")}
               </h4>
               <p className="dashboard-subtitle">
                 View aggregated and detailed supplementary nutrition data across
@@ -1397,7 +1415,7 @@ const DPODashboard = () => {
               onClick={fetchData}
               disabled={loading}
             >
-              <FaSyncAlt className={loading ? "fa-spin" : ""} /> Refresh Data
+              <FaSyncAlt className={loading ? "fa-spin" : ""} /> {t("Refresh Data", "डेटा रीफ़्रेश करें")}
             </Button>
           </div>
 
@@ -1438,14 +1456,14 @@ const DPODashboard = () => {
                 setSelectedSectors([]);
               }}
             >
-              Reset
+              {t("Reset", "रीसेट करें")}
             </Button>
             <Button
               className="dpo-export-btn"
               onClick={handleOpenFoodItemModal}
-              title="View Food Items"
+              title={t("View Food Items", "खाद्य सामग्री देखें")}
             >
-              <FaUtensils className="text-primary" /> Food Items
+              <FaUtensils className="text-primary" /> {t("Food Items", "खाद्य सामग्री")}
             </Button>
           </div>
 
@@ -1454,7 +1472,7 @@ const DPODashboard = () => {
               {SUMMARY_PILLS.map((field) => (
                 <div key={field.key} className="dpo-stat-pill">
                   <span className="dpo-stat-pill-icon">{field.icon}</span>
-                  <span className="dpo-stat-pill-label">{field.label}</span>
+                  <span className="dpo-stat-pill-label">{translateLabel(field.label)}</span>
                   <span className="dpo-stat-pill-value">
                     {summaryStats[field.key]?.toLocaleString() || 0}
                   </span>
@@ -1467,7 +1485,7 @@ const DPODashboard = () => {
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
-                <FaWarehouse /> Supplies Received & Distributed Summary
+                <FaWarehouse /> {t("Supplies Received & Distributed Summary", "प्राप्त एवं वितरित सामग्री का सारांश")}
               </h5>
               <div className="d-flex align-items-center gap-3 flex-wrap">
                 <ButtonGroup className="dpo-toggle-group">
@@ -1499,21 +1517,21 @@ const DPODashboard = () => {
                   <Button
                     className={`dpo-toggle-btn ${suppliesViewMode === "project" ? "active" : ""}`}
                     onClick={() => setSuppliesViewMode("project")}
-                    title="Project-wise"
+                    title={t("Project-wise", "परियोजना-वार")}
                   >
-                    Project
+                    {t("Project", "परियोजना")}
                   </Button>
                   <Button
                     className={`dpo-toggle-btn ${suppliesViewMode === "sector" ? "active" : ""}`}
                     onClick={() => setSuppliesViewMode("sector")}
-                    title="Sector-wise"
+                    title={t("Sector-wise", "सेक्टर-वार")}
                   >
-                    Sector
+                    {t("Sector", "सेक्टर")}
                   </Button>
                   <Button
                     className={`dpo-toggle-btn ${suppliesViewMode === "awc" ? "active" : ""}`}
                     onClick={() => setSuppliesViewMode("awc")}
-                    title="AWC-wise"
+                    title={t("AWC-wise", "आंगनवाड़ी-वार")}
                   >
                     AWC
                   </Button>
@@ -1541,7 +1559,7 @@ const DPODashboard = () => {
                       setSelectedSupplyFYs([]);
                     }}
                   >
-                    Reset
+                    {t("Reset", "रीसेट करें")}
                   </Button>
                 )}
                 <div className="dpo-export-btns">
@@ -1570,27 +1588,27 @@ const DPODashboard = () => {
                   <Table hover className="dpo-data-table mb-0">
                     <thead>
                       <tr>
-                        <th rowSpan="2">S. No.</th>
+                        <th rowSpan="2">{t("S. No.", "क्रम संख्या")}</th>
                         {suppliesViewMode === "project" ? (
                           <>
-                            <th rowSpan="2">Project</th>
-                            <th rowSpan="2">Trimester</th>
-                            <th rowSpan="2">Financial Year</th>
+                            <th rowSpan="2">{t("Project", "परियोजना")}</th>
+                            <th rowSpan="2">{t("Trimester", "त्रैमासिक")}</th>
+                            <th rowSpan="2">{t("Financial Year", "वित्तीय वर्ष")}</th>
                           </>
                         ) : suppliesViewMode === "sector" ? (
                           <>
-                            <th rowSpan="2">Sector</th>
-                            <th rowSpan="2">Trimester</th>
-                            <th rowSpan="2">Financial Year</th>
+                            <th rowSpan="2">{t("Sector", "सेक्टर")}</th>
+                            <th rowSpan="2">{t("Trimester", "त्रैमासिक")}</th>
+                            <th rowSpan="2">{t("Financial Year", "वित्तीय वर्ष")}</th>
                           </>
                         ) : (
                           <>
-                            <th rowSpan="2">Project</th>
-                            <th rowSpan="2">Sector</th>
-                            <th rowSpan="2">AWC Name</th>
-                            <th rowSpan="2">AWC Code</th>
-                            <th rowSpan="2">Trimester</th>
-                            <th rowSpan="2">Financial Year</th>
+                            <th rowSpan="2">{t("Project", "परियोजना")}</th>
+                            <th rowSpan="2">{t("Sector", "सेक्टर")}</th>
+                            <th rowSpan="2">{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</th>
+                            <th rowSpan="2">{t("AWC Code", "आंगनवाड़ी केंद्र कोड")}</th>
+                            <th rowSpan="2">{t("Trimester", "त्रैमासिक")}</th>
+                            <th rowSpan="2">{t("Financial Year", "वित्तीय वर्ष")}</th>
                           </>
                         )}
                         {suppliesFoodItems.map((fi, idx) => (
@@ -1607,9 +1625,9 @@ const DPODashboard = () => {
                       <tr>
                         {suppliesFoodItems.map((fi, idx) => (
                           <React.Fragment key={`sub-${idx}`}>
-                            <th className="text-end">Received ({suppliesQuantityHeader})</th>
-                            <th className="text-end">Distributed ({suppliesQuantityHeader})</th>
-                            <th className="text-end">Remaining ({suppliesQuantityHeader})</th>
+                            <th className="text-end">{t("Received", "प्राप्त")} ({suppliesQuantityHeader})</th>
+                            <th className="text-end">{t("Distributed", "वितरित")} ({suppliesQuantityHeader})</th>
+                            <th className="text-end">{t("Remaining", "शेष")} ({suppliesQuantityHeader})</th>
                           </React.Fragment>
                         ))}
                       </tr>
@@ -1625,7 +1643,7 @@ const DPODashboard = () => {
                             }
                             className="text-center p-4 text-muted"
                           >
-                            No data available
+                            {t("No data available", "कोई डेटा उपलब्ध नहीं")}
                           </td>
                         </tr>
                       ) : (
@@ -1681,7 +1699,7 @@ const DPODashboard = () => {
                       <tfoot>
                         <tr>
                           <th colSpan={suppliesViewMode === "awc" ? 7 : 4} className="text-start">
-                            Total
+                            {t("Total", "कुल")}
                           </th>
                           {suppliesFoodItems.map((fi, idx) => {
                             const t = suppliesTotals[fi] || {
@@ -1717,8 +1735,8 @@ const DPODashboard = () => {
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
                 <FaLayerGroup />{" "}
-                {aggregateView === "sector" ? "Sector-wise" : "Project-wise"}{" "}
-                Aggregated Summary
+                {aggregateView === "sector" ? t("Sector-wise", "सेक्टर-वार") : t("Project-wise", "परियोजना-वार")}{" "}
+                {t("Aggregated Summary", "समेकित सारांश")}
               </h5>
               <div className="d-flex align-items-center gap-3 flex-wrap">
                 <ButtonGroup className="dpo-toggle-group">
@@ -1726,13 +1744,13 @@ const DPODashboard = () => {
                     className={`dpo-toggle-btn ${aggregateView === "project" ? "active" : ""}`}
                     onClick={() => setAggregateView("project")}
                   >
-                    Project-wise
+                    {t("Project-wise", "परियोजना-वार")}
                   </Button>
                   <Button
                     className={`dpo-toggle-btn ${aggregateView === "sector" ? "active" : ""}`}
                     onClick={() => setAggregateView("sector")}
                   >
-                    Sector-wise
+                    {t("Sector-wise", "सेक्टर-वार")}
                   </Button>
                 </ButtonGroup>
                 <div className="dpo-export-btns">
@@ -1755,15 +1773,15 @@ const DPODashboard = () => {
                   <Table hover className="dpo-data-table mb-0">
                     <thead>
                       <tr>
-                        <th>S. No.</th>
+                        <th>{t("S. No.", "क्रम संख्या")}</th>
                         <th style={{ textTransform: "capitalize" }}>
                           {aggregateView}
                         </th>
-                        <th>Months</th>
-                        <th>Fin. Years</th>
+                        <th>{t("Months", "महीने")}</th>
+                        <th>{t("Fin. Years", "वित्तीय वर्ष")}</th>
                         {NUMERIC_AGG_FIELDS.map((col, i) => (
                           <th key={i} className="text-end">
-                            {col.label}
+                            {translateLabel(col.label)}
                           </th>
                         ))}
                       </tr>
@@ -1775,7 +1793,7 @@ const DPODashboard = () => {
                             colSpan={NUMERIC_AGG_FIELDS.length + 4}
                             className="text-center p-4 text-muted"
                           >
-                            No data available
+                            {t("No data available", "कोई डेटा उपलब्ध नहीं")}
                           </td>
                         </tr>
                       ) : (
@@ -1800,7 +1818,7 @@ const DPODashboard = () => {
                       <tfoot>
                         <tr>
                           <th></th>
-                          <th>Total</th>
+                          <th>{t("Total", "कुल")}</th>
                           <th></th>
                           <th></th>
                           {NUMERIC_AGG_FIELDS.map((col, c) => (
@@ -1821,7 +1839,7 @@ const DPODashboard = () => {
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
-                <FaChartBar /> Detailed Records
+                <FaChartBar /> {t("Detailed Records", "विस्तृत रिकॉर्ड")}
               </h5>
               <div className="d-flex align-items-center gap-3 flex-wrap">
                 <InputGroup style={{ maxWidth: "300px" }}>
@@ -1829,7 +1847,7 @@ const DPODashboard = () => {
                     <FaSearch />
                   </InputGroup.Text>
                   <Form.Control
-                    placeholder="Search AWC, District, Trimester..."
+                    placeholder={t("Search AWC, District, Trimester...", "आंगनवाड़ी केंद्र, जिला, त्रैमासिक खोजें...")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -1869,7 +1887,7 @@ const DPODashboard = () => {
                     <thead>
                       <tr>
                         <th rowSpan={2} className="text-center align-middle">
-                          S. No.
+                          {t("S. No.", "क्रम संख्या")}
                         </th>
                         {EXCEL_META_COLUMNS.map((col) => (
                           <th
@@ -1877,7 +1895,7 @@ const DPODashboard = () => {
                             rowSpan={2}
                             className="text-center align-middle"
                           >
-                            {col.header}
+                            {translateLabel(col.header)}
                           </th>
                         ))}
                         {GRANT_CATEGORIES.map((cat) => (
@@ -1886,16 +1904,16 @@ const DPODashboard = () => {
                             colSpan={4 + getCategoryFoods(cat).length}
                             className="text-center align-middle dpo-grant-group-header"
                           >
-                            {cat.title}
+                            {translateLabel(cat.title)}
                           </th>
                         ))}
                       </tr>
                       <tr>
                         {GRANT_CATEGORIES.flatMap((cat) => [
                           ...[15, 30, 31].map((grantId) => (
-                            <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
+                            <th key={`${cat.countKey}-${grantId}`} className="text-center">{t("Grant", "अनुदान")} {grantId}</th>
                           )),
-                          <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>,
+                          <th key={`${cat.countKey}-total`} className="text-center">{t("TOTAL", "कुल")}</th>,
                           ...getCategoryFoods(cat).map((food) => (
                             <th key={food.key} className="text-center">{food.header}</th>
                           )),
@@ -1913,7 +1931,7 @@ const DPODashboard = () => {
                             }
                             className="text-center py-5 text-muted"
                           >
-                            No records found.
+                            {t("No records found.", "कोई रिकॉर्ड नहीं मिला।")}
                           </td>
                         </tr>
                       ) : (
@@ -2038,7 +2056,7 @@ const DPODashboard = () => {
           {loadingFoodItems ? (
             <div className="text-center py-5">
               <Spinner animation="border" variant="primary" />
-              <p className="mt-3 text-muted">Loading food items...</p>
+              <p className="mt-3 text-muted">{t("Loading food items...", "खाद्य सामग्री लोड हो रही है...")}</p>
             </div>
           ) : (
             <Tabs
@@ -2054,7 +2072,7 @@ const DPODashboard = () => {
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Food Item</th>
+                      <th>{t("Food Item", "खाद्य सामग्री")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2085,7 +2103,7 @@ const DPODashboard = () => {
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Food Item</th>
+                      <th>{t("Food Item", "खाद्य सामग्री")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2117,7 +2135,7 @@ const DPODashboard = () => {
             onClick={handleCloseFoodItemModal}
             className="dpo-btn-light px-4"
           >
-            <FaTimes className="me-1" /> Close
+            <FaTimes className="me-1" /> {t("Close", "बंद करें")}
           </Button>
         </Modal.Footer>
       </Modal>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Container, Row, Col, Card, Table, Button } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/itcellLeftnav.css";
 
 import ITCellLeftNav from "./ITCellLeftNav";
@@ -12,6 +13,7 @@ const ITCellHCMDistributions = () => {
   const [isTablet, setIsTablet] = useState(false);
   
   const { user, api } = useAuth();
+  const { t } = useLanguage();
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [totalRegistrations, setTotalRegistrations] = useState(0);
@@ -53,7 +55,7 @@ const ITCellHCMDistributions = () => {
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading">
             <h3 className="mb-4 fw-bold">
-              IT Dashboard
+              {t("IT Dashboard", "आईटी डैशबोर्ड")}
             </h3>
           </div>
 

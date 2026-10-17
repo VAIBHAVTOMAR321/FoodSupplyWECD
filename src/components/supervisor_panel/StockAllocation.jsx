@@ -34,6 +34,7 @@ import {
 } from "react-icons/fa";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 import "../../assets/css/dashboard.css";
 
@@ -392,6 +393,7 @@ const downloadPDF = async ({
 };
 
 const StockAllocation = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [isMobile, setIsMobile] = useState(false);
@@ -454,7 +456,7 @@ const StockAllocation = () => {
       if (payload?.success === false) {
         setError(
           payload?.message ||
-            "The stock allocation API returned an unsuccessful response.",
+            t("The stock allocation API returned an unsuccessful response.", "स्टॉक आवंटन API ने असफल प्रतिक्रिया दी।"),
         );
 
         setAllocations([]);
@@ -482,7 +484,7 @@ const StockAllocation = () => {
         );
       }
     } catch (fetchError) {
-      setError("Failed to fetch stock allocation data.");
+      setError(t("Failed to fetch stock allocation data.", "स्टॉक आवंटन डेटा प्राप्त नहीं हो सका।"));
 
       setAllocations([]);
 
@@ -885,7 +887,7 @@ const StockAllocation = () => {
     } catch (err) {
       console.error("Failed to generate PDF:", err);
 
-      setError("Failed to generate PDF. Please try again.");
+      setError(t("Failed to generate PDF. Please try again.", "PDF तैयार नहीं हो सकी। कृपया पुनः प्रयास करें।"));
     }
   };
 
@@ -907,11 +909,11 @@ const StockAllocation = () => {
           <div className="dashboard-header-section">
             <div>
               <h4 className="dashboard-main-title">
-                <FaBoxes /> Stock Allocation
+                <FaBoxes /> {t("Stock Allocation", "स्टॉक आवंटन")}
               </h4>
 
               <p className="dashboard-subtitle">
-                AWC-wise grant-wise stock allocation overview for your sector.
+                {t("AWC-wise grant-wise stock allocation overview for your sector.", "आपके सेक्टर के लिए आंगनवाड़ी केंद्र-वार और अनुदान-वार स्टॉक आवंटन का विवरण।")}
               </p>
             </div>
 
@@ -925,7 +927,7 @@ const StockAllocation = () => {
               disabled={refreshing || loading}
             >
               <FaSyncAlt className={refreshing || loading ? "fa-spin" : ""} />{" "}
-              Refresh
+              {t("Refresh", "रीफ़्रेश करें")}
             </Button>
           </div>
 
@@ -935,13 +937,13 @@ const StockAllocation = () => {
             <div className="d-flex gap-2 mb-3 flex-wrap">
               {sectorInfo && (
                 <span className="sa-info-pill">
-                  <FaLayerGroup /> Sector: <strong>{sectorInfo}</strong>
+                  <FaLayerGroup /> {t("Sector:", "सेक्टर:")} <strong>{sectorInfo}</strong>
                 </span>
               )}
 
               {anganwadiCount != null && (
                 <span className="sa-info-pill">
-                  <FaWarehouse /> Anganwadi Count:{" "}
+                  <FaWarehouse /> {t("Anganwadi Count:", "आंगनवाड़ी केंद्रों की संख्या:")}{" "}
                   <strong>{anganwadiCount}</strong>
                 </span>
               )}
@@ -964,8 +966,8 @@ const StockAllocation = () => {
                       <FaFilter className="me-1" />
 
                       {filters.awc_name.length
-                        ? `${filters.awc_name.length} AWC Names`
-                        : "All AWC Names"}
+                        ? t(`${filters.awc_name.length} AWC Names`, `${filters.awc_name.length} आंगनवाड़ी केंद्रों के नाम`)
+                        : t("All AWC Names", "सभी आंगनवाड़ी केंद्रों के नाम")}
                     </Dropdown.Toggle>
 
                     <Dropdown.Menu
@@ -976,7 +978,7 @@ const StockAllocation = () => {
                       }}
                     >
                       {uniqueValues.awc_name.length === 0 ? (
-                        <Dropdown.Item disabled>No options</Dropdown.Item>
+                        <Dropdown.Item disabled>{t("No options", "कोई विकल्प नहीं")}</Dropdown.Item>
                       ) : (
                         uniqueValues.awc_name.map((v) => (
                           <Dropdown.Item
@@ -1008,8 +1010,8 @@ const StockAllocation = () => {
                       <FaFilter className="me-1" />
 
                       {filters.awc_code.length
-                        ? `${filters.awc_code.length} AWC Codes`
-                        : "All AWC Codes"}
+                        ? t(`${filters.awc_code.length} AWC Codes`, `${filters.awc_code.length} आंगनवाड़ी केंद्र कोड`)
+                        : t("All AWC Codes", "सभी आंगनवाड़ी केंद्र कोड")}
                     </Dropdown.Toggle>
 
                     <Dropdown.Menu
@@ -1020,7 +1022,7 @@ const StockAllocation = () => {
                       }}
                     >
                       {uniqueValues.awc_code.length === 0 ? (
-                        <Dropdown.Item disabled>No options</Dropdown.Item>
+                        <Dropdown.Item disabled>{t("No options", "कोई विकल्प नहीं")}</Dropdown.Item>
                       ) : (
                         uniqueValues.awc_code.map((v) => (
                           <Dropdown.Item
@@ -1052,8 +1054,8 @@ const StockAllocation = () => {
                       <FaFilter className="me-1" />
 
                       {filters.quarter.length
-                        ? `${filters.quarter.length} Quarters`
-                        : "All Quarters"}
+                        ? t(`${filters.quarter.length} Quarters`, `${filters.quarter.length} तिमाहियां`)
+                        : t("All Quarters", "सभी तिमाहियां")}
                     </Dropdown.Toggle>
 
                     <Dropdown.Menu
@@ -1064,7 +1066,7 @@ const StockAllocation = () => {
                       }}
                     >
                       {uniqueValues.quarter.length === 0 ? (
-                        <Dropdown.Item disabled>No options</Dropdown.Item>
+                        <Dropdown.Item disabled>{t("No options", "कोई विकल्प नहीं")}</Dropdown.Item>
                       ) : (
                         uniqueValues.quarter.map((v) => (
                           <Dropdown.Item
@@ -1096,8 +1098,8 @@ const StockAllocation = () => {
                       <FaFilter className="me-1" />
 
                       {filters.financial_year.length
-                        ? `${filters.financial_year.length} Fin. Years`
-                        : "All Fin. Years"}
+                        ? t(`${filters.financial_year.length} Fin. Years`, `${filters.financial_year.length} वित्तीय वर्ष`)
+                        : t("All Fin. Years", "सभी वित्तीय वर्ष")}
                     </Dropdown.Toggle>
 
                     <Dropdown.Menu
@@ -1108,7 +1110,7 @@ const StockAllocation = () => {
                       }}
                     >
                       {uniqueValues.financial_year.length === 0 ? (
-                        <Dropdown.Item disabled>No options</Dropdown.Item>
+                        <Dropdown.Item disabled>{t("No options", "कोई विकल्प नहीं")}</Dropdown.Item>
                       ) : (
                         uniqueValues.financial_year.map((v) => (
                           <Dropdown.Item
@@ -1139,7 +1141,7 @@ const StockAllocation = () => {
 
                     <Form.Control
                       type="text"
-                      placeholder="Search..."
+                      placeholder={t("Search...", "खोजें...")}
                       value={searchText}
                       onChange={handleSearchChange}
                     />
@@ -1154,7 +1156,7 @@ const StockAllocation = () => {
                     size="sm"
                     onClick={resetFilters}
                   >
-                    Reset Filters
+                    {t("Reset Filters", "फ़िल्टर रीसेट करें")}
                   </Button>
 
                   <Button
@@ -1280,7 +1282,7 @@ const StockAllocation = () => {
                             }
                             className="text-center py-5 text-muted"
                           >
-                            No stock allocation records found.
+                            {t("No stock allocation records found.", "स्टॉक आवंटन का कोई रिकॉर्ड नहीं मिला।")}
                           </td>
                         </tr>
                       ) : (
@@ -1366,9 +1368,7 @@ const StockAllocation = () => {
             {totalRecords > 0 && (
               <Card.Footer className="d-flex justify-content-between align-items-center flex-wrap gap-2 py-3 px-4">
                 <span className="small text-muted">
-                  Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                  {Math.min(currentPage * itemsPerPage, totalRecords)} of{" "}
-                  {totalRecords} entries
+                  {t(`Showing ${(currentPage - 1) * itemsPerPage + 1} to ${Math.min(currentPage * itemsPerPage, totalRecords)} of ${totalRecords} entries.`, `${totalRecords} रिकॉर्ड में से ${(currentPage - 1) * itemsPerPage + 1} से ${Math.min(currentPage * itemsPerPage, totalRecords)} तक दिखाए जा रहे हैं।`)}
                 </span>
 
                 <div className="d-flex align-items-center gap-2">
@@ -1378,11 +1378,11 @@ const StockAllocation = () => {
                     disabled={currentPage === 1}
                     onClick={() => handlePageChange(currentPage - 1)}
                   >
-                    Previous
+                    {t("Previous", "पिछला")}
                   </Button>
 
                   <span className="small text-muted">
-                    Page {currentPage} of {totalPages || 1}
+                    {t(`Page ${currentPage} of ${totalPages || 1}`, `पृष्ठ ${currentPage} / ${totalPages || 1}`)}
                   </span>
 
                   <Button
@@ -1391,7 +1391,7 @@ const StockAllocation = () => {
                     disabled={currentPage === totalPages || totalPages === 0}
                     onClick={() => handlePageChange(currentPage + 1)}
                   >
-                    Next
+                    {t("Next", "अगला")}
                   </Button>
                 </div>
               </Card.Footer>
@@ -1404,8 +1404,8 @@ const StockAllocation = () => {
           ref={stickyScrollRef}
           className="sa-sticky-horizontal-scrollbar"
           role="region"
-          aria-label="Scroll Stock Allocation table horizontally"
-          title="Scroll table left or right"
+          aria-label={t("Scroll Stock Allocation table horizontally", "स्टॉक आवंटन तालिका को क्षैतिज रूप से स्क्रॉल करें")}
+          title={t("Scroll table left or right", "तालिका को बाएं या दाएं स्क्रॉल करें")}
           style={{
             display: showStickyScrollbar ? "block" : "none",
             position: "fixed",

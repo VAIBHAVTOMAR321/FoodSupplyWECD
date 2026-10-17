@@ -4,6 +4,7 @@ import { Container, Row, Col, Card, Spinner, Alert, Form, Button, Collapse, Tabl
 import "../../assets/css/itcellLeftnav.css";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import { FaEye, FaEyeSlash, FaKey, FaUserShield, FaUserGraduate, FaUserCog, FaUserTie, FaHome, FaLaptopCode } from "react-icons/fa";
 import ITCellLeftNav from "./ITCellLeftNav";
 import ITCellHeader from "./ITCellHeader";
@@ -14,6 +15,12 @@ const AllRoleResetpassword = () => {
   const [isTablet, setIsTablet] = useState(false);
 
   const { api } = useAuth();
+  const { t } = useLanguage();
+  const roleName = (role) => {
+    const names = { director: "Director", dpo: "DPO", cdpo: "CDPO", supervisor: "Supervisor", anganwadi: "Anganwadi" };
+    const englishName = names[role.toLowerCase()] || role;
+    return t(englishName, ({ Director: "निदेशक", DPO: "डीपीओ", CDPO: "सीडीपीओ", Supervisor: "पर्यवेक्षक", Anganwadi: "आंगनवाड़ी" })[englishName]);
+  };
   const [roles] = useState([
     { key: "director", label: "Director", icon: <FaUserGraduate /> },
     { key: "dpo", label: "DPO", icon: <FaUserCog /> },
@@ -132,14 +139,14 @@ const AllRoleResetpassword = () => {
           setUsers(response.data?.users || []);
       }
     } catch (err) {
-      setError(`Failed to fetch users for role: ${role}.`);
+      setError(t(`Failed to fetch users for role: ${role}.`, `${roleName(role)} भूमिका के लिए उपयोगकर्ता प्राप्त नहीं हो सके।`));
       console.error(err);
       setUsers([]);
     }
     finally {
       setLoadingUsers(false);
     }
-  }, [api]);
+  }, [api, t]);
 
   useEffect(() => {
     if (selectedRole) {
@@ -161,7 +168,7 @@ const AllRoleResetpassword = () => {
   const handleDirectReset = async (userToReset) => {
     if (!userToReset) return;
 
-    if (!window.confirm(`Are you sure you want to reset the password for ${userToReset.name}? This will happen immediately.`)) {
+    if (!window.confirm(t(`Are you sure you want to reset the password for ${userToReset.name}? This will happen immediately.`, `क्या आप वाकई ${userToReset.name} का पासवर्ड रीसेट करना चाहते हैं? यह तुरंत होगा।`))) {
       return;
     }
 
@@ -177,9 +184,9 @@ const AllRoleResetpassword = () => {
         }],
       };
       await api.post("/bulk-password-reset/", payload);
-      setSuccess(`Password for ${userToReset.name} has been reset successfully.`);
+      setSuccess(t(`Password for ${userToReset.name} has been reset successfully.`, `${userToReset.name} का पासवर्ड सफलतापूर्वक रीसेट कर दिया गया है।`));
     } catch (err) {
-      setError(err.response?.data?.error || `Failed to reset password for ${userToReset.name}.`);
+      setError(err.response?.data?.error || t(`Failed to reset password for ${userToReset.name}.`, `${userToReset.name} का पासवर्ड रीसेट नहीं हो सका।`));
     } finally {
       setLoadingUsers(false);
     }
@@ -188,7 +195,7 @@ const AllRoleResetpassword = () => {
   const handleBulkReset = async () => {
     if (selectedUsers.length === 0) return;
 
-    if (!window.confirm(`Are you sure you want to reset passwords for ${selectedUsers.length} selected users? This will happen immediately.`)) {
+    if (!window.confirm(t(`Are you sure you want to reset passwords for ${selectedUsers.length} selected users? This will happen immediately.`, `क्या आप वाकई ${selectedUsers.length} चयनित उपयोगकर्ताओं के पासवर्ड रीसेट करना चाहते हैं? यह तुरंत होगा।`))) {
       return;
     }
 
@@ -205,10 +212,10 @@ const AllRoleResetpassword = () => {
       };
 
       await api.post("/bulk-password-reset/", payload);
-      setSuccess(`Passwords for ${selectedUsers.length} selected users have been reset successfully.`);
+      setSuccess(t(`Passwords for ${selectedUsers.length} selected users have been reset successfully.`, `${selectedUsers.length} चयनित उपयोगकर्ताओं के पासवर्ड सफलतापूर्वक रीसेट कर दिए गए हैं।`));
       setSelectedUsers([]); // Clear selection after successful reset
     } catch (err) {
-      setError(err.response?.data?.error || `Failed to reset passwords for selected users.`);
+      setError(err.response?.data?.error || t("Failed to reset passwords for selected users.", "चयनित उपयोगकर्ताओं के पासवर्ड रीसेट नहीं हो सके।"));
       console.error(err);
     } finally {
       setLoadingUsers(false);
@@ -285,7 +292,7 @@ const AllRoleResetpassword = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading">
-            <h3 className="mb-4 fw-bold"><FaUserShield className="me-2" /> All Role Password Reset</h3>
+            <h3 className="mb-4 fw-bold"><FaUserShield className="me-2" /> {t("All Role Password Reset", "सभी भूमिकाओं के पासवर्ड रीसेट")}</h3>
           </div>
 
           
@@ -301,7 +308,7 @@ const AllRoleResetpassword = () => {
                     <div className="d-flex align-items-center">
                       <div className="role-icon-wrapper me-3 flex-shrink-0">{role.icon}</div>
                       <div className="role-details">
-                        <Card.Title as="h6" className="mb-0">{role.label}</Card.Title>
+                        <Card.Title as="h6" className="mb-0">{roleName(role.label)}</Card.Title>
                       </div>
                     </div>
                     <div className="role-count">
@@ -325,11 +332,11 @@ const AllRoleResetpassword = () => {
                   <Card className="shadow-sm">
                     <Card.Header as="h5" className="bg-primary text-white text-capitalize d-flex justify-content-between align-items-center">
                       <span>
-                        Reset Password for {selectedRole} {users.length > 0 && `(${users.length} Users)`}
+                        {t("Reset Password for", "पासवर्ड रीसेट करें")} {roleName(selectedRole.toUpperCase())} {users.length > 0 && `(${users.length} ${t("Users", "उपयोगकर्ता")})`}
                       </span>
                       {selectedUsers.length > 0 && (
                         <Button variant="light" size="sm" onClick={handleBulkReset}>
-                          Reset Password for Selected ({selectedUsers.length})
+                          {t("Reset Password for Selected", "चयनित के पासवर्ड रीसेट करें")} ({selectedUsers.length})
                         </Button>
                       )}
                     </Card.Header>
@@ -342,8 +349,9 @@ const AllRoleResetpassword = () => {
                           <thead>
                             <tr>
                               <th style={{ width: '5%' }}>
-                                <Form.Check 
+                                <Form.Check
                                   type="checkbox"
+                                  aria-label={t("Select all users", "सभी उपयोगकर्ताओं को चुनें")}
                                   onChange={handleSelectAll}
                                   checked={users.length > 0 && selectedUsers.length === users.length}
                                 />
@@ -353,18 +361,19 @@ const AllRoleResetpassword = () => {
                                 // Don't create columns for internal/unwanted keys
                                 if (['id', 'role', 'stat_fin', 'db_use', 'sdname', 'unique_id', 'bill_use', 'updated_on', 'district_code', 'code1', 'ang_pur_adhar_stat'].includes(key)) return null;
                                 return (
-                                  <th key={key} className="text-capitalize">{key.replace(/_/g, ' ')}</th>
+                                  <th key={key} className="text-capitalize">{t(key.replace(/_/g, ' '), ({ username: "उपयोगकर्ता नाम", district: "जिला", "project name": "परियोजना का नाम", "sector incharge": "सेक्टर प्रभारी", "awc name": "आंगनवाड़ी केंद्र का नाम", email: "ईमेल", phone: "फ़ोन", mobile: "मोबाइल" })[key.replace(/_/g, ' ')] )}</th>
                                 );
                               })}
-                              <th>Action</th>
+                              <th>{t("Action", "कार्रवाई")}</th>
                             </tr>
                           </thead>
                           <tbody>
                             {currentUsers.map((user, index) => (
                               <tr key={user.unique_id || user.username}>
                                 <td>
-                                  <Form.Check 
+                                  <Form.Check
                                     type="checkbox"
+                                    aria-label={`${t("Select", "चुनें")} ${user.name}`}
                                     checked={selectedUsers.includes(user.unique_id)}
                                     onChange={() => handleSelectUser(user.unique_id)}
                                   />
@@ -378,7 +387,7 @@ const AllRoleResetpassword = () => {
                                 })}
                                 <td>
                                   <Button variant="outline-primary" size="sm" onClick={() => handleDirectReset(user)}>
-                                    <FaKey className="me-1" /> Reset Password
+                                    <FaKey className="me-1" /> {t("Reset Password", "पासवर्ड रीसेट करें")}
                                   </Button>
                                 </td>
                               </tr>
@@ -388,7 +397,7 @@ const AllRoleResetpassword = () => {
                           {renderPagination()}
                         </>
                       ) : (
-                        <div className="text-center text-muted">No users found for this role.</div>
+                        <div className="text-center text-muted">{t("No users found for this role.", "इस भूमिका के लिए कोई उपयोगकर्ता नहीं मिला।")}</div>
                       )}
                    
                   </Card>

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { useLanguage } from './LanguageContext';
 import '../../assets/css/login.css';
 import UkLogo from '../../assets/images/new_logo_uk.png';
 import Womenlogo from '../../assets/images/women_logo.jpeg';
@@ -20,9 +21,10 @@ const Login = () => {
 
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { language, t } = useLanguage();
 
   // Content in Hindi - Government Portal Style
-  const content = {
+  const hindiContent = {
     brandSubtitle: 'आंगनबाड़ी केंद्र प्रबंधन प्रणाली',
     welcomeTitle: 'स्वागत है',
     welcomeSubtitle: 'कृपया लॉगिन करने के लिए अपनी भूमिका और विवरण दर्ज करें',
@@ -52,21 +54,52 @@ const Login = () => {
     },
   };
 
+  const englishContent = {
+    brandSubtitle: 'Anganwadi Center Management System',
+    welcomeTitle: 'Welcome',
+    welcomeSubtitle: 'Please enter your role and details to log in',
+    roleLabel: 'Select your role',
+    phoneLabel: 'Mobile number',
+    phonePlaceholder: 'Enter mobile number',
+    passwordLabel: 'Password',
+    passwordPlaceholder: 'Enter password',
+    otpLabel: 'OTP',
+    otpPlaceholder: 'Enter OTP',
+    loginBtn: 'Log in',
+    loggingIn: 'Logging in...',
+    sendOtp: 'Send OTP',
+    sendingOtp: 'Sending OTP...',
+    verifyOtp: 'Verify OTP',
+    verifyingOtp: 'Verifying...',
+    loginSuccess: 'Login successful!',
+    errors: {
+      phoneRequired: 'Mobile number is required',
+      passwordRequired: 'Password is required',
+      otpRequired: 'OTP is required',
+      loginFailed: 'Login failed. Please try again.',
+      invalidCredentials: 'Invalid credentials. Please try again.',
+      userNotFound: 'User not found.',
+      otpSendFailed: 'Failed to send OTP. Please try again.',
+      otpVerifyFailed: 'OTP verification failed. Please try again.',
+    },
+  };
+  const content = language === 'hi' ? hindiContent : englishContent;
+
   const roleOptions = useMemo(() => {
     return [
-      { value: 'director', label: 'Director', icon: 'bi-person-workspace' },
-      { value: 'it-cell', label: 'IT Cell', icon: 'bi-cpu' },
-      { value: 'dpo', label: 'District Program Officer', icon: 'bi-briefcase' },
-      { value: 'cdpo', label: 'Project Program Officer', icon: 'bi-person-badge' },
-      { value: 'supervisor', label: 'Supervisor', icon: 'bi-person-check' },
-      { value: 'anganwadi', label: 'Anganwadi Center', icon: 'bi-house-door' },
+      { value: 'director', label: 'Director', hindiLabel: 'निदेशक', icon: 'bi-person-workspace' },
+      { value: 'it-cell', label: 'IT Cell', hindiLabel: 'आईटी सेल', icon: 'bi-cpu' },
+      { value: 'dpo', label: 'District Program Officer', hindiLabel: 'जिला कार्यक्रम अधिकारी', icon: 'bi-briefcase' },
+      { value: 'cdpo', label: 'Project Program Officer', hindiLabel: 'परियोजना कार्यक्रम अधिकारी', icon: 'bi-person-badge' },
+      { value: 'supervisor', label: 'Supervisor', hindiLabel: 'पर्यवेक्षक', icon: 'bi-person-check' },
+      { value: 'anganwadi', label: 'Anganwadi Center', hindiLabel: 'आंगनवाड़ी केंद्र', icon: 'bi-house-door' },
     ];
   }, []);
 
   const loginTitle = useMemo(() => {
     const selectedRole = roleOptions.find((r) => r.value === formData.role);
-    return selectedRole ? selectedRole.label : 'लॉगिन';
-  }, [formData.role, roleOptions]);
+    return selectedRole ? t(selectedRole.label, selectedRole.hindiLabel) : t('Log in', 'लॉगिन');
+  }, [formData.role, roleOptions, t]);
 
   useEffect(() => {
     if (roleOptions.length > 0 && !formData.role) {
@@ -281,9 +314,10 @@ const Login = () => {
           <div className="uttarakhand-section">
             <img src={UkLogo} alt="Uttarakhand Logo" className="uttarakhand-logo" />
             <h2 className="uttarakhand-title-s">
-              महिला सशक्तिकरण एवं बाल विकास विभाग
-              <br />
-              Women Empowerment &amp; Child Development Department
+              {t(
+                'Women Empowerment & Child Development Department',
+                'महिला सशक्तिकरण एवं बाल विकास विभाग'
+              )}
             </h2>
           </div>
         </div>
@@ -316,7 +350,7 @@ const Login = () => {
                       checked={formData.role === option.value}
                       onChange={handleChange}
                     />
-                    <span className="radio-label">{option.label}</span>
+                    <span className="radio-label">{t(option.label, option.hindiLabel)}</span>
                   </label>
                 ))}
               </div>
@@ -438,7 +472,7 @@ const Login = () => {
             </form>
 
             <div className="login-footer">
-              <p>OTP आधारित लॉगिन | OTP-based Login</p>
+              <p>{t('OTP-based login', 'OTP आधारित लॉगिन')}</p>
             </div>
           </div>
         </div>

@@ -10,6 +10,7 @@ import {
   ButtonGroup,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
@@ -53,6 +54,7 @@ const safeText = (value) =>
   value === null || value === undefined || value === "" ? "—" : String(value);
 
 function CdpoAWCList() {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -103,7 +105,7 @@ function CdpoAWCList() {
         );
       } catch (err) {
         console.error("Failed to fetch CDPO AWC/Sector lists:", err);
-        setError("Failed to load AWC and sector data. Please try again.");
+        setError(t("Failed to load AWC and sector data. Please try again.", "आंगनवाड़ी केंद्र और सेक्टर डेटा लोड नहीं हो सका। कृपया पुनः प्रयास करें।"));
       } finally {
         setLoading(false);
       }
@@ -208,7 +210,7 @@ function CdpoAWCList() {
       pdf.save(isAwc ? "CDPO_AWC_List.pdf" : "CDPO_Sector_List.pdf");
     } catch (err) {
       console.error("Failed to export CDPO list PDF:", err);
-      window.alert("Failed to export PDF. Please try again.");
+      window.alert(t("Failed to export PDF. Please try again.", "पीडीएफ़ निर्यात नहीं हो सका। कृपया पुनः प्रयास करें।"));
     } finally {
       setExportingPdf(false);
     }
@@ -230,7 +232,7 @@ function CdpoAWCList() {
         <Container fluid className="dashboard-box mt-3">
           <div className="dashboard-section">
             <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-              <h4 className="section-title mb-0">CDPO AWC &amp; Sector List</h4>
+              <h4 className="section-title mb-0">{t("CDPO AWC & Sector List", "सीडीपीओ आंगनवाड़ी केंद्र एवं सेक्टर सूची")}</h4>
               <div className="d-flex align-items-center gap-2">
                 <ButtonGroup>
                   <Button
@@ -240,7 +242,7 @@ function CdpoAWCList() {
                     disabled={loading || !activeData.length || exportingPdf}
                   >
                     <FaFilePdf className="me-1" />
-                    {exportingPdf ? "Preparing PDF…" : "Export PDF"}
+                    {exportingPdf ? t("Preparing PDF…", "पीडीएफ़ तैयार हो रही है…") : t("Export PDF", "पीडीएफ़ निर्यात करें")}
                   </Button>
                   <Button
                     variant="outline-success"
@@ -249,7 +251,7 @@ function CdpoAWCList() {
                     disabled={loading || !activeData.length}
                   >
                     <FaFileExcel className="me-1" />
-                    Export Excel
+                    {t("Export Excel", "एक्सेल निर्यात करें")}
                   </Button>
                 </ButtonGroup>
               </div>
@@ -267,13 +269,21 @@ function CdpoAWCList() {
                 id="cdpo-awc-list-tabs"
                 className="mb-4"
               >
-                <Tab eventKey="awc" title={`AWC List (${awcCount})`}>
+                <Tab eventKey="awc" title={`${t("AWC List", "आंगनवाड़ी केंद्र सूची")} (${awcCount})`}>
                   <div className="table-responsive">
                     <Table striped bordered hover responsive className="mb-0">
                       <thead className="table-light">
                         <tr>
                           {AWC_COLUMNS.map((column) => (
-                            <th key={column.key}>{column.label}</th>
+                            <th key={column.key}>{t(column.label, ({
+                              "AWC Code": "आंगनवाड़ी केंद्र कोड",
+                              "AWC Name": "आंगनवाड़ी केंद्र का नाम",
+                              "AWC Type": "आंगनवाड़ी केंद्र का प्रकार",
+                              Code: "कोड",
+                              Sector: "सेक्टर",
+                              Project: "परियोजना",
+                              District: "जिला",
+                            })[column.label] || column.label)}</th>
                           ))}
                         </tr>
                       </thead>
@@ -291,13 +301,21 @@ function CdpoAWCList() {
                     </Table>
                   </div>
                 </Tab>
-                <Tab eventKey="sector" title={`Sector List (${sectorCount})`}>
+                <Tab eventKey="sector" title={`${t("Sector List", "सेक्टर सूची")} (${sectorCount})`}>
                   <div className="table-responsive">
                     <Table striped bordered hover responsive className="mb-0">
                       <thead className="table-light">
                         <tr>
                           {SECTOR_COLUMNS.map((column) => (
-                            <th key={column.key}>{column.label}</th>
+                            <th key={column.key}>{t(column.label, ({
+                              "SD Name": "एसडी का नाम",
+                              District: "जिला",
+                              "Project Code": "परियोजना कोड",
+                              "Project Name": "परियोजना का नाम",
+                              Sector: "सेक्टर",
+                              "Sector Incharge": "सेक्टर प्रभारी",
+                              "Incharge Mobile": "प्रभारी का मोबाइल",
+                            })[column.label] || column.label)}</th>
                           ))}
                         </tr>
                       </thead>

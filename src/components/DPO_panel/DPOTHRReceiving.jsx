@@ -18,6 +18,8 @@ import {
 import "../../assets/css/dpo.css";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
+import dpoHindi from "./DPOTranslations.json";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -216,6 +218,8 @@ const expiryRowKey = (row) => String(
 
 
 const DPOTHRReceiving = () => {
+  const { t } = useLanguage();
+  const translateLabel = (text) => t(text, dpoHindi[text] || text);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isTablet, setIsTablet] = useState(
@@ -322,7 +326,7 @@ const DPOTHRReceiving = () => {
         setReports(results.data || []);
       }
     } catch (err) {
-      setError("Failed to fetch THR receiving summary.");
+      setError(t("Failed to fetch THR receiving summary.", "THR प्राप्ति सारांश प्राप्त करने में विफल।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -537,7 +541,7 @@ const DPOTHRReceiving = () => {
       XLSX.writeFile(workbook, "dpo_thr_receiving_report.xlsx", { bookType: "xlsx", compression: true });
     } catch (err) {
       console.error("Receiving Excel export failed:", err);
-      setError("Excel export failed. Please try again.");
+      setError(t("Excel export failed. Please try again.", "Excel निर्यात विफल रहा। कृपया पुनः प्रयास करें।"));
     }
   };
 
@@ -669,7 +673,7 @@ const DPOTHRReceiving = () => {
       pdf.save("dpo_thr_receiving_report.pdf");
     } catch (err) {
       console.error("Receiving PDF export failed:", err);
-      setError("PDF export failed. Please try again.");
+      setError(t("PDF export failed. Please try again.", "PDF निर्यात विफल रहा। कृपया पुनः प्रयास करें।"));
     } finally {
       if (exportRoot?.parentNode) exportRoot.parentNode.removeChild(exportRoot);
       setIsPrinting(false);
@@ -781,7 +785,7 @@ const DPOTHRReceiving = () => {
           )}
 
           <div className="dashboard-section">
-            <h4 className="section-title">THR प्राप्ति सारांश</h4>
+            <h4 className="section-title">{t("THR Receiving Summary", "THR प्राप्ति सारांश")}</h4>
 
             {loading ? (
               <div className="text-center">
@@ -795,16 +799,16 @@ const DPOTHRReceiving = () => {
                 id="beneficiary-summary-tabs"
                 className="mb-3"
               >
-                <Tab eventKey="district_summary" title="District Summary">
-                  <h5 className="mt-4">District Summary: {summaryData.district}</h5>
+                <Tab eventKey="district_summary" title={t("District Summary", "जिला सारांश")}>
+                  <h5 className="mt-4">{t("District Summary", "जिला सारांश")}: {summaryData.district}</h5>
                   <Table striped bordered hover responsive>
                     <thead>
                       <tr>
-                        <th>District</th>
-                        <th>Food Item</th>
-                        <th>Beneficiary Category</th>
-                        <th>Total Quantity</th>
-                        <th>Unit</th>
+                        <th>{t("District", "जिला")}</th>
+                        <th>{t("Food Item", "खाद्य सामग्री")}</th>
+                        <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                        <th>{t("Total Quantity", "कुल मात्रा")}</th>
+                        <th>{t("Unit", "इकाई")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -821,16 +825,16 @@ const DPOTHRReceiving = () => {
                   </Table>
                 </Tab>
 
-                <Tab eventKey="project_summary" title="Project Summary">
-                  <h5 className="mt-4">Project-wise Summary (Total)</h5>
+                <Tab eventKey="project_summary" title={t("Project Summary", "परियोजना सारांश")}>
+                  <h5 className="mt-4">{t("Project-wise Summary (Total)", "परियोजना-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
-                        <th>Project</th>
-                        <th>Food Item</th>
-                        <th>Beneficiary Category</th>
-                        <th>Total Quantity</th>
-                        <th>Unit</th>
+                        <th>{t("Project", "परियोजना")}</th>
+                        <th>{t("Food Item", "खाद्य सामग्री")}</th>
+                        <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                        <th>{t("Total Quantity", "कुल मात्रा")}</th>
+                        <th>{t("Unit", "इकाई")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -847,16 +851,16 @@ const DPOTHRReceiving = () => {
                   </Table>
                 </Tab>
 
-                <Tab eventKey="sector_summary" title="Sector Summary">
-                  <h5 className="mt-4">Sector-wise Summary (Total)</h5>
+                <Tab eventKey="sector_summary" title={t("Sector Summary", "सेक्टर सारांश")}>
+                  <h5 className="mt-4">{t("Sector-wise Summary (Total)", "सेक्टर-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
-                        <th>Sector</th>
-                        <th>Food Item</th>
-                        <th>Beneficiary Category</th>
-                        <th>Total Quantity</th>
-                        <th>Unit</th>
+                        <th>{t("Sector", "सेक्टर")}</th>
+                        <th>{t("Food Item", "खाद्य सामग्री")}</th>
+                        <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                        <th>{t("Total Quantity", "कुल मात्रा")}</th>
+                        <th>{t("Unit", "इकाई")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -873,18 +877,18 @@ const DPOTHRReceiving = () => {
                   </Table>
                 </Tab>
 
-                <Tab eventKey="awc_report" title="AWC Report">
+                <Tab eventKey="awc_report" title={t("AWC Report", "आंगनवाड़ी रिपोर्ट")}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="mb-0">AWC THR Receiving Report</h5>
+                    <h5 className="mb-0">{t("AWC THR Receiving Report", "आंगनवाड़ी THR प्राप्ति रिपोर्ट")}</h5>
                     <div>
                       <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
-                        <FaFilePdf className="me-1" /> Export PDF
+                        <FaFilePdf className="me-1" /> {t("Export PDF", "PDF निर्यात करें")}
                       </Button>
                       <Button variant="outline-success" size="sm" onClick={exportToExcel} className="me-2">
-                        <FaFileExcel className="me-1" /> Export Excel
+                        <FaFileExcel className="me-1" /> {t("Export Excel", "Excel निर्यात करें")}
                       </Button>
                       <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)}>
-                        <FaEye className="me-1" /> Column Visibility
+                        <FaEye className="me-1" /> {t("Column Visibility", "कॉलम दृश्यता")}
                       </Button>
                     </div>
                   </div>
@@ -893,7 +897,7 @@ const DPOTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.fin_year.length ? `${filters.fin_year.length} selected` : "All Fin. Years"}
+                          {filters.fin_year.length ? `${filters.fin_year.length} ${t("selected", "चयनित")}` : t("All Fin. Years", "सभी वित्तीय वर्ष")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueFinYears.map((v) => (
@@ -908,7 +912,7 @@ const DPOTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100" id="dropdown-months">
-                          {filters.months.length ? `${filters.months.length} selected` : "All Months"}
+                          {filters.months.length ? `${filters.months.length} ${t("selected", "चयनित")}` : t("All Months", "सभी महीने")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueMonths.map((v) => (
@@ -923,7 +927,7 @@ const DPOTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.district.length ? `${filters.district.length} selected` : "All Districts"}
+                          {filters.district.length ? `${filters.district.length} ${t("selected", "चयनित")}` : t("All Districts", "सभी जिले")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueDistricts.map((v) => (
@@ -938,7 +942,7 @@ const DPOTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.project.length ? `${filters.project.length} selected` : "All Projects"}
+                          {filters.project.length ? `${filters.project.length} ${t("selected", "चयनित")}` : t("All Projects", "सभी परियोजनाएँ")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueProjects.map((v) => (
@@ -953,7 +957,7 @@ const DPOTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.sector.length ? `${filters.sector.length} selected` : "All Sectors"}
+                          {filters.sector.length ? `${filters.sector.length} ${t("selected", "चयनित")}` : t("All Sectors", "सभी सेक्टर")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueSectors.map((v) => (
@@ -968,7 +972,7 @@ const DPOTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.food_item.length ? `${filters.food_item.length} selected` : "All Food Items"}
+                          {filters.food_item.length ? `${filters.food_item.length} ${t("selected", "चयनित")}` : t("All Food Items", "सभी खाद्य सामग्री")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueFoodItems.map((v) => (
@@ -983,7 +987,7 @@ const DPOTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.bene_category.length ? `${filters.bene_category.length} selected` : "All Categories"}
+                          {filters.bene_category.length ? `${filters.bene_category.length} ${t("selected", "चयनित")}` : t("All Categories", "सभी श्रेणियाँ")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueBeneCategories.map((v) => (
@@ -997,7 +1001,7 @@ const DPOTHRReceiving = () => {
 
                     <Col md={2} className="d-flex align-items-end">
                       <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [] })}>
-                        Clear Filters
+                        {t("Clear Filters", "फ़िल्टर हटाएँ")}
                       </Button>
                     </Col>
                   </Row>
@@ -1013,7 +1017,7 @@ const DPOTHRReceiving = () => {
                           <thead>
                             <tr>
                               {visibleColumns.map((col) => (
-                                <th key={col.dataField}>{col.text}</th>
+                                <th key={col.dataField}>{translateLabel(col.text)}</th>
                               ))}
                             </tr>
                           </thead>
@@ -1054,7 +1058,7 @@ const DPOTHRReceiving = () => {
                                 {visibleColumns.map((col) => {
                                   let cellContent = '';
                                   if (col.dataField === '#') {
-                                    cellContent = <strong>Total</strong>;
+                                    cellContent = <strong>{t("Total", "कुल")}</strong>;
                                   } else if (col.dataField === 'quantity') {
                                     cellContent = (
                                       <Button variant="link" size="sm" onClick={() => setShowQtyModal(true)}>
@@ -1080,28 +1084,28 @@ const DPOTHRReceiving = () => {
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
           <Modal.Header closeButton>
-            <Modal.Title>Show/Hide Columns</Modal.Title>
+            <Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएँ/छिपाएँ")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {columns.map((col, index) => (
-              <Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />
+              <Form.Check key={index} type="checkbox" label={translateLabel(col.text)} checked={col.visible} onChange={() => handleColumnToggle(index)} />
             ))}
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button>
+            <Button variant="secondary" onClick={() => setShowColumnModal(false)}>{t("Close", "बंद करें")}</Button>
           </Modal.Footer>
         </Modal>
 
         <Modal show={showQtyModal} onHide={() => setShowQtyModal(false)} centered>
           <Modal.Header closeButton>
-            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+            <Modal.Title>{t("Quantity Breakdown by Unit", "इकाई के अनुसार मात्रा विवरण")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             <Table striped bordered hover>
               <thead>
                 <tr>
-                  <th>Unit</th>
-                  <th>Total Quantity</th>
+                  <th>{t("Unit", "इकाई")}</th>
+                  <th>{t("Total Quantity", "कुल मात्रा")}</th>
                 </tr>
               </thead>
               <tbody>

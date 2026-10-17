@@ -12,6 +12,8 @@ import {
   ButtonGroup,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
+import dpoHindi from "./DPOTranslations.json";
 import "../../assets/css/dashboard.css";
 import "../../assets/css/dpo.css";
 import DPOHeader from "./DPOHeader";
@@ -56,6 +58,8 @@ const displayValue = (value) =>
   value === null || value === undefined || value === "" ? "—" : value;
 
 const DPOMaterSupplementary = () => {
+  const { t } = useLanguage();
+  const translateLabel = (text) => t(text, dpoHindi[text] || text);
   const { api } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -75,7 +79,7 @@ const DPOMaterSupplementary = () => {
       })
       .catch((err) => {
         console.error("Fetch supplementary nutrition records error:", err);
-        if (isActive) setError("Failed to fetch supplementary nutrition records. Please try again.");
+        if (isActive) setError(t("Failed to fetch supplementary nutrition records. Please try again.", "पूरक पोषण रिकॉर्ड प्राप्त करने में विफल। कृपया पुनः प्रयास करें।"));
       })
       .finally(() => {
         if (isActive) setLoading(false);
@@ -219,7 +223,7 @@ const DPOMaterSupplementary = () => {
       pdf.save("DPO_Supplementary_Nutrition.pdf");
     } catch (err) {
       console.error("Failed to export supplementary nutrition PDF:", err);
-      window.alert("PDF export failed. Please try again.");
+      window.alert(t("PDF export failed. Please try again.", "PDF निर्यात विफल रहा। कृपया पुनः प्रयास करें।"));
     } finally {
       setExportingPdf(false);
     }
@@ -237,7 +241,7 @@ const DPOMaterSupplementary = () => {
         <DPOHeader toggleSidebar={toggleSidebar} />
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-            <h3 className="fw-bold mb-0">Supplementary Nutrition Master</h3>
+            <h3 className="fw-bold mb-0">{t("Supplementary Nutrition Master", "पूरक पोषण मास्टर")}</h3>
             <ButtonGroup>
               <Button
                 variant="outline-danger"
@@ -246,7 +250,7 @@ const DPOMaterSupplementary = () => {
                 disabled={loading || !filteredReports.length || exportingPdf}
               >
                 <FaFilePdf className="me-1" />
-                {exportingPdf ? "Preparing PDF…" : "Export PDF"}
+                {exportingPdf ? t("Preparing PDF…", "PDF तैयार हो रही है…") : t("Export PDF", "PDF निर्यात करें")}
               </Button>
               <Button
                 variant="outline-success"
@@ -254,7 +258,7 @@ const DPOMaterSupplementary = () => {
                 onClick={exportToExcel}
                 disabled={loading || !filteredReports.length}
               >
-                <FaFileExcel className="me-1" /> Export Excel
+                <FaFileExcel className="me-1" /> {t("Export Excel", "Excel निर्यात करें")}
               </Button>
             </ButtonGroup>
           </div>
@@ -263,13 +267,13 @@ const DPOMaterSupplementary = () => {
           <Row className="mb-3">
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Financial Year</Form.Label>
+                <Form.Label>{t("Filter by Financial Year", "वित्तीय वर्ष के अनुसार फ़िल्टर करें")}</Form.Label>
                 <Form.Select
                   name="financial_year"
                   value={filters.financial_year}
                   onChange={handleFilterChange}
                 >
-                  <option value="">All Years</option>
+                  <option value="">{t("All Years", "सभी वर्ष")}</option>
                   {uniqueFinYears.map((year) => (
                     <option key={year} value={year}>{year}</option>
                   ))}
@@ -278,13 +282,13 @@ const DPOMaterSupplementary = () => {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Trimester</Form.Label>
+                <Form.Label>{t("Filter by Trimester", "त्रैमासिक के अनुसार फ़िल्टर करें")}</Form.Label>
                 <Form.Select
                   name="quarter"
                   value={filters.quarter}
                   onChange={handleFilterChange}
                 >
-                  <option value="">All Trimester</option>
+                  <option value="">{t("All Trimester", "सभी त्रैमासिक")}</option>
                   {uniqueQuarters.map((quarter) => (
                     <option key={quarter} value={quarter}>{quarter}</option>
                   ))}
@@ -297,13 +301,13 @@ const DPOMaterSupplementary = () => {
             {loading ? (
               <div className="text-center my-5">
                 <Spinner animation="border" variant="primary" />
-                <p className="mt-2 text-muted">Fetching records, please wait...</p>
+                <p className="mt-2 text-muted">{t("Fetching records, please wait...", "रिकॉर्ड प्राप्त किए जा रहे हैं, कृपया प्रतीक्षा करें...")}</p>
               </div>
             ) : (
               <Table striped bordered hover responsive size="sm">
                 <thead>
                   <tr>
-                    {COLUMNS.map((column) => <th key={column.key}>{column.label}</th>)}
+                    {COLUMNS.map((column) => <th key={column.key}>{translateLabel(column.label)}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -324,7 +328,7 @@ const DPOMaterSupplementary = () => {
                   ) : (
                     <tr>
                       <td colSpan={COLUMNS.length} className="text-center">
-                        No supplementary nutrition records found.
+                        {t("No supplementary nutrition records found.", "पूरक पोषण का कोई रिकॉर्ड नहीं मिला।")}
                       </td>
                     </tr>
                   )}

@@ -17,6 +17,7 @@ import {
 } from "react-bootstrap";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 import "../../assets/css/supervisorleftnav.css";
 
@@ -228,6 +229,7 @@ const formatMonths = (monthsOrQuarter) => {
 };
 
 const ThrSupervisorDistributions = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [isMobile, setIsMobile] = useState(false);
@@ -326,6 +328,20 @@ const ThrSupervisorDistributions = () => {
   const [showColumnModal, setShowColumnModal] = useState(false);
 
   const visibleColumns = columns.filter((c) => c.visible);
+
+  const getColumnLabel = (col) => {
+    const hindiLabels = {
+      "Select": "?????", "District": "?????", "Sector": "??????", "Project": "????????",
+      "AWC Name": "????????? ?????? ?? ???", "AWC Code": "????????? ?????? ???", "AWC Type": "????????? ?????? ?? ??????",
+      "Food Item": "????? ???????", "Quantity": "??????", "Unit": "????", "Beneficiary Category": "???????? ??????",
+      "Date": "??????", "Fin. Year": "??????? ????", "Fin Year": "??????? ????", "Financial Year": "??????? ????",
+      "Trimester": "????????? ????", "Months": "?????", "Current Month": "??????? ?????", "Max Expiry Date": "?????? ??????? ????",
+      "Expired Packets": "?????? ?????", "Expiry Details": "??????? ?????", "Packet Expiry Details": "????? ??????? ?????",
+      "Sector Remark": "?????? ???????", "Sector Status": "?????? ??????", "Actions": "????????", "Action": "????????",
+      "Days Allotted": "?????? ???", "Beneficiaries": "????????", "Qty": "??????", "Remark": "???????"
+    };
+    return t(col.text, hindiLabels[col.text] || col.text);
+  };
 
   const [filters, setFilters] = useState({
     finYear: [],
@@ -517,7 +533,7 @@ const ThrSupervisorDistributions = () => {
 
       setDistributions(items);
     } else {
-      setError("Failed to fetch THR distributions.");
+      setError(t("Failed to fetch THR distributions.", "THR वितरण डेटा प्राप्त नहीं हो सका।"));
 
       console.error(
         "Failed to fetch THR distributions:",
@@ -536,14 +552,14 @@ const ThrSupervisorDistributions = () => {
         setAllocations([]);
 
         setComparisonError(
-          "Stock allocation data is unavailable; distributions cannot be compared.",
+          t("Stock allocation data is unavailable; distributions cannot be compared.", "स्टॉक आवंटन डेटा उपलब्ध नहीं है; वितरण की तुलना नहीं की जा सकती।"),
         );
       }
     } else {
       setAllocations([]);
 
       setComparisonError(
-        "Failed to fetch stock allocation data; distributions cannot be compared.",
+        t("Failed to fetch stock allocation data; distributions cannot be compared.", "स्टॉक आवंटन डेटा प्राप्त नहीं हो सका; वितरण की तुलना नहीं की जा सकती।"),
       );
 
       console.error(
@@ -561,14 +577,14 @@ const ThrSupervisorDistributions = () => {
 
       if (payload?.success === false || mappings.length === 0) {
         setComparisonError(
-          "Food item mappings are unavailable; distributions cannot be compared.",
+          t("Food item mappings are unavailable; distributions cannot be compared.", "खाद्य सामग्री मैपिंग उपलब्ध नहीं है; वितरण की तुलना नहीं की जा सकती।"),
         );
       }
     } else {
       setFoodItemOptions([]);
 
       setComparisonError(
-        "Failed to fetch food item mappings; distributions cannot be compared.",
+        t("Failed to fetch food item mappings; distributions cannot be compared.", "खाद्य सामग्री मैपिंग प्राप्त नहीं हो सकी; वितरण की तुलना नहीं की जा सकती।"),
       );
 
       console.error(
@@ -594,7 +610,7 @@ const ThrSupervisorDistributions = () => {
     } catch (err) {
       console.error("Failed to fetch beneficiary categories.", err);
 
-      setError("Failed to fetch beneficiary categories.");
+      setError(t("Failed to fetch beneficiary categories.", "लाभार्थी श्रेणियां प्राप्त नहीं हो सकीं।"));
     }
   };
 
@@ -634,7 +650,7 @@ const ThrSupervisorDistributions = () => {
     setActionError("");
 
     if (action === "rejected" && !remark) {
-      setActionError("Please enter a remark for rejection.");
+      setActionError(t("Please enter a remark for rejection.", "अस्वीकृति के लिए कृपया टिप्पणी दर्ज करें।"));
 
       return;
     }
@@ -653,7 +669,7 @@ const ThrSupervisorDistributions = () => {
       });
 
       if (response.data?.success !== false) {
-        setSuccessMsg(`Status updated to ${action} successfully.`);
+        setSuccessMsg(t(`Status updated to ${action} successfully.`, `स्थिति सफलतापूर्वक ${action === "approved" ? "स्वीकृत" : "अस्वीकृत"} की गई।`));
 
         setDistributions((prev) =>
           prev.map((d) =>
@@ -671,10 +687,10 @@ const ThrSupervisorDistributions = () => {
 
         setTimeout(() => setSuccessMsg(""), 3000);
       } else {
-        setActionError(response.data?.message || "Failed to update status.");
+        setActionError(response.data?.message || t("Failed to update status.", "स्थिति अपडेट नहीं हो सकी।"));
       }
     } catch (err) {
-      setActionError("Failed to update status. Please try again.");
+      setActionError(t("Failed to update status. Please try again.", "स्थिति अपडेट नहीं हो सकी। कृपया पुनः प्रयास करें।"));
 
       console.error(err);
     } finally {
@@ -686,13 +702,13 @@ const ThrSupervisorDistributions = () => {
 
   const handleBulkAction = async () => {
     if (selectedIds.length === 0) {
-      setActionError("No items selected.");
+      setActionError(t("No items selected.", "कोई आइटम चयनित नहीं है।"));
 
       return;
     }
 
     if (bulkAction === "approved" && !bulkRemark) {
-      setActionError("Please enter a remark for bulk approval.");
+      setActionError(t("Please enter a remark for bulk approval.", "सामूहिक स्वीकृति के लिए कृपया टिप्पणी दर्ज करें।"));
 
       return;
     }
@@ -709,7 +725,7 @@ const ThrSupervisorDistributions = () => {
       });
 
       if (response.data?.success !== false) {
-        setSuccessMsg(`Successfully updated ${selectedIds.length} items.`);
+        setSuccessMsg(t(`Successfully updated ${selectedIds.length} items.`, `${selectedIds.length} आइटम सफलतापूर्वक अपडेट किए गए।`));
 
         fetchDistributions(); // Refetch to get updated data
 
@@ -722,11 +738,11 @@ const ThrSupervisorDistributions = () => {
         setTimeout(() => setSuccessMsg(""), 3000);
       } else {
         setActionError(
-          response.data?.message || "Failed to perform bulk action.",
+          response.data?.message || t("Failed to perform bulk action.", "सामूहिक कार्रवाई नहीं की जा सकी।"),
         );
       }
     } catch (err) {
-      setActionError("Failed to perform bulk action. Please try again.");
+      setActionError(t("Failed to perform bulk action. Please try again.", "सामूहिक कार्रवाई नहीं की जा सकी। कृपया पुनः प्रयास करें।"));
 
       console.error(err);
     } finally {
@@ -821,7 +837,7 @@ const ThrSupervisorDistributions = () => {
         const headRow = document.createElement("tr");
         exportColumns.forEach((col) => {
           const th = document.createElement("th");
-          th.textContent = col.text;
+          th.textContent = getColumnLabel(col);
           th.style.cssText = "border:1px solid #adb5bd;background:#e9eef3;padding:5px 4px;text-align:left;white-space:normal;overflow-wrap:anywhere;";
           headRow.appendChild(th);
         });
@@ -886,24 +902,24 @@ const ThrSupervisorDistributions = () => {
     const dataToExport = filteredData.map((row, index) => {
       const output = {};
       exportColumns.forEach((col) => {
-        if (col.dataField === "#") output[col.text] = index + 1;
-        else if (col.dataField === "trimester") output[col.text] = formatTrimester(row);
-        else if (col.dataField === "date") output[col.text] = formatDistributionDate(getDistributionDateValue(row));
-        else output[col.text] = row[col.dataField] ?? "";
+        if (col.dataField === "#") output[getColumnLabel(col)] = index + 1;
+        else if (col.dataField === "trimester") output[getColumnLabel(col)] = formatTrimester(row);
+        else if (col.dataField === "date") output[getColumnLabel(col)] = formatDistributionDate(getDistributionDateValue(row));
+        else output[getColumnLabel(col)] = row[col.dataField] ?? "";
       });
       return output;
     });
     const totalRow = {};
     exportColumns.forEach((col, index) => {
-      if (index === 0) totalRow[col.text] = "Total";
-      else if (col.dataField === "total_beneficiaries") totalRow[col.text] = totals.beneficiaries;
-      else totalRow[col.text] = "";
+      if (index === 0) totalRow[getColumnLabel(col)] = "Total";
+      else if (col.dataField === "total_beneficiaries") totalRow[getColumnLabel(col)] = totals.beneficiaries;
+      else totalRow[getColumnLabel(col)] = "";
     });
     dataToExport.push(totalRow);
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     worksheet["!cols"] = exportColumns.map((col) => ({
-      wch: Math.min(32, Math.max(col.text.length + 2, 14))
+      wch: Math.min(32, Math.max(getColumnLabel(col).length + 2, 14))
     }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "THR Distributions");
@@ -1011,7 +1027,7 @@ const ThrSupervisorDistributions = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3 className="mb-0">THR Supervisor Distributions</h3>
+            <h3 className="mb-0">{t("THR Supervisor Distributions", "THR पर्यवेक्षक वितरण")}</h3>
 
             <div>
               <Button
@@ -1020,7 +1036,7 @@ const ThrSupervisorDistributions = () => {
                 onClick={exportToPDF}
                 className="me-2"
               >
-                <FaFilePdf className="me-1" /> Export PDF
+                <FaFilePdf className="me-1" /> {t("Export PDF", "PDF निर्यात करें")}
               </Button>
 
               <Button
@@ -1029,7 +1045,7 @@ const ThrSupervisorDistributions = () => {
                 onClick={exportToExcel}
                 className="me-2"
               >
-                <FaFileExcel className="me-1" /> Export Excel
+                <FaFileExcel className="me-1" /> {t("Export Excel", "Excel निर्यात करें")}
               </Button>
 
               <Button
@@ -1037,7 +1053,7 @@ const ThrSupervisorDistributions = () => {
                 size="sm"
                 onClick={() => setShowColumnModal(true)}
               >
-                <FaEye className="me-1" /> Column Visibility
+                <FaEye className="me-1" /> {t("Column Visibility", "कॉलम दिखाएं/छिपाएं")}
               </Button>
             </div>
           </div>
@@ -1052,12 +1068,12 @@ const ThrSupervisorDistributions = () => {
                   setShowBulkRemarkModal(true);
                 }}
               >
-                Approve Selected ({selectedIds.length})
+                {t(`Approve Selected (${selectedIds.length})`, `चयनित स्वीकृत करें (${selectedIds.length})`)}
               </Button>
             )}
 
             <Button variant="info" size="sm" onClick={handleSelectAllPending}>
-              Select All Pending
+              {t("Select All Pending", "सभी लंबित चुनें")}
             </Button>
           </div>
 
@@ -1070,8 +1086,8 @@ const ThrSupervisorDistributions = () => {
                   className="w-100"
                 >
                   {filters.finYear.length
-                    ? `${filters.finYear.length} years selected`
-                    : "All Fin. Years"}
+                    ? t(`${filters.finYear.length} years selected`, `${filters.finYear.length} वर्ष चयनित`)
+                    : t("All Fin. Years", "सभी वित्तीय वर्ष")}
                 </Dropdown.Toggle>
 
                 <Dropdown.Menu
@@ -1101,8 +1117,8 @@ const ThrSupervisorDistributions = () => {
                   className="w-100"
                 >
                   {filters.trimester.length
-                    ? `${filters.trimester.length} selected`
-                    : "All Trimesters"}
+                    ? t(`${filters.trimester.length} selected`, `${filters.trimester.length} चयनित`)
+                    : t("All Trimesters", "सभी त्रैमासिक अवधियां")}
                 </Dropdown.Toggle>
 
                 <Dropdown.Menu
@@ -1130,8 +1146,8 @@ const ThrSupervisorDistributions = () => {
                   className="w-100"
                 >
                   {filters.district.length
-                    ? `${filters.district.length} districts selected`
-                    : "All Districts"}
+                    ? t(`${filters.district.length} districts selected`, `${filters.district.length} ज़िले चयनित`)
+                    : t("All Districts", "सभी ज़िले")}
                 </Dropdown.Toggle>
 
                 <Dropdown.Menu
@@ -1159,8 +1175,8 @@ const ThrSupervisorDistributions = () => {
                   className="w-100"
                 >
                   {filters.project.length
-                    ? `${filters.project.length} projects selected`
-                    : "All Projects"}
+                    ? t(`${filters.project.length} projects selected`, `${filters.project.length} परियोजनाएं चयनित`)
+                    : t("All Projects", "सभी परियोजनाएं")}
                 </Dropdown.Toggle>
 
                 <Dropdown.Menu
@@ -1188,8 +1204,8 @@ const ThrSupervisorDistributions = () => {
                   className="w-100"
                 >
                   {filters.sector.length
-                    ? `${filters.sector.length} sectors selected`
-                    : "All Sectors"}
+                    ? t(`${filters.sector.length} sectors selected`, `${filters.sector.length} सेक्टर चयनित`)
+                    : t("All Sectors", "सभी सेक्टर")}
                 </Dropdown.Toggle>
 
                 <Dropdown.Menu
@@ -1217,8 +1233,8 @@ const ThrSupervisorDistributions = () => {
                   className="w-100"
                 >
                   {filters.food_item.length
-                    ? `${filters.food_item.length} items selected`
-                    : "All Food Items"}
+                    ? t(`${filters.food_item.length} items selected`, `${filters.food_item.length} आइटम चयनित`)
+                    : t("All Food Items", "सभी खाद्य सामग्री")}
                 </Dropdown.Toggle>
 
                 <Dropdown.Menu
@@ -1248,8 +1264,8 @@ const ThrSupervisorDistributions = () => {
                   className="w-100"
                 >
                   {filters.bene_category.length
-                    ? `${filters.bene_category.length} categories selected`
-                    : "All Bene. Categories"}
+                    ? t(`${filters.bene_category.length} categories selected`, `${filters.bene_category.length} श्रेणियां चयनित`)
+                    : t("All Bene. Categories", "सभी लाभार्थी श्रेणियां")}
                 </Dropdown.Toggle>
 
                 <Dropdown.Menu
@@ -1294,7 +1310,7 @@ const ThrSupervisorDistributions = () => {
                 }
                 className="me-2"
               >
-                Clear Filters
+                {t("Clear Filters", "फ़िल्टर साफ़ करें")}
               </Button>
             </Col>
           </Row>
@@ -1330,7 +1346,7 @@ const ThrSupervisorDistributions = () => {
               </div>
             ) : filteredData.length === 0 ? (
               <div className="text-center py-4 text-muted">
-                No THR distributions found.
+                {t("No THR distributions found.", "कोई THR वितरण नहीं मिला।")}
               </div>
             ) : (
               <div className="table-responsive">
@@ -1369,7 +1385,7 @@ const ThrSupervisorDistributions = () => {
                                 : {}
                             }
                           >
-                            {col.text}
+                            {getColumnLabel(col)}
                           </th>
                         ))}
                     </tr>
@@ -1486,7 +1502,7 @@ const ThrSupervisorDistributions = () => {
                                               )
                                             }
                                           >
-                                            Approve
+                                            {t("Approve", "स्वीकृत करें")}
                                           </Button>
 
                                           <Button
@@ -1506,7 +1522,7 @@ const ThrSupervisorDistributions = () => {
                                               )
                                             }
                                           >
-                                            Reject
+                                            {t("Reject", "अस्वीकार करें")}
                                           </Button>
 
                                           <Button
@@ -1516,7 +1532,7 @@ const ThrSupervisorDistributions = () => {
                                               handleViewRemark(row)
                                             }
                                           >
-                                            View Remark
+                                            {t("View Remark", "टिप्पणी देखें")}
                                           </Button>
                                         </div>
                                       );
@@ -1549,7 +1565,7 @@ const ThrSupervisorDistributions = () => {
                                     <Form.Control
                                       type="text"
                                       size="sm"
-                                      placeholder="Enter remark"
+                                      placeholder={t("Enter remark", "टिप्पणी दर्ज करें")}
                                       value={remarkValue}
                                       onChange={(e) =>
                                         setRemarkValue(e.target.value)
@@ -1571,8 +1587,8 @@ const ThrSupervisorDistributions = () => {
                                       onClick={() => handleStatusUpdate(row)}
                                     >
                                       {loadingAction[row.id]
-                                        ? "Saving..."
-                                        : "Save"}
+                                        ? t("Saving...", "सहेजा जा रहा है...")
+                                        : t("Save", "सहेजें")}
                                     </Button>
 
                                     <Button
@@ -1591,7 +1607,7 @@ const ThrSupervisorDistributions = () => {
                                         setActionError("");
                                       }}
                                     >
-                                      Cancel
+                                      {t("Cancel", "रद्द करें")}
                                     </Button>
                                   </div>
                                 </td>
@@ -1606,7 +1622,7 @@ const ThrSupervisorDistributions = () => {
                           colSpan={visibleColumns.length + (isPrinting ? 0 : 1)}
                           className="text-center"
                         >
-                          No data available
+                          {t("No data available", "कोई डेटा उपलब्ध नहीं है")}
                         </td>
                       </tr>
                     )}
@@ -1625,7 +1641,7 @@ const ThrSupervisorDistributions = () => {
                             return <td key="total-select-spacer"></td>;
 
                           if (i === 0) {
-                            cellContent = <strong>Total</strong>;
+                            cellContent = <strong>{t("Total", "कुल")}</strong>;
                           } else if (col.dataField === "total_beneficiaries") {
                             cellContent = (
                               <strong>{totals.beneficiaries}</strong>
@@ -1639,7 +1655,7 @@ const ThrSupervisorDistributions = () => {
                                     size="sm"
                                     onClick={() => setShowQtyModal(true)}
                                   >
-                                    View Total
+                                    {t("View Total", "कुल देखें")}
                                   </Button>
                                 )}
                               </>
@@ -1669,39 +1685,39 @@ const ThrSupervisorDistributions = () => {
           size="lg"
         >
           <Modal.Header closeButton>
-            <Modal.Title>All Remarks - {selectedRemarks?.awc_name}</Modal.Title>
+            <Modal.Title>{t("All Remarks", "सभी टिप्पणियां")} - {selectedRemarks?.awc_name}</Modal.Title>
           </Modal.Header>
 
           <Modal.Body>
             {selectedRemarks && (
               <div>
                 <div className="mb-3">
-                  <h6>Sector Remark</h6>
+                  <h6>{t("Sector Remark", "सेक्टर टिप्पणी")}</h6>
 
                   <p className="mb-1">
-                    <strong>Status:</strong>{" "}
+                    <strong>{t("Status:", "स्थिति:")}</strong>{" "}
                     <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>
                       {selectedRemarks.sector_status}
                     </Badge>
                   </p>
 
                   <p className="mb-0">
-                    <strong>Remark:</strong>{" "}
-                    {selectedRemarks.sector_remark || "No remark"}
+                    <strong>{t("Remark:", "टिप्पणी:")}</strong>{" "}
+                    {selectedRemarks.sector_remark || t("No remark", "कोई टिप्पणी नहीं")}
                   </p>
                 </div>
 
                 <div className="mb-3">
-                  <h6>Anganwadi Details</h6>
+                  <h6>{t("Anganwadi Details", "आंगनवाड़ी विवरण")}</h6>
 
                   <p className="mb-1">
-                    <strong>Expired Quantity:</strong>{" "}
+                    <strong>{t("Expired Quantity:", "समाप्त मात्रा:")}</strong>{" "}
                     {selectedRemarks.expired_quantity || 0}
                   </p>
 
                   <p className="mb-0">
-                    <strong>Anganwadi Remark:</strong>{" "}
-                    {selectedRemarks.anganwadi_remark || "No remark"}
+                    <strong>{t("Anganwadi Remark:", "आंगनवाड़ी टिप्पणी:")}</strong>{" "}
+                    {selectedRemarks.anganwadi_remark || t("No remark", "कोई टिप्पणी नहीं")}
                   </p>
                 </div>
               </div>
@@ -1710,14 +1726,14 @@ const ThrSupervisorDistributions = () => {
 
           <Modal.Footer>
             <Button variant="secondary" onClick={handleCloseRemarkModal}>
-              Close
+              {t("Close", "बंद करें")}
             </Button>
           </Modal.Footer>
         </Modal>
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
           <Modal.Header closeButton>
-            <Modal.Title>Show/Hide Columns</Modal.Title>
+            <Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएं/छिपाएं")}</Modal.Title>
           </Modal.Header>
 
           <Modal.Body>
@@ -1725,7 +1741,7 @@ const ThrSupervisorDistributions = () => {
               <Form.Check
                 key={index}
                 type="checkbox"
-                label={col.text}
+                label={getColumnLabel(col)}
                 checked={col.visible}
                 onChange={() => handleColumnToggle(index)}
               />
@@ -1737,7 +1753,7 @@ const ThrSupervisorDistributions = () => {
               variant="secondary"
               onClick={() => setShowColumnModal(false)}
             >
-              Close
+              {t("Close", "बंद करें")}
             </Button>
           </Modal.Footer>
         </Modal>
@@ -1748,16 +1764,16 @@ const ThrSupervisorDistributions = () => {
           centered
         >
           <Modal.Header closeButton>
-            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+            <Modal.Title>{t("Quantity Breakdown by Unit", "इकाई के अनुसार मात्रा का विवरण")}</Modal.Title>
           </Modal.Header>
 
           <Modal.Body>
             <Table striped bordered hover>
               <thead>
                 <tr>
-                  <th>Unit</th>
+                  <th>{t("Unit", "इकाई")}</th>
 
-                  <th>Total Quantity</th>
+                  <th>{t("Total Quantity", "कुल मात्रा")}</th>
                 </tr>
               </thead>
 
@@ -1788,16 +1804,16 @@ const ThrSupervisorDistributions = () => {
           centered
         >
           <Modal.Header closeButton>
-            <Modal.Title>Bulk Approve Remark</Modal.Title>
+            <Modal.Title>{t("Bulk Approve Remark", "सामूहिक स्वीकृति टिप्पणी")}</Modal.Title>
           </Modal.Header>
 
           <Modal.Body>
             <Form.Group>
-              <Form.Label>Remark for Approval</Form.Label>
+              <Form.Label>{t("Remark for Approval", "स्वीकृति के लिए टिप्पणी")}</Form.Label>
 
               <Form.Control
                 type="text"
-                placeholder="Enter remark (e.g., Checked by sector)"
+                placeholder={t("Enter remark (e.g., Checked by sector)", "टिप्पणी दर्ज करें (जैसे, सेक्टर द्वारा जांचा गया)")}
                 value={bulkRemark}
                 onChange={(e) => setBulkRemark(e.target.value)}
               />
@@ -1815,7 +1831,7 @@ const ThrSupervisorDistributions = () => {
               variant="secondary"
               onClick={() => setShowBulkRemarkModal(false)}
             >
-              Cancel
+              {t("Cancel", "रद्द करें")}
             </Button>
 
             <Button
@@ -1824,8 +1840,8 @@ const ThrSupervisorDistributions = () => {
               disabled={submitting}
             >
               {submitting
-                ? "Submitting..."
-                : `Approve ${selectedIds.length} items`}
+                ? t("Submitting...", "जमा किया जा रहा है...")
+                : t(`Approve ${selectedIds.length} items`, `${selectedIds.length} आइटम स्वीकृत करें`)}
             </Button>
           </Modal.Footer>
         </Modal>

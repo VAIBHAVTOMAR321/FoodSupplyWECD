@@ -12,6 +12,7 @@ import {
   ButtonGroup,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/dashboard.css";
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
@@ -56,6 +57,7 @@ const displayValue = (value) =>
   value === null || value === undefined || value === "" ? "—" : value;
 
 const CDPOFoodSupplementary = () => {
+  const { t } = useLanguage();
   const { api } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -75,7 +77,7 @@ const CDPOFoodSupplementary = () => {
       const response = await api.get(API_URL, { timeout: 30000 });
       setReports(getRecords(response.data));
     } catch (err) {
-      setError("Failed to fetch supplementary nutrition records. Please try again.");
+      setError(t("Failed to fetch supplementary nutrition records. Please try again.", "पूरक पोषण रिकॉर्ड प्राप्त नहीं हो सके। कृपया पुनः प्रयास करें।"));
       console.error("Fetch supplementary nutrition records error:", err);
     } finally {
       setLoading(false);
@@ -217,7 +219,7 @@ const CDPOFoodSupplementary = () => {
       pdf.save("CDPO_Supplementary_Nutrition.pdf");
     } catch (err) {
       console.error("Failed to export supplementary nutrition PDF:", err);
-      window.alert("Failed to export PDF. Please try again.");
+      window.alert(t("Failed to export PDF. Please try again.", "पीडीएफ़ निर्यात नहीं हो सका। कृपया पुनः प्रयास करें।"));
     } finally {
       setExportingPdf(false);
     }
@@ -235,7 +237,7 @@ const CDPOFoodSupplementary = () => {
         <CDPOHeader toggleSidebar={toggleSidebar} />
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-            <h3 className="fw-bold mb-0">Supplementary Nutrition Master</h3>
+            <h3 className="fw-bold mb-0">{t("Supplementary Nutrition Master", "पूरक पोषण मास्टर")}</h3>
             <ButtonGroup>
               <Button
                 variant="outline-danger"
@@ -263,13 +265,13 @@ const CDPOFoodSupplementary = () => {
           <Row className="mb-3">
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Financial Year</Form.Label>
+                <Form.Label>{t("Filter by Financial Year", "वित्तीय वर्ष के अनुसार फ़िल्टर करें")}</Form.Label>
                 <Form.Select
                   name="financial_year"
                   value={filters.financial_year}
                   onChange={handleFilterChange}
                 >
-                  <option value="">All Years</option>
+                  <option value="">{t("All Years", "सभी वर्ष")}</option>
                   {uniqueFinYears.map((year) => (
                     <option key={year} value={year}>{year}</option>
                   ))}
@@ -278,13 +280,13 @@ const CDPOFoodSupplementary = () => {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Trimester</Form.Label>
+                <Form.Label>{t("Filter by Trimester", "तिमाही के अनुसार फ़िल्टर करें")}</Form.Label>
                 <Form.Select
                   name="quarter"
                   value={filters.quarter}
                   onChange={handleFilterChange}
                 >
-                  <option value="">All Quarters</option>
+                  <option value="">{t("All Quarters", "सभी तिमाहियां")}</option>
                   {uniqueQuarters.map((quarter) => (
                     <option key={quarter} value={quarter}>{quarter}</option>
                   ))}
@@ -297,7 +299,7 @@ const CDPOFoodSupplementary = () => {
             {loading ? (
               <div className="text-center my-5">
                 <Spinner animation="border" variant="primary" />
-                <p className="mt-2 text-muted">Fetching records, please wait...</p>
+                <p className="mt-2 text-muted">{t("Fetching records, please wait...", "रिकॉर्ड प्राप्त किए जा रहे हैं, कृपया प्रतीक्षा करें...")}</p>
               </div>
             ) : (
               <Table striped bordered hover responsive size="sm">

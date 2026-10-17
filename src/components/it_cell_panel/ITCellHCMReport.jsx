@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Container, Row, Col, Form, Spinner, Table, Button, Alert, Pagination, Modal, Dropdown, Badge } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/itcellLeftnav.css";
 
 import ITCellLeftNav from "./ITCellLeftNav";
@@ -17,6 +18,7 @@ const ITCellHCMReport = () => {
   const [isTablet, setIsTablet] = useState(false);
 
   const { api } = useAuth();
+  const { t } = useLanguage();
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -82,12 +84,12 @@ const ITCellHCMReport = () => {
       setUniqueBeneCategories([...new Set(data.map((item) => item.bene_category))]);
       fetchFoodItems();
     } catch (err) {
-      setError("Failed to fetch HCM report data.");
+      setError(t("Failed to fetch HCM report data.", "एचसीएम रिपोर्ट डेटा प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, t]);
 
   const fetchFoodItems = useCallback(async () => {
     try {
@@ -194,7 +196,7 @@ const ITCellHCMReport = () => {
       handleCloseEditModal();
       fetchData(); // Refresh data
     } catch (err) {
-      setFormErrors({ api: "Failed to update record. Please try again." });
+      setFormErrors({ api: t("Failed to update record. Please try again.", "रिकॉर्ड अपडेट नहीं हो सका। कृपया पुनः प्रयास करें।") });
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -202,12 +204,12 @@ const ITCellHCMReport = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this record?")) {
+    if (window.confirm(t("Are you sure you want to delete this record?", "क्या आप वाकई यह रिकॉर्ड हटाना चाहते हैं?"))) {
       try {
         await api.delete("/hcm-director-distributions/", { data: { id: [id] } });
         fetchData(); // Refresh data
       } catch (err) {
-        setError("Failed to delete record. Please try again.");
+        setError(t("Failed to delete record. Please try again.", "रिकॉर्ड हटाया नहीं जा सका। कृपया पुनः प्रयास करें।"));
         console.error(err);
       }
     }
@@ -242,12 +244,12 @@ const ITCellHCMReport = () => {
       const totalsTableContainer = document.createElement('div');
       totalsTableContainer.innerHTML = `
         <div style="padding: 20px; font-family: sans-serif;">
-          <h4 style="text-align: center; margin-bottom: 15px;">Total Quantity by Unit</h4>
+          <h4 style="text-align: center; margin-bottom: 15px;">${t("Total Quantity by Unit", "इकाई के अनुसार कुल मात्रा")}</h4>
           <table style="width: 50%; margin: 0 auto; border-collapse: collapse; border: 1px solid #dee2e6;">
             <thead style="background-color: #f2f2f2;">
               <tr>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Unit</th>
-                <th style="border: 1px solid #dee2e6; padding: 8px;">Total Quantity</th>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">${t("Unit", "इकाई")}</th>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">${t("Total Quantity", "कुल मात्रा")}</th>
               </tr>
             </thead>
             <tbody>
@@ -297,7 +299,7 @@ const ITCellHCMReport = () => {
           pdf.save('hcm_it_cell_report.pdf');
         } catch (e) {
           console.error("Error generating PDF:", e);
-          setError("Could not generate PDF. Please try again.");
+          setError(t("Could not generate PDF. Please try again.", "PDF तैयार नहीं हो सका। कृपया पुनः प्रयास करें।"));
         }
         document.body.removeChild(totalsTableContainer);
         setIsPrinting(false);
@@ -366,27 +368,27 @@ const ITCellHCMReport = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3 className="mb-0">HCM Distribution Report</h3>
+            <h3 className="mb-0">{t("HCM Distribution Report", "एचसीएम वितरण रिपोर्ट")}</h3>
             <div>
-              <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2"><FaFilePdf className="me-1" /> Export PDF</Button>
-              <Button variant="outline-success" size="sm" onClick={exportToExcel}><FaFileExcel className="me-1" /> Export Excel</Button>
-              <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)} className="ms-2"><FaEye className="me-1" /> Column Visibility</Button>
+              <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2"><FaFilePdf className="me-1" /> {t("Export PDF", "PDF निर्यात करें")}</Button>
+              <Button variant="outline-success" size="sm" onClick={exportToExcel}><FaFileExcel className="me-1" /> {t("Export Excel", "Excel निर्यात करें")}</Button>
+              <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)} className="ms-2"><FaEye className="me-1" /> {t("Column Visibility", "कॉलम दृश्यता")}</Button>
             </div>
           </div>
 
           <Row className="mb-3">
-            <Col md={2}><Form.Control type="date" name="startDate" onChange={handleFilterChange} value={filters.startDate} /></Col>
-            <Col md={2}><Form.Control type="date" name="endDate" onChange={handleFilterChange} value={filters.endDate} /></Col>
-            <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.district.length ? `${filters.district.length} selected` : 'All Districts'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueDistricts.map(d => (<Dropdown.Item key={d} as="div"><Form.Check type="checkbox" label={d} checked={filters.district.includes(d)} onChange={() => handleMultiSelectChange('district', d)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
-            <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.project.length ? `${filters.project.length} selected` : 'All Projects'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueProjects.map(p => (<Dropdown.Item key={p} as="div"><Form.Check type="checkbox" label={p} checked={filters.project.includes(p)} onChange={() => handleMultiSelectChange('project', p)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
-            <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.sector.length ? `${filters.sector.length} selected` : 'All Sectors'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueSectors.map(s => (<Dropdown.Item key={s} as="div"><Form.Check type="checkbox" label={s} checked={filters.sector.includes(s)} onChange={() => handleMultiSelectChange('sector', s)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
-            <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.food_item.length ? `${filters.food_item.length} selected` : 'All Food Items'}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueFoodItems.map(item => (<Dropdown.Item key={item} as="div"><Form.Check type="checkbox" label={item} checked={filters.food_item.includes(item)} onChange={() => handleMultiSelectChange('food_item', item)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
+            <Col md={2}><Form.Control type="date" name="startDate" aria-label={t("Start Date", "प्रारंभ तिथि")} onChange={handleFilterChange} value={filters.startDate} /></Col>
+            <Col md={2}><Form.Control type="date" name="endDate" aria-label={t("End Date", "समाप्ति तिथि")} onChange={handleFilterChange} value={filters.endDate} /></Col>
+            <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.district.length ? `${filters.district.length} ${t("selected", "चयनित")}` : t("All Districts", "सभी जिले")}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueDistricts.map(d => (<Dropdown.Item key={d} as="div"><Form.Check type="checkbox" label={d} checked={filters.district.includes(d)} onChange={() => handleMultiSelectChange('district', d)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
+            <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.project.length ? `${filters.project.length} ${t("selected", "चयनित")}` : t("All Projects", "सभी परियोजनाएं")}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueProjects.map(p => (<Dropdown.Item key={p} as="div"><Form.Check type="checkbox" label={p} checked={filters.project.includes(p)} onChange={() => handleMultiSelectChange('project', p)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
+            <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.sector.length ? `${filters.sector.length} ${t("selected", "चयनित")}` : t("All Sectors", "सभी सेक्टर")}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueSectors.map(s => (<Dropdown.Item key={s} as="div"><Form.Check type="checkbox" label={s} checked={filters.sector.includes(s)} onChange={() => handleMultiSelectChange('sector', s)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
+            <Col md={2}><Dropdown><Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.food_item.length ? `${filters.food_item.length} ${t("selected", "चयनित")}` : t("All Food Items", "सभी खाद्य पदार्थ")}</Dropdown.Toggle><Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueFoodItems.map(item => (<Dropdown.Item key={item} as="div"><Form.Check type="checkbox" label={item} checked={filters.food_item.includes(item)} onChange={() => handleMultiSelectChange('food_item', item)} /></Dropdown.Item>))}</Dropdown.Menu></Dropdown></Col>
           </Row>
           <Row className="mb-3">
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category" className="w-100">
-                  {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
+                  {filters.bene_category.length ? `${filters.bene_category.length} ${t("categories selected", "श्रेणियां चयनित")}` : t("All Bene. Categories", "सभी लाभार्थी श्रेणियां")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueBeneCategories.map(cat => (<Dropdown.Item key={cat} as="div"><Form.Check type="checkbox" label={cat} checked={filters.bene_category.includes(cat)} onChange={() => handleMultiSelectChange('bene_category', cat)} /></Dropdown.Item>))}
@@ -398,7 +400,7 @@ const ITCellHCMReport = () => {
           {loading ? <div className="text-center"><Spinner animation="border" /></div> : error ? <Alert variant="danger">{error}</Alert> : (
             <>
               <Table striped bordered hover responsive className="bg-white" ref={tableRef}>
-                <thead><tr>{columns.map((col, index) => col.visible && <th key={index}>{col.text}</th>)}</tr></thead>
+                <thead><tr>{columns.map((col, index) => col.visible && <th key={index}>{t(col.text, ({ District: "जिला", Project: "परियोजना", Sector: "सेक्टर", "AWC Name": "आंगनवाड़ी केंद्र का नाम", "AWC Code": "आंगनवाड़ी केंद्र कोड", "AWC Type": "आंगनवाड़ी केंद्र का प्रकार", "Food Item": "खाद्य पदार्थ", "Beneficiary Category": "लाभार्थी श्रेणी", "Days Allotted": "आवंटित दिन", Date: "तारीख", Beneficiaries: "लाभार्थी", Quantity: "मात्रा", Unit: "इकाई", Action: "कार्रवाई" })[col.text])}</th>)}</tr></thead>
                 <tbody>
                   {currentItems.length > 0 ? currentItems.map((row, index) => (
                     <tr key={row.id}>
@@ -412,8 +414,8 @@ const ITCellHCMReport = () => {
                           case 'action':
                             cellContent = (
                               <>
-                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleShowEditModal(row)}><FaEdit /></Button>
-                                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(row.id)}><FaTrash /></Button>
+                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleShowEditModal(row)} aria-label={t("Edit", "संपादित करें")}><FaEdit /></Button>
+                                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(row.id)} aria-label={t("Delete", "हटाएं")}><FaTrash /></Button>
                               </>
                             );
                             break;
@@ -423,11 +425,11 @@ const ITCellHCMReport = () => {
                         return <td key={i}>{cellContent}</td>;
                       })}
                     </tr>
-                  )) : <tr><td colSpan={columns.filter(c => c.visible).length} className="text-center">No data available</td></tr>}
+                  )) : <tr><td colSpan={columns.filter(c => c.visible).length} className="text-center">{t("No data available", "कोई डेटा उपलब्ध नहीं है")}</td></tr>}
                 </tbody>
                 <tfoot>
                   <tr className="fw-bold table-info">
-                    <td colSpan={columns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')}>Total</td>
+                    <td colSpan={columns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')}>{t("Total", "कुल")}</td>
                     {columns.filter(c => c.visible).slice(columns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')).map(col => {
                       if (col.dataField === 'total_beneficiaries') {
                         return <td key="total_beneficiaries">{totals.beneficiaries}</td>;
@@ -435,7 +437,7 @@ const ITCellHCMReport = () => {
                       if (col.dataField === 'quantity') {
                         return (
                           <td key="total_quantity">
-                            {!isPrinting && <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Totals</Button>}
+                            {!isPrinting && <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>{t("View Totals", "कुल देखें")}</Button>}
                           </td>
                         );
                       }
@@ -450,24 +452,24 @@ const ITCellHCMReport = () => {
         </Container>
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
-          <Modal.Header closeButton><Modal.Title>Show/Hide Columns</Modal.Title></Modal.Header>
+          <Modal.Header closeButton closeLabel={t("Close", "बंद करें")}><Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएं/छिपाएं")}</Modal.Title></Modal.Header>
           <Modal.Body>
-            {columns.map((col, index) => (<Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />))}
+            {columns.map((col, index) => (<Form.Check key={index} type="checkbox" label={t(col.text, ({ District: "जिला", Project: "परियोजना", Sector: "सेक्टर", "AWC Name": "आंगनवाड़ी केंद्र का नाम", "AWC Code": "आंगनवाड़ी केंद्र कोड", "AWC Type": "आंगनवाड़ी केंद्र का प्रकार", "Food Item": "खाद्य पदार्थ", "Beneficiary Category": "लाभार्थी श्रेणी", "Days Allotted": "आवंटित दिन", Date: "तारीख", Beneficiaries: "लाभार्थी", Quantity: "मात्रा", Unit: "इकाई", Action: "कार्रवाई" })[col.text])} checked={col.visible} onChange={() => handleColumnToggle(index)} />))}
           </Modal.Body>
-          <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button></Modal.Footer>
+          <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>{t("Close", "बंद करें")}</Button></Modal.Footer>
         </Modal>
 
         <Modal show={showQuantityModal} onHide={() => setShowQuantityModal(false)} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Total Quantity by Unit</Modal.Title>
+          <Modal.Header closeButton closeLabel={t("Close", "बंद करें")}>
+            <Modal.Title>{t("Total Quantity by Unit", "इकाई के अनुसार कुल मात्रा")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {Object.keys(totals.quantityByUnit).length > 0 ? (
               <Table striped bordered>
                 <thead>
                   <tr>
-                    <th>Unit</th>
-                    <th>Total Quantity</th>
+                    <th>{t("Unit", "इकाई")}</th>
+                    <th>{t("Total Quantity", "कुल मात्रा")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -476,14 +478,14 @@ const ITCellHCMReport = () => {
                   ))}
                 </tbody>
               </Table>
-            ) : <p>No quantity data to display.</p>}
+            ) : <p>{t("No quantity data to display.", "दिखाने के लिए मात्रा का डेटा नहीं है।")}</p>}
           </Modal.Body>
         </Modal>
 
         {editingItem && (
           <Modal show={showEditModal} onHide={handleCloseEditModal} centered size="lg">
-            <Modal.Header closeButton>
-              <Modal.Title>Edit HCM Distribution</Modal.Title>
+            <Modal.Header closeButton closeLabel={t("Close", "बंद करें")}>
+              <Modal.Title>{t("Edit HCM Distribution", "एचसीएम वितरण संपादित करें")}</Modal.Title>
             </Modal.Header>
             <Modal.Body>
               {formErrors.api && <Alert variant="danger">{formErrors.api}</Alert>}
@@ -491,16 +493,16 @@ const ITCellHCMReport = () => {
                 <Row>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>Food Item</Form.Label>
+                      <Form.Label>{t("Food Item", "खाद्य पदार्थ")}</Form.Label>
                       <Form.Control as="select" name="food_item" value={editFormData.food_item} onChange={handleEditFormChange} required>
-                        <option value="">Select Food Item</option>
+                        <option value="">{t("Select Food Item", "खाद्य पदार्थ चुनें")}</option>
                         {foodItems.map(fi => <option key={fi.id} value={fi.food_item}>{fi.food_item}</option>)}
                       </Form.Control>
                     </Form.Group>
                   </Col>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>Date</Form.Label>
+                      <Form.Label>{t("Date", "तारीख")}</Form.Label>
                       <Form.Control type="date" name="date" value={editFormData.date} onChange={handleEditFormChange} required />
                     </Form.Group>
                   </Col>
@@ -508,13 +510,13 @@ const ITCellHCMReport = () => {
                 <Row>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>District</Form.Label>
+                      <Form.Label>{t("District", "जिला")}</Form.Label>
                       <Form.Control type="text" name="district" value={editFormData.district} onChange={handleEditFormChange} required />
                     </Form.Group>
                   </Col>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>Project</Form.Label>
+                      <Form.Label>{t("Project", "परियोजना")}</Form.Label>
                       <Form.Control type="text" name="project" value={editFormData.project} onChange={handleEditFormChange} required />
                     </Form.Group>
                   </Col>
@@ -522,15 +524,15 @@ const ITCellHCMReport = () => {
                 <Row>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>Sector</Form.Label>
+                      <Form.Label>{t("Sector", "सेक्टर")}</Form.Label>
                       <Form.Control type="text" name="sector" value={editFormData.sector} onChange={handleEditFormChange} required />
                     </Form.Group>
                   </Col>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>AWC Type</Form.Label>
+                      <Form.Label>{t("AWC Type", "आंगनवाड़ी केंद्र का प्रकार")}</Form.Label>
                       <Form.Control as="select" name="awc_type" value={editFormData.awc_type} onChange={handleEditFormChange} required>
-                        <option value="">Select AWC Type</option>
+                        <option value="">{t("Select AWC Type", "आंगनवाड़ी केंद्र का प्रकार चुनें")}</option>
                         <option value="AWC">AWC</option>
                         <option value="Mini-AWC">Mini-AWC</option>
                       </Form.Control>
@@ -540,7 +542,7 @@ const ITCellHCMReport = () => {
                 <Row>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>Total Beneficiaries</Form.Label>
+                      <Form.Label>{t("Total Beneficiaries", "कुल लाभार्थी")}</Form.Label>
                       <Form.Control type="number" name="total_beneficiaries" value={editFormData.total_beneficiaries} onChange={handleEditFormChange} required />
                     </Form.Group>
                   </Col>
@@ -548,13 +550,13 @@ const ITCellHCMReport = () => {
                 <Row>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>AWC Name</Form.Label>
+                      <Form.Label>{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</Form.Label>
                       <Form.Control type="text" name="awc_name" value={editFormData.awc_name} onChange={handleEditFormChange} required />
                     </Form.Group>
                   </Col>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>AWC Code</Form.Label>
+                      <Form.Label>{t("AWC Code", "आंगनवाड़ी केंद्र कोड")}</Form.Label>
                       <Form.Control type="text" name="awc_code" value={editFormData.awc_code} onChange={handleEditFormChange} required />
                     </Form.Group>
                   </Col>
@@ -562,17 +564,17 @@ const ITCellHCMReport = () => {
                 <Row>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>Quantity</Form.Label>
+                      <Form.Label>{t("Quantity", "मात्रा")}</Form.Label>
                       <Form.Control type="number" step="0.01" name="quantity" value={editFormData.quantity} onChange={handleEditFormChange} required />
                     </Form.Group>
                   </Col>
                 </Row>
                 <div className="d-flex justify-content-end">
                   <Button variant="secondary" onClick={handleCloseEditModal} className="me-2">
-                    Cancel
+                    {t("Cancel", "रद्द करें")}
                   </Button>
                   <Button variant="primary" type="submit" disabled={submitting}>
-                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : 'Update'}
+                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : t("Update", "अपडेट करें")}
                   </Button>
                 </div>
               </Form>

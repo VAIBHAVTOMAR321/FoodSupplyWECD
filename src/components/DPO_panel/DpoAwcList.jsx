@@ -14,6 +14,8 @@ import {
 } from "react-bootstrap";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
+import dpoHindi from "./DPOTranslations.json";
 import "../../assets/css/dpo.css";
 import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
@@ -80,6 +82,8 @@ const valueForColumn = (item, key) => {
 };
 
 const DpoAwcList = () => {
+  const { t } = useLanguage();
+  const translateLabel = (text) => t(text, dpoHindi[text] || text);
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -146,7 +150,7 @@ const DpoAwcList = () => {
         setProjectCount(projectPayload?.count ?? projects.length);
       } catch (err) {
         console.error("Failed to fetch DPO AWC/Sector/Project lists:", err);
-        if (isActive) setError("Failed to load AWC, sector, or project data. Please try again.");
+        if (isActive) setError(t("Failed to load AWC, sector, or project data. Please try again.", "आंगनवाड़ी केंद्र, सेक्टर या परियोजना डेटा लोड करने में विफल। कृपया पुनः प्रयास करें।"));
       } finally {
         if (isActive) setLoading(false);
       }
@@ -249,7 +253,7 @@ const DpoAwcList = () => {
       pdf.save(`${config.filename}.pdf`);
     } catch (err) {
       console.error("Failed to export DPO list PDF:", err);
-      window.alert("PDF export failed. Please try again.");
+      window.alert(t("PDF export failed. Please try again.", "PDF निर्यात विफल रहा। कृपया पुनः प्रयास करें।"));
     } finally {
       setExportingPdf(false);
     }
@@ -259,7 +263,7 @@ const DpoAwcList = () => {
     <div className="table-responsive">
       <Table striped bordered hover responsive className="mb-0">
         <thead className="table-light">
-          <tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr>
+          <tr>{columns.map((column) => <th key={column.key}>{translateLabel(column.label)}</th>)}</tr>
         </thead>
         <tbody>
           {data.map((item, index) => (
@@ -289,7 +293,7 @@ const DpoAwcList = () => {
         <Container fluid className="dashboard-box mt-3">
           <div className="dashboard-section">
             <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-              <h4 className="section-title mb-0">CDPO AWC &amp; Sector List</h4>
+              <h4 className="section-title mb-0">{t("CDPO AWC & Sector List", "सीडीपीओ आंगनवाड़ी केंद्र एवं सेक्टर सूची")}</h4>
               <ButtonGroup>
                 <Button
                   variant="outline-danger"
@@ -298,7 +302,7 @@ const DpoAwcList = () => {
                   disabled={loading || !exportRows.length || exportingPdf}
                 >
                   <FaFilePdf className="me-1" />
-                  {exportingPdf ? "Preparing PDF…" : "Export PDF"}
+                  {exportingPdf ? t("Preparing PDF…", "PDF तैयार हो रही है…") : t("Export PDF", "PDF निर्यात करें")}
                 </Button>
                 <Button
                   variant="outline-success"
@@ -306,7 +310,7 @@ const DpoAwcList = () => {
                   onClick={exportToExcel}
                   disabled={loading || !exportRows.length}
                 >
-                  <FaFileExcel className="me-1" /> Export Excel
+                  <FaFileExcel className="me-1" /> {t("Export Excel", "Excel निर्यात करें")}
                 </Button>
               </ButtonGroup>
             </div>
@@ -323,13 +327,13 @@ const DpoAwcList = () => {
                 id="dpo-awc-list-tabs"
                 className="mb-4"
               >
-                <Tab eventKey="awc" title={`AWC List (${awcCount})`}>
+                <Tab eventKey="awc" title={`${t("AWC List", "आंगनवाड़ी केंद्र सूची")} (${awcCount})`}>
                   {renderTable(awcData, TABLE_CONFIG.awc.columns, "awc_code")}
                 </Tab>
-                <Tab eventKey="sector" title={`Sector List (${sectorCount})`}>
+                <Tab eventKey="sector" title={`${t("Sector List", "सेक्टर सूची")} (${sectorCount})`}>
                   {renderTable(sectorData, TABLE_CONFIG.sector.columns, "id")}
                 </Tab>
-                <Tab eventKey="project" title={`Project List (${projectCount})`}>
+                <Tab eventKey="project" title={`${t("Project List", "परियोजना सूची")} (${projectCount})`}>
                   {renderTable(projectData, TABLE_CONFIG.project.columns, "id")}
                 </Tab>
               </Tabs>

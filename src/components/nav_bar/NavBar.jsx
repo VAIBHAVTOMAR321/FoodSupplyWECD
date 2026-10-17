@@ -5,6 +5,7 @@ import Container from "react-bootstrap/Container";
 import Button from "react-bootstrap/Button";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../all_login/LanguageContext";
+import LanguageToggle from "../all_login/LanguageToggle";
 
 import "../../assets/css/navbar.css";
 import ukLogo from "../../assets/images/new_logo_uk.png";
@@ -12,7 +13,7 @@ import womenLogo from "../../assets/images/women_logo.jpeg";
 
 function NavBar() {
   const [expanded, setExpanded] = useState(false);
-  const { language, setLanguage } = useLanguage();
+  const { language } = useLanguage();
 
   return (
     <Navbar expand="lg" expanded={expanded} onToggle={setExpanded} fixed="top" className="custom-navbar">
@@ -27,21 +28,11 @@ function NavBar() {
             
             <div className="uttarakhand-heading">
               <span className="uttarakhand-title">
-               {language === 'hi' ? (
-  ''
-) : (
-  <>
- <div style={{ lineHeight: "1.2" }} className="women-style">
-  
-
-
-  <>
-    Women Empowerment & <br />
-    Child Development Department
-  </>
-</div>
-</>
-)}
+                <div style={{ lineHeight: "1.2" }} className="women-style">
+                  {language === 'hi'
+                    ? <>महिला सशक्तिकरण एवं<br />बाल विकास विभाग</>
+                    : <>Women Empowerment &amp;<br />Child Development Department</>}
+                </div>
               </span>
               <img 
                 src={womenLogo} 
@@ -61,6 +52,7 @@ function NavBar() {
 
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="ms-auto nav-links">
+            <LanguageToggle />
             {/* <Nav.Link as={Link} to="/" className="nav-link-item" onClick={() => setExpanded(false)}>
               <span className="nav-link-dot"></span>
               {language === 'hi' ? 'होम' : 'Home'}

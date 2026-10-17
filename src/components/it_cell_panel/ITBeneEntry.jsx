@@ -16,6 +16,7 @@ import {
 } from "react-bootstrap";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/itcellLeftnav.css";
 import ITCellLeftNav from "./ITCellLeftNav";
 import ITCellHeader from "./ITCellHeader";
@@ -119,6 +120,7 @@ const ITBeneEntry = () => {
   const [success, setSuccess] = useState("");
 
   const { api } = useAuth();
+  const { t } = useLanguage();
   const [reports, setReports] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -187,13 +189,13 @@ const ITBeneEntry = () => {
       setReports(data);
       reportsRef.current = data;
     } catch (err) {
-      setError("Failed to fetch supplementary nutrition records. Please try again.");
+      setError(t("Failed to fetch supplementary nutrition records. Please try again.", "पूरक पोषण रिकॉर्ड प्राप्त नहीं हो सके। कृपया पुनः प्रयास करें।"));
       console.error("Fetch reports error:", err.message);
     } finally {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [api]);
+  }, [api, t]);
 
   // Fetch reports specifically for modal
   const fetchReportsForModal = useCallback(async () => {
@@ -284,13 +286,13 @@ const ITBeneEntry = () => {
 
   // ===================== DELETE =====================
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this record?")) {
+    if (window.confirm(t("Are you sure you want to delete this record?", "क्या आप वाकई यह रिकॉर्ड हटाना चाहते हैं?"))) {
       try {
         await api.delete(API_URL, { data: { ids: [id] } });
-        setSuccess("Record deleted successfully.");
+        setSuccess(t("Record deleted successfully.", "रिकॉर्ड सफलतापूर्वक हटाया गया।"));
         fetchReports();
       } catch (err) {
-        setError("Failed to delete record.");
+        setError(t("Failed to delete record.", "रिकॉर्ड हटाया नहीं जा सका।"));
         console.error(err);
       }
     }
@@ -414,7 +416,7 @@ const ITBeneEntry = () => {
         const aoa = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
         if (aoa.length < 3) {
-          setBulkUploadError("The Excel file is empty or has no data rows (minimum 2 header rows + 1 data row required).");
+          setBulkUploadError(t("The Excel file is empty or has no data rows (minimum 2 header rows + 1 data row required).", "Excel फ़ाइल खाली है या उसमें डेटा पंक्तियां नहीं हैं (कम से कम 2 शीर्षक पंक्तियां और 1 डेटा पंक्ति आवश्यक है)।"));
           return;
         }
 
@@ -449,7 +451,7 @@ const ITBeneEntry = () => {
         const mappedFields = Object.values(columnMap);
         const missingFields = DUPLICATE_CHECK_FIELDS.filter((f) => !mappedFields.includes(f));
         if (missingFields.length > 0) {
-          setBulkUploadError(`Missing required columns: ${missingFields.join(", ")}. Please use the downloaded template.`);
+          setBulkUploadError(t(`Missing required columns: ${missingFields.join(", ")}. Please use the downloaded template.`, `आवश्यक कॉलम मौजूद नहीं हैं: ${missingFields.join(", ")}। कृपया डाउनलोड किए गए टेम्पलेट का उपयोग करें।`));
           return;
         }
 
@@ -465,7 +467,7 @@ const ITBeneEntry = () => {
         }
 
         if (jsonData.length === 0) {
-          setBulkUploadError("No data rows found in the file.");
+          setBulkUploadError(t("No data rows found in the file.", "फ़ाइल में कोई डेटा पंक्ति नहीं मिली।"));
           return;
         }
 
@@ -554,10 +556,10 @@ const ITBeneEntry = () => {
             `Found ${duplicateCount} duplicate entry/entries! For the specified trimester(s) of this financial year, the entry for the District/Project combination is already present. Duplicates: ${duplicateDetails.map((d) => `Row ${d.row} (${d.district} - ${d.project} - ${d.quarter} - ${d.fin_year})`).join(", ")}. Please remove duplicate rows before uploading.`
           );
         } else if (hasNonDuplicateErrors) {
-          setBulkUploadError("Your file contains validation errors. Please fix them before uploading.");
+          setBulkUploadError(t("Your file contains validation errors. Please fix them before uploading.", "फ़ाइल में सत्यापन त्रुटियां हैं। कृपया अपलोड करने से पहले उन्हें ठीक करें।"));
         }
       } catch (err) {
-        setBulkUploadError("Failed to parse the Excel file. Please ensure it's a valid .xlsx or .xls file.");
+        setBulkUploadError(t("Failed to parse the Excel file. Please ensure it's a valid .xlsx or .xls file.", "Excel फ़ाइल पढ़ी नहीं जा सकी। कृपया सुनिश्चित करें कि यह मान्य .xlsx या .xls फ़ाइल है।"));
         console.error(err);
       }
     };
@@ -569,7 +571,7 @@ const ITBeneEntry = () => {
     const hasErrors = bulkPreviewData.some((item) => Object.keys(item.errors).length > 0);
 
     if (!bulkFile || hasErrors) {
-      setBulkUploadError("Cannot upload. Please select a valid file and fix all errors including duplicate entries.");
+      setBulkUploadError(t("Cannot upload. Please select a valid file and fix all errors including duplicate entries.", "अपलोड नहीं किया जा सकता। कृपया मान्य फ़ाइल चुनें और डुप्लिकेट सहित सभी त्रुटियां ठीक करें।"));
       return;
     }
 
@@ -601,11 +603,11 @@ const ITBeneEntry = () => {
       const uploadPromises = validRows.map((payload) => api.post(API_URL, payload));
       await Promise.all(uploadPromises);
       
-      setSuccess("Bulk upload successful!");
+      setSuccess(t("Bulk upload successful!", "बल्क अपलोड सफल रहा!"));
       handleCloseBulkUploadModal();
       fetchReports();
     } catch (err) {
-      setBulkUploadError("An error occurred during bulk upload. Some records may have failed.");
+      setBulkUploadError(t("An error occurred during bulk upload. Some records may have failed.", "बल्क अपलोड के दौरान त्रुटि हुई। कुछ रिकॉर्ड विफल हो सकते हैं।"));
       console.error("Bulk upload failed:", err.response || err);
     } finally {
       setBulkUploading(false);
@@ -644,7 +646,7 @@ const ITBeneEntry = () => {
 
     try {
       await api.put(API_URL, payload);
-      setSuccess("Record updated successfully.");
+      setSuccess(t("Record updated successfully.", "रिकॉर्ड सफलतापूर्वक अपडेट किया गया।"));
       setShowForm(false);
       setFormData(initialFormData);
       setEditingId(null);
@@ -652,7 +654,7 @@ const ITBeneEntry = () => {
     } catch (err) {
       const errors = err.response?.data || {};
       setFormErrors(errors);
-      setError("Failed to update record.");
+      setError(t("Failed to update record.", "रिकॉर्ड अपडेट नहीं हो सका।"));
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -728,10 +730,10 @@ const ITBeneEntry = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading d-flex justify-content-between align-items-center">
-            <h3 className="mb-4 fw-bold">Supplementary Nutrition Master</h3>
+            <h3 className="mb-4 fw-bold">{t("Supplementary Nutrition Master", "पूरक पोषण मास्टर")}</h3>
             <div>
               <Button onClick={handleShowBulkUploadModal} variant="success" className="me-2">
-                <FaUpload className="me-2" /> Bulk Upload
+                <FaUpload className="me-2" /> {t("Bulk Upload", "बल्क अपलोड")}
               </Button>
             </div>
           </div>
@@ -742,46 +744,46 @@ const ITBeneEntry = () => {
           {/* ===================== EDIT FORM (PUT) ===================== */}
           <Collapse in={showForm}>
             <Card className="mb-4">
-              <Card.Header as="h5">Edit Supplementary Nutrition Record</Card.Header>
+              <Card.Header as="h5">{t("Edit Supplementary Nutrition Record", "पूरक पोषण रिकॉर्ड संपादित करें")}</Card.Header>
               <Card.Body>
                 <Form onSubmit={handleSubmit}>
                   <Row>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>District</Form.Label>
+                        <Form.Label>{t("District", "जिला")}</Form.Label>
                         <Form.Control type="text" name="district" value={formData.district} onChange={handleFormChange} required />
                       </Form.Group>
                     </Col>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Project</Form.Label>
+                        <Form.Label>{t("Project", "परियोजना")}</Form.Label>
                         <Form.Control type="text" name="project" value={formData.project} onChange={handleFormChange} required />
                       </Form.Group>
                     </Col>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Trimester</Form.Label>
+                        <Form.Label>{t("Trimester", "तिमाही")}</Form.Label>
                         <Form.Select name="quarter" value={formData.quarter} onChange={handleFormChange} required>
-                          <option value="">Select Trimester</option>
+                          <option value="">{t("Select Trimester", "तिमाही चुनें")}</option>
                           {QUARTERS.map((quarter) => <option key={quarter} value={quarter}>{quarter}</option>)}
                         </Form.Select>
                       </Form.Group>
                     </Col>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Financial Year</Form.Label>
+                        <Form.Label>{t("Financial Year", "वित्तीय वर्ष")}</Form.Label>
                         <Form.Control type="text" name="financial_year" value={formData.financial_year} onChange={handleFormChange} required />
                       </Form.Group>
                     </Col>
                   </Row>
 
                   <hr />
-                  <h6 className="mb-3">Beneficiary Numbers & Supplementary Nutrition Details</h6>
+                  <h6 className="mb-3">{t("Beneficiary Numbers & Supplementary Nutrition Details", "लाभार्थी संख्या और पूरक पोषण विवरण")}</h6>
 
                   <Row>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Pregnant Woman & Lactating Mother</Form.Label>
+                        <Form.Label>{t("Pregnant Woman & Lactating Mother", "गर्भवती महिला एवं स्तनपान कराने वाली माता")}</Form.Label>
                         <Form.Control type="number" name="pregnant_woman_lactating_mother" value={formData.pregnant_woman_lactating_mother} onChange={handleFormChange} required />
                       </Form.Group>
                     </Col>
@@ -796,7 +798,7 @@ const ITBeneEntry = () => {
                   <Row>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Children 6m-3y</Form.Label>
+                        <Form.Label>{t("Children 6m-3y", "बच्चे 6 माह-3 वर्ष")}</Form.Label>
                         <Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required />
                       </Form.Group>
                     </Col>
@@ -811,7 +813,7 @@ const ITBeneEntry = () => {
                   <Row>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>SAM 6M-5Y / SUW 6M-6Y</Form.Label>
+                        <Form.Label>{t("SAM 6M-5Y / SUW 6M-6Y", "एसएएम 6 माह-5 वर्ष / एसयूडब्ल्यू 6 माह-6 वर्ष")}</Form.Label>
                         <Form.Control type="number" name="sam_children_6m_5y_suw_children_6m_6y" value={formData.sam_children_6m_5y_suw_children_6m_6y} onChange={handleFormChange} required />
                       </Form.Group>
                     </Col>
@@ -826,7 +828,7 @@ const ITBeneEntry = () => {
                   <Row>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>SAM 3Y-5Y / SUW 3Y-6Y</Form.Label>
+                        <Form.Label>{t("SAM 3Y-5Y / SUW 3Y-6Y", "एसएएम 3-5 वर्ष / एसयूडब्ल्यू 3-6 वर्ष")}</Form.Label>
                         <Form.Control type="number" name="sam_children_3y_5y_suw_children_3y_6y" value={formData.sam_children_3y_5y_suw_children_3y_6y} onChange={handleFormChange} required />
                       </Form.Group>
                     </Col>
@@ -841,7 +843,7 @@ const ITBeneEntry = () => {
                   <Row>
                     <Col md={3}>
                       <Form.Group className="mb-3">
-                        <Form.Label>HCM Beneficiaries 3Y-6Y</Form.Label>
+                        <Form.Label>{t("HCM Beneficiaries 3Y-6Y", "एचसीएम लाभार्थी 3-6 वर्ष")}</Form.Label>
                         <Form.Control type="number" name="hcm_beneficiaries_3y_6y" value={formData.hcm_beneficiaries_3y_6y} onChange={handleFormChange} required />
                       </Form.Group>
                     </Col>
@@ -860,10 +862,10 @@ const ITBeneEntry = () => {
                   </Row>
 
                   <Button variant="secondary" onClick={() => { setShowForm(false); setEditingId(null); setFormData(initialFormData); }} className="me-2">
-                    Cancel
+                    {t("Cancel", "रद्द करें")}
                   </Button>
                   <Button variant="primary" type="submit" disabled={submitting}>
-                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : "Update Record"}
+                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : t("Update Record", "रिकॉर्ड अपडेट करें")}
                   </Button>
                 </Form>
               </Card.Body>
@@ -871,22 +873,22 @@ const ITBeneEntry = () => {
           </Collapse>
 
           {/* ===================== DATA TABLE ===================== */}
-          <h5 className="mt-4">Existing Supplementary Nutrition Records</h5>
+          <h5 className="mt-4">{t("Existing Supplementary Nutrition Records", "मौजूदा पूरक पोषण रिकॉर्ड")}</h5>
           <Row className="mb-3">
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Financial Year</Form.Label>
+                <Form.Label>{t("Filter by Financial Year", "वित्तीय वर्ष के अनुसार फ़िल्टर करें")}</Form.Label>
                 <Form.Select name="financial_year" value={filters.financial_year} onChange={handleFilterChange}>
-                  <option value="">All Years</option>
+                  <option value="">{t("All Years", "सभी वर्ष")}</option>
                   {uniqueFinYears.map((year) => <option key={year} value={year}>{year}</option>)}
                 </Form.Select>
               </Form.Group>
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Trimester</Form.Label>
+                <Form.Label>{t("Filter by Trimester", "तिमाही के अनुसार फ़िल्टर करें")}</Form.Label>
                 <Form.Select name="quarter" value={filters.quarter} onChange={handleFilterChange}>
-                  <option value="">All Trimesters</option>
+                  <option value="">{t("All Trimesters", "सभी तिमाहियां")}</option>
                   {uniqueQuarters.map((quarter) => <option key={quarter} value={quarter}>{quarter}</option>)}
                 </Form.Select>
               </Form.Group>
@@ -897,29 +899,29 @@ const ITBeneEntry = () => {
             {loading ? (
               <div className="text-center my-5">
                 <Spinner animation="border" variant="primary" />
-                <p className="mt-2 text-muted">Fetching records, please wait...</p>
+                <p className="mt-2 text-muted">{t("Fetching records, please wait...", "रिकॉर्ड प्राप्त हो रहे हैं, कृपया प्रतीक्षा करें...")}</p>
               </div>
             ) : (
               <Table striped bordered hover responsive size="sm">
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>District</th>
-                    <th>Project</th>
-                    <th>Trimester</th>
-                    <th>Financial Year</th>
-                    <th>PW & LM</th>
+                    <th>{t("District", "जिला")}</th>
+                    <th>{t("Project", "परियोजना")}</th>
+                    <th>{t("Trimester", "तिमाही")}</th>
+                    <th>{t("Financial Year", "वित्तीय वर्ष")}</th>
+                    <th>{t("PW & LM", "गर्भवती एवं स्तनपान कराने वाली माताएं")}</th>
                     <th>Poushik Sattu</th>
-                    <th>Children 6m-3y</th>
+                    <th>{t("Children 6m-3y", "बच्चे 6 माह-3 वर्ष")}</th>
                     <th>Panjeeri 6m-3y</th>
-                    <th>SAM 6M-5Y/SUW 6M-6Y</th>
+                    <th>{t("SAM 6M-5Y/SUW 6M-6Y", "एसएएम 6 माह-5 वर्ष/एसयूडब्ल्यू 6 माह-6 वर्ष")}</th>
                     <th>Panjeeri SAM</th>
-                    <th>SAM 3Y-5Y/SUW 3Y-6Y</th>
+                    <th>{t("SAM 3Y-5Y/SUW 3Y-6Y", "एसएएम 3-5 वर्ष/एसयूडब्ल्यू 3-6 वर्ष")}</th>
                     <th>Sattu SAM</th>
-                    <th>HCM 3Y-6Y</th>
+                    <th>{t("HCM 3Y-6Y", "एचसीएम 3-6 वर्ष")}</th>
                     <th>Mung Dal Khichdi</th>
                     <th>Multi Grain Aata</th>
-                    <th>Actions</th>
+                    <th>{t("Actions", "कार्रवाई")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -943,10 +945,10 @@ const ITBeneEntry = () => {
                         <td>{report.mung_dal_khichdi_3y_6y}</td>
                         <td>{report.multi_grain_aata_3y_6y}</td>
                         <td>
-                          <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(report)}>
+                          <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(report)} aria-label={t("Edit", "संपादित करें")}>
                             <FaEdit />
                           </Button>
-                          <Button variant="outline-danger" size="sm" onClick={() => handleDelete(report.id)}>
+                          <Button variant="outline-danger" size="sm" onClick={() => handleDelete(report.id)} aria-label={t("Delete", "हटाएं")}>
                             <FaTrash />
                           </Button>
                         </td>
@@ -954,7 +956,7 @@ const ITBeneEntry = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="17" className="text-center">No records found.</td>
+                      <td colSpan="17" className="text-center">{t("No records found.", "कोई रिकॉर्ड नहीं मिला।")}</td>
                     </tr>
                   )}
                 </tbody>
@@ -965,14 +967,14 @@ const ITBeneEntry = () => {
 
           {/* ===================== BULK UPLOAD MODAL ===================== */}
           <Modal show={showBulkUploadModal} onHide={handleCloseBulkUploadModal} centered size="xl">
-            <Modal.Header closeButton>
-              <Modal.Title>Bulk Upload Supplementary Nutrition Records</Modal.Title>
+            <Modal.Header closeButton closeLabel={t("Close", "बंद करें")}>
+              <Modal.Title>{t("Bulk Upload Supplementary Nutrition Records", "पूरक पोषण रिकॉर्ड बल्क अपलोड")}</Modal.Title>
             </Modal.Header>
             <Modal.Body>
               {reportsLoadingForModal && (
                 <Alert variant="info">
                   <Spinner as="span" animation="border" size="sm" className="me-2" />
-                  Loading existing records for duplicate checking...
+                  {t("Loading existing records for duplicate checking...", "डुप्लिकेट जांच के लिए मौजूदा रिकॉर्ड लोड हो रहे हैं...")}
                 </Alert>
               )}
 
@@ -983,50 +985,50 @@ const ITBeneEntry = () => {
                 </Alert>
               )}
 
-              <p>Upload an Excel file with the required columns. The column names must match the downloaded template.</p>
+              <p>{t("Upload an Excel file with the required columns. The column names must match the downloaded template.", "आवश्यक कॉलम वाली Excel फ़ाइल अपलोड करें। कॉलम के नाम डाउनलोड किए गए टेम्पलेट से मेल खाने चाहिए।")}</p>
 
               <div className="d-flex align-items-center mb-3">
                 <Button variant="link" onClick={downloadSampleFile} className="p-0 me-3">
-                  <FaFileExcel className="me-1" /> Download Template File
+                  <FaFileExcel className="me-1" /> {t("Download Template File", "टेम्पलेट फ़ाइल डाउनलोड करें")}
                 </Button>
                 <Badge bg="info" pill>
-                  {reportsRef.current.length} existing records in system
+                  {reportsRef.current.length} {t("existing records in system", "मौजूदा रिकॉर्ड सिस्टम में")}
                 </Badge>
               </div>
 
               <div className="mb-3 p-2" style={{ backgroundColor: "#f8f9fa", borderRadius: "4px", fontSize: "0.85rem" }}>
-                <strong>Duplicate Check Rule:</strong> An entry is considered duplicate if the combination of{" "}
-                <Badge bg="primary" className="mx-1">District</Badge> +{" "}
-                <Badge bg="primary" className="mx-1">Project</Badge> +{" "}
-                <Badge bg="primary" className="mx-1">Trimester</Badge> +{" "}
-                <Badge bg="primary" className="mx-1">Financial Year</Badge>{" "}
-                already exists. The numeric count fields are NOT checked for duplicates.
+                <strong>{t("Duplicate Check Rule:", "डुप्लिकेट जांच नियम:")}</strong> {t("An entry is considered duplicate if the combination of", "किसी प्रविष्टि को डुप्लिकेट माना जाएगा यदि निम्न का संयोजन")}{" "}
+                <Badge bg="primary" className="mx-1">{t("District", "जिला")}</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">{t("Project", "परियोजना")}</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">{t("Trimester", "तिमाही")}</Badge> +{" "}
+                <Badge bg="primary" className="mx-1">{t("Financial Year", "वित्तीय वर्ष")}</Badge>{" "}
+                {t("already exists. The numeric count fields are NOT checked for duplicates.", "पहले से मौजूद है। संख्यात्मक गणना फ़ील्ड डुप्लिकेट के लिए जांचे नहीं जाते।")}
               </div>
 
               <Form.Group controlId="formFile" className="mb-3">
-                <Form.Label>Select Excel File</Form.Label>
+                <Form.Label>{t("Select Excel File", "Excel फ़ाइल चुनें")}</Form.Label>
                 <Form.Control key={bulkFileInputKey} type="file" accept=".xlsx, .xls" onChange={handleFileSelect} disabled={reportsLoadingForModal} />
                 {reportsLoadingForModal && (
                   <Form.Text className="text-muted">
-                    Loading required data... file selection will be enabled shortly.
+                    {t("Loading required data... file selection will be enabled shortly.", "आवश्यक डेटा लोड हो रहा है... फ़ाइल चयन शीघ्र सक्षम होगा।")}
                   </Form.Text>
                 )}
               </Form.Group>
 
               {bulkPreviewData.length > 0 && (
                 <div className="mt-4" style={{ maxHeight: "400px", overflowY: "auto" }}>
-                  <h6>File Preview</h6>
+                  <h6>{t("File Preview", "फ़ाइल पूर्वावलोकन")}</h6>
                   <Table striped bordered hover responsive size="sm">
                     <thead>
                       <tr>
                         <th>#</th>
                         {PREVIEW_COLUMNS.map((col) => (
-                          <th key={col.key} style={{ backgroundColor: col.isDuplicate ? "#cce5ff" : "transparent", fontWeight: col.isDuplicate ? "bold" : "normal" }} title={col.isDuplicate ? "Checked for duplicates" : "Format validated only, not checked for duplicates"}>
-                            {col.label}
+                          <th key={col.key} style={{ backgroundColor: col.isDuplicate ? "#cce5ff" : "transparent", fontWeight: col.isDuplicate ? "bold" : "normal" }} title={col.isDuplicate ? t("Checked for duplicates", "डुप्लिकेट के लिए जांचा गया") : t("Format validated only, not checked for duplicates", "केवल प्रारूप सत्यापित, डुप्लिकेट की जांच नहीं")}>
+                            {t(col.label, ({ District: "जिला", Project: "परियोजना", Trimester: "तिमाही", "Financial Year": "वित्तीय वर्ष" })[col.label] || col.label)}
                             {col.isDuplicate && <span style={{ color: "#004085", fontSize: "0.7rem" }}> *</span>}
                           </th>
                         ))}
-                        <th>Status / Error</th>
+                        <th>{t("Status / Error", "स्थिति / त्रुटि")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1040,22 +1042,22 @@ const ITBeneEntry = () => {
                               const cellError = getCellError(item, col.key);
                               const cellClass = getCellClass(item, col.key);
                               return (
-                                <td key={col.key} className={cellClass} title={cellError || (col.isDuplicate ? "Checked for duplicates" : "Count field - not checked for duplicates")} style={{ cursor: cellError ? "help" : "default", fontSize: "0.85rem", backgroundColor: col.isDuplicate && !cellClass ? "#f0f7ff" : undefined }}>
+                                <td key={col.key} className={cellClass} title={cellError || (col.isDuplicate ? t("Checked for duplicates", "डुप्लिकेट के लिए जांचा गया") : t("Count field - not checked for duplicates", "गणना फ़ील्ड - डुप्लिकेट की जांच नहीं"))} style={{ cursor: cellError ? "help" : "default", fontSize: "0.85rem", backgroundColor: col.isDuplicate && !cellClass ? "#f0f7ff" : undefined }}>
                                   {item.data[col.key]}
-                                  {cellError && <div className="text-danger mt-1" style={{ fontSize: "0.65rem", fontWeight: "600" }}>⚠ DUPLICATE</div>}
+                                  {cellError && <div className="text-danger mt-1" style={{ fontSize: "0.65rem", fontWeight: "600" }}>⚠ {t("DUPLICATE", "डुप्लिकेट")}</div>}
                                 </td>
                               );
                             })}
                             <td style={{ fontSize: "0.8rem", minWidth: "220px" }}>
                               {hasErrors ? (
                                 <div>
-                                  <Badge bg="danger" className="mb-1">{hasDupError ? "DUPLICATE" : "ERROR"}</Badge>
+                                  <Badge bg="danger" className="mb-1">{hasDupError ? t("DUPLICATE", "डुप्लिकेट") : t("ERROR", "त्रुटि")}</Badge>
                                   <div className="text-danger" style={{ fontSize: "0.7rem" }}>
                                     {item.errors.duplicate_server || item.errors.duplicate_file || Object.values(item.errors).filter((e) => e !== item.errors.duplicate_server && e !== item.errors.duplicate_file).join(", ")}
                                   </div>
                                 </div>
                               ) : (
-                                <Badge bg="success">OK</Badge>
+                                <Badge bg="success">{t("OK", "ठीक है")}</Badge>
                               )}
                             </td>
                           </tr>
@@ -1067,15 +1069,15 @@ const ITBeneEntry = () => {
                   {bulkPreviewData.some((item) => hasDuplicateError(item.errors)) && (
                     <Alert variant="danger" className="mt-3 mb-0">
                       <FaExclamationTriangle className="me-2" />
-                      <strong>Duplicate Entries Found - Upload Disabled!</strong>
+                      <strong>{t("Duplicate Entries Found - Upload Disabled!", "डुप्लिकेट प्रविष्टियां मिलीं - अपलोड अक्षम है!")}</strong>
                       <div className="mt-2 mb-1" style={{ fontSize: "0.8rem" }}>
-                        The following rows have the same{" "}
-                        <strong>District + Project + Trimester + Financial Year</strong> combination that already exists:
+                        {t("The following rows have the same", "निम्न पंक्तियों में समान")}{" "}
+                        <strong>{t("District + Project + Trimester + Financial Year", "जिला + परियोजना + तिमाही + वित्तीय वर्ष")}</strong> {t("combination that already exists:", "का संयोजन पहले से मौजूद है:")}
                       </div>
                       <ul className="mb-0" style={{ fontSize: "0.8rem" }}>
                         {bulkPreviewData.filter((item) => hasDuplicateError(item.errors)).map((item, idx) => (
                           <li key={idx}>
-                            <strong>Row {bulkPreviewData.indexOf(item) + 1}:</strong>{" "}
+                            <strong>{t("Row", "पंक्ति")} {bulkPreviewData.indexOf(item) + 1}:</strong>{" "}
                             {item.errors.duplicate_server || item.errors.duplicate_file}
                           </li>
                         ))}
@@ -1086,12 +1088,12 @@ const ITBeneEntry = () => {
               )}
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="secondary" onClick={handleCloseBulkUploadModal} disabled={bulkUploading}>Cancel</Button>
-              <Button variant="primary" onClick={handleBulkUpload} disabled={isBulkUploadDisabled} title={isBulkUploadDisabled && bulkFile ? "Fix all duplicate errors (District + Project + Trimester + Financial Year) before uploading" : ""}>
+              <Button variant="secondary" onClick={handleCloseBulkUploadModal} disabled={bulkUploading}>{t("Cancel", "रद्द करें")}</Button>
+              <Button variant="primary" onClick={handleBulkUpload} disabled={isBulkUploadDisabled} title={isBulkUploadDisabled && bulkFile ? t("Fix all duplicate errors (District + Project + Trimester + Financial Year) before uploading", "अपलोड करने से पहले डुप्लिकेट त्रुटियां ठीक करें (जिला + परियोजना + तिमाही + वित्तीय वर्ष)") : ""}>
                 {bulkUploading ? (
-                  <><Spinner as="span" animation="border" size="sm" /> Uploading...</>
+                  <><Spinner as="span" animation="border" size="sm" /> {t("Uploading...", "अपलोड हो रहा है...")}</>
                 ) : (
-                  "Upload"
+                  t("Upload", "अपलोड करें")
                 )}
               </Button>
             </Modal.Footer>

@@ -1,9 +1,11 @@
 import React from "react";
 import { Container, Row, Col } from "react-bootstrap";
 import "../../assets/css/footer.css";
+import { useLanguage } from "../all_login/LanguageContext";
 
 function Footer() {
   const currentYear = new Date().getFullYear();
+  const { t } = useLanguage();
 
   return (
     <footer className="gov-footer py-2">
@@ -11,11 +13,11 @@ function Footer() {
         <Row className="align-items-center">
           <Col md={12} className="text-center">
             <p className="mb-0">
-  © 2026 Food Chain &amp; Supply. All Rights Reserved.
+  © {currentYear} {t("Food Chain & Supply. All Rights Reserved.", "फूड चेन एंड सप्लाई। सर्वाधिकार सुरक्षित।")}
 </p>
 
 <p className="mb-0 mt-1">
-  Designed &amp; Developed by{" "}
+  {t("Designed & Developed by", "डिज़ाइन एवं विकास")}{" "}
   <a
     href="https://brainrock.in"
     target="_blank"

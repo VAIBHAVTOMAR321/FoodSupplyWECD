@@ -5,6 +5,7 @@ import {
 } from "react-bootstrap";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import AnganwadiLeftNav from "./AnganwadiLeftNav";
 import AnganwadiHeader from "./AnganwadiHeader";
 
@@ -345,6 +346,7 @@ const downloadGrantWisePDF = async ({ title, filename, records, totalsRow }) => 
 };
 
 const FoodItemReceiving = () => {
+  const { t } = useLanguage();
   const { api } = useAuth();
 
   // ── NEW: ref for scrolling modal to top on error ──
@@ -553,15 +555,15 @@ const FoodItemReceiving = () => {
     const totalQty = parseFloat(formData.quantity) || 0;
     const listTotal = packetExpiryTotal;
     if (!totalQty && !listTotal) {
-      return { ok: false, message: 'Enter quantity & packet details.', variant: 'muted' };
+      return { ok: false, message: t('Enter quantity & packet details.', 'मात्रा और पैकेट विवरण दर्ज करें।'), variant: 'muted' };
     }
     if (listTotal > totalQty) {
-      return { ok: false, message: `List total (${listTotal}) exceeds quantity (${totalQty}).`, variant: 'danger' };
+      return { ok: false, message: t(`List total (${listTotal}) exceeds quantity (${totalQty}).`, `सूची का कुल (${listTotal}) मात्रा (${totalQty}) से अधिक है।`), variant: 'danger' };
     }
     if (listTotal === totalQty) {
-      return { ok: true, message: `List total (${listTotal}) matches quantity ✓`, variant: 'success' };
+      return { ok: true, message: t(`List total (${listTotal}) matches quantity ✓`, `सूची का कुल (${listTotal}) मात्रा से मेल खाता है ✓`), variant: 'success' };
     }
-    return { ok: false, message: `List total (${listTotal}). Required: ${totalQty}. Remaining: ${totalQty - listTotal}`, variant: 'warning' };
+    return { ok: false, message: t(`List total (${listTotal}). Required: ${totalQty}. Remaining: ${totalQty - listTotal}`, `सूची का कुल (${listTotal})। आवश्यक: ${totalQty}। शेष: ${totalQty - listTotal}`), variant: 'warning' };
   }, [packetExpiryTotal, formData.quantity]);
 
   // Expiry batch details are optional. Only enforce the packet-total match
@@ -616,7 +618,7 @@ const FoodItemReceiving = () => {
         },
       });
     } catch (err) {
-      setError("Failed to fetch data. Please refresh the page.");
+      setError(t("Failed to fetch data. Please refresh the page.", "डेटा प्राप्त नहीं हो सका। कृपया पृष्ठ रीफ़्रेश करें।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -860,20 +862,20 @@ const FoodItemReceiving = () => {
 
     const trimesterValue = normalizeTrimester(formData.quarter) || formData.quarter || '';
     if (!trimesterValue) {
-      setFormErrorAndScroll('कृपया receiving के लिए trimester चुनें।');
+      setFormErrorAndScroll(t('Please select a trimester for receiving.', 'कृपया प्राप्ति के लिए त्रैमासिक अवधि चुनें।'));
       setSubmitting(false);
       return;
     }
 
     // At least one receiving month is mandatory; expiry details are optional.
     if (selectedMonths.length === 0) {
-      setFormErrorAndScroll('कृपया receiving के लिए कम से कम एक महीना चुनें।');
+      setFormErrorAndScroll(t('Please select at least one month for receiving.', 'कृपया प्राप्ति के लिए कम से कम एक महीना चुनें।'));
       setSubmitting(false);
       return;
     }
 
     if (!selectedTrimesterHasData) {
-      setFormErrorAndScroll(`इस trimester (${trimesterValue}) के लिए Supplementary Nutrition में data उपलब्ध नहीं है। कृपया दूसरा trimester चुनें।`);
+      setFormErrorAndScroll(t(`No Supplementary Nutrition data is available for trimester (${trimesterValue}). Please select another trimester.`, `इस त्रैमासिक अवधि (${trimesterValue}) के लिए पूरक पोषण डेटा उपलब्ध नहीं है। कृपया दूसरी अवधि चुनें।`));
       setSubmitting(false);
       return;
     }
@@ -895,14 +897,14 @@ const FoodItemReceiving = () => {
         formData.fin_year || getCurrentFinancialYear()
       );
       setFormErrorAndScroll(
-        `Your receiving limit for ${trimesterValue} is ${totalAllocated} packets. All ${totalAllocated} allocated packets have already been received in ${isThr ? 'THR' : 'HCM'} Receiving. You cannot add more receiving for this food item and trimester.`
+        t(`Your receiving limit for ${trimesterValue} is ${totalAllocated} packets. All ${totalAllocated} allocated packets have already been received in ${isThr ? 'THR' : 'HCM'} Receiving. You cannot add more receiving for this food item and trimester.`, `${trimesterValue} के लिए आपकी प्राप्ति सीमा ${totalAllocated} पैकेट है। सभी आवंटित पैकेट ${isThr ? 'THR' : 'HCM'} प्राप्ति में दर्ज हो चुके हैं। इस खाद्य सामग्री और अवधि के लिए और प्राप्ति दर्ज नहीं की जा सकती।`)
       );
       setSubmitting(false);
       return;
     }
 
     if (parsedQuantity > allocationLimit) {
-      setFormErrorAndScroll(`Your remaining receiving limit for ${trimesterValue} is ${allocationLimit} packets. You cannot receive more than the allocated quantity.`);
+      setFormErrorAndScroll(t(`Your remaining receiving limit for ${trimesterValue} is ${allocationLimit} packets. You cannot receive more than the allocated quantity.`, `${trimesterValue} के लिए आपकी शेष प्राप्ति सीमा ${allocationLimit} पैकेट है। आवंटित मात्रा से अधिक प्राप्त नहीं कर सकते।`));
       setSubmitting(false);
       return;
     }
@@ -920,7 +922,7 @@ const FoodItemReceiving = () => {
     });
 
     if (duplicate) {
-      setFormErrorAndScroll("इस माह का प्राप्ति रिकॉर्ड इसी श्रेणी (category) के लिए पहले ही दर्ज है।");
+      setFormErrorAndScroll(t("A receiving record for this month and category already exists.", "इस महीने और श्रेणी के लिए प्राप्ति रिकॉर्ड पहले से दर्ज है।"));
       setSubmitting(false);
       return;
     }
@@ -944,20 +946,20 @@ const FoodItemReceiving = () => {
     // Only validate batch totals when packet details have actually been entered.
     if (cleanedPacketExpiry.length > 0) {
       if (peTotal > parsedQuantity) {
-        setFormErrorAndScroll(`Packet details का योग (${peTotal}) quantity (${parsedQuantity}) से अधिक नहीं हो सकता।`);
+        setFormErrorAndScroll(t(`Packet details total (${peTotal}) cannot exceed quantity (${parsedQuantity}).`, `पैकेट विवरण का कुल (${peTotal}) मात्रा (${parsedQuantity}) से अधिक नहीं हो सकता।`));
         setSubmitting(false);
         return;
       }
       if (peTotal !== parsedQuantity) {
         setFormErrorAndScroll(
-          `Packet details का योग (${peTotal}) और quantity (${parsedQuantity}) समान होना चाहिए। शेष: ${parsedQuantity - peTotal}`
+          t(`Packet details total (${peTotal}) must equal quantity (${parsedQuantity}). Remaining: ${parsedQuantity - peTotal}`, `पैकेट विवरण का कुल (${peTotal}) मात्रा (${parsedQuantity}) के बराबर होना चाहिए। शेष: ${parsedQuantity - peTotal}`)
         );
         setSubmitting(false);
         return;
       }
       const incomplete = cleanedPacketExpiry.find(r => r[0] === '' || r[1] === '');
       if (incomplete) {
-        setFormErrorAndScroll("यदि Packet Details भर रहे हैं, तो हर batch में packet count और expiry date दोनों भरें।");
+        setFormErrorAndScroll(t("If you enter Packet Details, provide both packet count and expiry date for every batch.", "यदि पैकेट विवरण भरते हैं, तो हर बैच के लिए पैकेट संख्या और समाप्ति तिथि दोनों भरें।"));
         setSubmitting(false);
         return;
       }
@@ -1011,7 +1013,7 @@ const FoodItemReceiving = () => {
           }
         }
       }
-      setFormErrorAndScroll(`Failed to ${editingItem ? 'update' : 'create'} record. ${backendMessage || 'Please try again.'}`);
+      setFormErrorAndScroll(t(`Failed to ${editingItem ? 'update' : 'create'} record. ${backendMessage || 'Please try again.'}`, `${editingItem ? 'अपडेट' : 'नया'} रिकॉर्ड नहीं बनाया जा सका। ${backendMessage || 'कृपया पुनः प्रयास करें।'}`));
       console.error("API Error:", err.response ? err.response.data : err);
     } finally {
       setSubmitting(false);
@@ -1019,13 +1021,13 @@ const FoodItemReceiving = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this receiving record?")) {
+    if (window.confirm(t("Are you sure you want to delete this receiving record?", "क्या आप वाकई यह प्राप्ति रिकॉर्ड हटाना चाहते हैं?"))) {
       const url = activeTab === 'thr' ? API_URLS.thr_receiving : API_URLS.hcm_receiving;
       try {
         await api.delete(url, { data: { id } });
         fetchData();
       } catch (err) {
-        alert("Failed to delete record.");
+        alert(t("Failed to delete record.", "रिकॉर्ड हटाया नहीं जा सका।"));
         console.error(err);
       }
     }
@@ -1342,20 +1344,20 @@ const FoodItemReceiving = () => {
         <thead>
           <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
             <th>#</th>
-            <th>Date</th>
-            <th>Trimester Packets Distribution</th>
-            <th>Beneficiary Category</th>
-            <th>Packets</th>
-            <th>Unit</th>
-            <th>Fin. Year</th>
-            <th>Current Month</th>
-            <th>Max Expiry Date</th>
-            <th>Trimester</th>
-            <th>Months</th>
-            <th>Expired Packets / समाप्त पैकेट</th>
-            <th>Expiry Details / समाप्ति विवरण</th>
-            <th>Sector Status</th>
-            <th>Actions</th>
+            <th>{t("Date", "दिनांक")}</th>
+            <th>{t("Trimester Packets Distribution", "त्रैमासिक पैकेट वितरण")}</th>
+            <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+            <th>{t("Packets", "पैकेट")}</th>
+            <th>{t("Unit", "इकाई")}</th>
+            <th>{t("Fin. Year", "वित्तीय वर्ष")}</th>
+            <th>{t("Current Month", "वर्तमान महीना")}</th>
+            <th>{t("Max Expiry Date", "अधिकतम समाप्ति तिथि")}</th>
+            <th>{t("Trimester", "त्रैमासिक अवधि")}</th>
+            <th>{t("Months", "महीने")}</th>
+            <th>{t("Expired Packets", "समाप्त पैकेट")}</th>
+            <th>{t("Expiry Details", "समाप्ति विवरण")}</th>
+            <th>{t("Sector Status", "सेक्टर स्थिति")}</th>
+            <th>{t("Actions", "कार्रवाई")}</th>
           </tr>
         </thead>
         <tbody>
@@ -1373,7 +1375,7 @@ const FoodItemReceiving = () => {
               <td>{normalizeTrimester(rec.quarter) || rec.quarter || '-'}</td>
               <td>{formatMonths(getMonthsArray(rec))}</td>
               <td className="text-center">{getExpiredPacketCount(rec).toLocaleString()}</td>
-              <td style={{ minWidth: '260px', whiteSpace: 'normal', verticalAlign: 'top', overflowWrap: 'anywhere', lineHeight: 1.5, height: 'auto' }}>{getExpiryBreakdown(rec) || 'No expiry details / समाप्ति विवरण उपलब्ध नहीं'}</td>
+              <td style={{ minWidth: '260px', whiteSpace: 'normal', verticalAlign: 'top', overflowWrap: 'anywhere', lineHeight: 1.5, height: 'auto' }}>{getExpiryBreakdown(rec) || t('No expiry details available.', 'समाप्ति विवरण उपलब्ध नहीं है।')}</td>
               <td>
                 <Badge bg={getStatusVariant(rec.sector_status)}>{rec.sector_status || 'pending'}</Badge>
               </td>
@@ -1381,7 +1383,7 @@ const FoodItemReceiving = () => {
                 <div className="d-flex gap-1 flex-wrap">
                   {rec.sector_status === 'approved' || rec.sector_status === 'rejected' ? (
                     <Button variant="outline-info" size="sm" onClick={() => handleOpenViewModal(rec)}>
-                      <FaEye /> View
+                      <FaEye /> {t("View", "देखें")}
                     </Button>
                   ) : (
                     <>
@@ -1398,22 +1400,22 @@ const FoodItemReceiving = () => {
                       variant="outline-warning"
                       size="sm"
                       onClick={() => handleOpenExpiryModal(rec)}
-                      title="View Packet Expiry Details"
+                      title={t("View Packet Expiry Details", "पैकेट समाप्ति विवरण देखें")}
                     >
-                      <FaCalendarCheck /> Expiry
+                      <FaCalendarCheck /> {t("Expiry", "समाप्ति")}
                     </Button>
                   )}
                 </div>
               </td>
             </tr>
           )) : (
-            <tr><td colSpan="15" className="text-center">No records found.</td></tr>
+            <tr><td colSpan="15" className="text-center">{t("No records found.", "कोई रिकॉर्ड नहीं मिला।")}</td></tr>
           )}
         </tbody>
         {records.length > 0 && (
           <tfoot>
             <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
-              <td colSpan="4" className="text-end">Total Quantity:</td>
+              <td colSpan="4" className="text-end">{t("Total Quantity:", "कुल मात्रा:")}</td>
               <td>{totalQuantity}</td>
               <td colSpan="10"></td>
             </tr>
@@ -1433,9 +1435,9 @@ const FoodItemReceiving = () => {
         <Row className="mb-3 g-2 align-items-end">
           <Col md={3}>
             <Form.Group>
-              <Form.Label>Trimester</Form.Label>
+              <Form.Label>{t("Trimester", "त्रैमासिक अवधि")}</Form.Label>
               <Form.Select name="quarter" value={suppFilters.quarter} onChange={handleSuppFilterChange}>
-                <option value="">All Trimesters</option>
+                <option value="">{t("All Trimesters", "सभी त्रैमासिक अवधियां")}</option>
                 {suppUniqueTrimesters.map(trimester => (
                   <option key={trimester} value={trimester}>{trimester}</option>
                 ))}
@@ -1444,20 +1446,20 @@ const FoodItemReceiving = () => {
           </Col>
           <Col md={3}>
             <Form.Group>
-              <Form.Label>Financial Year</Form.Label>
+              <Form.Label>{t("Financial Year", "वित्तीय वर्ष")}</Form.Label>
               <Form.Select name="financial_year" value={suppFilters.financial_year} onChange={handleSuppFilterChange}>
-                <option value="">All Years</option>
+                <option value="">{t("All Years", "सभी वर्ष")}</option>
                 {suppUniqueFYs.map(y => <option key={y} value={y}>{y}</option>)}
               </Form.Select>
             </Form.Group>
           </Col>
           <Col md={6} className="d-flex gap-2 justify-content-end align-items-end flex-wrap">
-            <Button variant="secondary" size="sm" onClick={resetSuppFilters}>Reset</Button>
+            <Button variant="secondary" size="sm" onClick={resetSuppFilters}>{t("Reset", "रीसेट करें")}</Button>
             <Button variant="success" size="sm" onClick={exportSuppToExcel} disabled={!records.length}>
-              <FaFileExcel className="me-1" /> Excel
+              <FaFileExcel className="me-1" /> {t("Excel", "एक्सेल")}
             </Button>
             <Button variant="danger" size="sm" onClick={exportSuppToPDF} disabled={!records.length}>
-              <FaFilePdf className="me-1" /> PDF
+              <FaFilePdf className="me-1" /> {t("PDF", "पीडीएफ")}
             </Button>
           </Col>
         </Row>
@@ -1471,22 +1473,32 @@ const FoodItemReceiving = () => {
           >
             <thead>
               <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
-                <th rowSpan={2} className="text-center align-middle">S. No.</th>
+                <th rowSpan={2} className="text-center align-middle">{t("S. No.", "क्रम सं.")}</th>
                 {EXCEL_META_COLUMNS.map((col) => (
-                  <th key={col.key} rowSpan={2} className="text-center align-middle">{col.header}</th>
+                  <th key={col.key} rowSpan={2} className="text-center align-middle">{t(col.header, ({
+                    DISTRICT: "जिला", PROJECT: "परियोजना", SECTOR: "सेक्टर",
+                    "AWC NAME": "आंगनवाड़ी केंद्र का नाम", "AWC CODE": "आंगनवाड़ी केंद्र कोड",
+                    Trimester: "त्रैमासिक अवधि", "FINANCIAL YEAR": "वित्तीय वर्ष"
+                  })[col.header])}</th>
                 ))}
                 {GRANT_CATEGORIES.map((cat, index) => (
                   <th key={cat.countKey} colSpan={4 + getFoodForCategory(index).length} className="text-center align-middle supp-grant-group-header">
-                    {cat.title}
+                    {t(cat.title, ({
+                      "Pregnant Woman and Lactating Mother": "गर्भवती महिलाएं और स्तनपान कराने वाली माताएं",
+                      "Children 6m-3y": "6 माह से 3 वर्ष के बच्चे",
+                      "SAM 6M-5Y / SUW 6M-6Y": "SAM 6 माह–5 वर्ष / SUW 6 माह–6 वर्ष",
+                      "SAM 3Y-5Y / SUW 3Y-6Y": "SAM 3–5 वर्ष / SUW 3–6 वर्ष",
+                      "HCM Beneficiaries 3Y-6Y (Normal Children)": "HCM लाभार्थी 3–6 वर्ष (सामान्य बच्चे)"
+                    })[cat.title])}
                   </th>
                 ))}
               </tr>
               <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
                 {GRANT_CATEGORIES.flatMap((cat, index) => [
                   ...[15, 30, 31].map((grantId) => (
-                    <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
+                    <th key={`${cat.countKey}-${grantId}`} className="text-center">{t(`Grant ${grantId}`, `अनुदान ${grantId}`)}</th>
                   )),
-                  <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>,
+                  <th key={`${cat.countKey}-total`} className="text-center">{t("TOTAL", "कुल")}</th>,
                   ...getFoodForCategory(index).map((food) => (
                     <th key={food.key} className="text-center supp-food-subheader">{food.header}</th>
                   )),
@@ -1520,7 +1532,7 @@ const FoodItemReceiving = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={totalCols} className="text-center text-muted p-4">No supplementary nutrition records found.</td>
+                  <td colSpan={totalCols} className="text-center text-muted p-4">{t("No supplementary nutrition records found.", "पूरक पोषण का कोई रिकॉर्ड नहीं मिला।")}</td>
                 </tr>
               )}
             </tbody>
@@ -1529,7 +1541,7 @@ const FoodItemReceiving = () => {
                 <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
                   <th></th>
                   {EXCEL_META_COLUMNS.map((col, idx) => (
-                    <th key={col.key}>{idx === 0 ? "TOTAL" : ""}</th>
+                    <th key={col.key}>{idx === 0 ? t("TOTAL", "कुल") : ""}</th>
                   ))}
                   {GRANT_CATEGORIES.flatMap((cat, categoryIndex) => [
                     <th key={`${cat.countKey}-g15`}></th>,
@@ -1555,18 +1567,18 @@ const FoodItemReceiving = () => {
       <Row className="mb-3 align-items-end">
         <Col md={4}>
           <Form.Group>
-            <Form.Label>Financial Year</Form.Label>
+            <Form.Label>{t("Financial Year", "वित्तीय वर्ष")}</Form.Label>
             <Form.Select name="fin_year" value={filters.fin_year} onChange={handleFilterChange}>
-              <option value="">All Years</option>
+              <option value="">{t("All Years", "सभी वर्ष")}</option>
               {currentFilters && currentFilters.fin_year ? currentFilters.fin_year.map(year => <option key={year} value={year}>{year}</option>) : null}
             </Form.Select>
           </Form.Group>
         </Col>
         <Col md={4}>
           <Form.Group>
-            <Form.Label>Months</Form.Label>
+            <Form.Label>{t("Months", "महीने")}</Form.Label>
             <Dropdown>
-              <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? `${filters.months.length} selected` : 'All Months'}</Dropdown.Toggle>
+              <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? t(`${filters.months.length} selected`, `${filters.months.length} चयनित`) : t('All Months', 'सभी महीने')}</Dropdown.Toggle>
               <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                 {currentFilters && currentFilters.months ? currentFilters.months.map(v => (
                   <Dropdown.Item key={v} as="div">
@@ -1578,7 +1590,7 @@ const FoodItemReceiving = () => {
           </Form.Group>
         </Col>
         <Col md={4} className="d-flex align-items-end gap-2 flex-wrap">
-          <Button variant="secondary" onClick={resetFilters}>Reset</Button>
+          <Button variant="secondary" onClick={resetFilters}>{t("Reset", "रीसेट करें")}</Button>
           <Button variant="outline-success" onClick={exportReceivingToExcel} disabled={!(activeTab === 'thr' ? filteredThrReceivings : filteredHcmReceivings).length}>
             <FaFileExcel className="me-1" /> Excel
           </Button>
@@ -1742,10 +1754,10 @@ const FoodItemReceiving = () => {
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading d-flex justify-content-between align-items-center">
             <h3 className="fw-bold mb-4">
-              <FaBoxes className="me-2" /> Food Item Receiving
+              <FaBoxes className="me-2" /> {t("Food Item Receiving", "खाद्य सामग्री प्राप्ति")}
             </h3>
             {activeTab !== 'supp' && (
-              <Button onClick={() => handleOpenModal()}>Add New Receiving</Button>
+              <Button onClick={() => handleOpenModal()}>{t("Add New Receiving", "नई प्राप्ति जोड़ें")}</Button>
             )}
           </div>
 
@@ -1754,30 +1766,30 @@ const FoodItemReceiving = () => {
 
           <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k)} id="receiving-tabs" className="mb-3">
 
-            <Tab eventKey="hcm" title="HCM Receiving">
+            <Tab eventKey="hcm" title={t("HCM Receiving", "HCM प्राप्ति")}>
               {!loading && !error && (
                 <>
-                  <h5 className="mt-4">HCM Receiving Records</h5>
+                  <h5 className="mt-4">{t("HCM Receiving Records", "HCM प्राप्ति रिकॉर्ड")}</h5>
                   {renderFilters()}
                   {renderTable(filteredHcmReceivings)}
                 </>
               )}
             </Tab>
 
-            <Tab eventKey="thr" title="THR Receiving">
+            <Tab eventKey="thr" title={t("THR Receiving", "THR प्राप्ति")}>
               {!loading && !error && (
                 <>
-                  <h5 className="mt-4">THR Receiving Records</h5>
+                  <h5 className="mt-4">{t("THR Receiving Records", "THR प्राप्ति रिकॉर्ड")}</h5>
                   {renderFilters()}
                   {renderTable(filteredThrReceivings)}
                 </>
               )}
             </Tab>
 
-            <Tab eventKey="supp" title="Supplementary Nutrition">
+            <Tab eventKey="supp" title={t("Supplementary Nutrition", "पूरक पोषण")}>
               {!loading && !error && (
                 <>
-                  <h5 className="mt-4">Supplementary Nutrition Records</h5>
+                  <h5 className="mt-4">{t("Supplementary Nutrition Records", "पूरक पोषण रिकॉर्ड")}</h5>
                   {renderSuppTable(filteredSuppNutritionData)}
                 </>
               )}
@@ -1788,7 +1800,7 @@ const FoodItemReceiving = () => {
 
         <Modal show={showModal} onHide={handleCloseModal} centered size="lg">
           <Modal.Header closeButton>
-            <Modal.Title>{editingItem ? 'Edit' : 'Add'} {activeTab.toUpperCase()} Receiving</Modal.Title>
+            <Modal.Title>{t(editingItem ? 'Edit' : 'Add', editingItem ? 'संपादित करें' : 'जोड़ें')} {activeTab.toUpperCase()} {t('Receiving', 'प्राप्ति')}</Modal.Title>
           </Modal.Header>
           <Modal.Body ref={modalBodyRef} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             {formError && <Alert variant="danger">{formError}</Alert>}
@@ -1796,28 +1808,28 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Select Trimester <span className="text-danger">*</span></Form.Label>
+                    <Form.Label>{t("Select Trimester", "त्रैमासिक अवधि चुनें")} <span className="text-danger">*</span></Form.Label>
                     <Form.Select name="quarter" value={normalizeTrimester(formData.quarter) || ''} onChange={handleFormChange} required>
-                      <option value="">Select Trimester</option>
+                      <option value="">{t("Select Trimester", "त्रैमासिक अवधि चुनें")}</option>
                       {TRIMESTER_OPTIONS.map(q => <option key={q.value} value={q.value}>{q.label}</option>)}
                     </Form.Select>
                     {formData.quarter && !selectedTrimesterHasData && (
                       <Alert variant="danger" className="mt-2 mb-0 py-2" role="alert">
-                        <strong>Data not available:</strong> Supplementary Nutrition data is not found for this trimester. Please select another trimester.
+                        <strong>{t("Data not available:", "डेटा उपलब्ध नहीं है:")}</strong> {t("Supplementary Nutrition data is not found for this trimester. Please select another trimester.", "इस त्रैमासिक अवधि के लिए पूरक पोषण डेटा नहीं मिला। कृपया दूसरी अवधि चुनें।")}
                       </Alert>
                     )}
                   </Form.Group>
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Trimester Packets Distribution <span className="text-danger">*</span></Form.Label>
+                    <Form.Label>{t("Trimester Packets Distribution", "त्रैमासिक पैकेट वितरण")} <span className="text-danger">*</span></Form.Label>
                     <Form.Select
                       name="food_item"
                       value={formData.food_item_value || ''}
                       onChange={handleFormChange}
                       required
                     >
-                      <option value="">Select Trimester Packets Distribution</option>
+                      <option value="">{t("Select Trimester Packets Distribution", "त्रैमासिक पैकेट वितरण चुनें")}</option>
                       {availableFoodItems.map((item, index) => {
                         const itemCategory = item.beneficiary_category || FOOD_BENE_CATEGORY_MAP[item.food_item] || '';
                         const itemValue = itemCategory
@@ -1828,7 +1840,7 @@ const FoodItemReceiving = () => {
                             {item.food_item}
                           </option>,
                           <option key={`${index}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>
-                            &nbsp;&nbsp;↳ Category: {itemCategory || 'N/A'}
+                            &nbsp;&nbsp;↳ {t("Category:", "श्रेणी:")} {itemCategory || 'N/A'}
                           </option>
                         ];
                       })}
@@ -1837,7 +1849,7 @@ const FoodItemReceiving = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Packets (Auto-fetched from Supplementary Nutrition) <span className="text-danger">*</span></Form.Label>
+                    <Form.Label>{t("Packets (Auto-fetched from Supplementary Nutrition)", "पैकेट (पूरक पोषण से स्वतः प्राप्त)")} <span className="text-danger">*</span></Form.Label>
                     <InputGroup>
                       <Form.Control
                         type="number"
@@ -1849,12 +1861,12 @@ const FoodItemReceiving = () => {
                           const value = e.target.value;
                           if (value !== '' && Number(value) > remainingAllocation) {
                             setFormData(prev => ({ ...prev, quantity: String(remainingAllocation) }));
-                            setFormError(`Maximum packets available for receiving: ${remainingAllocation}.`);
+                            setFormError(t(`Maximum packets available for receiving: ${remainingAllocation}.`, `प्राप्ति के लिए अधिकतम उपलब्ध पैकेट: ${remainingAllocation}।`));
                           } else {
                             handleFormChange(e);
                           }
                         }}
-                        placeholder="Auto-filled Quantity"
+                        placeholder={t("Auto-filled Quantity", "स्वतः भरी गई मात्रा")}
                         required
                       />
                       <Form.Control
@@ -1862,30 +1874,30 @@ const FoodItemReceiving = () => {
                         name="unit"
                         value={formData.unit || ''}
                         onChange={handleFormChange}
-                        placeholder="Unit"
+                        placeholder={t("Unit", "इकाई")}
                         readOnly
                         required
                       />
                     </InputGroup>
                     {formData.field_name && formData.quarter && remainingAllocation > 0 && (
                       <small className="text-primary d-block mt-1">
-                        Remaining allocation for this trimester: {remainingAllocation} packets.
+                        {t(`Remaining allocation for this trimester: ${remainingAllocation} packets.`, `इस त्रैमासिक अवधि के लिए शेष आवंटन: ${remainingAllocation} पैकेट।`)}
                       </small>
                     )}
                     {formData.field_name && formData.food_item && formData.quarter && remainingAllocation <= 0 && !editingItem && (
                       <Alert variant="danger" className="mt-2 mb-0 py-2" role="alert">
-                        <strong>Receiving limit reached:</strong>{' '}
-                        Your total allocation for {normalizeTrimester(formData.quarter)} is {computePacketsForTrimester(formData.quarter, formData.field_name, formData.fin_year || getCurrentFinancialYear())} packets. All allocated packets have already been received in the {activeTab.toUpperCase()} Receiving table. You cannot add more receiving for this food item and trimester.
+                        <strong>{t("Receiving limit reached:", "प्राप्ति सीमा पूरी हो गई:")}</strong>{' '}
+                        {t(`Your total allocation for ${normalizeTrimester(formData.quarter)} is ${computePacketsForTrimester(formData.quarter, formData.field_name, formData.fin_year || getCurrentFinancialYear())} packets. All allocated packets have already been received in the ${activeTab.toUpperCase()} Receiving table. You cannot add more receiving for this food item and trimester.`, `${normalizeTrimester(formData.quarter)} के लिए आपका कुल आवंटन ${computePacketsForTrimester(formData.quarter, formData.field_name, formData.fin_year || getCurrentFinancialYear())} पैकेट है। सभी आवंटित पैकेट ${activeTab.toUpperCase()} प्राप्ति तालिका में दर्ज हो चुके हैं। इस खाद्य सामग्री और अवधि के लिए और प्राप्ति नहीं जोड़ सकते।`)}
                       </Alert>
                     )}
                     {formData.field_name && (formData.quantity === '' || formData.quantity === undefined) && (
                       <small className="text-warning d-block mt-1">
-                        No packet data found in Supplementary Nutrition for the selected trimester and food category.
+                        {t("No packet data found in Supplementary Nutrition for the selected trimester and food category.", "चयनित त्रैमासिक अवधि और खाद्य श्रेणी के लिए पूरक पोषण में पैकेट डेटा नहीं मिला।")}
                       </small>
                     )}
                     {formData.field_name && formData.quantity !== '' && formData.quantity !== undefined && Number(formData.quantity) > 0 && (
                       <small className="text-success d-block mt-1">
-                        ✓ Total packets auto-fetched for {normalizeTrimester(formData.quarter) || 'selected trimester'} from Supplementary Nutrition.
+                        {t(`✓ Total packets auto-fetched for ${normalizeTrimester(formData.quarter) || 'selected trimester'} from Supplementary Nutrition.`, `✓ ${normalizeTrimester(formData.quarter) || 'चयनित अवधि'} के लिए कुल पैकेट पूरक पोषण से स्वतः प्राप्त हुए।`)}
                       </small>
                     )}
                   </Form.Group>
@@ -1895,13 +1907,13 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col>
                   <Form.Group className="mb-3">
-                    <Form.Label>Beneficiary Category</Form.Label>
+                    <Form.Label>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</Form.Label>
                     <Form.Control
                       type="text"
                       name="bene_category"
                       value={formData.bene_category || ''}
                       onChange={handleFormChange}
-                      placeholder="Enter Beneficiary Category"
+                      placeholder={t("Enter Beneficiary Category", "लाभार्थी श्रेणी दर्ज करें")}
                       required
                       disabled
                     />
@@ -1912,7 +1924,7 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Date of Receiving <span className="text-danger">*</span></Form.Label>
+                    <Form.Label>{t("Date of Receiving", "प्राप्ति की तिथि")} <span className="text-danger">*</span></Form.Label>
                     <Form.Control
                       type="date"
                       name="date"
@@ -1924,13 +1936,13 @@ const FoodItemReceiving = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Financial Year</Form.Label>
+                    <Form.Label>{t("Financial Year", "वित्तीय वर्ष")}</Form.Label>
                     <Form.Control
                       type="text"
                       name="fin_year"
                       value={formData.fin_year || ''}
                       onChange={handleFormChange}
-                      placeholder="e.g., 2025-26"
+                      placeholder={t("e.g., 2025-26", "उदाहरण: 2025-26")}
                       required
                       disabled
                     />
@@ -1941,7 +1953,7 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Current Month (Auto-filled)</Form.Label>
+                    <Form.Label>{t("Current Month (Auto-filled)", "वर्तमान महीना (स्वतः भरा गया)")}</Form.Label>
                     <Form.Control
                       type="text"
                       name="curr_month"
@@ -1952,7 +1964,7 @@ const FoodItemReceiving = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Max Expiry Date (Safe to distribute till) <span className="text-muted">(Optional)</span></Form.Label>
+                    <Form.Label>{t("Max Expiry Date (Safe to distribute till)", "अधिकतम समाप्ति तिथि (इस तिथि तक वितरण सुरक्षित है)")} <span className="text-muted">({t("Optional", "वैकल्पिक")})</span></Form.Label>
                     <Form.Control
                       type="date"
                       name="max_expirydate"
@@ -1966,7 +1978,7 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={12}>
                   <Form.Group className="mb-3">
-                    <h6 className="mt-2 mb-3">Select Months (Only months in the selected trimester) <span className="text-danger">*</span></h6>
+                    <h6 className="mt-2 mb-3">{t("Select Months (Only months in the selected trimester)", "महीने चुनें (केवल चयनित त्रैमासिक अवधि के महीने)")} <span className="text-danger">*</span></h6>
                     <div className="month-checkbox-group d-flex flex-wrap gap-2">
                       {availableMonthsForSelectedFoodItem.map((monthValue) => {
                         const month = monthOptions.find(m => m.value === monthValue) || { value: monthValue, label: monthValue };
@@ -1988,10 +2000,10 @@ const FoodItemReceiving = () => {
                       })}
                     </div>
                     {!formData.field_name ? (
-                      <small className="text-muted">Select a trimester first. Only the three months in that trimester can be selected for receiving.</small>
+                      <small className="text-muted">{t("Select a trimester first. Only the three months in that trimester can be selected for receiving.", "पहले त्रैमासिक अवधि चुनें। प्राप्ति के लिए उसी अवधि के केवल तीन महीने चुने जा सकते हैं।")}</small>
                     ) : (
                       <small className="text-muted">
-                        Select only the months in which receiving is being recorded. Packet total is fetched independently from Supplementary Nutrition using the selected trimester and food category.
+                        {t("Select only the months in which receiving is being recorded. Packet total is fetched independently from Supplementary Nutrition using the selected trimester and food category.", "केवल वे महीने चुनें जिनमें प्राप्ति दर्ज की जा रही है। पैकेट की कुल संख्या चयनित त्रैमासिक अवधि और खाद्य श्रेणी के आधार पर पूरक पोषण से प्राप्त होती है।")}
                       </small>
                     )}
                   </Form.Group>
@@ -2003,9 +2015,9 @@ const FoodItemReceiving = () => {
                   <Form.Group className="mb-3">
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <div>
-                        <h6 className="mb-0">Packet Details (Per Expiry Batch) <span className="text-muted">(Optional)</span></h6>
+                        <h6 className="mb-0">{t("Packet Details (Per Expiry Batch)", "पैकेट विवरण (प्रत्येक समाप्ति बैच के लिए)")} <span className="text-muted">({t("Optional", "वैकल्पिक")})</span></h6>
                         <small className="text-muted">
-                          Optional — receiving can be saved without packet-wise expiry details.
+                          {t("Optional — receiving can be saved without packet-wise expiry details.", "वैकल्पिक — पैकेट-वार समाप्ति विवरण के बिना भी प्राप्ति सहेजी जा सकती है।")}
                         </small>
                       </div>
                       <Button
@@ -2017,7 +2029,7 @@ const FoodItemReceiving = () => {
                           packetExpiryTotal >= (parseFloat(formData.quantity) || 0)
                         }
                       >
-                        <FaPlus className="me-1" /> Add Row
+                        <FaPlus className="me-1" /> {t("Add Row", "पंक्ति जोड़ें")}
                       </Button>
                     </div>
 
@@ -2025,10 +2037,10 @@ const FoodItemReceiving = () => {
                       <thead>
                         <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
                           <th style={{ width: '40px' }}>#</th>
-                          <th style={{ width: '120px' }}>Packets</th>
-                          <th style={{ width: '160px' }}>Expiry Date</th>
-                          <th>Remarks</th>
-                          <th style={{ width: '80px' }}>Action</th>
+                          <th style={{ width: '120px' }}>{t("Packets", "पैकेट")}</th>
+                          <th style={{ width: '160px' }}>{t("Expiry Date", "समाप्ति तिथि")}</th>
+                          <th>{t("Remarks", "टिप्पणियां")}</th>
+                          <th style={{ width: '80px' }}>{t("Action", "कार्रवाई")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2041,7 +2053,7 @@ const FoodItemReceiving = () => {
                                 min="0"
                                 value={row ? row[0] : ''}
                                 onChange={(e) => handlePacketExpiryChange(idx, 'count', e.target.value)}
-                                placeholder="Packets"
+                                placeholder={t("Packets", "पैकेट")}
                                 isInvalid={
                                   (parseFloat(formData.quantity) || 0) > 0 &&
                                   (parseFloat(row && row[0]) || 0) > 0 &&
@@ -2061,7 +2073,7 @@ const FoodItemReceiving = () => {
                                 type="text"
                                 value={row ? row[2] : ''}
                                 onChange={(e) => handlePacketExpiryChange(idx, 'remarks', e.target.value)}
-                                placeholder="Enter remarks for this batch"
+                                placeholder={t("Enter remarks for this batch", "इस बैच के लिए टिप्पणियां दर्ज करें")}
                               />
                             </td>
                             <td className="text-center">
@@ -2079,7 +2091,7 @@ const FoodItemReceiving = () => {
                       </tbody>
                       <tfoot>
                         <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
-                          <td className="text-end">Total:</td>
+                          <td className="text-end">{t("Total:", "कुल:")}</td>
                           <td>{packetExpiryTotal}</td>
                           <td colSpan={3}>
                             <small className={`text-${packetExpiryMatchInfo.variant}`}>
@@ -2090,7 +2102,7 @@ const FoodItemReceiving = () => {
                       </tfoot>
                     </Table>
                     <small className="text-muted d-block">
-                      नोट: Packet details का योग (Total) auto-fetched Packets संख्या के बराबर होना चाहिए — अधिक नहीं हो सकता।
+                      {t("Note: Packet details total must equal the auto-fetched packet count and cannot exceed it.", "ध्यान दें: पैकेट विवरण का कुल स्वतः प्राप्त पैकेट संख्या के बराबर होना चाहिए और उससे अधिक नहीं हो सकता।")}
                     </small>
                   </Form.Group>
                 </Col>
@@ -2098,14 +2110,14 @@ const FoodItemReceiving = () => {
 
               <div className="d-flex justify-content-end">
                 <Button variant="secondary" onClick={handleCloseModal} className="me-2">
-                  Cancel
+                  {t("Cancel", "रद्द करें")}
                 </Button>
                 <Button
                   variant="primary"
                   type="submit"
                   disabled={submitting || (packetExpiryHasInput && !packetExpiryMatchInfo.ok) || (!!formData.quarter && !selectedTrimesterHasData) || (!!formData.field_name && !!formData.food_item && !!formData.quarter && remainingAllocation <= 0 && !editingItem)}
                 >
-                  {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingItem ? 'Update' : 'Submit')}
+                  {submitting ? <Spinner as="span" animation="border" size="sm" /> : t(editingItem ? 'Update' : 'Submit', editingItem ? 'अपडेट करें' : 'जमा करें')}
                 </Button>
               </div>
             </Form>
@@ -2115,35 +2127,35 @@ const FoodItemReceiving = () => {
         {viewItem && (
           <Modal show={showViewModal} onHide={handleCloseViewModal} centered>
             <Modal.Header closeButton className="view-modal-header">
-              <Modal.Title>View Record: {viewItem.food_item}</Modal.Title>
+              <Modal.Title>{t("View Record:", "रिकॉर्ड देखें:")} {viewItem.food_item}</Modal.Title>
             </Modal.Header>
             <Modal.Body className="view-modal-body">
               <ListGroup variant="flush">
-                <ListGroup.Item><FaBuilding className="view-modal-icon" /> <strong>AWC Name:</strong> {viewItem.awc_name}</ListGroup.Item>
-                <ListGroup.Item><FaHashtag className="view-modal-icon" /> <strong>AWC Code:</strong> {viewItem.awc_code}</ListGroup.Item>
-                <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>Trimester Packets Distribution:</strong> {viewItem.food_item}</ListGroup.Item>
-                <ListGroup.Item><FaWeightHanging className="view-modal-icon" /> <strong>Quantity:</strong> {viewItem.quantity} {viewItem.unit}</ListGroup.Item>
-                <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Trimester:</strong> {normalizeTrimester(viewItem.quarter) || viewItem.quarter || '-'}</ListGroup.Item>
+                <ListGroup.Item><FaBuilding className="view-modal-icon" /> <strong>{t("AWC Name:", "आंगनवाड़ी केंद्र का नाम:")}</strong> {viewItem.awc_name}</ListGroup.Item>
+                <ListGroup.Item><FaHashtag className="view-modal-icon" /> <strong>{t("AWC Code:", "आंगनवाड़ी केंद्र कोड:")}</strong> {viewItem.awc_code}</ListGroup.Item>
+                <ListGroup.Item><FaUtensils className="view-modal-icon" /> <strong>{t("Trimester Packets Distribution:", "त्रैमासिक पैकेट वितरण:")}</strong> {viewItem.food_item}</ListGroup.Item>
+                <ListGroup.Item><FaWeightHanging className="view-modal-icon" /> <strong>{t("Quantity:", "मात्रा:")}</strong> {viewItem.quantity} {viewItem.unit}</ListGroup.Item>
+                <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>{t("Trimester:", "त्रैमासिक अवधि:")}</strong> {normalizeTrimester(viewItem.quarter) || viewItem.quarter || '-'}</ListGroup.Item>
                 {viewItem.date ? (
-                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Date:</strong> {new Date(viewItem.date).toLocaleDateString()}</ListGroup.Item>
+                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>{t("Date:", "दिनांक:")}</strong> {new Date(viewItem.date).toLocaleDateString()}</ListGroup.Item>
                 ) : (
                   <>
-                    <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Financial Year:</strong> {viewItem.fin_year}</ListGroup.Item>
-                    <ListGroup.Item><FaCubes className="view-modal-icon" /> <strong>Months:</strong> {formatMonths(getMonthsArray(viewItem))}</ListGroup.Item>
+                    <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>{t("Financial Year:", "वित्तीय वर्ष:")}</strong> {viewItem.fin_year}</ListGroup.Item>
+                    <ListGroup.Item><FaCubes className="view-modal-icon" /> <strong>{t("Months:", "महीने:")}</strong> {formatMonths(getMonthsArray(viewItem))}</ListGroup.Item>
                   </>
                 )}
                 {viewItem.curr_month && (
-                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Current Month:</strong> {viewItem.curr_month}</ListGroup.Item>
+                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>{t("Current Month:", "वर्तमान महीना:")}</strong> {viewItem.curr_month}</ListGroup.Item>
                 )}
                 {viewItem.max_expirydate && (
-                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>Max Expiry Date:</strong> {new Date(viewItem.max_expirydate).toLocaleDateString()}</ListGroup.Item>
+                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>{t("Max Expiry Date:", "अधिकतम समाप्ति तिथि:")}</strong> {new Date(viewItem.max_expirydate).toLocaleDateString()}</ListGroup.Item>
                 )}
                 {Array.isArray(viewItem.packet_expiry) && viewItem.packet_expiry.length > 0 && (
                   <ListGroup.Item>
-                    <FaInfoCircle className="view-modal-icon" /> <strong>Packet Details:</strong>
+                    <FaInfoCircle className="view-modal-icon" /> <strong>{t("Packet Details:", "पैकेट विवरण:")}</strong>
                     <Table bordered size="sm" className="mt-2 mb-0">
                       <thead>
-                        <tr><th>Packets</th><th>Expiry Date</th><th>Remarks</th></tr>
+                        <tr><th>{t("Packets", "पैकेट")}</th><th>{t("Expiry Date", "समाप्ति तिथि")}</th><th>{t("Remarks", "टिप्पणियां")}</th></tr>
                       </thead>
                       <tbody>
                         {viewItem.packet_expiry.map((pe, i) => {
@@ -2162,19 +2174,19 @@ const FoodItemReceiving = () => {
                     </Table>
                   </ListGroup.Item>
                 )}
-                <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>Sector:</strong> {viewItem.sector}</ListGroup.Item>
-                <ListGroup.Item><FaProjectDiagram className="view-modal-icon" /> <strong>Project:</strong> {viewItem.project}</ListGroup.Item>
-                <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>District:</strong> {viewItem.district}</ListGroup.Item>
+                <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>{t("Sector:", "सेक्टर:")}</strong> {viewItem.sector}</ListGroup.Item>
+                <ListGroup.Item><FaProjectDiagram className="view-modal-icon" /> <strong>{t("Project:", "परियोजना:")}</strong> {viewItem.project}</ListGroup.Item>
+                <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>{t("District:", "जिला:")}</strong> {viewItem.district}</ListGroup.Item>
                 {viewItem.sector_status && (
-                  <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>Sector Status:</strong> <Badge bg={getStatusVariant(viewItem.sector_status)}>{viewItem.sector_status}</Badge></ListGroup.Item>
+                  <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>{t("Sector Status:", "सेक्टर स्थिति:")}</strong> <Badge bg={getStatusVariant(viewItem.sector_status)}>{viewItem.sector_status}</Badge></ListGroup.Item>
                 )}
                 {viewItem.sector_remark && (
-                  <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>Sector Remark:</strong> {viewItem.sector_remark}</ListGroup.Item>
+                  <ListGroup.Item><FaInfoCircle className="view-modal-icon" /> <strong>{t("Sector Remark:", "सेक्टर टिप्पणी:")}</strong> {viewItem.sector_remark}</ListGroup.Item>
                 )}
               </ListGroup>
             </Modal.Body>
             <Modal.Footer className="view-modal-footer">
-              <Button variant="secondary" onClick={handleCloseViewModal}>Close</Button>
+              <Button variant="secondary" onClick={handleCloseViewModal}>{t("Close", "बंद करें")}</Button>
             </Modal.Footer>
           </Modal>
         )}
@@ -2184,32 +2196,32 @@ const FoodItemReceiving = () => {
             <Modal.Header closeButton className="view-modal-header">
               <Modal.Title>
                 <FaCalendarCheck className="me-2" />
-                Packet Expiry Details: {expiryViewItem.food_item}
+                {t("Packet Expiry Details:", "पैकेट समाप्ति विवरण:")} {expiryViewItem.food_item}
               </Modal.Title>
             </Modal.Header>
             <Modal.Body className="view-modal-body">
               <ListGroup variant="flush">
                 <ListGroup.Item>
                   <FaUtensils className="view-modal-icon" />
-                  <strong>Food Item:</strong> {expiryViewItem.food_item}
+                  <strong>{t("Food Item:", "खाद्य सामग्री:")}</strong> {expiryViewItem.food_item}
                 </ListGroup.Item>
                 <ListGroup.Item>
                   <FaWeightHanging className="view-modal-icon" />
-                  <strong>Total Packets:</strong> {expiryViewItem.quantity} {expiryViewItem.unit}
+                  <strong>{t("Total Packets:", "कुल पैकेट:")}</strong> {expiryViewItem.quantity} {expiryViewItem.unit}
                 </ListGroup.Item>
                 <ListGroup.Item>
                   <FaCalendarDay className="view-modal-icon" />
-                  <strong>Date of Receiving:</strong>{' '}
+                  <strong>{t("Date of Receiving:", "प्राप्ति की तिथि:")}</strong>{' '}
                   {expiryViewItem.date ? new Date(expiryViewItem.date).toLocaleDateString() : '-'}
                 </ListGroup.Item>
                 <ListGroup.Item>
                   <FaCubes className="view-modal-icon" />
-                  <strong>Trimester:</strong> {normalizeTrimester(expiryViewItem.quarter) || expiryViewItem.quarter || '-'}<br />
-                  <strong>Months:</strong> {formatMonths(getMonthsArray(expiryViewItem))}
+                  <strong>{t("Trimester:", "त्रैमासिक अवधि:")}</strong> {normalizeTrimester(expiryViewItem.quarter) || expiryViewItem.quarter || '-'}<br />
+                  <strong>{t("Months:", "महीने:")}</strong> {formatMonths(getMonthsArray(expiryViewItem))}
                 </ListGroup.Item>
                 <ListGroup.Item>
                   <FaInfoCircle className="view-modal-icon" />
-                  <strong>Sector Status:</strong>{' '}
+                  <strong>{t("Sector Status:", "सेक्टर स्थिति:")}</strong>{' '}
                   <Badge bg={getStatusVariant(expiryViewItem.sector_status)}>
                     {expiryViewItem.sector_status || 'pending'}
                   </Badge>
@@ -2219,15 +2231,15 @@ const FoodItemReceiving = () => {
               <hr />
 
               <h6 className="mb-2">
-                <FaCalendarCheck className="me-1" /> Packet-wise Expiry List
+                <FaCalendarCheck className="me-1" /> {t("Packet-wise Expiry List", "पैकेट-वार समाप्ति सूची")}
               </h6>
               <Table bordered striped size="sm" className="mb-0">
                 <thead>
                   <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
-                    <th className="text-center" style={{ width: '50px' }}>S. No.</th>
-                    <th className="text-center">Packets</th>
-                    <th className="text-center">Expiry Date</th>
-                    <th className="text-center">Remarks</th>
+                    <th className="text-center" style={{ width: '50px' }}>{t("S. No.", "क्रम सं.")}</th>
+                    <th className="text-center">{t("Packets", "पैकेट")}</th>
+                    <th className="text-center">{t("Expiry Date", "समाप्ति तिथि")}</th>
+                    <th className="text-center">{t("Remarks", "टिप्पणियां")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2250,7 +2262,7 @@ const FoodItemReceiving = () => {
                   ) : (
                     <tr>
                       <td colSpan={4} className="text-center text-muted p-3">
-                        No packet expiry details available.
+                        {t("No packet expiry details available.", "पैकेट समाप्ति विवरण उपलब्ध नहीं है।")}
                       </td>
                     </tr>
                   )}
@@ -2258,7 +2270,7 @@ const FoodItemReceiving = () => {
                 {Array.isArray(expiryViewItem.packet_expiry) && expiryViewItem.packet_expiry.length > 0 && (
                   <tfoot>
                     <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
-                      <td className="text-end">Total:</td>
+                      <td className="text-end">{t("Total:", "कुल:")}</td>
                       <td className="text-center">
                         {expiryViewItem.packet_expiry.reduce((sum, pe) => {
                           const c = Array.isArray(pe) ? pe[0] : (pe && pe.count);
@@ -2273,7 +2285,7 @@ const FoodItemReceiving = () => {
               </Table>
             </Modal.Body>
             <Modal.Footer className="view-modal-footer">
-              <Button variant="secondary" onClick={handleCloseExpiryModal}>Close</Button>
+              <Button variant="secondary" onClick={handleCloseExpiryModal}>{t("Close", "बंद करें")}</Button>
             </Modal.Footer>
           </Modal>
         )}

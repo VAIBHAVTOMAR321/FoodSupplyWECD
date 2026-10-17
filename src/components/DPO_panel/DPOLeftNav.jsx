@@ -42,10 +42,12 @@ import {
 } from "react-icons/fa";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 
 const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClick }) => {
   const { logout, user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -157,7 +159,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
           {sidebarOpen ? (
             <div className="logo-container">
               <div className="logo">
-                  DPO Panel
+                  {t("DPO Panel")}
               </div>
             </div>
           ) : (
@@ -181,7 +183,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
           onClick={() => toggleSubmenu(index)}
         >
           <span className="nav-icon">{item.icon}</span>
-          <span className="nav-text">{item.label}</span>
+          <span className="nav-text">{t(item.label)}</span>
           <span className="submenu-arrow">
             {openSubmenu === index ? <FaChevronDown /> : <FaChevronRight />}
           </span>
@@ -193,7 +195,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
            onClick={(e) => handleItemClick(e, item.path, item.active)}
          >
            <span className="nav-icon">{item.icon}</span>
-           <span className="nav-text">{item.label}</span>
+           <span className="nav-text">{t(item.label)}</span>
          </Link>
       )}
 
@@ -209,7 +211,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
                    onClick={(e) => handleItemClick(e, subItem.path, false)}
                  >
                    <span className="submenu-icon">{subItem.icon}</span>
-                   <span className="nav-text br-text-sub">{subItem.label}</span>
+                   <span className="nav-text br-text-sub">{t(subItem.label)}</span>
                  </Link>
             ))}
           </div>
@@ -232,7 +234,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
             <span className="nav-icon">
               <FaSignOutAlt />
             </span>
-            <span className="nav-text">Logout</span>
+            <span className="nav-text">{t("Logout")}</span>
           </Nav.Link>
         </div>
       </div>
@@ -261,7 +263,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
               onClick={() => toggleSubmenu(index)}
             >
               <span className="nav-icon">{item.icon}</span>
-              <span className="nav-text br-nav-text-mob">{item.label}</span>
+              <span className="nav-text br-nav-text-mob">{t(item.label)}</span>
               <span className="submenu-arrow">
                 {openSubmenu === index ? <FaChevronDown /> : <FaChevronRight />}
               </span>
@@ -273,7 +275,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
                onClick={(e) => handleItemClick(e, item.path, item.active)}
              >
                <span className="nav-icon">{item.icon}</span>
-               <span className="nav-text br-nav-text-mob">{item.label}</span>
+               <span className="nav-text br-nav-text-mob">{t(item.label)}</span>
              </Link>
           )}
 
@@ -287,7 +289,7 @@ const DPOLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClic
                      className="submenu-item nav-link"
                      onClick={(e) => handleItemClick(e, subItem.path, false)}
                    >
-                     <span className="nav-text">{subItem.label}</span>
+                     <span className="nav-text">{t(subItem.label)}</span>
                    </Link>
                 ))}
               </div>

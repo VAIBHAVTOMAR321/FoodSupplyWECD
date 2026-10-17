@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Container, Tabs, Tab, Form, Button, Table, Modal, Spinner, Alert, Row, Col } from "react-bootstrap";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 import "../../assets/css/directorleftnav.css";
 import "../../assets/css/dashboard.css";
@@ -20,6 +21,7 @@ const API_URLS = {
 
 const DirFoodItemReceiving = () => {
   const { api, user } = useAuth();
+  const { t } = useLanguage();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -57,7 +59,7 @@ const DirFoodItemReceiving = () => {
       setThrFoodItems(thrItems.data || []);
       setBeneficiaryCategories(benCategories.data || []);
     } catch (err) {
-      setError("Failed to fetch data. Please refresh the page.");
+      setError(t("Failed to fetch data. Please refresh the page.", "डेटा प्राप्त नहीं हो सका। कृपया पृष्ठ रीफ़्रेश करें।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -119,7 +121,7 @@ const DirFoodItemReceiving = () => {
     const selectedFoodItem = foodItemsList.find(fi => fi.food_item === formData.food_item);
 
     if (!selectedFoodItem) {
-      setFormError("Invalid food item selected.");
+      setFormError(t("Invalid food item selected.", "अमान्य खाद्य सामग्री चुनी गई है।"));
       setSubmitting(false);
       return;
     }
@@ -143,7 +145,9 @@ const DirFoodItemReceiving = () => {
       handleCloseModal();
       fetchData();
     } catch (err) {
-      setFormError(`Failed to ${editingItem ? 'update' : 'create'} record. Please try again.`);
+      setFormError(editingItem
+        ? t("Failed to update record. Please try again.", "रिकॉर्ड अपडेट नहीं हो सका। कृपया पुनः प्रयास करें।")
+        : t("Failed to create record. Please try again.", "रिकॉर्ड बनाया नहीं जा सका। कृपया पुनः प्रयास करें।"));
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -151,13 +155,13 @@ const DirFoodItemReceiving = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this receiving record?")) {
+    if (window.confirm(t("Are you sure you want to delete this receiving record?", "क्या आप इस प्राप्ति रिकॉर्ड को हटाना चाहते हैं?"))) {
       const url = activeTab === 'thr' ? API_URLS.thr_receiving : API_URLS.hcm_receiving;
       try {
         await api.delete(url, { data: { id } });
         fetchData();
       } catch (err) {
-        alert("Failed to delete record.");
+        alert(t("Failed to delete record.", "रिकॉर्ड हटाया नहीं जा सका।"));
         console.error(err);
       }
     }
@@ -169,12 +173,12 @@ const DirFoodItemReceiving = () => {
         <thead>
           <tr>
             <th>#</th>
-            <th>Date</th>
-            <th>Food Item</th>
-            <th>Beneficiary Category</th>
-            <th>Quantity</th>
-            <th>Unit</th>
-            <th>Actions</th>
+            <th>{t("Date", "तिथि")}</th>
+            <th>{t("Food Item", "खाद्य सामग्री")}</th>
+            <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+            <th>{t("Quantity", "मात्रा")}</th>
+            <th>{t("Unit", "इकाई")}</th>
+            <th>{t("Actions", "कार्रवाई")}</th>
           </tr>
         </thead>
         <tbody>
@@ -187,17 +191,17 @@ const DirFoodItemReceiving = () => {
               <td>{rec.qty}</td>
               <td>{rec.unit}</td>
               <td>
-                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleOpenModal(rec)}>
+                <Button variant="outline-primary" size="sm" className="me-2" aria-label={t("Edit receiving record", "प्राप्ति रिकॉर्ड संपादित करें")} onClick={() => handleOpenModal(rec)}>
                   <FaEdit />
                 </Button>
-                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(rec.id)}>
+                <Button variant="outline-danger" size="sm" aria-label={t("Delete receiving record", "प्राप्ति रिकॉर्ड हटाएँ")} onClick={() => handleDelete(rec.id)}>
                   <FaTrash />
                 </Button>
               </td>
             </tr>
           )) : (
             <tr>
-              <td colSpan="7" className="text-center">No records found.</td>
+              <td colSpan="7" className="text-center">{t("No records found.", "कोई रिकॉर्ड नहीं मिला।")}</td>
             </tr>
           )}
         </tbody>
@@ -244,27 +248,27 @@ const DirFoodItemReceiving = () => {
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading d-flex justify-content-between align-items-center">
             <h3 className="fw-bold mb-4">
-              Food Item Receiving
+              {t("Food Item Receiving", "खाद्य सामग्री प्राप्ति")}
             </h3>
-            <Button onClick={() => handleOpenModal()}>Add New Receiving</Button>
+            <Button onClick={() => handleOpenModal()}>{t("Add New Receiving", "नई प्राप्ति जोड़ें")}</Button>
           </div>
 
           {loading && <div className="text-center"><Spinner animation="border" /></div>}
           {error && <Alert variant="danger">{error}</Alert>}
 
           <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k)} id="receiving-tabs" className="mb-3">
-            <Tab eventKey="hcm" title="HCM Receiving">
+            <Tab eventKey="hcm" title={t("HCM Receiving", "एचसीएम प्राप्ति")}>
               {!loading && !error && (
                 <>
-                  <h5 className="mt-4">HCM Receiving Records</h5>
+                  <h5 className="mt-4">{t("HCM Receiving Records", "एचसीएम प्राप्ति रिकॉर्ड")}</h5>
                   {renderTable(hcmReceivings)}
                 </>
               )}
             </Tab>
-            <Tab eventKey="thr" title="THR Receiving">
+            <Tab eventKey="thr" title={t("THR Receiving", "टीएचआर प्राप्ति")}>
               {!loading && !error && (
                 <>
-                  <h5 className="mt-4">THR Receiving Records</h5>
+                  <h5 className="mt-4">{t("THR Receiving Records", "टीएचआर प्राप्ति रिकॉर्ड")}</h5>
                   {renderTable(thrReceivings)}
                 </>
               )}
@@ -274,7 +278,7 @@ const DirFoodItemReceiving = () => {
 
         <Modal show={showModal} onHide={handleCloseModal} centered>
           <Modal.Header closeButton>
-            <Modal.Title>{editingItem ? 'Edit' : 'Add'} {activeTab.toUpperCase()} Receiving</Modal.Title>
+            <Modal.Title>{editingItem ? t("Edit", "संपादित करें") : t("Add", "जोड़ें")} {activeTab.toUpperCase()} {t("Receiving", "प्राप्ति")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {formError && <Alert variant="danger">{formError}</Alert>}
@@ -282,33 +286,33 @@ const DirFoodItemReceiving = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Food Item</Form.Label>
+                    <Form.Label>{t("Food Item", "खाद्य सामग्री")}</Form.Label>
                     <Form.Select
                       name="food_item"
                       value={formData.food_item || ''}
                       onChange={handleFormChange}
                       required
                     >
-                      <option value="">Select Food Item</option>
+                      <option value="">{t("Select Food Item", "खाद्य सामग्री चुनें")}</option>
                       {(activeTab === 'hcm' ? hcmFoodItems : thrFoodItems).map(item => [
                         <option key={item.id} value={item.food_item} style={{ fontWeight: 'bold' }}>
                           {item.food_item}
                         </option>,
-                        <option key={`${item.id}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>&nbsp;&nbsp;↳ Category: {item.bene_category}</option>
+                        <option key={`${item.id}-cat`} disabled style={{ color: '#6c757d', paddingLeft: '15px' }}>&nbsp;&nbsp;↳ {t("Category", "श्रेणी")}: {item.bene_category}</option>
                       ])}
                     </Form.Select>
                   </Form.Group>
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Quantity</Form.Label>
+                    <Form.Label>{t("Quantity", "मात्रा")}</Form.Label>
                     <Form.Control
                       type="number"
                       step="0.01"
                       name="qty"
                       value={formData.qty || ''}
                       onChange={handleFormChange}
-                      placeholder="Enter quantity"
+                      placeholder={t("Enter quantity", "मात्रा दर्ज करें")}
                       required
                     />
                   </Form.Group>
@@ -317,7 +321,7 @@ const DirFoodItemReceiving = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Unit</Form.Label>
+                    <Form.Label>{t("Unit", "इकाई")}</Form.Label>
                      <Form.Control
                        type="text"
                        name="unit"
@@ -328,7 +332,7 @@ const DirFoodItemReceiving = () => {
                 </Col>
                 <Col>
                   <Form.Group className="mb-3">
-                    <Form.Label>Beneficiary Category</Form.Label>
+                    <Form.Label>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</Form.Label>
                     <Form.Control type="text" name="bene_category" value={formData.bene_category || ''} readOnly disabled />
                   </Form.Group>
                 </Col>
@@ -336,7 +340,7 @@ const DirFoodItemReceiving = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Date of Receiving</Form.Label>
+                    <Form.Label>{t("Date of Receiving", "प्राप्ति की तिथि")}</Form.Label>
                     <Form.Control
                       type="date"
                       name="date"
@@ -350,10 +354,10 @@ const DirFoodItemReceiving = () => {
 
               <div className="d-flex justify-content-end">
                 <Button variant="secondary" onClick={handleCloseModal} className="me-2">
-                  Cancel
+                  {t("Cancel", "रद्द करें")}
                 </Button>
                 <Button variant="primary" type="submit" disabled={submitting}>
-                  {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingItem ? 'Update' : 'Submit')}
+                  {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingItem ? t("Update", "अपडेट करें") : t("Submit", "जमा करें"))}
                 </Button>
               </div>
             </Form>

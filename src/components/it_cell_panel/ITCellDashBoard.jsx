@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/directorleftnav.css";
 
 import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading } from "react-icons/fa";
@@ -17,6 +18,7 @@ const ITCellDashBoard = () => {
   
   const navigate = useNavigate();
   const { api } = useAuth();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hcmSummary, setHcmSummary] = useState(null);
@@ -66,7 +68,7 @@ const ITCellDashBoard = () => {
       setHcmSummary(hcmRes.data);
       setThrSummary(thrRes.data);
     } catch (err) {
-      setError("Failed to fetch dashboard summaries.");
+      setError(t("Failed to fetch dashboard summaries.", "डैशबोर्ड सारांश प्राप्त नहीं हो सका।"));
       console.error("Dashboard summary fetch error:", err);
     }
   };
@@ -77,7 +79,7 @@ const ITCellDashBoard = () => {
     try {
       await Promise.all([fetchDashboardSummaries(), fetchHcmFoodItems(), fetchThrFoodItems()]);
     } catch (err) {
-      setError("Failed to fetch Director dashboard data.");
+      setError(t("Failed to fetch Director dashboard data.", "डायरेक्टर डैशबोर्ड डेटा प्राप्त नहीं हो सका।"));
     } finally {
       setLoading(false);
     }
@@ -110,18 +112,18 @@ const ITCellDashBoard = () => {
           const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
           setItems(Array.isArray(data) ? data : []);
         } catch (err) {
-          setError(`Failed to fetch ${scheme.toUpperCase()} food items.`);
+          setError(t(`Failed to fetch ${scheme.toUpperCase()} food items.`, `${scheme.toUpperCase()} खाद्य पदार्थ प्राप्त नहीं हो सके।`));
           console.error(err);
         } finally {
           setLoading(false);
         }
       };
       fetchItems();
-    }, [scheme, api]);
+    }, [scheme, api, t]);
 
     if (loading) return <div className="text-center p-4"><Spinner animation="border" /></div>;
     if (error) return <Alert variant="danger">{error}</Alert>;
-    if (items.length === 0) return <div className="text-center p-4 text-muted">No food items found.</div>;
+    if (items.length === 0) return <div className="text-center p-4 text-muted">{t("No food items found.", "कोई खाद्य पदार्थ नहीं मिला।")}</div>;
 
     return (
       <div className="table-responsive food-item-table-container">
@@ -129,12 +131,12 @@ const ITCellDashBoard = () => {
           <thead className="table-light sticky-top">
             <tr>
               <th>#</th>
-              <th>Food Item</th>
-              <th>Quantity Per Beneficiary</th>
-              <th>Unit</th>
-              <th>Beneficiary Category</th>
-              <th>Days Allotted</th>
-              <th>Total Quantity</th>
+              <th>{t("Food Item", "खाद्य पदार्थ")}</th>
+              <th>{t("Quantity Per Beneficiary", "प्रति लाभार्थी मात्रा")}</th>
+              <th>{t("Unit", "इकाई")}</th>
+              <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+              <th>{t("Days Allotted", "आवंटित दिन")}</th>
+              <th>{t("Total Quantity", "कुल मात्रा")}</th>
             </tr>
           </thead>
           <tbody>
@@ -156,7 +158,7 @@ const ITCellDashBoard = () => {
   };
 
   const ReceivingTable = ({ items }) => { 
-    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No receiving records found.</div>;
+    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">{t("No receiving records found.", "प्राप्ति रिकॉर्ड नहीं मिले।")}</div>;
 
     return (
       <div className="table-responsive food-item-table-container">
@@ -164,8 +166,8 @@ const ITCellDashBoard = () => {
           <thead className="table-light sticky-top">
             <tr>
               <th>#</th>
-              <th>Quantity</th>
-              <th>Unit</th>
+              <th>{t("Quantity", "मात्रा")}</th>
+              <th>{t("Unit", "इकाई")}</th>
             </tr>
           </thead>
           <tbody>
@@ -183,7 +185,7 @@ const ITCellDashBoard = () => {
   };
 
   const DistributionTable = ({ items }) => { 
-    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No distribution records found.</div>;
+    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">{t("No distribution records found.", "वितरण रिकॉर्ड नहीं मिले।")}</div>;
 
     return (
       <div className="table-responsive food-item-table-container">
@@ -191,9 +193,9 @@ const ITCellDashBoard = () => {
           <thead className="table-light sticky-top">
             <tr>
               <th>#</th>
-              <th>Total Beneficiaries</th>
-              <th>Total Quantity</th>
-              <th>Unit</th>
+              <th>{t("Total Beneficiaries", "कुल लाभार्थी")}</th>
+              <th>{t("Total Quantity", "कुल मात्रा")}</th>
+              <th>{t("Unit", "इकाई")}</th>
             </tr>
           </thead>
           <tbody>
@@ -212,7 +214,7 @@ const ITCellDashBoard = () => {
   };
 
   const BeneficiarySummaryTable = ({ items }) => { 
-    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No beneficiary summary found.</div>;
+    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">{t("No beneficiary summary found.", "लाभार्थी सारांश नहीं मिला।")}</div>;
 
     return (
       <div className="table-responsive food-item-table-container">
@@ -220,8 +222,8 @@ const ITCellDashBoard = () => {
           <thead className="table-light sticky-top">
             <tr>
               <th>#</th>
-              <th>Category Name</th>
-              <th>Beneficiary Count</th>
+              <th>{t("Category Name", "श्रेणी का नाम")}</th>
+              <th>{t("Beneficiary Count", "लाभार्थी संख्या")}</th>
             </tr>
           </thead>
           <tbody>
@@ -257,7 +259,7 @@ const ITCellDashBoard = () => {
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
 
           <div className="dashboard-section">
-            <h4 className="section-title">Food Items Overview</h4>
+            <h4 className="section-title">{t("Food Items Overview", "खाद्य पदार्थों का अवलोकन")}</h4>
             <Row className="g-3">
               <Col md={6}>
                 <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm')}>
@@ -265,7 +267,7 @@ const ITCellDashBoard = () => {
                     <div className=" d-flex align-items-center">
                       <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">HCM Food Items</h6>
+                        <h6 className="dashboard-card-title">{t("HCM Food Items", "एचसीएम खाद्य पदार्थ")}</h6>
                         <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}</div>
                       </div>
                       <div className="ms-auto expand-icon">
@@ -286,7 +288,7 @@ const ITCellDashBoard = () => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon thr-icon"><FaBox /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">THR Food Items</h6>
+                        <h6 className="dashboard-card-title">{t("THR Food Items", "टीएचआर खाद्य पदार्थ")}</h6>
                         <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}</div>
                       </div>
                       <div className="ms-auto expand-icon">
@@ -305,7 +307,7 @@ const ITCellDashBoard = () => {
           </div>
 
           <div className="dashboard-section">
-            <h4 className="section-title">THR Distribution & Received Summary</h4>
+            <h4 className="section-title">{t("THR Distribution & Received Summary", "टीएचआर वितरण और प्राप्ति सारांश")}</h4>
             <Row className="g-3"> 
               <Col md={4} className="d-flex">
                 <Card className="dashboard-card card-thr h-100" onClick={() => navigate('/ITCellTHRReport')}>
@@ -313,7 +315,7 @@ const ITCellDashBoard = () => {
                     <div className="d-flex align-items-center w-100">
                       <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
+                        <h6 className="dashboard-card-title mb-1">{t("THR Distribution", "टीएचआर वितरण")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
                         </div>
@@ -328,7 +330,7 @@ const ITCellDashBoard = () => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon thr-icon"><FaTruckLoading /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">THR Received</h6>
+                        <h6 className="dashboard-card-title">{t("THR Received", "टीएचआर प्राप्त")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : 
                             thrSummary?.receiving_summary?.length || 0
@@ -353,7 +355,7 @@ const ITCellDashBoard = () => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon thr-icon"><FaBox /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">THR Quantity Records</h6>
+                        <h6 className="dashboard-card-title mb-1">{t("THR Quantity Records", "टीएचआर मात्रा रिकॉर्ड")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.length || 0}
                         </div>
@@ -373,7 +375,7 @@ const ITCellDashBoard = () => {
             </Row>
           </div>
           <div className="dashboard-section">
-            <h4 className="section-title">HCM Distribution & Received Summary</h4>
+            <h4 className="section-title">{t("HCM Distribution & Received Summary", "एचसीएम वितरण और प्राप्ति सारांश")}</h4>
             <Row className="g-3"> 
               <Col md={4} className="d-flex">
                 <Card className="dashboard-card card-hcm h-100" onClick={() => navigate('/ITCellHCMReport')}>
@@ -381,7 +383,7 @@ const ITCellDashBoard = () => {
                     <div className="d-flex align-items-center w-100">
                       <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
+                        <h6 className="dashboard-card-title mb-1">{t("HCM Distribution", "एचसीएम वितरण")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
                         </div>
@@ -396,7 +398,7 @@ const ITCellDashBoard = () => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon hcm-icon"><FaTruckLoading /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">HCM Received</h6>
+                        <h6 className="dashboard-card-title">{t("HCM Received", "एचसीएम प्राप्त")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : 
                             hcmSummary?.receiving_summary?.length || 0
@@ -421,7 +423,7 @@ const ITCellDashBoard = () => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">HCM Quantity Records</h6>
+                        <h6 className="dashboard-card-title mb-1">{t("HCM Quantity Records", "एचसीएम मात्रा रिकॉर्ड")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.length || 0}
                         </div>

@@ -18,6 +18,7 @@ import {
 import "../../assets/css/directorleftnav.css";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -244,6 +245,7 @@ const DirectorTHRReceiving = () => {
     window.innerWidth >= 768 && window.innerWidth < 1024
   );
   const { api } = useAuth();
+  const { t } = useLanguage();
   const [summaryData, setSummaryData] = useState(null);
   const [reports, setReports] = useState([]);
   const [expiryDetailsByRow, setExpiryDetailsByRow] = useState({});
@@ -274,26 +276,26 @@ const DirectorTHRReceiving = () => {
   // Updated columns state to include 'curr_month' and 'max_expirydate'
   const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
-    { dataField: "date", text: "Date", visible: true },
-    { dataField: "awc_name", text: "AWC Name", visible: true },
-    { dataField: "awc_code", text: "AWC Code", visible: true },
-    { dataField: "awc_type", text: "AWC Type", visible: true },
-    { dataField: "district", text: "District", visible: true },
-    { dataField: "project", text: "Project", visible: true },
-    { dataField: "sector", text: "Sector", visible: true },
-    { dataField: "food_item", text: "Food Item", visible: true },
-    { dataField: "bene_category", text: "Beneficiary Category", visible: true },
-    { dataField: "quantity", text: "Quantity", visible: true },
-    { dataField: "unit", text: "Unit", visible: true },
-    { dataField: "fin_year", text: "Fin. Year", visible: true },
-    { dataField: "months", text: "Months", visible: true },
-    { dataField: "quarter", text: "Trimester", visible: true },
-    { dataField: "curr_month", text: "Current Month", visible: true },
-    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
-    { dataField: "sector_status", text: "Sector Status", visible: true },
-    { dataField: "expired_packets", text: "Expired Packets", visible: true },
-    { dataField: "expiry_breakdown", text: "Expiry Details", visible: true },
-    { dataField: "actions", text: "Actions", visible: true },
+    { dataField: "date", text: t("Date", "तिथि"), visible: true },
+    { dataField: "awc_name", text: t("AWC Name", "आंगनवाड़ी केंद्र का नाम"), visible: true },
+    { dataField: "awc_code", text: t("AWC Code", "आंगनवाड़ी केंद्र कोड"), visible: true },
+    { dataField: "awc_type", text: t("AWC Type", "आंगनवाड़ी केंद्र का प्रकार"), visible: true },
+    { dataField: "district", text: t("District", "ज़िला"), visible: true },
+    { dataField: "project", text: t("Project", "परियोजना"), visible: true },
+    { dataField: "sector", text: t("Sector", "सेक्टर"), visible: true },
+    { dataField: "food_item", text: t("Food Item", "खाद्य सामग्री"), visible: true },
+    { dataField: "bene_category", text: t("Beneficiary Category", "लाभार्थी श्रेणी"), visible: true },
+    { dataField: "quantity", text: t("Quantity", "मात्रा"), visible: true },
+    { dataField: "unit", text: t("Unit", "इकाई"), visible: true },
+    { dataField: "fin_year", text: t("Fin. Year", "वित्तीय वर्ष"), visible: true },
+    { dataField: "months", text: t("Months", "महीने"), visible: true },
+    { dataField: "quarter", text: t("Trimester", "त्रैमासिक अवधि"), visible: true },
+    { dataField: "curr_month", text: t("Current Month", "वर्तमान महीना"), visible: true },
+    { dataField: "max_expirydate", text: t("Max Expiry Date", "अधिकतम समाप्ति तिथि"), visible: true },
+    { dataField: "sector_status", text: t("Sector Status", "सेक्टर की स्थिति"), visible: true },
+    { dataField: "expired_packets", text: t("Expired Packets", "समाप्त पैकेट"), visible: true },
+    { dataField: "expiry_breakdown", text: t("Expiry Details", "समाप्ति विवरण"), visible: true },
+    { dataField: "actions", text: t("Actions", "कार्रवाई"), visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
@@ -345,12 +347,12 @@ const DirectorTHRReceiving = () => {
         setReports(results.data || []);
       }
     } catch (err) {
-      setError("Failed to fetch THR receiving summary.");
+      setError(t("Failed to fetch THR receiving summary.", "टीएचआर प्राप्ति सारांश प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, t]);
 
   useEffect(() => {
     fetchBeneficiarySummary();
@@ -429,7 +431,22 @@ const DirectorTHRReceiving = () => {
     setColumns(newColumns);
   };
 
-  const visibleColumns = columns.filter((c) => c.visible);
+  const columnLabels = {
+    date: ["Date", "तिथि"], awc_name: ["AWC Name", "आंगनवाड़ी केंद्र का नाम"],
+    awc_code: ["AWC Code", "आंगनवाड़ी केंद्र कोड"], awc_type: ["AWC Type", "आंगनवाड़ी केंद्र का प्रकार"],
+    district: ["District", "ज़िला"], project: ["Project", "परियोजना"], sector: ["Sector", "सेक्टर"],
+    food_item: ["Food Item", "खाद्य सामग्री"], bene_category: ["Beneficiary Category", "लाभार्थी श्रेणी"],
+    quantity: ["Quantity", "मात्रा"], unit: ["Unit", "इकाई"], fin_year: ["Fin. Year", "वित्तीय वर्ष"],
+    months: ["Months", "महीने"], quarter: ["Trimester", "त्रैमासिक अवधि"],
+    curr_month: ["Current Month", "वर्तमान महीना"], max_expirydate: ["Max Expiry Date", "अधिकतम समाप्ति तिथि"],
+    sector_status: ["Sector Status", "सेक्टर की स्थिति"], expired_packets: ["Expired Packets", "समाप्त पैकेट"],
+    expiry_breakdown: ["Expiry Details", "समाप्ति विवरण"], actions: ["Actions", "कार्रवाई"],
+  };
+  const localizedColumns = columns.map((column) => ({
+    ...column,
+    text: columnLabels[column.dataField] ? t(...columnLabels[column.dataField]) : column.text,
+  }));
+  const visibleColumns = localizedColumns.filter((c) => c.visible);
 
 
 
@@ -462,9 +479,9 @@ const DirectorTHRReceiving = () => {
     const breakdown = entries.map((entry) => {
       const date = formatDateValue(expiryDateOf(entry));
       const packets = expiryPacketsOf(entry);
-      const status = isExpiryPast(expiryDateOf(entry)) ? "EXPIRED / समाप्त" : "Not expired / समाप्त नहीं";
+      const status = isExpiryPast(expiryDateOf(entry)) ? t("EXPIRED", "समाप्त") : t("Not expired", "समाप्त नहीं");
       const remarks = expiryRemarksOf(entry);
-      return `${date || "Date unavailable / तिथि उपलब्ध नहीं"}: ${packets === "" ? "Packet count unavailable / पैकेट संख्या उपलब्ध नहीं" : packets} packet(s) [${status}]${remarks ? ` — ${remarks}` : ""}`;
+      return `${date || t("Date unavailable", "तिथि उपलब्ध नहीं")}: ${packets === "" ? t("Packet count unavailable", "पैकेट संख्या उपलब्ध नहीं") : packets} ${t("packet(s)", "पैकेट")} [${status}]${remarks ? ` — ${remarks}` : ""}`;
     });
     return { entries, expiredPackets, breakdown: breakdown.join("; ") };
   };
@@ -498,7 +515,7 @@ const DirectorTHRReceiving = () => {
       else if (col.dataField === "max_expirydate") record[col.text] = formatDateValue(getMaxExpiryDate(row));
       else if (col.dataField === "curr_month") record[col.text] = getCurrentMonth(row) || "";
       else if (col.dataField === "expired_packets") record[col.text] = expiry.expiredPackets;
-      else if (col.dataField === "expiry_breakdown") record[col.text] = expiry.breakdown || "No expiry details loaded / expiry data unavailable";
+      else if (col.dataField === "expiry_breakdown") record[col.text] = expiry.breakdown || t("No expiry details loaded / expiry data unavailable", "समाप्ति विवरण लोड नहीं हुआ / डेटा उपलब्ध नहीं");
       else if (col.dataField === "actions") return;
       else record[col.text] = value ?? "";
     });
@@ -508,10 +525,10 @@ const DirectorTHRReceiving = () => {
   const exportToExcel = async () => {
     try {
       const exportReports = await fetchLatestExportReports();
-      const exportColumns = columns.filter((col) => col.visible && col.dataField !== "#" && col.dataField !== "actions");
+      const exportColumns = localizedColumns.filter((col) => col.visible && col.dataField !== "#" && col.dataField !== "actions");
       // Keep the expiry columns in the export even if a user has hidden them in the table.
       for (const field of ["expired_packets", "expiry_breakdown"]) {
-        const column = columns.find((col) => col.dataField === field);
+        const column = localizedColumns.find((col) => col.dataField === field);
         if (column && !exportColumns.some((col) => col.dataField === field)) exportColumns.push(column);
       }
       const data = exportReports.map((row, index) => makeExportRecord(row, index, exportColumns));
@@ -563,7 +580,7 @@ const DirectorTHRReceiving = () => {
       XLSX.writeFile(workbook, "director_thr_receiving_report.xlsx", { bookType: "xlsx", compression: true });
     } catch (err) {
       console.error("Receiving Excel export failed:", err);
-      setError("Excel export failed. Please try again.");
+      setError(t("Excel export failed. Please try again.", "एक्सेल निर्यात विफल हुआ। कृपया पुनः प्रयास करें।"));
     }
   };
 
@@ -573,9 +590,9 @@ const DirectorTHRReceiving = () => {
     let exportRoot;
     try {
       const exportReports = await fetchLatestExportReports();
-      const exportColumns = columns.filter((col) => col.visible && col.dataField !== "actions");
+      const exportColumns = localizedColumns.filter((col) => col.visible && col.dataField !== "actions");
       for (const field of ["expired_packets", "expiry_breakdown"]) {
-        const column = columns.find((col) => col.dataField === field);
+        const column = localizedColumns.find((col) => col.dataField === field);
         if (column && !exportColumns.some((col) => col.dataField === field)) exportColumns.push(column);
       }
       const headers = exportColumns.map((col) => col.text);
@@ -589,7 +606,7 @@ const DirectorTHRReceiving = () => {
       exportRoot = document.createElement("div");
       exportRoot.style.cssText = "position:fixed;left:-10000px;top:0;width:1800px;background:#fff;color:#111;padding:20px;font-family:Arial,'Noto Sans Devanagari',Mangal,sans-serif;z-index:-1;";
       const title = document.createElement("h2");
-      title.textContent = "THR प्राप्ति रिपोर्ट / THR Receiving Report";
+      title.textContent = t("THR Receiving Report", "टीएचआर प्राप्ति रिपोर्ट");
       title.style.cssText = "font-size:20px;margin:0 0 14px;text-align:center;font-weight:700;";
       exportRoot.appendChild(title);
 
@@ -620,7 +637,7 @@ const DirectorTHRReceiving = () => {
       exportRoot.appendChild(table);
 
       const totalsTitle = document.createElement("h3");
-      totalsTitle.textContent = "Total Quantity by Unit / इकाई के अनुसार कुल मात्रा";
+      totalsTitle.textContent = t("Total Quantity by Unit", "इकाई के अनुसार कुल मात्रा");
       totalsTitle.style.cssText = "font-size:15px;margin:18px 0 8px;";
       exportRoot.appendChild(totalsTitle);
       const totalsTable = document.createElement("table");
@@ -638,12 +655,17 @@ const DirectorTHRReceiving = () => {
       exportRoot.appendChild(totalsTable);
 
       const expiryTitle = document.createElement("h3");
-      expiryTitle.textContent = "Packet Expiry Details / पैकेट की समाप्ति जानकारी";
+      expiryTitle.textContent = t("Packet Expiry Details", "पैकेट की समाप्ति जानकारी");
       expiryTitle.style.cssText = "font-size:15px;margin:18px 0 8px;";
       exportRoot.appendChild(expiryTitle);
       const expiryTable = document.createElement("table");
       expiryTable.style.cssText = "width:100%;border-collapse:collapse;font-size:10px;table-layout:auto;";
-      const expiryHeaders = ["District", "Project", "Sector", "AWC Name", "Food Item", "Expiry Date", "Packet Count", "Status", "Remarks"];
+      const expiryHeaders = [
+        t("District", "ज़िला"), t("Project", "परियोजना"), t("Sector", "सेक्टर"),
+        t("AWC Name", "आंगनवाड़ी केंद्र का नाम"), t("Food Item", "खाद्य सामग्री"),
+        t("Expiry Date", "समाप्ति तिथि"), t("Packet Count", "पैकेट संख्या"),
+        t("Status", "स्थिति"), t("Remarks", "टिप्पणियाँ"),
+      ];
       const expiryHead = document.createElement("tr");
       expiryHeaders.forEach((label) => {
         const th = document.createElement("th");
@@ -658,8 +680,8 @@ const DirectorTHRReceiving = () => {
         entries.forEach((entry) => {
           const vals = [
             row.district ?? "-", row.project ?? "-", row.sector ?? "-", row.awc_name ?? "-",
-            row.food_item ?? "-", entry ? formatDateValue(expiryDateOf(entry)) : "No expiry details loaded",
-            entry ? expiryPacketsOf(entry) : "-", entry ? (isExpiryPast(expiryDateOf(entry)) ? "EXPIRED / समाप्त" : "Not expired / समाप्त नहीं") : "-",
+            row.food_item ?? "-", entry ? formatDateValue(expiryDateOf(entry)) : t("No expiry details loaded", "समाप्ति विवरण लोड नहीं हुआ"),
+            entry ? expiryPacketsOf(entry) : "-", entry ? (isExpiryPast(expiryDateOf(entry)) ? t("EXPIRED", "समाप्त") : t("Not expired", "समाप्त नहीं")) : "-",
             entry ? expiryRemarksOf(entry) : "-"
           ];
           const tr = document.createElement("tr");
@@ -695,7 +717,7 @@ const DirectorTHRReceiving = () => {
       pdf.save("director_thr_receiving_report.pdf");
     } catch (err) {
       console.error("Receiving PDF export failed:", err);
-      setError("PDF export failed. Please try again.");
+      setError(t("PDF export failed. Please try again.", "पीडीएफ निर्यात विफल हुआ। कृपया पुनः प्रयास करें।"));
     } finally {
       if (exportRoot?.parentNode) exportRoot.parentNode.removeChild(exportRoot);
       setIsPrinting(false);
@@ -713,6 +735,7 @@ const DirectorTHRReceiving = () => {
     items.push(
       <Pagination.First
         key="first"
+        aria-label={t("First page", "पहला पृष्ठ")}
         onClick={() => handlePageChange(1)}
         disabled={currentPage === 1}
       />
@@ -720,6 +743,7 @@ const DirectorTHRReceiving = () => {
     items.push(
       <Pagination.Prev
         key="prev"
+        aria-label={t("Previous page", "पिछला पृष्ठ")}
         onClick={() => handlePageChange(currentPage - 1)}
         disabled={currentPage === 1}
       />
@@ -772,6 +796,7 @@ const DirectorTHRReceiving = () => {
     items.push(
       <Pagination.Next
         key="next"
+        aria-label={t("Next page", "अगला पृष्ठ")}
         onClick={() => handlePageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
       />
@@ -779,6 +804,7 @@ const DirectorTHRReceiving = () => {
     items.push(
       <Pagination.Last
         key="last"
+        aria-label={t("Last page", "अंतिम पृष्ठ")}
         onClick={() => handlePageChange(totalPages)}
         disabled={currentPage === totalPages}
       />
@@ -826,7 +852,7 @@ const DirectorTHRReceiving = () => {
           )}
 
           <div className="dashboard-section">
-            <h4 className="section-title">THR प्राप्ति सारांश</h4>
+            <h4 className="section-title">{t("THR Receiving Summary", "टीएचआर प्राप्ति सारांश")}</h4>
 
             {loading ? (
               <div className="text-center">
@@ -840,15 +866,15 @@ const DirectorTHRReceiving = () => {
                 id="beneficiary-summary-tabs"
                 className="mb-3"
               >
-                <Tab eventKey="district_summary" title="District Summary">
-                  <h5 className="mt-4">District-wise Summary (Total)</h5>
+                <Tab eventKey="district_summary" title={t("District Summary", "ज़िला सारांश")}>
+                  <h5 className="mt-4">{t("District-wise Summary (Total)", "ज़िला-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive>
                     <thead>
                       <tr>
-                        <th>Food Item</th>
-                        <th>Beneficiary Category</th>
-                        <th>Total Quantity</th>
-                        <th>Unit</th>
+                        <th>{t("Food Item", "खाद्य सामग्री")}</th>
+                        <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                        <th>{t("Total Quantity", "कुल मात्रा")}</th>
+                        <th>{t("Unit", "इकाई")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -863,25 +889,25 @@ const DirectorTHRReceiving = () => {
                     </tbody>
                     <tfoot>
                       <tr className="fw-bold table-info">
-                        <td colSpan="2">Total</td>
+                        <td colSpan="2">{t("Total", "कुल")}</td>
                         <td colSpan="2">
-                          <Button variant="link" size="sm" onClick={() => handleViewTotals(summaryData.district_summary, 'District Summary Totals')}>View Totals</Button>
+                          <Button variant="link" size="sm" onClick={() => handleViewTotals(summaryData.district_summary, t("District Summary Totals", "ज़िला सारांश कुल"))}>{t("View Totals", "कुल देखें")}</Button>
                         </td>
                       </tr>
                     </tfoot>
                   </Table>
                 </Tab>
 
-                <Tab eventKey="project_summary" title="Project Summary">
-                  <h5 className="mt-4">Project-wise Summary (Total)</h5>
+                <Tab eventKey="project_summary" title={t("Project Summary", "परियोजना सारांश")}>
+                  <h5 className="mt-4">{t("Project-wise Summary (Total)", "परियोजना-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
-                        <th>Project</th>
-                        <th>Food Item</th>
-                        <th>Beneficiary Category</th>
-                        <th>Total Quantity</th>
-                        <th>Unit</th>
+                        <th>{t("Project", "परियोजना")}</th>
+                        <th>{t("Food Item", "खाद्य सामग्री")}</th>
+                        <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                        <th>{t("Total Quantity", "कुल मात्रा")}</th>
+                        <th>{t("Unit", "इकाई")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -897,25 +923,25 @@ const DirectorTHRReceiving = () => {
                     </tbody>
                     <tfoot>
                       <tr className="fw-bold table-info">
-                        <td colSpan="3">Total</td>
+                        <td colSpan="3">{t("Total", "कुल")}</td>
                         <td colSpan="2">
-                          <Button variant="link" size="sm" onClick={() => handleViewTotals(summaryData.project_summary, 'Project Summary Totals')}>View Totals</Button>
+                          <Button variant="link" size="sm" onClick={() => handleViewTotals(summaryData.project_summary, t("Project Summary Totals", "परियोजना सारांश कुल"))}>{t("View Totals", "कुल देखें")}</Button>
                         </td>
                       </tr>
                     </tfoot>
                   </Table>
                 </Tab>
 
-                <Tab eventKey="sector_summary" title="Sector Summary">
-                  <h5 className="mt-4">Sector-wise Summary (Total)</h5>
+                <Tab eventKey="sector_summary" title={t("Sector Summary", "सेक्टर सारांश")}>
+                  <h5 className="mt-4">{t("Sector-wise Summary (Total)", "सेक्टर-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
-                        <th>Sector</th>
-                        <th>Food Item</th>
-                        <th>Beneficiary Category</th>
-                        <th>Total Quantity</th>
-                        <th>Unit</th>
+                        <th>{t("Sector", "सेक्टर")}</th>
+                        <th>{t("Food Item", "खाद्य सामग्री")}</th>
+                        <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                        <th>{t("Total Quantity", "कुल मात्रा")}</th>
+                        <th>{t("Unit", "इकाई")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -931,27 +957,27 @@ const DirectorTHRReceiving = () => {
                     </tbody>
                     <tfoot>
                       <tr className="fw-bold table-info">
-                        <td colSpan="3">Total</td>
+                        <td colSpan="3">{t("Total", "कुल")}</td>
                         <td colSpan="2">
-                          <Button variant="link" size="sm" onClick={() => handleViewTotals(summaryData.sector_summary, 'Sector Summary Totals')}>View Totals</Button>
+                          <Button variant="link" size="sm" onClick={() => handleViewTotals(summaryData.sector_summary, t("Sector Summary Totals", "सेक्टर सारांश कुल"))}>{t("View Totals", "कुल देखें")}</Button>
                         </td>
                       </tr>
                     </tfoot>
                   </Table>
                 </Tab>
 
-                <Tab eventKey="awc_report" title="AWC Report">
+                <Tab eventKey="awc_report" title={t("AWC Report", "आंगनवाड़ी केंद्र रिपोर्ट")}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="mb-0">AWC THR Receiving Report</h5>
+                    <h5 className="mb-0">{t("AWC THR Receiving Report", "आंगनवाड़ी केंद्र टीएचआर प्राप्ति रिपोर्ट")}</h5>
                     <div>
                       <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
-                        <FaFilePdf className="me-1" /> Export PDF
+                        <FaFilePdf className="me-1" /> {t("Export PDF", "पीडीएफ निर्यात करें")}
                       </Button>
                       <Button variant="outline-success" size="sm" onClick={exportToExcel} className="me-2">
-                        <FaFileExcel className="me-1" /> Export Excel
+                        <FaFileExcel className="me-1" /> {t("Export Excel", "एक्सेल निर्यात करें")}
                       </Button>
                       <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)}>
-                        <FaEye className="me-1" /> Column Visibility
+                        <FaEye className="me-1" /> {t("Column Visibility", "कॉलम दृश्यता")}
                       </Button>
                     </div>
                   </div>
@@ -960,7 +986,7 @@ const DirectorTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.fin_year.length ? `${filters.fin_year.length} selected` : "All Fin. Years"}
+                          {filters.fin_year.length ? t(`${filters.fin_year.length} selected`, `${filters.fin_year.length} चयनित`) : t("All Fin. Years", "सभी वित्तीय वर्ष")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueFinYears.map((v) => (
@@ -975,7 +1001,7 @@ const DirectorTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" id="dropdown-months" className="w-100">
-                          {filters.months.length ? `${filters.months.length} selected` : 'All Months'}
+                          {filters.months.length ? t(`${filters.months.length} selected`, `${filters.months.length} चयनित`) : t('All Months', 'सभी महीने')}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueMonths.map(m => (
@@ -990,7 +1016,7 @@ const DirectorTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.district.length ? `${filters.district.length} selected` : "All Districts"}
+                          {filters.district.length ? t(`${filters.district.length} selected`, `${filters.district.length} चयनित`) : t("All Districts", "सभी ज़िले")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueDistricts.map((v) => (
@@ -1005,7 +1031,7 @@ const DirectorTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.project.length ? `${filters.project.length} selected` : "All Projects"}
+                          {filters.project.length ? t(`${filters.project.length} selected`, `${filters.project.length} चयनित`) : t("All Projects", "सभी परियोजनाएँ")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueProjects.map((v) => (
@@ -1020,7 +1046,7 @@ const DirectorTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.sector.length ? `${filters.sector.length} selected` : "All Sectors"}
+                          {filters.sector.length ? t(`${filters.sector.length} selected`, `${filters.sector.length} चयनित`) : t("All Sectors", "सभी सेक्टर")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueSectors.map((v) => (
@@ -1035,7 +1061,7 @@ const DirectorTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.food_item.length ? `${filters.food_item.length} selected` : "All Food Items"}
+                          {filters.food_item.length ? t(`${filters.food_item.length} selected`, `${filters.food_item.length} चयनित`) : t("All Food Items", "सभी खाद्य सामग्री")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueFoodItems.map((v) => (
@@ -1050,7 +1076,7 @@ const DirectorTHRReceiving = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.bene_category.length ? `${filters.bene_category.length} selected` : "All Categories"}
+                          {filters.bene_category.length ? t(`${filters.bene_category.length} selected`, `${filters.bene_category.length} चयनित`) : t("All Categories", "सभी श्रेणियाँ")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueBeneCategories.map((v) => (
@@ -1064,14 +1090,14 @@ const DirectorTHRReceiving = () => {
 
                     <Col md={2} className="d-flex align-items-end">
                       <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [] })}>
-                        Clear Filters
+                        {t("Clear Filters", "फ़िल्टर साफ़ करें")}
                       </Button>
                     </Col>
                   </Row>
 
                   {filteredReports.length === 0 ? (
                     <div className="text-center py-4 text-muted">
-                      No THR receiving reports found for the selected filters.
+                      {t("No THR receiving reports found for the selected filters.", "चुने गए फ़िल्टर के लिए कोई टीएचआर प्राप्ति रिपोर्ट नहीं मिली।")}
                     </div>
                   ) : (
                     <Card className="shadow-sm">
@@ -1104,7 +1130,7 @@ const DirectorTHRReceiving = () => {
                                       : col.dataField === "expired_packets"
                                       ? getExpiryExportValues(report).expiredPackets
                                       : col.dataField === "expiry_breakdown"
-                                      ? (getExpiryExportValues(report).breakdown || "Expiry details load when available")
+                                      ? (getExpiryExportValues(report).breakdown || t("Expiry details load when available", "उपलब्ध होने पर समाप्ति विवरण लोड होगा"))
                                       : col.dataField === "actions"
                                       ? <PacketExpiryDetails record={report} onDetailsLoaded={(payload) => handleExpiryDetailsLoaded(report, payload)} />
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
@@ -1117,12 +1143,12 @@ const DirectorTHRReceiving = () => {
                           </tbody>
                           <tfoot>
                             <tr className="fw-bold table-info">
-                              <td colSpan={visibleColumns.findIndex(c => c.dataField === 'quantity')}>Total</td>
+                              <td colSpan={visibleColumns.findIndex(c => c.dataField === 'quantity')}>{t("Total", "कुल")}</td>
                               {visibleColumns.slice(visibleColumns.findIndex(c => c.dataField === 'quantity')).map(col => {
                                 if (col.dataField === 'quantity') {
                                   return (
                                     <td key="total_quantity">
-                                      {!isPrinting && <Button variant="link" size="sm" onClick={() => handleViewTotals(filteredReports, 'AWC Report Totals', 'quantity')}>View Totals</Button>}
+                                      {!isPrinting && <Button variant="link" size="sm" onClick={() => handleViewTotals(filteredReports, t("AWC Report Totals", "आंगनवाड़ी केंद्र रिपोर्ट कुल"), 'quantity')}>{t("View Totals", "कुल देखें")}</Button>}
                                     </td>
                                   );
                                 }
@@ -1143,15 +1169,15 @@ const DirectorTHRReceiving = () => {
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
           <Modal.Header closeButton>
-            <Modal.Title>Show/Hide Columns</Modal.Title>
+            <Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएँ/छिपाएँ")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            {columns.map((col, index) => (
+            {localizedColumns.map((col, index) => (
               <Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />
             ))}
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button>
+            <Button variant="secondary" onClick={() => setShowColumnModal(false)}>{t("Close", "बंद करें")}</Button>
           </Modal.Footer>
         </Modal>
 
@@ -1164,8 +1190,8 @@ const DirectorTHRReceiving = () => {
               <Table striped bordered>
                 <thead>
                   <tr>
-                    <th>Unit</th>
-                    <th>Total Quantity</th>
+                    <th>{t("Unit", "इकाई")}</th>
+                    <th>{t("Total Quantity", "कुल मात्रा")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1174,7 +1200,7 @@ const DirectorTHRReceiving = () => {
                   ))}
                 </tbody>
               </Table>
-            ) : <p>No quantity data to display.</p>}
+            ) : <p>{t("No quantity data to display.", "दिखाने के लिए मात्रा डेटा उपलब्ध नहीं है।")}</p>}
           </Modal.Body>
         </Modal>
       </div>

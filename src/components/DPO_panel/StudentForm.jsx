@@ -19,6 +19,8 @@ import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
 import "../../assets/css/dpo.css";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
+import dpoHindi from "./DPOTranslations.json";
 import { FaPlus, FaEdit, FaTrash, FaEye, FaUsers, FaChild, FaFemale, FaExclamationTriangle, FaUpload, FaFileExcel } from "react-icons/fa";
 import * as XLSX from "xlsx";
 
@@ -49,6 +51,8 @@ const initialFormData = {
 };
 
 const StudentForm = () => {
+  const { t } = useLanguage();
+  const translateLabel = (text) => t(text, dpoHindi[text] || text);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isTablet, setIsTablet] = useState(
@@ -146,7 +150,7 @@ const StudentForm = () => {
       setReports(response.data.results || []);
       setTotalPages(response.data.total_pages || 1); // Make sure your API returns this
     } catch (err) {
-      setError("Failed to fetch reports.");
+      setError(t("Failed to fetch reports.", "रिपोर्ट प्राप्त करने में विफल।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -262,13 +266,13 @@ const StudentForm = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this report?")) {
+    if (window.confirm(t("Are you sure you want to delete this report?", "क्या आप वाकई इस रिपोर्ट को हटाना चाहते हैं?"))) {
       try {
         await api.delete("/ang-beneficiary-report/", { data: { id } });
-        setSuccess("Report deleted successfully.");
+        setSuccess(t("Report deleted successfully.", "रिपोर्ट सफलतापूर्वक हटा दी गई।"));
         fetchReports(currentPage, filters);
       } catch (err) {
-        setError("Failed to delete report.");
+        setError(t("Failed to delete report.", "रिपोर्ट हटाने में विफल।"));
         console.error(err);
       }
     }
@@ -333,9 +337,9 @@ const StudentForm = () => {
 
     if (awcList.length === 0) {
       if (awcListLoading) {
-        setBulkUploadError("AWC list is still loading. Please wait a moment and select the file again.");
+        setBulkUploadError(t("AWC list is still loading. Please wait a moment and select the file again.", "आंगनवाड़ी केंद्र सूची अभी लोड हो रही है। कृपया प्रतीक्षा करें और फ़ाइल फिर से चुनें।"));
       } else {
-        setBulkUploadError("AWC list is not available. Please refresh the page and try again.");
+        setBulkUploadError(t("AWC list is not available. Please refresh the page and try again.", "आंगनवाड़ी केंद्र सूची उपलब्ध नहीं है। पृष्ठ रीफ़्रेश करके पुनः प्रयास करें।"));
       }
       setBulkPreviewData([]);
       setBulkFile(null);
@@ -356,7 +360,7 @@ const StudentForm = () => {
         const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
         if (json.length === 0) {
-          setBulkUploadError("The Excel file is empty.");
+          setBulkUploadError(t("The Excel file is empty.", "Excel फ़ाइल खाली है।"));
           return;
         }
 
@@ -369,7 +373,7 @@ const StudentForm = () => {
         const missingHeaders = requiredHeaders.filter(h => !fileHeaders.includes(h));
 
         if (missingHeaders.length > 0) {
-          setBulkUploadError(`Missing required columns: ${missingHeaders.join(", ")}`);
+          setBulkUploadError(`${t("Missing required columns:", "आवश्यक कॉलम अनुपस्थित हैं:")} ${missingHeaders.join(", ")}`);
           return;
         }
 
@@ -385,10 +389,10 @@ const StudentForm = () => {
           requiredHeaders.forEach(header => {
             const value = row[header];
             if (value === undefined || value === null || String(value).trim() === "") {
-              rowErrors[header] = `'${header}' is missing.`;
+              rowErrors[header] = t(`'${header}' is missing.`, `'${header}' अनुपस्थित है।`);
             } else {
               if (header !== 'fin_year' && header !== 'month' && header !== 'awc_name' && isNaN(Number(value))) {
-                rowErrors[header] = `'${header}' must be a valid number.`;
+                rowErrors[header] = t(`'${header}' must be a valid number.`, `'${header}' मान्य संख्या होनी चाहिए।`);
               }
             }
           });
@@ -397,7 +401,7 @@ const StudentForm = () => {
           const excelAwcName = row.awc_name ? String(row.awc_name).trim().toUpperCase() : "";
 
           if (!excelAwcName) {
-            rowErrors['awc_name'] = "'awc_name' is missing.";
+            rowErrors['awc_name'] = t("'awc_name' is missing.", "'awc_name' अनुपस्थित है।");
           } else if (awcNameMap.has(excelAwcName)) {
             row.awc_name = awcNameMap.get(excelAwcName); // Correct casing
           }  else {
@@ -415,10 +419,12 @@ const StudentForm = () => {
 
             // Automatically correct if the spelling is very close
             if (bestMatch && minDistance <= 2) { // Stricter threshold for auto-correction
-              rowErrors['awc_name_suggestion'] = `Original: '${row.awc_name}'. Corrected to '${bestMatch}'.`;
+              rowErrors['awc_name_suggestion'] = `${t("Original:", "मूल:")} '${row.awc_name}'. ${t("Corrected to", "में सुधारकर")} '${bestMatch}'.`;
               row.awc_name = bestMatch;
             } else {
-              const errorMessage = bestMatch ? `'${row.awc_name}' is not a valid AWC name. Did you mean '${bestMatch}'?` : `'${row.awc_name}' is not a valid AWC name.`;
+              const errorMessage = bestMatch
+                ? t(`'${row.awc_name}' is not a valid AWC name. Did you mean '${bestMatch}'?`, `'${row.awc_name}' मान्य आंगनवाड़ी केंद्र का नाम नहीं है। क्या आपका मतलब '${bestMatch}' है?`)
+                : t(`'${row.awc_name}' is not a valid AWC name.`, `'${row.awc_name}' मान्य आंगनवाड़ी केंद्र का नाम नहीं है।`);
               rowErrors['awc_name'] = errorMessage;
             }
           }
@@ -427,7 +433,10 @@ const StudentForm = () => {
           if (Object.keys(rowErrors).length === 0) {
             const entryKey = `${row.fin_year}|${row.month}|${row.awc_name}`;
             if (seenEntries.has(entryKey)) {
-              rowErrors['duplicate'] = `Duplicate entry for AWC '${row.awc_name}' in month '${row.month}'.`;
+              rowErrors['duplicate'] = t(
+                `Duplicate entry for AWC '${row.awc_name}' in month '${row.month}'.`,
+                `आंगनवाड़ी केंद्र '${row.awc_name}' के लिए '${row.month}' महीने में डुप्लिकेट प्रविष्टि।`,
+              );
             } else {
               seenEntries.add(entryKey);
             }
@@ -437,10 +446,10 @@ const StudentForm = () => {
 
         setBulkPreviewData(previewData);
         if (previewData.some(item => Object.keys(item.errors).length > 0)) {
-          setBulkUploadError("Your file contains errors. Please fix them before uploading.");
+          setBulkUploadError(t("Your file contains errors. Please fix them before uploading.", "आपकी फ़ाइल में त्रुटियाँ हैं। अपलोड करने से पहले उन्हें ठीक करें।"));
         }
       } catch (err) {
-        setBulkUploadError("Failed to parse the Excel file. Please ensure it's a valid .xlsx or .xls file.");
+        setBulkUploadError(t("Failed to parse the Excel file. Please ensure it's a valid .xlsx or .xls file.", "Excel फ़ाइल पढ़ने में विफल। सुनिश्चित करें कि यह मान्य .xlsx या .xls फ़ाइल है।"));
         console.error(err);
       }
     };
@@ -462,7 +471,7 @@ const StudentForm = () => {
   };
   const handleBulkUpload = async () => {
     if (!bulkFile || bulkPreviewData.some(item => Object.keys(item.errors).length > 0 && !item.errors.awc_name_suggestion)) {
-      setBulkUploadError("Cannot upload. Please select a valid file and fix any errors.");
+      setBulkUploadError(t("Cannot upload. Please select a valid file and fix any errors.", "अपलोड नहीं किया जा सकता। कृपया मान्य फ़ाइल चुनें और त्रुटियाँ ठीक करें।"));
       return;
     }
     setBulkUploading(true);
@@ -482,11 +491,11 @@ const StudentForm = () => {
       });
 
       await Promise.all(uploadPromises);
-      setSuccess("Bulk upload successful!");
+      setSuccess(t("Bulk upload successful!", "बल्क अपलोड सफल!"));
       handleCloseBulkUploadModal();
       fetchReports(1, { fin_year: "", month: "" });
     } catch (err) {
-      setBulkUploadError("An error occurred during bulk upload. Some records may have failed.");
+      setBulkUploadError(t("An error occurred during bulk upload. Some records may have failed.", "बल्क अपलोड के दौरान त्रुटि हुई। कुछ रिकॉर्ड अपलोड नहीं हो सके।"));
       console.error("Bulk upload failed:", err.response || err);
     } finally {
       setBulkUploading(false);
@@ -516,10 +525,10 @@ const StudentForm = () => {
       if (editingId) {
         payload.id = editingId;
         await api.put("/ang-beneficiary-report/", payload);
-        setSuccess("Report updated successfully.");
+        setSuccess(t("Report updated successfully.", "रिपोर्ट सफलतापूर्वक अपडेट हुई।"));
       } else {
         await api.post("/ang-beneficiary-report/", payload);
-        setSuccess("Report created successfully.");
+        setSuccess(t("Report created successfully.", "रिपोर्ट सफलतापूर्वक बनाई गई।"));
       }
       setFormData(initialFormData);
       setEditingId(null);
@@ -528,7 +537,9 @@ const StudentForm = () => {
     } catch (err) {
       const errors = err.response?.data || {};
       setFormErrors(errors);
-      setError(`Failed to ${editingId ? 'update' : 'create'} report.`);
+      setError(editingId
+        ? t("Failed to update report.", "रिपोर्ट अपडेट करने में विफल।")
+        : t("Failed to create report.", "रिपोर्ट बनाने में विफल।"));
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -543,38 +554,38 @@ const StudentForm = () => {
         <Form onSubmit={handleSubmit}>
           {error && <Alert variant="danger">{error}</Alert>}
           <Row>
-            <Col md={3}><Form.Group className="mb-3"><Form.Label>Financial Year</Form.Label><Form.Control type="text" name="fin_year" value={formData.fin_year} onChange={handleFormChange} required /></Form.Group></Col>            <Col md={3}><Form.Group className="mb-3"><Form.Label>Month</Form.Label>
+            <Col md={3}><Form.Group className="mb-3"><Form.Label>{t("Financial Year", "वित्तीय वर्ष")}</Form.Label><Form.Control type="text" name="fin_year" value={formData.fin_year} onChange={handleFormChange} required /></Form.Group></Col>            <Col md={3}><Form.Group className="mb-3"><Form.Label>{t("Month", "महीना")}</Form.Label>
               <Form.Select name="month" value={formData.month} onChange={handleFormChange} required>
-                  <option value="">Select Month</option>
-                  <option value="jan">January</option><option value="feb">February</option><option value="mar">March</option>
-                  <option value="apr">April</option><option value="may">May</option><option value="jun">June</option>
-                  <option value="jul">July</option><option value="aug">August</option><option value="sep">September</option>
-                  <option value="oct">October</option><option value="nov">November</option><option value="dec">December</option>
+                  <option value="">{t("Select Month", "महीना चुनें")}</option>
+                  <option value="jan">{t("January", "जनवरी")}</option><option value="feb">{t("February", "फ़रवरी")}</option><option value="mar">{t("March", "मार्च")}</option>
+                  <option value="apr">{t("April", "अप्रैल")}</option><option value="may">{t("May", "मई")}</option><option value="jun">{t("June", "जून")}</option>
+                  <option value="jul">{t("July", "जुलाई")}</option><option value="aug">{t("August", "अगस्त")}</option><option value="sep">{t("September", "सितंबर")}</option>
+                  <option value="oct">{t("October", "अक्टूबर")}</option><option value="nov">{t("November", "नवंबर")}</option><option value="dec">{t("December", "दिसंबर")}</option>
               </Form.Select>
             </Form.Group></Col>
-            <Col md={6}><Form.Group className="mb-3"><Form.Label>AWC Name</Form.Label><Form.Select name="awc_name" value={formData.awc_name} onChange={handleAwcChange} required disabled={!!editingId}><option value="">Select AWC</option>{awcList.map(awc => <option key={awc.awc_code} value={awc.awc_name}>{awc.awc_name}</option>)}</Form.Select>{formErrors.awc_name && <Form.Text className="text-danger">{formErrors.awc_name}</Form.Text>}</Form.Group></Col>
+            <Col md={6}><Form.Group className="mb-3"><Form.Label>{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</Form.Label><Form.Select name="awc_name" value={formData.awc_name} onChange={handleAwcChange} required disabled={!!editingId}><option value="">{t("Select AWC", "आंगनवाड़ी केंद्र चुनें")}</option>{awcList.map(awc => <option key={awc.awc_code} value={awc.awc_name}>{awc.awc_name}</option>)}</Form.Select>{formErrors.awc_name && <Form.Text className="text-danger">{formErrors.awc_name}</Form.Text>}</Form.Group></Col>
           </Row>
           <Row>
-            <Col md={4}><Form.Group className="mb-3"><Form.Label>District</Form.Label><Form.Control type="text" name="district" value={formData.district || ''} disabled /></Form.Group></Col>
-            <Col md={4}><Form.Group className="mb-3"><Form.Label>Project</Form.Label><Form.Control type="text" name="project" value={formData.project || ''} disabled /></Form.Group></Col>
-            <Col md={4}><Form.Group className="mb-3"><Form.Label>Sector</Form.Label><Form.Control type="text" name="sector" value={formData.sector || ''} disabled /></Form.Group></Col>
+            <Col md={4}><Form.Group className="mb-3"><Form.Label>{t("District", "जिला")}</Form.Label><Form.Control type="text" name="district" value={formData.district || ''} disabled /></Form.Group></Col>
+            <Col md={4}><Form.Group className="mb-3"><Form.Label>{t("Project", "परियोजना")}</Form.Label><Form.Control type="text" name="project" value={formData.project || ''} disabled /></Form.Group></Col>
+            <Col md={4}><Form.Group className="mb-3"><Form.Label>{t("Sector", "सेक्टर")}</Form.Label><Form.Control type="text" name="sector" value={formData.sector || ''} disabled /></Form.Group></Col>
           </Row>
-          <h6 className="mt-3">Beneficiary Counts</h6>
+          <h6 className="mt-3">{t("Beneficiary Counts", "लाभार्थी संख्या")}</h6>
           <Row>
-            <Col md={3}><Form.Group className="mb-3"><Form.Label>PW & LM</Form.Label><Form.Control type="number" name="pw_lm" value={formData.pw_lm} onChange={handleFormChange} required /></Form.Group></Col>
-            <Col md={3}><Form.Group className="mb-3"><Form.Label>Children (6m-3y)</Form.Label><Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-            <Col md={3}><Form.Group className="mb-3"><Form.Label>Children (3-6y)</Form.Label><Form.Control type="number" name="children_3_6y" value={formData.children_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
-            <Col md={3}><Form.Group className="mb-3"><Form.Label>Adolescent Girls</Form.Label><Form.Control type="number" name="adolescent_girls" value={formData.adolescent_girls} onChange={handleFormChange} required /></Form.Group></Col>
+            <Col md={3}><Form.Group className="mb-3"><Form.Label>{t("PW & LM", "गर्भवती एवं स्तनपान कराने वाली माताएँ")}</Form.Label><Form.Control type="number" name="pw_lm" value={formData.pw_lm} onChange={handleFormChange} required /></Form.Group></Col>
+            <Col md={3}><Form.Group className="mb-3"><Form.Label>{t("Children (6m-3y)", "बच्चे (6 माह-3 वर्ष)")}</Form.Label><Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
+            <Col md={3}><Form.Group className="mb-3"><Form.Label>{t("Children (3-6y)", "बच्चे (3-6 वर्ष)")}</Form.Label><Form.Control type="number" name="children_3_6y" value={formData.children_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
+            <Col md={3}><Form.Group className="mb-3"><Form.Label>{t("Adolescent Girls", "किशोरियाँ")}</Form.Label><Form.Control type="number" name="adolescent_girls" value={formData.adolescent_girls} onChange={handleFormChange} required /></Form.Group></Col>
           </Row>
           <Row>
-            <Col md={3}><Form.Group className="mb-3"><Form.Label>SAM (6m-3y)</Form.Label><Form.Control type="number" name="sam_6m_3y" value={formData.sam_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-            <Col md={3}><Form.Group className="mb-3"><Form.Label>SAM (3-5y)</Form.Label><Form.Control type="number" name="sam_3_5y" value={formData.sam_3_5y} onChange={handleFormChange} required /></Form.Group></Col>
-            <Col md={3}><Form.Group className="mb-3"><Form.Label>SUW (6m-3y)</Form.Label><Form.Control type="number" name="suw_6m_3y" value={formData.suw_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-            <Col md={3}><Form.Group className="mb-3"><Form.Label>SUW (3-6y)</Form.Label><Form.Control type="number" name="suw_3_6y" value={formData.suw_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
+            <Col md={3}><Form.Group className="mb-3"><Form.Label>{t("SAM (6m-3y)", "SAM (6 माह-3 वर्ष)")}</Form.Label><Form.Control type="number" name="sam_6m_3y" value={formData.sam_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
+            <Col md={3}><Form.Group className="mb-3"><Form.Label>{t("SAM (3-5y)", "SAM (3-5 वर्ष)")}</Form.Label><Form.Control type="number" name="sam_3_5y" value={formData.sam_3_5y} onChange={handleFormChange} required /></Form.Group></Col>
+            <Col md={3}><Form.Group className="mb-3"><Form.Label>{t("SUW (6m-3y)", "SUW (6 माह-3 वर्ष)")}</Form.Label><Form.Control type="number" name="suw_6m_3y" value={formData.suw_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
+            <Col md={3}><Form.Group className="mb-3"><Form.Label>{t("SUW (3-6y)", "SUW (3-6 वर्ष)")}</Form.Label><Form.Control type="number" name="suw_3_6y" value={formData.suw_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
           </Row>
-          <Button variant="secondary" onClick={() => setShowForm(false)} className="me-2">Cancel</Button>
+          <Button variant="secondary" onClick={() => setShowForm(false)} className="me-2">{t("Cancel", "रद्द करें")}</Button>
           <Button variant="primary" type="submit" disabled={submitting}>
-            {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingId ? "Update Report" : "Save Report")}
+            {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingId ? t("Update Report", "रिपोर्ट अपडेट करें") : t("Save Report", "रिपोर्ट सहेजें"))}
           </Button>
         </Form>
       
@@ -595,10 +606,10 @@ const StudentForm = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <h3 className="fw-bold">Beneficiary Reports</h3>
+            <h3 className="fw-bold">{t("Beneficiary Reports", "लाभार्थी रिपोर्ट")}</h3>
             <div>
-              <Button onClick={handleShowBulkUploadModal} variant="success" className="me-2"><FaUpload className="me-2" /> Bulk Upload</Button>
-              <Button onClick={handleAddNew} variant="primary"><FaPlus className="me-2" /> Add New Report</Button>
+              <Button onClick={handleShowBulkUploadModal} variant="success" className="me-2"><FaUpload className="me-2" /> {t("Bulk Upload", "बल्क अपलोड")}</Button>
+              <Button onClick={handleAddNew} variant="primary"><FaPlus className="me-2" /> {t("Add New Report", "नई रिपोर्ट जोड़ें")}</Button>
             </div>
           </div>
 
@@ -611,25 +622,25 @@ const StudentForm = () => {
           <Card>
             <Card.Header>
               <Row className="align-items-center">
-                <Col md={3}><Card.Title as="h5" className="mb-0">Existing Reports</Card.Title></Col>
+                <Col md={3}><Card.Title as="h5" className="mb-0">{t("Existing Reports", "मौजूदा रिपोर्ट")}</Card.Title></Col>
                 <Col md={9}>
-                  <Button variant="secondary" onClick={handleResetFilters}>Reset Filters</Button>
+                  <Button variant="secondary" onClick={handleResetFilters}>{t("Reset Filters", "फ़िल्टर रीसेट करें")}</Button>
                 </Col>
               </Row>
               <Row className="mt-3">
-                <Col md={2}><Form.Control type="text" name="fin_year" placeholder="Fin. Year (e.g., 2025-26)" value={filters.fin_year} onChange={handleFilterChange} /></Col>
+                <Col md={2}><Form.Control type="text" name="fin_year" placeholder={t("Fin. Year (e.g., 2025-26)", "वित्तीय वर्ष (उदा., 2025-26)")} value={filters.fin_year} onChange={handleFilterChange} /></Col>
                 <Col md={2}><Form.Select name="month" value={filters.month} onChange={handleFilterChange}>
-                    <option value="">All Months</option>
-                    <option value="jan">Jan</option><option value="feb">Feb</option><option value="mar">Mar</option>
-                    <option value="apr">Apr</option><option value="may">May</option><option value="jun">Jun</option>
-                    <option value="jul">Jul</option><option value="aug">Aug</option><option value="sep">Sep</option>
-                    <option value="oct">Oct</option><option value="nov">Nov</option><option value="dec">Dec</option>
+                    <option value="">{t("All Months", "सभी महीने")}</option>
+                    <option value="jan">{t("Jan", "जनवरी")}</option><option value="feb">{t("Feb", "फ़रवरी")}</option><option value="mar">{t("Mar", "मार्च")}</option>
+                    <option value="apr">{t("Apr", "अप्रैल")}</option><option value="may">{t("May", "मई")}</option><option value="jun">{t("Jun", "जून")}</option>
+                    <option value="jul">{t("Jul", "जुलाई")}</option><option value="aug">{t("Aug", "अगस्त")}</option><option value="sep">{t("Sep", "सितंबर")}</option>
+                    <option value="oct">{t("Oct", "अक्टूबर")}</option><option value="nov">{t("Nov", "नवंबर")}</option><option value="dec">{t("Dec", "दिसंबर")}</option>
                   </Form.Select>
                 </Col>
-                <Col md={2}><Form.Select name="district" value={filters.district} onChange={handleDistrictChange}><option value="">All Districts</option>{uniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}</Form.Select></Col>
-                <Col md={2}><Form.Select name="project" value={filters.project} onChange={handleProjectChange} disabled={!filters.district}><option value="">All Projects</option>{uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}</Form.Select></Col>
-                <Col md={2}><Form.Select name="sector" value={filters.sector} onChange={handleSectorChange} disabled={!filters.project}><option value="">All Sectors</option>{uniqueSectors.map(s => <option key={s} value={s}>{s}</option>)}</Form.Select></Col>
-                <Col md={2}><Form.Select name="awc_name" value={filters.awc_name} onChange={handleFilterChange} disabled={!filters.sector}><option value="">All AWCs</option>{uniqueAwcs.map(a => <option key={a} value={a}>{a}</option>)}</Form.Select></Col>
+                <Col md={2}><Form.Select name="district" value={filters.district} onChange={handleDistrictChange}><option value="">{t("All Districts", "सभी जिले")}</option>{uniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}</Form.Select></Col>
+                <Col md={2}><Form.Select name="project" value={filters.project} onChange={handleProjectChange} disabled={!filters.district}><option value="">{t("All Projects", "सभी परियोजनाएँ")}</option>{uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}</Form.Select></Col>
+                <Col md={2}><Form.Select name="sector" value={filters.sector} onChange={handleSectorChange} disabled={!filters.project}><option value="">{t("All Sectors", "सभी सेक्टर")}</option>{uniqueSectors.map(s => <option key={s} value={s}>{s}</option>)}</Form.Select></Col>
+                <Col md={2}><Form.Select name="awc_name" value={filters.awc_name} onChange={handleFilterChange} disabled={!filters.sector}><option value="">{t("All AWCs", "सभी आंगनवाड़ी केंद्र")}</option>{uniqueAwcs.map(a => <option key={a} value={a}>{a}</option>)}</Form.Select></Col>
               </Row>
             </Card.Header>
           
@@ -639,21 +650,21 @@ const StudentForm = () => {
                     <thead>
                       <tr>
                         <th>#</th>
-                        <th>District</th>
-                        <th>Project</th>
-                        <th>Sector</th>
-                        <th>AWC Name</th>
-                        <th>Fin. Year</th>
-                        <th>Month</th>
-                        <th title="Pregnant Women & Lactating Mothers">PW & LM</th>
-                        <th title="Children 6 months to 3 years">Child (6m-3y)</th>
-                        <th title="Children 3 to 6 years">Child (3-6y)</th>
-                        <th title="Adolescent Girls">Adol. Girls</th>
-                        <th title="SAM 6 months to 3 years">SAM (6m-3y)</th>
-                        <th title="SAM 3 to 5 years">SAM (3-5y)</th>
-                        <th title="SUW 6 months to 3 years">SUW (6m-3y)</th>
-                        <th title="SUW 3 to 6 years">SUW (3-6y)</th>
-                        <th>Actions</th>
+                        <th>{t("District", "जिला")}</th>
+                        <th>{t("Project", "परियोजना")}</th>
+                        <th>{t("Sector", "सेक्टर")}</th>
+                        <th>{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</th>
+                        <th>{t("Fin. Year", "वित्तीय वर्ष")}</th>
+                        <th>{t("Month", "महीना")}</th>
+                        <th title={t("Pregnant Women & Lactating Mothers", "गर्भवती एवं स्तनपान कराने वाली माताएँ")}>{t("PW & LM", "गर्भवती एवं स्तनपान कराने वाली माताएँ")}</th>
+                        <th title={t("Children 6 months to 3 years", "बच्चे 6 माह से 3 वर्ष")}>{t("Child (6m-3y)", "बच्चे (6 माह-3 वर्ष)")}</th>
+                        <th title={t("Children 3 to 6 years", "बच्चे 3 से 6 वर्ष")}>{t("Child (3-6y)", "बच्चे (3-6 वर्ष)")}</th>
+                        <th title={t("Adolescent Girls", "किशोरियाँ")}>{t("Adol. Girls", "किशोरियाँ")}</th>
+                        <th title={t("SAM 6 months to 3 years", "SAM 6 माह से 3 वर्ष")}>{t("SAM (6m-3y)", "SAM (6 माह-3 वर्ष)")}</th>
+                        <th title={t("SAM 3 to 5 years", "SAM 3 से 5 वर्ष")}>{t("SAM (3-5y)", "SAM (3-5 वर्ष)")}</th>
+                        <th title={t("SUW 6 months to 3 years", "SUW 6 माह से 3 वर्ष")}>{t("SUW (6m-3y)", "SUW (6 माह-3 वर्ष)")}</th>
+                        <th title={t("SUW 3 to 6 years", "SUW 3 से 6 वर्ष")}>{t("SUW (3-6y)", "SUW (3-6 वर्ष)")}</th>
+                        <th>{t("Actions", "कार्रवाई")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -677,14 +688,14 @@ const StudentForm = () => {
                               <td>{report.suw_6m_3y}</td>
                               <td>{report.suw_3_6y}</td>
                               <td>
-                                <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleShowViewModal(report)}><FaEye /></Button>
-                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(report)}><FaEdit /></Button>
-                                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(report.id)}><FaTrash /></Button>
+                                <Button variant="outline-info" size="sm" className="me-2" onClick={() => handleShowViewModal(report)} aria-label={t("View", "देखें")}><FaEye /></Button>
+                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEdit(report)} aria-label={t("Edit", "संपादित करें")}><FaEdit /></Button>
+                                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(report.id)} aria-label={t("Delete", "हटाएँ")}><FaTrash /></Button>
                               </td>
                             </tr>
                           ))}
                           <tr className="table-active fw-bold">
-                            <td colSpan="7">Total</td>
+                            <td colSpan="7">{t("Total", "कुल")}</td>
                             <td>{reports.reduce((sum, r) => sum + (Number(r.pw_lm) || 0), 0)}</td>
                             <td>{reports.reduce((sum, r) => sum + (Number(r.children_6m_3y) || 0), 0)}</td>
                             <td>{reports.reduce((sum, r) => sum + (Number(r.children_3_6y) || 0), 0)}</td>
@@ -697,7 +708,7 @@ const StudentForm = () => {
                           </tr>
                         </>
                       ) : (
-                        <tr><td colSpan="16" className="text-center">No reports found.</td></tr>
+                        <tr><td colSpan="16" className="text-center">{t("No reports found.", "कोई रिपोर्ट नहीं मिली।")}</td></tr>
                       )}
                     </tbody>
                   </Table>
@@ -710,29 +721,29 @@ const StudentForm = () => {
           {viewingReport && (
             <Modal show={showViewModal} onHide={handleCloseViewModal} centered size="lg">
               <Modal.Header closeButton>
-                <Modal.Title>Beneficiary Report Details</Modal.Title>
+                <Modal.Title>{t("Beneficiary Report Details", "लाभार्थी रिपोर्ट विवरण")}</Modal.Title>
               </Modal.Header>
-            <Modal.Body>                <Row><Col md={6}><p><strong>AWC Name:</strong> {viewingReport.awc_name}</p><p><strong>Financial Year:</strong> {viewingReport.fin_year}</p><p><strong>Month:</strong> {viewingReport.month}</p></Col><Col md={6}><p><strong>District:</strong> {viewingReport.district}</p><p><strong>Project:</strong> {viewingReport.project}</p><p><strong>Sector:</strong> {viewingReport.sector}</p></Col></Row>
+            <Modal.Body>                <Row><Col md={6}><p><strong>{t("AWC Name:", "आंगनवाड़ी केंद्र का नाम:")}</strong> {viewingReport.awc_name}</p><p><strong>{t("Financial Year:", "वित्तीय वर्ष:")}</strong> {viewingReport.fin_year}</p><p><strong>{t("Month:", "महीना:")}</strong> {viewingReport.month}</p></Col><Col md={6}><p><strong>{t("District:", "जिला:")}</strong> {viewingReport.district}</p><p><strong>{t("Project:", "परियोजना:")}</strong> {viewingReport.project}</p><p><strong>{t("Sector:", "सेक्टर:")}</strong> {viewingReport.sector}</p></Col></Row>
                 <hr />
-                <h5 className="mb-3">Beneficiary Counts</h5>
-                <ListGroup variant="flush"><ListGroup.Item><FaUsers className="me-2 text-primary" /> Pregnant Women & Lactating Mothers: <strong>{viewingReport.pw_lm}</strong></ListGroup.Item><ListGroup.Item><FaChild className="me-2 text-info" /> Children (6 months - 3 years): <strong>{viewingReport.children_6m_3y}</strong></ListGroup.Item><ListGroup.Item><FaChild className="me-2 text-success" /> Children (3 years - 6 years): <strong>{viewingReport.children_3_6y}</strong></ListGroup.Item><ListGroup.Item><FaFemale className="me-2 text-secondary" /> Adolescent Girls: <strong>{viewingReport.adolescent_girls}</strong></ListGroup.Item><ListGroup.Item><FaExclamationTriangle className="me-2 text-danger" /> SAM (6 months - 3 years): <strong>{viewingReport.sam_6m_3y}</strong></ListGroup.Item><ListGroup.Item><FaExclamationTriangle className="me-2 text-danger" /> SAM (3 years - 5 years): <strong>{viewingReport.sam_3_5y}</strong></ListGroup.Item><ListGroup.Item><FaExclamationTriangle className="me-2 text-warning" /> SUW (6 months - 3 years): <strong>{viewingReport.suw_6m_3y}</strong></ListGroup.Item><ListGroup.Item><FaExclamationTriangle className="me-2 text-warning" /> SUW (3 years - 6 years): <strong>{viewingReport.suw_3_6y}</strong></ListGroup.Item></ListGroup>
+                <h5 className="mb-3">{t("Beneficiary Counts", "लाभार्थी संख्या")}</h5>
+                <ListGroup variant="flush"><ListGroup.Item><FaUsers className="me-2 text-primary" /> {t("Pregnant Women & Lactating Mothers:", "गर्भवती एवं स्तनपान कराने वाली माताएँ:")} <strong>{viewingReport.pw_lm}</strong></ListGroup.Item><ListGroup.Item><FaChild className="me-2 text-info" /> {t("Children (6 months - 3 years):", "बच्चे (6 माह - 3 वर्ष):")} <strong>{viewingReport.children_6m_3y}</strong></ListGroup.Item><ListGroup.Item><FaChild className="me-2 text-success" /> {t("Children (3 years - 6 years):", "बच्चे (3 वर्ष - 6 वर्ष):")} <strong>{viewingReport.children_3_6y}</strong></ListGroup.Item><ListGroup.Item><FaFemale className="me-2 text-secondary" /> {t("Adolescent Girls:", "किशोरियाँ:")} <strong>{viewingReport.adolescent_girls}</strong></ListGroup.Item><ListGroup.Item><FaExclamationTriangle className="me-2 text-danger" /> {t("SAM (6 months - 3 years):", "SAM (6 माह - 3 वर्ष):")} <strong>{viewingReport.sam_6m_3y}</strong></ListGroup.Item><ListGroup.Item><FaExclamationTriangle className="me-2 text-danger" /> {t("SAM (3 years - 5 years):", "SAM (3 वर्ष - 5 वर्ष):")} <strong>{viewingReport.sam_3_5y}</strong></ListGroup.Item><ListGroup.Item><FaExclamationTriangle className="me-2 text-warning" /> {t("SUW (6 months - 3 years):", "SUW (6 माह - 3 वर्ष):")} <strong>{viewingReport.suw_6m_3y}</strong></ListGroup.Item><ListGroup.Item><FaExclamationTriangle className="me-2 text-warning" /> {t("SUW (3 years - 6 years):", "SUW (3 वर्ष - 6 वर्ष):")} <strong>{viewingReport.suw_3_6y}</strong></ListGroup.Item></ListGroup>
               </Modal.Body>
-              <Modal.Footer><Button variant="secondary" onClick={handleCloseViewModal}>Close</Button></Modal.Footer>
+              <Modal.Footer><Button variant="secondary" onClick={handleCloseViewModal}>{t("Close", "बंद करें")}</Button></Modal.Footer>
             </Modal>
           )}
 
           <Modal show={showBulkUploadModal} onHide={handleCloseBulkUploadModal} centered size="xl">
             <Modal.Header closeButton>
-              <Modal.Title>Bulk Upload Beneficiary Reports</Modal.Title>
+              <Modal.Title>{t("Bulk Upload Beneficiary Reports", "लाभार्थी रिपोर्ट का बल्क अपलोड")}</Modal.Title>
             </Modal.Header>
             <Modal.Body>
               {bulkUploadError && <Alert variant="danger">{bulkUploadError}</Alert>}
-              <p>Upload an Excel file with the required columns. The 'awc_name' must match an existing AWC in the system.</p>
+              <p>{t("Upload an Excel file with the required columns. The 'awc_name' must match an existing AWC in the system.", "आवश्यक कॉलम वाली Excel फ़ाइल अपलोड करें। 'awc_name' सिस्टम में मौजूद आंगनवाड़ी केंद्र से मेल खाना चाहिए।")}</p>
               <Button variant="link" onClick={downloadSampleFile} className="p-0 mb-3">
-                <FaFileExcel className="me-1" /> Download Sample File
+                <FaFileExcel className="me-1" /> {t("Download Sample File", "नमूना फ़ाइल डाउनलोड करें")}
               </Button>
               <Form.Group controlId="formFile" className="mb-3">
-                <Form.Label>Select Excel File</Form.Label>
+                <Form.Label>{t("Select Excel File", "Excel फ़ाइल चुनें")}</Form.Label>
                 <Form.Control
                   type="file"
                   accept=".xlsx, .xls"
@@ -742,19 +753,19 @@ const StudentForm = () => {
 
               {bulkPreviewData.length > 0 && (
                 <div className="mt-4" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  <h6>File Preview</h6>
+                  <h6>{t("File Preview", "फ़ाइल पूर्वावलोकन")}</h6>
                   <Table striped bordered hover responsive size="sm">
                     <thead>
                       <tr>
                         <th>#</th>
                         {Object.keys(previewHeaders).map(key => (
-                          <th key={key}>{previewHeaders[key]}</th>
+                          <th key={key}>{translateLabel(previewHeaders[key])}</th>
                         ))}
-                        <th>Status</th>
+                        <th>{t("Status", "स्थिति")}</th>
                       </tr>
                     </thead>
                     {bulkPreviewData.some(item => item.errors.duplicate) && (
-                      <Alert variant="warning" className="mt-2">Duplicate rows were found in your file. Only the first instance of each will be uploaded.</Alert>
+                      <Alert variant="warning" className="mt-2">{t("Duplicate rows were found in your file. Only the first instance of each will be uploaded.", "फ़ाइल में डुप्लिकेट पंक्तियाँ मिलीं। प्रत्येक की केवल पहली पंक्ति अपलोड की जाएगी।")}</Alert>
                     )}
                     <tbody>
                       {bulkPreviewData.map((item, index) => (
@@ -776,10 +787,10 @@ const StudentForm = () => {
                                 className="text-danger"
                                 title={Object.values(item.errors).join(' \n')}
                               >
-                                Error
+                                {t("Error", "त्रुटि")}
                               </span>
                             ) : (
-                              <span className="text-success">OK</span>
+                              <span className="text-success">{t("OK", "ठीक है")}</span>
                             )}
                           </td>
                         </tr>
@@ -790,8 +801,8 @@ const StudentForm = () => {
               )}
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="secondary" onClick={handleCloseBulkUploadModal} disabled={bulkUploading}>Cancel</Button>
-              <Button variant="primary" onClick={handleBulkUpload} disabled={bulkUploading || !bulkFile || bulkPreviewData.some(item => Object.keys(item.errors).length > 0 && !item.errors.awc_name_suggestion)}>{bulkUploading ? <><Spinner as="span" animation="border" size="sm" /> Uploading...</> : "Upload"}</Button>
+              <Button variant="secondary" onClick={handleCloseBulkUploadModal} disabled={bulkUploading}>{t("Cancel", "रद्द करें")}</Button>
+              <Button variant="primary" onClick={handleBulkUpload} disabled={bulkUploading || !bulkFile || bulkPreviewData.some(item => Object.keys(item.errors).length > 0 && !item.errors.awc_name_suggestion)}>{bulkUploading ? <><Spinner as="span" animation="border" size="sm" /> {t("Uploading...", "अपलोड हो रहा है...")}</> : t("Upload", "अपलोड करें")}</Button>
             </Modal.Footer>
           </Modal>
         </Container>

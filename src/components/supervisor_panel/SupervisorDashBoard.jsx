@@ -18,6 +18,7 @@ import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 import "../../assets/css/dpo.css";
 
@@ -75,12 +76,12 @@ const getTotal = (items, key) =>
   );
 
 
-const ExportActions = ({ onPdf, onExcel }) => (
-  <ButtonGroup size="sm" aria-label="Export table">
-    <Button variant="outline-danger" onClick={onPdf} title="Export this table to PDF">
+const ExportActions = ({ onPdf, onExcel, t }) => (
+  <ButtonGroup size="sm" aria-label={t("Export table", "तालिका निर्यात करें")}>
+    <Button variant="outline-danger" onClick={onPdf} title={t("Export this table to PDF", "इस तालिका को PDF में निर्यात करें")}>
       <FaFilePdf className="me-1" /> PDF
     </Button>
-    <Button variant="outline-success" onClick={onExcel} title="Export this table to Excel">
+    <Button variant="outline-success" onClick={onExcel} title={t("Export this table to Excel", "इस तालिका को Excel में निर्यात करें")}>
       <FaFileExcel className="me-1" /> Excel
     </Button>
   </ButtonGroup>
@@ -256,18 +257,18 @@ const exportRowsToExcel = (title, headers, rows, filename) => {
   XLSX.writeFile(workbook, filename, { compression: true });
 };
 
-const DistributionSummaryTable = ({ items, loading, scheme }) => (
+const DistributionSummaryTable = ({ items, loading, scheme, t }) => (
   <div className="dpo-table-wrapper">
     <Table hover className="dpo-data-table mb-0">
       <thead>
         <tr>
           <th>#</th>
 
-          <th className="text-end">Total Beneficiaries</th>
+          <th className="text-end">{t("Total Beneficiaries", "कुल लाभार्थी")}</th>
 
-          <th className="text-end">Total Quantity</th>
+          <th className="text-end">{t("Total Quantity", "कुल मात्रा")}</th>
 
-          <th>Unit</th>
+          <th>{t("Unit", "इकाई")}</th>
         </tr>
       </thead>
 
@@ -281,7 +282,7 @@ const DistributionSummaryTable = ({ items, loading, scheme }) => (
         ) : items.length === 0 ? (
           <tr>
             <td colSpan={4} className="text-center p-4 text-muted">
-              No distribution records found.
+              {t("No distribution records found.", "वितरण का कोई रिकॉर्ड नहीं मिला।")}
             </td>
           </tr>
         ) : (
@@ -304,16 +305,16 @@ const DistributionSummaryTable = ({ items, loading, scheme }) => (
   </div>
 );
 
-const ReceivingSummaryTable = ({ items, loading, scheme }) => (
+const ReceivingSummaryTable = ({ items, loading, scheme, t }) => (
   <div className="dpo-table-wrapper">
     <Table hover className="dpo-data-table mb-0">
       <thead>
         <tr>
           <th>#</th>
 
-          <th className="text-end">Quantity Received</th>
+          <th className="text-end">{t("Quantity Received", "प्राप्त मात्रा")}</th>
 
-          <th>Unit</th>
+          <th>{t("Unit", "इकाई")}</th>
         </tr>
       </thead>
 
@@ -327,7 +328,7 @@ const ReceivingSummaryTable = ({ items, loading, scheme }) => (
         ) : items.length === 0 ? (
           <tr>
             <td colSpan={3} className="text-center p-4 text-muted">
-              No receiving records found.
+              {t("No receiving records found.", "प्राप्ति का कोई रिकॉर्ड नहीं मिला।")}
             </td>
           </tr>
         ) : (
@@ -347,6 +348,7 @@ const ReceivingSummaryTable = ({ items, loading, scheme }) => (
 );
 
 const SupervisorDashBoard = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [isMobile, setIsMobile] = useState(false);
@@ -475,7 +477,7 @@ const SupervisorDashBoard = () => {
 
     if (failed)
       setError(
-        "Some dashboard information could not be loaded. Please refresh and try again.",
+        t("Some dashboard information could not be loaded. Please refresh and try again.", "डैशबोर्ड की कुछ जानकारी लोड नहीं हो सकी। कृपया रीफ़्रेश करके पुनः प्रयास करें।"),
       );
 
     setLoading(false);
@@ -507,37 +509,37 @@ const SupervisorDashBoard = () => {
 
   const stats = [
     {
-      label: "HCM Beneficiaries",
+      label: t("HCM Beneficiaries", "HCM लाभार्थी"),
       value: getTotal(hcmDistributions, "total_beneficiaries"),
       icon: <FaUserFriends />,
     },
 
     {
-      label: "THR Beneficiaries",
+      label: t("THR Beneficiaries", "THR लाभार्थी"),
       value: getTotal(thrDistributions, "total_beneficiaries"),
       icon: <FaUserFriends />,
     },
 
     {
-      label: "HCM Distribution Records",
+      label: t("HCM Distribution Records", "HCM वितरण रिकॉर्ड"),
       value: hcmDistributions.length,
       icon: <FaChartBar />,
     },
 
     {
-      label: "THR Distribution Records",
+      label: t("THR Distribution Records", "THR वितरण रिकॉर्ड"),
       value: thrDistributions.length,
       icon: <FaChartBar />,
     },
 
     {
-      label: "HCM Received Records",
+      label: t("HCM Received Records", "HCM प्राप्ति रिकॉर्ड"),
       value: hcmReceipts.length,
       icon: <FaTruckLoading />,
     },
 
     {
-      label: "THR Received Records",
+      label: t("THR Received Records", "THR प्राप्ति रिकॉर्ड"),
       value: thrReceipts.length,
       icon: <FaTruckLoading />,
     },
@@ -733,12 +735,11 @@ const SupervisorDashBoard = () => {
           <div className="dashboard-header-section">
             <div>
               <h4 className="dashboard-main-title">
-                <FaBoxes /> Supervisor Dashboard
+                <FaBoxes /> {t("Supervisor Dashboard", "पर्यवेक्षक डैशबोर्ड")}
               </h4>
 
               <p className="dashboard-subtitle">
-                Overview of HCM and THR distribution, receiving, food items, and
-                assigned AWCs.
+                {t("Overview of HCM and THR distribution, receiving, food items, and assigned AWCs.", "HCM और THR वितरण, प्राप्ति, खाद्य सामग्री और आवंटित आंगनवाड़ी केंद्रों का विवरण।")}
               </p>
             </div>
 
@@ -747,7 +748,7 @@ const SupervisorDashBoard = () => {
               onClick={fetchAllData}
               disabled={loading}
             >
-              <FaSyncAlt className={loading ? "fa-spin" : ""} /> Refresh Data
+              <FaSyncAlt className={loading ? "fa-spin" : ""} /> {t("Refresh Data", "डेटा रीफ़्रेश करें")}
             </Button>
           </div>
 
@@ -769,7 +770,7 @@ const SupervisorDashBoard = () => {
 
                   <div>
                     <div className="small text-uppercase text-muted fw-bold">
-                      HCM Food Items
+                      {t("HCM Food Items", "HCM खाद्य सामग्री")}
                     </div>
 
                     <div className="fs-4 fw-bold">
@@ -801,7 +802,7 @@ const SupervisorDashBoard = () => {
 
                   <div>
                     <div className="small text-uppercase text-muted fw-bold">
-                      THR Food Items
+                      {t("THR Food Items", "THR खाद्य सामग्री")}
                     </div>
 
                     <div className="fs-4 fw-bold">
@@ -842,7 +843,7 @@ const SupervisorDashBoard = () => {
 
                   <div>
                     <div className="small text-uppercase text-muted fw-bold">
-                      Assigned AWCs
+                      {t("Assigned AWCs", "आवंटित आंगनवाड़ी केंद्र")}
                     </div>
 
                     <div className="fs-4 fw-bold">
@@ -877,17 +878,17 @@ const SupervisorDashBoard = () => {
               variant="outline-danger"
               onClick={() => exportAllDistributionReceiving("pdf")}
               disabled={loading}
-              title="Export all four HCM and THR summary tables to one PDF"
+              title={t("Export all four HCM and THR summary tables to one PDF", "HCM और THR की सभी चार सारांश तालिकाओं को एक PDF में निर्यात करें")}
             >
-              <FaFilePdf className="me-1" /> Export Summary PDF
+              <FaFilePdf className="me-1" /> {t("Export Summary PDF", "सारांश PDF निर्यात करें")}
             </Button>
             <Button
               variant="outline-success"
               onClick={() => exportAllDistributionReceiving("excel")}
               disabled={loading}
-              title="Export all four HCM and THR summary tables to one Excel workbook"
+              title={t("Export all four HCM and THR summary tables to one Excel workbook", "HCM और THR की सभी चार सारांश तालिकाओं को एक Excel फ़ाइल में निर्यात करें")}
             >
-              <FaFileExcel className="me-1" /> Export Summary Excel
+              <FaFileExcel className="me-1" /> {t("Export Summary Excel", "सारांश Excel निर्यात करें")}
             </Button>
           </div>
 
@@ -935,7 +936,7 @@ const SupervisorDashBoard = () => {
                         size="sm"
                         onClick={() => navigate(scheme.distributionRoute)}
                       >
-                        <FaFileAlt className="me-1" /> View distributions
+                        <FaFileAlt className="me-1" /> {t("View distributions", "वितरण देखें")}
                       </Button>
 
                       <Button
@@ -943,30 +944,32 @@ const SupervisorDashBoard = () => {
                         size="sm"
                         onClick={() => navigate(scheme.receivingRoute)}
                       >
-                        <FaTruckLoading className="me-1" /> View receiving
+                        <FaTruckLoading className="me-1" /> {t("View receiving", "प्राप्ति देखें")}
                       </Button>
                     </div>
                   </Card.Header>
 
                   <Card.Body className="p-0">
                     <div className="px-3 pt-3 pb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                      <span className="fw-bold text-secondary small text-uppercase">Distribution Summary</span>
+                      <span className="fw-bold text-secondary small text-uppercase">{t("Distribution Summary", "वितरण सारांश")}</span>
                     </div>
 
                     <DistributionSummaryTable
                       items={scheme.distributions}
                       loading={loading && !scheme.summary}
                       scheme={scheme.label.toLowerCase()}
+                      t={t}
                     />
 
                     <div className="px-3 pt-3 pb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                      <span className="fw-bold text-secondary small text-uppercase">Received Summary</span>
+                      <span className="fw-bold text-secondary small text-uppercase">{t("Received Summary", "प्राप्ति सारांश")}</span>
                     </div>
 
                     <ReceivingSummaryTable
                       items={scheme.receipts}
                       loading={loading && !scheme.summary}
                       scheme={scheme.label.toLowerCase()}
+                      t={t}
                     />
                   </Card.Body>
                 </Card>
@@ -977,7 +980,7 @@ const SupervisorDashBoard = () => {
           <Card className="dpo-table-card mt-3">
             <Card.Header className="dpo-table-header d-flex justify-content-between align-items-center flex-wrap gap-2">
               <h5 className="dpo-section-title">
-                <FaWarehouse /> Supplies Received, Distributed &amp; Remaining
+                <FaWarehouse /> {t("Supplies Received, Distributed & Remaining", "प्राप्त, वितरित और शेष आपूर्ति")}
               </h5>
               <ButtonGroup
                 className="dpo-toggle-group"
@@ -999,6 +1002,7 @@ const SupervisorDashBoard = () => {
               <ExportActions
                 onPdf={() => exportReconciliation("pdf")}
                 onExcel={() => exportReconciliation("excel")}
+                t={t}
               />
             </Card.Header>
             <Card.Body className="p-0">
@@ -1016,24 +1020,23 @@ const SupervisorDashBoard = () => {
                     const fmtQty = (value) => formatSupplyQuantity(value, reconciliationTab);
                     return rows.length === 0 ? (
                       <div className="text-center p-4 text-muted">
-                        No {reconciliationTab.toUpperCase()} reconciliation
-                        records found.
+                        {t(`No ${reconciliationTab.toUpperCase()} reconciliation records found.`, `${reconciliationTab.toUpperCase()} मिलान रिकॉर्ड नहीं मिला।`)}
                       </div>
                     ) : (
                       <Table hover responsive className="dpo-data-table mb-0">
                         <thead>
                           <tr>
                             <th>#</th>
-                            <th>AWC Name</th>
-                            <th>AWC Code</th>
-                            <th>Sector</th>
-                            <th>Trimester</th>
-                            <th>Financial Year</th>
-                            <th>Food Item</th>
-                            <th>Beneficiary Category</th>
-                            <th className="text-end">Received</th>
-                            <th className="text-end">Distributed</th>
-                            <th className="text-end">Remaining</th>
+                            <th>{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</th>
+                            <th>{t("AWC Code", "आंगनवाड़ी केंद्र कोड")}</th>
+                            <th>{t("Sector", "सेक्टर")}</th>
+                            <th>{t("Trimester", "त्रैमासिक अवधि")}</th>
+                            <th>{t("Financial Year", "वित्तीय वर्ष")}</th>
+                            <th>{t("Food Item", "खाद्य सामग्री")}</th>
+                            <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                            <th className="text-end">{t("Received", "प्राप्त")}</th>
+                            <th className="text-end">{t("Distributed", "वितरित")}</th>
+                            <th className="text-end">{t("Remaining", "शेष")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1075,7 +1078,7 @@ const SupervisorDashBoard = () => {
           <Card className="dpo-table-card mt-3">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
-                <FaUtensils /> Food Items Overview
+                <FaUtensils /> {t("Food Items Overview", "खाद्य सामग्री का अवलोकन")}
               </h5>
 
               <ButtonGroup
@@ -1099,6 +1102,7 @@ const SupervisorDashBoard = () => {
               <ExportActions
                 onPdf={() => exportFoodItems("pdf")}
                 onExcel={() => exportFoodItems("excel")}
+                t={t}
               />
             </Card.Header>
 
@@ -1110,7 +1114,7 @@ const SupervisorDashBoard = () => {
                   </div>
                 ) : foodItems.length === 0 ? (
                   <div className="text-center p-5 text-muted">
-                    No {foodItemsTab.toUpperCase()} food items found.
+                    {t(`No ${foodItemsTab.toUpperCase()} food items found.`, `${foodItemsTab.toUpperCase()} की कोई खाद्य सामग्री नहीं मिली।`)}
                   </div>
                 ) : (
                   <Table hover className="dpo-data-table mb-0">
@@ -1118,9 +1122,9 @@ const SupervisorDashBoard = () => {
                       <tr>
                         <th>#</th>
 
-                        <th>Food Item</th>
+                        <th>{t("Food Item", "खाद्य सामग्री")}</th>
 
-                        <th>Beneficiary Category</th>
+                        <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
                       </tr>
                     </thead>
 

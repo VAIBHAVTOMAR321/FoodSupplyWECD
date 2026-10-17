@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Container, Row, Col, Form, Spinner, Table, Button, Alert, Pagination, Modal, Dropdown } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
@@ -109,6 +110,7 @@ const THRDirectorReport = () => {
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
 
   const { api } = useAuth();
+  const { t } = useLanguage();
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -160,6 +162,19 @@ const THRDirectorReport = () => {
   ];
 
   const [columns, setColumns] = useState(initialColumns);
+  const localizedColumns = columns.map((column) => ({
+    ...column,
+    text: t(column.text, ({
+      District: "ज़िला", Project: "परियोजना", Sector: "सेक्टर",
+      "AWC Name": "आंगनवाड़ी केंद्र का नाम", "AWC Code": "आंगनवाड़ी केंद्र कोड",
+      "AWC Type": "आंगनवाड़ी केंद्र का प्रकार", "Food Item": "खाद्य सामग्री",
+      "Beneficiary Category": "लाभार्थी श्रेणी", "Days Allotted": "आवंटित दिन",
+      "Fin. Year": "वित्तीय वर्ष", Months: "महीने", Trimester: "त्रैमासिक अवधि",
+      Beneficiaries: "लाभार्थी", Quantity: "मात्रा", Unit: "इकाई",
+      "Anganwadi Remark": "आंगनवाड़ी केंद्र टिप्पणी", "Sector Status": "सेक्टर की स्थिति",
+      "Sector Remark": "सेक्टर टिप्पणी",
+    })[column.text] || column.text),
+  }));
   const tableRef = useRef(null);
 
   const fetchData = useCallback(async () => {
@@ -184,12 +199,12 @@ const THRDirectorReport = () => {
       setUniqueBeneCategories([...new Set(data.map(item => getField(item, 'bene_category')).filter(Boolean))]);
       setUniqueSectorStatuses([...new Set(data.map(item => getField(item, 'sector_status')).filter(Boolean))]);
     } catch (err) {
-      setError("Failed to fetch THR report data.");
+      setError(t("Failed to fetch THR report data.", "टीएचआर रिपोर्ट डेटा प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, t]);
 
   useEffect(() => {
     fetchData();
@@ -263,7 +278,7 @@ const THRDirectorReport = () => {
 
   const exportToPDF = async () => {
     if (!filteredData.length) {
-      window.alert("No data available to export.");
+      window.alert(t("No data available to export.", "निर्यात के लिए कोई डेटा उपलब्ध नहीं है।"));
       return;
     }
 
@@ -271,7 +286,7 @@ const THRDirectorReport = () => {
     let exportContainer;
 
     try {
-      const visibleColumns = columns.filter(col => col.visible);
+      const visibleColumns = localizedColumns.filter(col => col.visible);
       const escapeHtml = (value) => String(value ?? "-")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -309,7 +324,7 @@ const THRDirectorReport = () => {
       });
 
       const title = document.createElement("h3");
-      title.textContent = "THR Distribution Report";
+      title.textContent = t("THR Distribution Report", "टीएचआर वितरण रिपोर्ट");
       Object.assign(title.style, { textAlign: "center", margin: "0 0 14px", fontSize: "18px" });
       exportContainer.appendChild(title);
 
@@ -358,7 +373,7 @@ const THRDirectorReport = () => {
       const totalRow = document.createElement("tr");
       visibleColumns.forEach((col, index) => {
         const td = document.createElement("td");
-        if (index === 0) td.textContent = "Total";
+        if (index === 0) td.textContent = t("Total", "कुल");
         else if (col.dataField === "total_beneficiaries") td.textContent = String(totals.beneficiaries);
         else td.textContent = "";
         Object.assign(td.style, {
@@ -372,7 +387,7 @@ const THRDirectorReport = () => {
       // Keep the Total label aligned with the existing report footer, including if the
       // beneficiary column is hidden or moved by the user.
       if (beneficiaryIndex > 0 && visibleColumns[0]?.dataField !== "#") {
-        totalRow.cells[0].textContent = "Total";
+        totalRow.cells[0].textContent = t("Total", "कुल");
       }
       const tfoot = document.createElement("tfoot");
       tfoot.appendChild(totalRow);
@@ -426,7 +441,7 @@ const THRDirectorReport = () => {
       pdf.save("thr_director_report.pdf");
     } catch (err) {
       console.error("Failed to export THR report PDF:", err);
-      window.alert("Unable to export PDF. Please try again.");
+      window.alert(t("Unable to export PDF. Please try again.", "पीडीएफ निर्यात नहीं हो सकी। कृपया पुनः प्रयास करें।"));
     } finally {
       if (exportContainer?.parentNode) exportContainer.parentNode.removeChild(exportContainer);
       setIsPrinting(false);
@@ -434,7 +449,7 @@ const THRDirectorReport = () => {
   };
 
   const exportToExcel = () => {
-    const visibleColumns = columns.filter(col => col.visible);
+    const visibleColumns = localizedColumns.filter(col => col.visible);
     const dataToExport = filteredData.map((row, index) => {
       const newRow = {};
       visibleColumns.forEach(col => {
@@ -448,7 +463,7 @@ const THRDirectorReport = () => {
 
     const totalRow = {};
     visibleColumns.forEach((col, index) => {
-      if (index === 0) totalRow[col.text] = "Total";
+      if (index === 0) totalRow[col.text] = t("Total", "कुल");
       else if (col.dataField === "total_beneficiaries") totalRow[col.text] = totals.beneficiaries;
       else totalRow[col.text] = "";
     });
@@ -490,16 +505,16 @@ const THRDirectorReport = () => {
         <DirectorHeader toggleSidebar={toggleSidebar} />
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3 className="mb-0">THR Distribution Report</h3>
+            <h3 className="mb-0">{t("THR Distribution Report", "टीएचआर वितरण रिपोर्ट")}</h3>
             <div>
               <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
-                <FaFilePdf className="me-1" /> Export PDF
+                <FaFilePdf className="me-1" /> {t("Export PDF", "पीडीएफ निर्यात करें")}
               </Button>
               <Button variant="outline-success" size="sm" onClick={exportToExcel}>
-                <FaFileExcel className="me-1" /> Export Excel
+                <FaFileExcel className="me-1" /> {t("Export Excel", "एक्सेल निर्यात करें")}
               </Button>
               <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)} className="ms-2">
-                <FaEye className="me-1" /> Column Visibility
+                <FaEye className="me-1" /> {t("Column Visibility", "कॉलम दृश्यता")}
               </Button>
             </div>
           </div>
@@ -508,7 +523,7 @@ const THRDirectorReport = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-finyear" className="w-100">
-                  {filters.finYear.length ? `${filters.finYear.length} years selected` : 'All Fin. Years'}
+                  {filters.finYear.length ? t(`${filters.finYear.length} years selected`, `${filters.finYear.length} वर्ष चयनित`) : t('All Fin. Years', 'सभी वित्तीय वर्ष')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueFinYears.map(year => (
@@ -522,7 +537,7 @@ const THRDirectorReport = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-months" className="w-100">
-                  {filters.months.length ? `${filters.months.length} months selected` : 'All Months'}
+                  {filters.months.length ? t(`${filters.months.length} months selected`, `${filters.months.length} महीने चयनित`) : t('All Months', 'सभी महीने')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueMonths.map(m => (
@@ -536,7 +551,7 @@ const THRDirectorReport = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-district" className="w-100">
-                  {filters.district.length ? `${filters.district.length} districts selected` : 'All Districts'}
+                  {filters.district.length ? t(`${filters.district.length} districts selected`, `${filters.district.length} ज़िले चयनित`) : t('All Districts', 'सभी ज़िले')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueDistricts.map(d => (
@@ -550,7 +565,7 @@ const THRDirectorReport = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-project" className="w-100">
-                  {filters.project.length ? `${filters.project.length} projects selected` : 'All Projects'}
+                  {filters.project.length ? t(`${filters.project.length} projects selected`, `${filters.project.length} परियोजनाएँ चयनित`) : t('All Projects', 'सभी परियोजनाएँ')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueProjects.map(p => (
@@ -564,7 +579,7 @@ const THRDirectorReport = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector" className="w-100">
-                  {filters.sector.length ? `${filters.sector.length} sectors selected` : 'All Sectors'}
+                  {filters.sector.length ? t(`${filters.sector.length} sectors selected`, `${filters.sector.length} सेक्टर चयनित`) : t('All Sectors', 'सभी सेक्टर')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueSectors.map(s => (
@@ -578,7 +593,7 @@ const THRDirectorReport = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-food-item" className="w-100">
-                  {filters.food_item.length ? `${filters.food_item.length} items selected` : 'All Food Items'}
+                  {filters.food_item.length ? t(`${filters.food_item.length} items selected`, `${filters.food_item.length} खाद्य सामग्री चयनित`) : t('All Food Items', 'सभी खाद्य सामग्री')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueFoodItems.map(item => (
@@ -592,7 +607,7 @@ const THRDirectorReport = () => {
             <Col md={2} className="mt-2">
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category" className="w-100">
-                  {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
+                  {filters.bene_category.length ? t(`${filters.bene_category.length} categories selected`, `${filters.bene_category.length} श्रेणियाँ चयनित`) : t('All Bene. Categories', 'सभी लाभार्थी श्रेणियाँ')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueBeneCategories.map(cat => (
@@ -606,7 +621,7 @@ const THRDirectorReport = () => {
             <Col md={2} className="mt-2">
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status" className="w-100">
-                  {filters.sector_status.length ? `${filters.sector_status.length} selected` : 'All Sector Status'}
+                  {filters.sector_status.length ? t(`${filters.sector_status.length} selected`, `${filters.sector_status.length} चयनित`) : t('All Sector Status', 'सभी सेक्टर स्थितियाँ')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueSectorStatuses.map(status => (
@@ -618,7 +633,7 @@ const THRDirectorReport = () => {
               </Dropdown>
             </Col>
             <Col md={2} className="mt-2">
-              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [] })}>Clear Filters</Button>
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [] })}>{t("Clear Filters", "फ़िल्टर साफ़ करें")}</Button>
             </Col>
           </Row>
 
@@ -631,7 +646,7 @@ const THRDirectorReport = () => {
               <Table striped bordered hover responsive className="bg-white" ref={tableRef} style={{ border: '1px solid #dee2e6' }}>
                 <thead>
                   <tr>
-                    {columns.map((col, index) => col.visible && (
+                    {localizedColumns.map((col, index) => col.visible && (
                       <th key={index}>
                         {col.dataField === 'bene_category' ? (
                           <div className="bene-category-cell" style={{ width: '150px' }}>{col.text}</div>
@@ -678,14 +693,14 @@ const THRDirectorReport = () => {
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan={columns.filter(c => c.visible).length} className="text-center">No data available</td>
+                      <td colSpan={columns.filter(c => c.visible).length} className="text-center">{t("No data available", "कोई डेटा उपलब्ध नहीं है")}</td>
                     </tr>
                   )}
                 </tbody>
                 <tfoot>
                   <tr className="fw-bold table-info">
-                    <td colSpan={columns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')}>Total</td>
-                    {columns.filter(c => c.visible).slice(columns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')).map(col => {
+                    <td colSpan={localizedColumns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')}>{t("Total", "कुल")}</td>
+                    {localizedColumns.filter(c => c.visible).slice(localizedColumns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')).map(col => {
                       if (col.dataField === 'total_beneficiaries') {
                         return <td key="total_beneficiaries">{totals.beneficiaries}</td>;
                       }
@@ -693,7 +708,7 @@ const THRDirectorReport = () => {
                         return <td key="total_quantity">
                           {!isPrinting && (
                             <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>
-                              View Totals
+                              {t("View Totals", "कुल देखें")}
                             </Button>
                           )}
                         </td>;
@@ -714,10 +729,10 @@ const THRDirectorReport = () => {
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
           <Modal.Header closeButton>
-            <Modal.Title>Show/Hide Columns</Modal.Title>
+            <Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएँ/छिपाएँ")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            {columns.map((col, index) => (
+            {localizedColumns.map((col, index) => (
               <Form.Check
                 key={index}
                 type="checkbox"
@@ -729,22 +744,22 @@ const THRDirectorReport = () => {
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setShowColumnModal(false)}>
-              Close
+              {t("Close", "बंद करें")}
             </Button>
           </Modal.Footer>
         </Modal>
 
         <Modal show={showQuantityModal} onHide={() => setShowQuantityModal(false)} centered>
           <Modal.Header closeButton>
-            <Modal.Title>Total Quantity by Unit</Modal.Title>
+            <Modal.Title>{t("Total Quantity by Unit", "इकाई के अनुसार कुल मात्रा")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {Object.keys(totals.quantityByUnit).length > 0 ? (
               <Table striped bordered>
                 <thead>
                   <tr>
-                    <th>Unit</th>
-                    <th>Total Quantity</th>
+                    <th>{t("Unit", "इकाई")}</th>
+                    <th>{t("Total Quantity", "कुल मात्रा")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -753,7 +768,7 @@ const THRDirectorReport = () => {
                   ))}
                 </tbody>
               </Table>
-            ) : <p>No quantity data to display.</p>}
+            ) : <p>{t("No quantity data to display.", "दिखाने के लिए मात्रा डेटा उपलब्ध नहीं है।")}</p>}
           </Modal.Body>
         </Modal>
       </div>

@@ -15,6 +15,7 @@ import {
 } from "react-bootstrap";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 import "../../assets/css/anganwadileftnav.css";
 
@@ -434,6 +435,7 @@ const toDateOnly = (input) => {
 };
 
 const AnganwadiDashboard = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [isMobile, setIsMobile] = useState(false);
@@ -551,7 +553,7 @@ const AnganwadiDashboard = () => {
       } catch (err) {
         setError((prev) => ({
           ...prev,
-          counts: "Failed to fetch food item counts.",
+          counts: t("Failed to fetch food item counts.", "खाद्य सामग्री की संख्या प्राप्त नहीं हो सकी।"),
         }));
 
         console.error(err);
@@ -609,8 +611,14 @@ const AnganwadiDashboard = () => {
           // fetch error locally instead of changing authentication state.
           setSuppliesError(
             err?.response?.status === 401 || err?.response?.status === 403
-              ? `You are not authorized to view ${suppliesTab.toUpperCase()} reconciliation data. Please verify the AWC login/session permissions.`
-              : `Failed to fetch ${suppliesTab.toUpperCase()} supplies data. Please retry.`,
+              ? t(
+                  `You are not authorized to view ${suppliesTab.toUpperCase()} reconciliation data. Please verify the AWC login/session permissions.`,
+                  `आपको ${suppliesTab.toUpperCase()} मिलान डेटा देखने की अनुमति नहीं है। कृपया आंगनवाड़ी केंद्र लॉगिन/सत्र अनुमतियां जांचें।`,
+                )
+              : t(
+                  `Failed to fetch ${suppliesTab.toUpperCase()} supplies data. Please retry.`,
+                  `${suppliesTab.toUpperCase()} आपूर्ति डेटा प्राप्त नहीं हो सका। कृपया पुनः प्रयास करें।`,
+                ),
           );
         }
       } finally {
@@ -791,7 +799,7 @@ const AnganwadiDashboard = () => {
       );
     } catch (exportError) {
       console.error("Failed to export supplies summary to Excel:", exportError);
-      setSuppliesExportError("Excel export failed. Please try again.");
+      setSuppliesExportError(t("Excel export failed. Please try again.", "Excel निर्यात विफल। कृपया पुनः प्रयास करें।"));
     }
   };
 
@@ -849,7 +857,7 @@ const AnganwadiDashboard = () => {
       });
     } catch (exportError) {
       console.error("Failed to export supplies summary to PDF:", exportError);
-      setSuppliesExportError("PDF export failed. Please try again.");
+      setSuppliesExportError(t("PDF export failed. Please try again.", "PDF निर्यात विफल। कृपया पुनः प्रयास करें।"));
     }
   };
 
@@ -887,7 +895,7 @@ const AnganwadiDashboard = () => {
       );
     } catch (exportError) {
       console.error("Failed to export distribution records to Excel:", exportError);
-      setDistributionExportError("Excel export failed. Please try again.");
+      setDistributionExportError(t("Excel export failed. Please try again.", "Excel निर्यात विफल। कृपया पुनः प्रयास करें।"));
     }
   };
 
@@ -915,7 +923,7 @@ const AnganwadiDashboard = () => {
       });
     } catch (exportError) {
       console.error("Failed to export distribution records to PDF:", exportError);
-      setDistributionExportError("PDF export failed. Please try again.");
+      setDistributionExportError(t("PDF export failed. Please try again.", "PDF निर्यात विफल। कृपया पुनः प्रयास करें।"));
     }
   };
 
@@ -1408,7 +1416,7 @@ const AnganwadiDashboard = () => {
     setDistributionError("");
 
     if (!distributionData.food_item_id) {
-      setDistributionError("कृपया एक खाद्य सामग्री चुनें।");
+      setDistributionError(t("Please select a food item.", "कृपया खाद्य सामग्री चुनें।"));
 
       setSubmitting(false);
 
@@ -1428,7 +1436,7 @@ const AnganwadiDashboard = () => {
       !distributionData.trimester ||
       !distributionData.months?.length
     ) {
-      setDistributionError("कृपया सभी आवश्यक फ़ील्ड भरें।");
+      setDistributionError(t("Please fill in all required fields.", "कृपया सभी आवश्यक फ़ील्ड भरें।"));
 
       setSubmitting(false);
 
@@ -1441,7 +1449,7 @@ const AnganwadiDashboard = () => {
       distributionData.months.some((m) => !allowedTrimesterMonths.includes(m))
     ) {
       setDistributionError(
-        "कृपया चुने गए Trimester के अंतर्गत आने वाले महीने ही चुनें।",
+        t("Please select only months included in the selected trimester.", "कृपया केवल चयनित त्रैमासिक अवधि के महीने चुनें।"),
       );
       setSubmitting(false);
       return;
@@ -1453,7 +1461,7 @@ const AnganwadiDashboard = () => {
 
     if (unreceivedMonths.length > 0) {
       setDistributionError(
-        `त्रुटि: ${formatMonths(unreceivedMonths)} के लिए रिसीविंग (Receiving) पंजीकृत नहीं है। कृपया पहले रिसीविंग दर्ज करें।`,
+        t(`Receiving is not registered for ${formatMonths(unreceivedMonths)}. Please record receiving first.`, `${formatMonths(unreceivedMonths)} के लिए प्राप्ति दर्ज नहीं है। कृपया पहले प्राप्ति दर्ज करें।`),
       );
 
       setSubmitting(false);
@@ -1467,7 +1475,7 @@ const AnganwadiDashboard = () => {
 
     if (unapprovedMonths.length > 0) {
       setDistributionError(
-        `त्रुटि: ${formatMonths(unapprovedMonths)} के लिए रिसीविंग स्वीकृत (approved) नहीं है। कृपया सुपरवाइजर से पहले रिसीविंग अनुमोदित करवाएं।`,
+        t(`Receiving for ${formatMonths(unapprovedMonths)} is not approved. Please ask the supervisor to approve it first.`, `${formatMonths(unapprovedMonths)} के लिए प्राप्ति स्वीकृत नहीं है। कृपया पहले सुपरवाइज़र से इसे अनुमोदित करवाएं।`),
       );
 
       setSubmitting(false);
@@ -1493,7 +1501,7 @@ const AnganwadiDashboard = () => {
 
       if (duplicateDate) {
         setDistributionError(
-          `इस दिनांक (${selectedDateOnly}) के लिए वितरण पहले ही दर्ज किया जा चुका है। एक दिनांक पर केवल एक ही HCM वितरण रिकॉर्ड किया जा सकता है।`,
+          t(`A distribution has already been recorded for ${selectedDateOnly}. Only one HCM distribution record can be created per date.`, `${selectedDateOnly} के लिए वितरण पहले ही दर्ज किया जा चुका है। प्रत्येक दिनांक पर केवल एक HCM वितरण रिकॉर्ड बनाया जा सकता है।`),
         );
 
         setSubmitting(false);
@@ -1555,7 +1563,7 @@ const AnganwadiDashboard = () => {
 
       if (duplicate) {
         setDistributionError(
-          "इस माह का स्टॉक पहले ही आवंटित किया जा चुका है। कृपया इस माह के लिए दोबारा वितरण न करें।",
+          t("Stock for this month has already been allocated. Please do not record another distribution for this month.", "इस महीने का स्टॉक पहले ही आवंटित किया जा चुका है। कृपया इस महीने के लिए दोबारा वितरण दर्ज न करें।"),
         );
 
         setSubmitting(false);
@@ -1627,7 +1635,7 @@ const AnganwadiDashboard = () => {
         refreshError,
       );
       setDistributionError(
-        "वितरण से पहले स्टॉक की पुष्टि नहीं हो सकी। कृपया दोबारा प्रयास करें।",
+        t("Unable to verify stock before distribution. Please try again.", "वितरण से पहले स्टॉक की पुष्टि नहीं हो सकी। कृपया पुनः प्रयास करें।"),
       );
       setSubmitting(false);
       return;
@@ -1682,14 +1690,14 @@ const AnganwadiDashboard = () => {
     );
     if (remainingDistributionLimit <= 0) {
       setDistributionError(
-        "आप वितरण नहीं कर सकते, आवंटित रिसीविंग समाप्त हो चुकी है। इस Trimester में कोई मात्रा शेष नहीं है।",
+        t("Distribution is unavailable because the received allocation has been exhausted. No quantity remains for this trimester.", "आप वितरण नहीं कर सकते, प्राप्त आवंटन समाप्त हो चुका है। इस त्रैमासिक अवधि के लिए कोई मात्रा शेष नहीं है।"),
       );
       setSubmitting(false);
       return;
     }
     if (calculatedQuantity > remainingDistributionLimit) {
       if (beneficiaryCount <= 0) {
-        setDistributionError("कृपया लाभार्थियों की संख्या दर्ज करें।");
+        setDistributionError(t("Please enter the number of beneficiaries.", "कृपया लाभार्थियों की संख्या दर्ज करें।"));
         setSubmitting(false);
         return;
       }
@@ -1714,8 +1722,8 @@ const AnganwadiDashboard = () => {
     ) {
       setDistributionError(
         calculatedQuantity <= 0
-          ? "शेष मात्रा लाभार्थियों में वितरित करने के लिए पर्याप्त नहीं है। वितरण नहीं किया जा सकता।"
-          : "वितरण मात्रा शेष स्टॉक से अधिक है। कृपया मात्रा जाँचें।",
+          ? t("The remaining quantity is insufficient for distribution among the beneficiaries. Distribution cannot proceed.", "शेष मात्रा लाभार्थियों में वितरित करने के लिए पर्याप्त नहीं है। वितरण नहीं किया जा सकता।")
+          : t("The distribution quantity exceeds the remaining stock. Please check the quantity.", "वितरण मात्रा शेष स्टॉक से अधिक है। कृपया मात्रा जाँचें।"),
       );
       setSubmitting(false);
       return;
@@ -1735,7 +1743,7 @@ const AnganwadiDashboard = () => {
     const quarterString = selectedTrimester;
 
     if (!quarterString || !trimesterToMonths[quarterString]) {
-      setDistributionError("कृपया वितरण के लिए सही Trimester चुनें।");
+      setDistributionError(t("Please select a valid trimester for distribution.", "कृपया वितरण के लिए सही त्रैमासिक अवधि चुनें।"));
       setSubmitting(false);
       return;
     }
@@ -1782,7 +1790,7 @@ const AnganwadiDashboard = () => {
     try {
       await api[method](url, payload);
 
-      alert(`Distribution ${isEdit ? "updated" : "recorded"} successfully!`);
+      alert(t(`Distribution ${isEdit ? "updated" : "recorded"} successfully!`, `वितरण ${isEdit ? "अपडेट" : "दर्ज"} सफलतापूर्वक हुआ!`));
 
       handleCloseDistributionModal();
 
@@ -1790,7 +1798,7 @@ const AnganwadiDashboard = () => {
     } catch (err) {
       console.error("API Error:", err.response?.data || err);
 
-      let errorMessage = `वितरण ${isEdit ? "अपडेट" : "रिकॉर्ड"} करने में विफल। कृपया पुन: प्रयास करें।`;
+      let errorMessage = t(`Failed to ${isEdit ? "update" : "record"} distribution. Please try again.`, `वितरण ${isEdit ? "अपडेट" : "दर्ज"} नहीं हो सका। कृपया पुनः प्रयास करें।`);
 
       if (err.response && err.response.data) {
         const errorData = err.response.data;
@@ -1823,7 +1831,7 @@ const AnganwadiDashboard = () => {
   const handleDelete = async (record) => {
     if (
       window.confirm(
-        `Are you sure you want to delete the distribution record for ${record.food_item}?`,
+        t(`Are you sure you want to delete the distribution record for ${record.food_item}?`, `क्या आप वाकई ${record.food_item} का वितरण रिकॉर्ड हटाना चाहते हैं?`),
       )
     ) {
       const url =
@@ -1834,11 +1842,11 @@ const AnganwadiDashboard = () => {
       try {
         await api.delete(url, { data: { id: record.id } });
 
-        alert("Distribution record deleted successfully!");
+        alert(t("Distribution record deleted successfully!", "वितरण रिकॉर्ड सफलतापूर्वक हटाया गया!"));
 
         handleCardClick(activeScheme);
       } catch (err) {
-        alert("Failed to delete distribution record.");
+        alert(t("Failed to delete distribution record.", "वितरण रिकॉर्ड हटाया नहीं जा सका।"));
 
         console.error(err);
       }
@@ -1971,7 +1979,7 @@ const AnganwadiDashboard = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading d-flex justify-content-between align-items-center">
-            <h3 className="mb-4 fw-bold">Anganwadi Dashboard</h3>
+            <h3 className="mb-4 fw-bold">{t("Anganwadi Dashboard", "आंगनवाड़ी डैशबोर्ड")}</h3>
           </div>
 
           <Row>
@@ -1983,7 +1991,7 @@ const AnganwadiDashboard = () => {
                 <Card.Body>
                   <FaUtensils className="card-icon" />
 
-                  <Card.Title>HCM Food Items</Card.Title>
+                  <Card.Title>{t("HCM Food Items", "HCM खाद्य सामग्री")}</Card.Title>
 
                   {loading.counts ? (
                     <Spinner animation="border" size="sm" />
@@ -1992,7 +2000,7 @@ const AnganwadiDashboard = () => {
                   )}
 
                   <Card.Text className="d-flex align-items-center">
-                    Total Items
+                    {t("Total Items", "कुल आइटम")}
                     {activeScheme === "hcm" ? (
                       <FaChevronUp className="ms-2" />
                     ) : (
@@ -2011,7 +2019,7 @@ const AnganwadiDashboard = () => {
                 <Card.Body>
                   <FaBoxOpen className="card-icon" />
 
-                  <Card.Title>THR Food Items</Card.Title>
+                  <Card.Title>{t("THR Food Items", "THR खाद्य सामग्री")}</Card.Title>
 
                   {loading.counts ? (
                     <Spinner animation="border" size="sm" />
@@ -2020,7 +2028,7 @@ const AnganwadiDashboard = () => {
                   )}
 
                   <Card.Text className="d-flex align-items-center">
-                    Total Items
+                    {t("Total Items", "कुल आइटम")}
                     {activeScheme === "thr" ? (
                       <FaChevronUp className="ms-2" />
                     ) : (
@@ -2063,7 +2071,7 @@ const AnganwadiDashboard = () => {
                       className="me-2"
                       style={{ color: "#0f766e" }}
                     />
-                    Supplies Received &amp; Distributed Summary{" "}
+                    {t("Supplies Received & Distributed Summary", "प्राप्त और वितरित आपूर्ति का सारांश")}{" "}
                     <span
                       className="badge rounded-pill ms-2"
                       style={{
@@ -2072,12 +2080,12 @@ const AnganwadiDashboard = () => {
                         fontSize: ".7rem",
                       }}
                     >
-                      AWC-wise
+                      {t("AWC-wise", "आंगनवाड़ी केंद्र-वार")}
                     </span>
                   </h5>
                   <div className="d-flex align-items-center flex-wrap gap-2">
                     <Form.Group className="mb-0">
-                      <Form.Label className="small mb-1">Trimester</Form.Label>
+                      <Form.Label className="small mb-1">{t("Trimester", "त्रैमासिक अवधि")}</Form.Label>
                       <Form.Select
                         size="sm"
                         value={selectedSupplyMonths[0] || ""}
@@ -2087,7 +2095,7 @@ const AnganwadiDashboard = () => {
                           )
                         }
                       >
-                        <option value="">All Trimesters</option>
+                        <option value="">{t("All Trimesters", "सभी त्रैमासिक अवधियां")}</option>
                         {suppliesMonths.map((m) => (
                           <option key={m} value={m}>
                             {m}
@@ -2097,7 +2105,7 @@ const AnganwadiDashboard = () => {
                     </Form.Group>
                     <Form.Group className="mb-0">
                       <Form.Label className="small mb-1">
-                        Financial Year
+                        {t("Financial Year", "वित्तीय वर्ष")}
                       </Form.Label>
                       <Form.Select
                         size="sm"
@@ -2108,7 +2116,7 @@ const AnganwadiDashboard = () => {
                           )
                         }
                       >
-                        <option value="">All Financial Years</option>
+                        <option value="">{t("All Financial Years", "सभी वित्तीय वर्ष")}</option>
                         {suppliesFinancialYears.map((fy) => (
                           <option key={fy} value={fy}>
                             {fy}
@@ -2154,7 +2162,7 @@ const AnganwadiDashboard = () => {
                       }}
                     >
                       <FaSyncAlt className="me-1" />
-                      Reset
+                      {t("Reset", "रीसेट करें")}
                     </Button>
                     <Button
                       size="sm"
@@ -2191,7 +2199,7 @@ const AnganwadiDashboard = () => {
                 {suppliesLoading ? (
                   <div className="text-center p-4">
                     <Spinner animation="border" size="sm" />{" "}
-                    <span className="ms-2">Loading supplies summary...</span>
+                    <span className="ms-2">{t("Loading supplies summary...", "आपूर्ति सारांश लोड हो रहा है...")}</span>
                   </div>
                 ) : suppliesError ? (
                   <Alert variant="danger" className="m-3">
@@ -2219,9 +2227,9 @@ const AnganwadiDashboard = () => {
                       >
                         <tr>
                           <th rowSpan={2}>S. No.</th>
-                          <th rowSpan={2}>Sector</th>
-                          <th rowSpan={2}>AWC Name</th>
-                          <th rowSpan={2}>AWC Code</th>
+                          <th rowSpan={2}>{t("Sector", "सेक्टर")}</th>
+                          <th rowSpan={2}>{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</th>
+                          <th rowSpan={2}>{t("AWC Code", "आंगनवाड़ी केंद्र कोड")}</th>
                           {suppliesFoodItems.map((fi) => (
                             <th key={fi} colSpan={3} className="text-center">
                               {fi}
@@ -2232,15 +2240,15 @@ const AnganwadiDashboard = () => {
                           {suppliesFoodItems.map((fi) => (
                             <React.Fragment key={`${fi}-sub`}>
                               <th className="text-end">
-                                Received (
+                                {t("Received", "प्राप्त")} (
                                 {suppliesTab === "hcm" ? "g / kg" : "packets"})
                               </th>
                               <th className="text-end">
-                                Distributed (
+                                {t("Distributed", "वितरित")} (
                                 {suppliesTab === "hcm" ? "g / kg" : "packets"})
                               </th>
                               <th className="text-end">
-                                Remaining (
+                                {t("Remaining", "शेष")} (
                                 {suppliesTab === "hcm" ? "g / kg" : "packets"})
                               </th>
                             </React.Fragment>
@@ -2258,8 +2266,7 @@ const AnganwadiDashboard = () => {
                               }
                               className="text-center text-muted p-4"
                             >
-                              No supplies data available for the selected
-                              filters.
+                              {t("No supplies data available for the selected filters.", "चयनित फ़िल्टर के लिए आपूर्ति डेटा उपलब्ध नहीं है।")}
                             </td>
                           </tr>
                         ) : (
@@ -2308,7 +2315,7 @@ const AnganwadiDashboard = () => {
                         >
                           <tr>
                             <th></th>
-                            <th>Total</th>
+                            <th>{t("Total", "कुल")}</th>
                             <th></th>
                             <th></th>
                             {suppliesFoodItems.map((fi) => {
@@ -2346,7 +2353,7 @@ const AnganwadiDashboard = () => {
               <Col xs={12}>
                 <div className="d-flex justify-content-between align-items-center mt-4 mb-3">
                   <h5 className="mb-0">
-                    {activeScheme.toUpperCase()} Distribution Records
+                    {t(`${activeScheme.toUpperCase()} Distribution Records`, `${activeScheme.toUpperCase()} वितरण रिकॉर्ड`)}
                   </h5>
 
                   <div className="d-flex flex-wrap gap-2">
@@ -2377,7 +2384,7 @@ const AnganwadiDashboard = () => {
                         )
                       }
                     >
-                      <FaDolly className="me-2" /> New Distribution
+                      <FaDolly className="me-2" /> {t("New Distribution", "नया वितरण")}
                     </Button>
                   </div>
                 </div>
@@ -2399,7 +2406,7 @@ const AnganwadiDashboard = () => {
                   <Alert variant="danger">{error.table}</Alert>
                 ) : distributionRecords.length === 0 ? (
                   <div className="empty-state">
-                    No distribution records found for{" "}
+                    {t("No distribution records found for", "इसके लिए कोई वितरण रिकॉर्ड नहीं मिला")}{" "}
                     {activeScheme.toUpperCase()}.
                   </div>
                 ) : (
@@ -2408,25 +2415,25 @@ const AnganwadiDashboard = () => {
                       <tr>
                         <th>#</th>
 
-                        <th>Food Item</th>
+                        <th>{t("Food Item", "खाद्य सामग्री")}</th>
 
-                        <th>Beneficiary Category</th>
+                        <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
 
-                        <th>Date</th>
+                        <th>{t("Date", "दिनांक")}</th>
 
-                        <th>Trimester / Months</th>
+                        <th>{t("Trimester / Months", "त्रैमासिक अवधि / महीने")}</th>
 
-                        <th>Year</th>
+                        <th>{t("Year", "वर्ष")}</th>
 
-                        <th>Total Beneficiaries</th>
+                        <th>{t("Total Beneficiaries", "कुल लाभार्थी")}</th>
 
-                        <th>Quantity</th>
+                        <th>{t("Quantity", "मात्रा")}</th>
 
-                        <th>Unit</th>
+                        <th>{t("Unit", "इकाई")}</th>
 
-                        <th>Remark</th>
+                        <th>{t("Remark", "टिप्पणी")}</th>
 
-                        <th>Actions</th>
+                        <th>{t("Actions", "कार्रवाई")}</th>
                       </tr>
                     </thead>
 
@@ -2533,7 +2540,7 @@ const AnganwadiDashboard = () => {
               <Col xs={12}>
                 <div className="food-items-table-container mt-4">
                   <h5 className="mb-3">
-                    {activeScheme.toUpperCase()} Food Item List
+                    {t(`${activeScheme.toUpperCase()} Food Item List`, `${activeScheme.toUpperCase()} खाद्य सामग्री सूची`)}
                   </h5>
 
                   {loading.table ? (
@@ -2544,7 +2551,7 @@ const AnganwadiDashboard = () => {
                     <Alert variant="danger">{error.table}</Alert>
                   ) : foodItems.length === 0 ? (
                     <div className="empty-state">
-                      No items found for {activeScheme.toUpperCase()}.
+                      {t(`No items found for ${activeScheme.toUpperCase()}.`, `${activeScheme.toUpperCase()} के लिए कोई आइटम नहीं मिला।`)}
                     </div>
                   ) : activeScheme === "hcm" ? (
                     /* ── HCM-specific Food Item List with grams/kg columns ── */
@@ -2556,15 +2563,15 @@ const AnganwadiDashboard = () => {
                         >
                           <th>#</th>
 
-                          <th>Food Item</th>
+                          <th>{t("Food Item", "खाद्य सामग्री")}</th>
 
-                          <th>Packet Weight (g)</th>
+                          <th>{t("Packet Weight (g)", "पैकेट का वज़न (g)")}</th>
 
-                          <th>Per Person Qty (g)</th>
+                          <th>{t("Per Person Qty (g)", "प्रति व्यक्ति मात्रा (g)")}</th>
 
-                          <th>Total Quantity (g)</th>
+                          <th>{t("Total Quantity (g)", "कुल मात्रा (g)")}</th>
 
-                          <th>Total Quantity (kg)</th>
+                          <th>{t("Total Quantity (kg)", "कुल मात्रा (kg)")}</th>
                         </tr>
                       </thead>
 
@@ -2603,15 +2610,15 @@ const AnganwadiDashboard = () => {
 
                           <th>Food Item</th>
 
-                          <th>Qty Per Beneficiary</th>
+                          <th>{t("Qty Per Beneficiary", "प्रति लाभार्थी मात्रा")}</th>
 
-                          <th>Unit</th>
+                          <th>{t("Unit", "इकाई")}</th>
 
-                          <th>Beneficiary Category</th>
+                          <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
 
-                          <th>Days Allotted</th>
+                          <th>{t("Days Allotted", "आवंटित दिन")}</th>
 
-                          <th>Total Quantity</th>
+                          <th>{t("Total Quantity", "कुल मात्रा")}</th>
                         </tr>
                       </thead>
 
@@ -2650,7 +2657,7 @@ const AnganwadiDashboard = () => {
             >
               <Modal.Header closeButton>
                 <Modal.Title>
-                  {selectedItem.isEdit ? "Edit" : "Record"} Distribution
+                  {selectedItem.isEdit ? t("Edit", "संपादित करें") : t("Record", "दर्ज करें")} {t("Distribution", "वितरण")}
                 </Modal.Title>
               </Modal.Header>
 
@@ -2661,7 +2668,7 @@ const AnganwadiDashboard = () => {
 
                 <Form onSubmit={handleDistributionSubmit}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Select Trimester</Form.Label>
+                    <Form.Label>{t("Select Trimester", "त्रैमासिक अवधि चुनें")}</Form.Label>
                     <Form.Select
                       value={distributionData.trimester || ""}
                       required
@@ -2686,7 +2693,7 @@ const AnganwadiDashboard = () => {
                           );
                       }}
                     >
-                      <option value="">Select Trimester</option>
+                      <option value="">{t("Select Trimester", "त्रैमासिक अवधि चुनें")}</option>
                       {trimesterOptions.map((t) => (
                         <option key={t.value} value={t.value}>
                           {t.label}
@@ -2696,7 +2703,7 @@ const AnganwadiDashboard = () => {
                   </Form.Group>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>Trimester</Form.Label>
+                    <Form.Label>{t("Trimester", "त्रैमासिक अवधि")}</Form.Label>
 
                     <div className="month-checkbox-group d-flex flex-wrap gap-2">
                       {monthOptions
@@ -2792,7 +2799,7 @@ const AnganwadiDashboard = () => {
                   </Form.Group>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>Food Item</Form.Label>
+                    <Form.Label>{t("Food Item", "खाद्य सामग्री")}</Form.Label>
 
                     <Form.Select
                       required
@@ -2823,7 +2830,7 @@ const AnganwadiDashboard = () => {
                         }));
                       }}
                     >
-                      <option value="">Select a food item...</option>
+                      <option value="">{t("Select a food item...", "खाद्य सामग्री चुनें...")}</option>
 
                       {foodItems.map((item) => [
                         <option
@@ -2839,7 +2846,7 @@ const AnganwadiDashboard = () => {
                           disabled
                           style={{ color: "#6c757d", paddingLeft: "15px" }}
                         >
-                          &nbsp;&nbsp;↳ Category: {item.bene_category}
+                          &nbsp;&nbsp;                          ↳ {t("Category:", "श्रेणी:")} {item.bene_category}
                         </option>,
                       ])}
                     </Form.Select>
@@ -2849,19 +2856,19 @@ const AnganwadiDashboard = () => {
                     <div className="row g-3 mb-3">
                       {[
                         {
-                          label: "Received",
+                          label: t("Received", "प्राप्त"),
                           value: receivedStockForDisplay,
                           color: "#0f766e",
                           bg: "#ecfdf5",
                         },
                         {
-                          label: "Distributed",
+                          label: t("Distributed", "वितरित"),
                           value: distributedStockForDisplay,
                           color: "#1d4ed8",
                           bg: "#eff6ff",
                         },
                         {
-                          label: "Remaining",
+                          label: t("Remaining", "शेष"),
                           value: remainingStockForDisplay,
                           color: "#7c3aed",
                           bg: "#f5f3ff",
@@ -2884,7 +2891,7 @@ const AnganwadiDashboard = () => {
                                 fontWeight: 700,
                               }}
                             >
-                              {item.label} quantity ({distributionQuantityUnit})
+                              {item.label} {t("quantity", "मात्रा")} ({distributionQuantityUnit})
                             </div>
                             <div
                               style={{
@@ -2895,7 +2902,7 @@ const AnganwadiDashboard = () => {
                               }}
                             >
                               {item.value === null
-                                ? "Select trimester and financial year"
+                                ? t("Select trimester and financial year", "त्रैमासिक अवधि और वित्तीय वर्ष चुनें")
                                 : formatDistributionQuantity(item.value)}
                             </div>
                           </div>
@@ -2905,7 +2912,7 @@ const AnganwadiDashboard = () => {
                   )}
 
                   <Form.Group className="mb-3">
-                    <Form.Label>Date of Distribution</Form.Label>
+                    <Form.Label>{t("Date of Distribution", "वितरण की तिथि")}</Form.Label>
 
                     <Form.Control
                       type="date"
@@ -2922,14 +2929,13 @@ const AnganwadiDashboard = () => {
 
                     {activeScheme === "hcm" && (
                       <Form.Text className="text-muted d-block mt-1">
-                        नोट: एक दिनांक पर केवल एक ही HCM वितरण रिकॉर्ड किया जा
-                        सकता है।
+                        {t("Note: Only one HCM distribution record can be recorded for a date.", "नोट: एक दिनांक पर केवल एक ही HCM वितरण रिकॉर्ड किया जा सकता है।")}
                       </Form.Text>
                     )}
                   </Form.Group>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>Anganwadi Remark</Form.Label>
+                    <Form.Label>{t("Anganwadi Remark", "आंगनवाड़ी टिप्पणी")}</Form.Label>
 
                     <Form.Control
                       type="text"
@@ -2941,17 +2947,17 @@ const AnganwadiDashboard = () => {
                           anganwadi_remark: e.target.value,
                         })
                       }
-                      placeholder="Enter remark"
+                      placeholder={t("Enter remark", "टिप्पणी दर्ज करें")}
                     />
                   </Form.Group>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>Total Beneficiaries</Form.Label>
+                    <Form.Label>{t("Total Beneficiaries", "कुल लाभार्थी")}</Form.Label>
 
                     {(!distributionData.months ||
                       distributionData.months.length === 0) && (
                       <Form.Text className="text-muted d-block mb-2">
-                        Please select a trimester first to enable this field.
+                        {t("Please select a trimester first to enable this field.", "इस फ़ील्ड को सक्रिय करने के लिए पहले त्रैमासिक अवधि चुनें।")}
                       </Form.Text>
                     )}
 
@@ -3020,7 +3026,7 @@ const AnganwadiDashboard = () => {
 
                     <Form.Control
                       type="text"
-                      placeholder="e.g., 2025-26"
+                      placeholder={t("e.g., 2025-26", "उदाहरण: 2025-26")}
                       value={distributionData.fin_year}
                       readOnly
                       required
@@ -3028,7 +3034,7 @@ const AnganwadiDashboard = () => {
                   </Form.Group>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>Beneficiary Category</Form.Label>
+                    <Form.Label>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</Form.Label>
 
                     <Form.Control
                       type="text"
@@ -3041,8 +3047,8 @@ const AnganwadiDashboard = () => {
 
                   <Form.Group className="mb-3">
                     <Form.Label>
-                      Total Quantity{" "}
-                      {activeScheme === "hcm" ? "(in grams & kg)" : ""}
+                      {t("Total Quantity", "कुल मात्रा")}{" "}
+                      {activeScheme === "hcm" ? t("(in grams & kg)", "(ग्राम और kg में)") : ""}
                     </Form.Label>
 
                     {activeScheme === "hcm" ? (
@@ -3054,13 +3060,13 @@ const AnganwadiDashboard = () => {
                         />
 
                         <Form.Text className="d-block mt-1">
-                          <strong>Per Person Qty:</strong>{" "}
+                          <strong>{t("Per Person Qty:", "प्रति व्यक्ति मात्रा:")}</strong>{" "}
                           {perPersonQtyGrams.toFixed(2)} ग्राम (
                           {(perPersonQtyGrams / 1000).toFixed(2)} kg)
                           <br />
-                          <strong>Calculation:</strong>{" "}
+                          <strong>{t("Calculation:", "गणना:")}</strong>{" "}
                           {perPersonQtyGrams.toFixed(2)} g × {beneficiaries}{" "}
-                          beneficiaries
+                          {t("beneficiaries", "लाभार्थी")}
                           <br />
                           <strong>
                             = {calculatedQuantityGrams.toFixed(2)} ग्राम (
@@ -3109,7 +3115,7 @@ const AnganwadiDashboard = () => {
                   </Form.Group>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>Unit</Form.Label>
+                    <Form.Label>{t("Unit", "इकाई")}</Form.Label>
 
                     <Form.Control
                       type="text"
@@ -3127,7 +3133,7 @@ const AnganwadiDashboard = () => {
                   {activeScheme === "hcm" && selectedFoodItemForCalc && (
                     <Form.Group className="mb-3">
                       <Form.Label>
-                        Packet Weight (1 packet = ? grams)
+                        {t("Packet Weight (1 packet = ? grams)", "पैकेट का वज़न (1 पैकेट = ? ग्राम)")}
                       </Form.Label>
 
                       <Form.Control
@@ -3137,8 +3143,7 @@ const AnganwadiDashboard = () => {
                       />
 
                       <Form.Text>
-                        1 packet = {selectedFoodItemForCalc.qty_per_ben}g | Per
-                        person allotted quantity ={" "}
+                        {t("1 packet", "1 पैकेट")} = {selectedFoodItemForCalc.qty_per_ben}g | {t("Per person allotted quantity", "प्रति व्यक्ति आवंटित मात्रा")} ={" "}
                         {selectedFoodItemForCalc.daily_consumption_qty}g
                       </Form.Text>
                     </Form.Group>
@@ -3150,7 +3155,7 @@ const AnganwadiDashboard = () => {
                       onClick={handleCloseDistributionModal}
                       className="me-2"
                     >
-                      Cancel
+                      {t("Cancel", "रद्द करें")}
                     </Button>
 
                     <Button
@@ -3166,9 +3171,9 @@ const AnganwadiDashboard = () => {
                       {submitting ? (
                         <Spinner as="span" animation="border" size="sm" />
                       ) : selectedItem.isEdit ? (
-                        "Update"
+                        t("Update", "अपडेट करें")
                       ) : (
-                        "Submit"
+                        t("Submit", "जमा करें")
                       )}
                     </Button>
                   </div>
@@ -3181,7 +3186,7 @@ const AnganwadiDashboard = () => {
             <Modal show={showViewModal} onHide={handleCloseViewModal} centered>
               <Modal.Header closeButton className="view-modal-header">
                 <Modal.Title>
-                  View Distribution: {viewItem.food_item}
+                  {t("View Distribution", "वितरण देखें")}: {viewItem.food_item}
                 </Modal.Title>
               </Modal.Header>
 
@@ -3189,28 +3194,28 @@ const AnganwadiDashboard = () => {
                 <ListGroup variant="flush">
                   <ListGroup.Item>
                     <FaBuilding className="view-modal-icon" />{" "}
-                    <strong>AWC Name:</strong> {viewItem.awc_name}
+                    <strong>{t("AWC Name:", "आंगनवाड़ी केंद्र का नाम:")}</strong> {viewItem.awc_name}
                   </ListGroup.Item>
 
                   <ListGroup.Item>
                     <FaHashtag className="view-modal-icon" />{" "}
-                    <strong>AWC Code:</strong> {viewItem.awc_code}
+                    <strong>{t("AWC Code:", "आंगनवाड़ी केंद्र कोड:")}</strong> {viewItem.awc_code}
                   </ListGroup.Item>
 
                   <ListGroup.Item>
                     <FaUtensils className="view-modal-icon" />{" "}
-                    <strong>Food Item:</strong> {viewItem.food_item}
+                    <strong>{t("Food Item:", "खाद्य सामग्री:")}</strong> {viewItem.food_item}
                   </ListGroup.Item>
 
                   <ListGroup.Item>
                     <FaUsers className="view-modal-icon" />{" "}
-                    <strong>Beneficiaries:</strong>{" "}
+                    <strong>{t("Beneficiaries:", "लाभार्थी:")}</strong>{" "}
                     {viewItem.total_beneficiaries}
                   </ListGroup.Item>
 
                   <ListGroup.Item>
                     <FaWeightHanging className="view-modal-icon" />
-                    <strong>Quantity:</strong> {viewItem.quantity}{" "}
+                    <strong>{t("Quantity:", "मात्रा:")}</strong> {viewItem.quantity}{" "}
                     {viewItem.unit}
                     {activeScheme === "hcm" && viewItem.quantity && (
                       <span className="text-muted ms-2">
@@ -3221,7 +3226,7 @@ const AnganwadiDashboard = () => {
 
                   <ListGroup.Item>
                     <FaCalendarDay className="view-modal-icon" />{" "}
-                    <strong>Date:</strong>{" "}
+                    <strong>{t("Date:", "दिनांक:")}</strong>{" "}
                     {viewItem.date
                       ? new Date(viewItem.date).toLocaleDateString()
                       : "-"}
@@ -3229,40 +3234,40 @@ const AnganwadiDashboard = () => {
 
                   <ListGroup.Item>
                     <FaInfoCircle className="view-modal-icon" />{" "}
-                    <strong>Anganwadi Remark:</strong>{" "}
+                    <strong>{t("Anganwadi Remark:", "आंगनवाड़ी टिप्पणी:")}</strong>{" "}
                     {viewItem.anganwadi_remark || "-"}
                   </ListGroup.Item>
 
                   <ListGroup.Item>
                     <FaCalendarDay className="view-modal-icon" />{" "}
-                    <strong>Financial Year:</strong> {viewItem.fin_year}
+                    <strong>{t("Financial Year:", "वित्तीय वर्ष:")}</strong> {viewItem.fin_year}
                   </ListGroup.Item>
 
                   <ListGroup.Item>
                     <FaCubes className="view-modal-icon" />{" "}
-                    <strong>Trimester:</strong>{" "}
+                    <strong>{t("Trimester:", "त्रैमासिक अवधि:")}</strong>{" "}
                     {formatMonths(viewItem.months || viewItem.quarter)}
                   </ListGroup.Item>
 
                   <ListGroup.Item>
                     <FaMapMarkerAlt className="view-modal-icon" />{" "}
-                    <strong>Sector:</strong> {viewItem.sector}
+                    <strong>{t("Sector:", "सेक्टर:")}</strong> {viewItem.sector}
                   </ListGroup.Item>
 
                   <ListGroup.Item>
                     <FaProjectDiagram className="view-modal-icon" />{" "}
-                    <strong>Project:</strong> {viewItem.project}
+                    <strong>{t("Project:", "परियोजना:")}</strong> {viewItem.project}
                   </ListGroup.Item>
 
                   <ListGroup.Item>
                     <FaMapMarkerAlt className="view-modal-icon" />{" "}
-                    <strong>District:</strong> {viewItem.district}
+                    <strong>{t("District:", "ज़िला:")}</strong> {viewItem.district}
                   </ListGroup.Item>
 
                   {viewItem.sector_status && (
                     <ListGroup.Item>
                       <FaInfoCircle className="view-modal-icon" />{" "}
-                      <strong>Sector Status:</strong>{" "}
+                      <strong>{t("Sector Status:", "सेक्टर स्थिति:")}</strong>{" "}
                       <span
                         className={`badge bg-${viewItem.sector_status === "approved" ? "success" : "warning"}`}
                       >
@@ -3278,7 +3283,7 @@ const AnganwadiDashboard = () => {
                   <Col>
                     <FaClock className="me-1" />
 
-                    <strong>Recorded:</strong>
+                    <strong>{t("Recorded:", "दर्ज किया गया:")}</strong>
 
                     <br />
 
@@ -3288,7 +3293,7 @@ const AnganwadiDashboard = () => {
                   <Col className="text-end">
                     <FaEdit className="me-1" />
 
-                    <strong>Updated:</strong>
+                    <strong>{t("Updated:", "अपडेट किया गया:")}</strong>
 
                     <br />
 
@@ -3299,7 +3304,7 @@ const AnganwadiDashboard = () => {
 
               <Modal.Footer className="view-modal-footer">
                 <Button variant="secondary" onClick={handleCloseViewModal}>
-                  Close
+                  {t("Close", "बंद करें")}
                 </Button>
               </Modal.Footer>
             </Modal>

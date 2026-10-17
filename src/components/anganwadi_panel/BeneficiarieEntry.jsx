@@ -15,6 +15,7 @@ import {
 } from "react-bootstrap";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/anganwadileftnav.css";
 import AnganwadiLeftNav from "./AnganwadiLeftNav";
 import AnganwadiHeader from "./AnganwadiHeader";
@@ -39,6 +40,7 @@ const getCurrentFinancialYear = () => {
 const API_URL = "/beneficiary-registration/";
 
 const BeneficiarieEntry = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true); 
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -85,7 +87,7 @@ const BeneficiarieEntry = () => {
       const response = await api.get(API_URL);
       setReports(response.data || []);
     } catch (err) {
-      setError("लाभार्थी रिपोर्ट लाने में विफल।");
+      setError(t("Failed to fetch beneficiary reports.", "लाभार्थी रिपोर्ट लाने में विफल।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -147,13 +149,13 @@ const BeneficiarieEntry = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this report?")) {
+    if (window.confirm(t("Are you sure you want to delete this report?", "क्या आप वाकई इस रिपोर्ट को हटाना चाहते हैं?"))) {
       try {
         await api.delete(API_URL, { data: { id: id } });
-        setSuccess("रिपोर्ट सफलतापूर्वक हटा दी गई।");
+        setSuccess(t("Report deleted successfully.", "रिपोर्ट सफलतापूर्वक हटा दी गई।"));
         fetchReports();
       } catch (err) {
-        setError("रिपोर्ट हटाने में विफल।");
+        setError(t("Failed to delete report.", "रिपोर्ट हटाने में विफल।"));
         console.error(err);
       }
     }
@@ -182,10 +184,10 @@ const BeneficiarieEntry = () => {
       if (editingId) {
         payload.id = editingId;
         await api.put(API_URL, payload); // Make sure your API handler for PUT uses payload.id
-        setSuccess("रिपोर्ट सफलतापूर्वक अपडेट की गई।");
+        setSuccess(t("Report updated successfully.", "रिपोर्ट सफलतापूर्वक अपडेट की गई।"));
       } else {
         await api.post(API_URL, payload);
-        setSuccess("रिपोर्ट सफलतापूर्वक बनाई गई।");
+        setSuccess(t("Report created successfully.", "रिपोर्ट सफलतापूर्वक बनाई गई।"));
       }
       setShowForm(false);
       setFormData(initialFormData);
@@ -194,7 +196,10 @@ const BeneficiarieEntry = () => {
     } catch (err) {
       const errors = err.response?.data || {};
       setFormErrors(errors);
-      setError(`रिपोर्ट ${editingId ? "अपडेट" : "बनाने"} में विफल।`);
+      setError(t(
+        `Failed to ${editingId ? "update" : "create"} report.`,
+        `रिपोर्ट ${editingId ? "अपडेट" : "बनाने"} में विफल।`,
+      ));
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -256,10 +261,10 @@ const BeneficiarieEntry = () => {
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading d-flex justify-content-between align-items-center">
             <h3 className="mb-4 fw-bold">
-              लाभार्थी एंट्री
+              {t("Beneficiary Entry", "लाभार्थी एंट्री")}
             </h3>
             <Button onClick={handleAddNew} variant="primary">
-              <FaPlus className="me-2" /> लाभार्थी विवरण जोड़ें
+              <FaPlus className="me-2" /> {t("Add Beneficiary Details", "लाभार्थी विवरण जोड़ें")}
             </Button>
           </div>
 
@@ -269,62 +274,62 @@ const BeneficiarieEntry = () => {
           <Collapse in={showForm}>
             <Card className="mb-4">
               <Card.Header as="h5">
-                {editingId ? "संपादित करें" : "जोड़ें"} लाभार्थी रिपोर्ट
+                {editingId ? t("Edit", "संपादित करें") : t("Add", "जोड़ें")} {t("Beneficiary Report", "लाभार्थी रिपोर्ट")}
               </Card.Header>
               <Card.Body>
                 <Form onSubmit={handleSubmit}>
                   <Row className="align-items-end">
                     <Col md>
                       <Form.Group className="mb-3">
-                        <Form.Label>वित्तीय वर्ष</Form.Label>
+                        <Form.Label>{t("Financial Year", "वित्तीय वर्ष")}</Form.Label>
                         <Form.Control type="text" name="fin_year" value={formData.fin_year} onChange={handleFormChange} required />
                       </Form.Group>
                     </Col>
                     <Col md>
                       <Form.Group className="mb-3">
-                        <Form.Label>महीना</Form.Label>
+                        <Form.Label>{t("Month", "महीना")}</Form.Label>
                         <Form.Select name="month" value={formData.month} onChange={handleFormChange} required>
-                          <option value="">माह का चयन करें</option>
+                          <option value="">{t("Select Month", "माह का चयन करें")}</option>
                           {["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].map(m => <option key={m} value={m}>{m}</option>)}
                         </Form.Select>
                       </Form.Group>
                     </Col>
                     <Col md><Form.Group className="mb-3"><Form.Label>PW & LM</Form.Label><Form.Control type="number" name="pw_lm" value={formData.pw_lm} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md><Form.Group className="mb-3"><Form.Label>बच्चे (6m-3y)</Form.Label><Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
-                    <Col md><Form.Group className="mb-3"><Form.Label>बच्चे (3-6y)</Form.Label><Form.Control type="number" name="children_3_6y" value={formData.children_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md><Form.Group className="mb-3"><Form.Label>{t("Children (6m-3y)", "बच्चे (6m-3y)")}</Form.Label><Form.Control type="number" name="children_6m_3y" value={formData.children_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md><Form.Group className="mb-3"><Form.Label>{t("Children (3-6y)", "बच्चे (3-6y)")}</Form.Label><Form.Control type="number" name="children_3_6y" value={formData.children_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
                   </Row>
                   <Row>
-                    <Col md><Form.Group className="mb-3"><Form.Label>किशोरी लड़कियां</Form.Label><Form.Control type="number" name="adolescent_girls" value={formData.adolescent_girls} onChange={handleFormChange} required /></Form.Group></Col>
+                    <Col md><Form.Group className="mb-3"><Form.Label>{t("Adolescent Girls", "किशोरी लड़कियां")}</Form.Label><Form.Control type="number" name="adolescent_girls" value={formData.adolescent_girls} onChange={handleFormChange} required /></Form.Group></Col>
                     <Col md><Form.Group className="mb-3"><Form.Label>SAM (6m-3y)</Form.Label><Form.Control type="number" name="sam_6m_3y" value={formData.sam_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
                     <Col md><Form.Group className="mb-3"><Form.Label>SAM (3-5y)</Form.Label><Form.Control type="number" name="sam_3_5y" value={formData.sam_3_5y} onChange={handleFormChange} required /></Form.Group></Col>
                     <Col md><Form.Group className="mb-3"><Form.Label>SUW (6m-3y)</Form.Label><Form.Control type="number" name="suw_6m_3y" value={formData.suw_6m_3y} onChange={handleFormChange} required /></Form.Group></Col>
                     <Col md><Form.Group className="mb-3"><Form.Label>SUW (3-6y)</Form.Label><Form.Control type="number" name="suw_3_6y" value={formData.suw_3_6y} onChange={handleFormChange} required /></Form.Group></Col>
                   </Row>
-                  <Button variant="secondary" onClick={() => setShowForm(false)} className="me-2">रद्द करें</Button>
+                  <Button variant="secondary" onClick={() => setShowForm(false)} className="me-2">{t("Cancel", "रद्द करें")}</Button>
                   <Button variant="primary" type="submit" disabled={submitting}>
-                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingId ? "रिपोर्ट अपडेट करें" : "रिपोर्ट सहेजें")}
+                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingId ? t("Update Report", "रिपोर्ट अपडेट करें") : t("Save Report", "रिपोर्ट सहेजें"))}
                   </Button>
                 </Form>
               </Card.Body>
             </Card>
           </Collapse>
 
-          <h5 className="mt-4">मौजूदा लाभार्थी रिपोर्ट</h5>
+          <h5 className="mt-4">{t("Existing Beneficiary Reports", "मौजूदा लाभार्थी रिपोर्ट")}</h5>
           <Row className="mb-3">
             <Col md={3}>
               <Form.Group>
-                <Form.Label>वित्तीय वर्ष के अनुसार फ़िल्टर करें</Form.Label>
+                <Form.Label>{t("Filter by Financial Year", "वित्तीय वर्ष के अनुसार फ़िल्टर करें")}</Form.Label>
                 <Form.Select name="fin_year" value={filters.fin_year} onChange={handleFilterChange}>
-                  <option value="">सभी वर्ष</option>
+                  <option value="">{t("All Years", "सभी वर्ष")}</option>
                   {uniqueFinYears.map(year => <option key={year} value={year}>{year}</option>)}
                 </Form.Select>
               </Form.Group>
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>महीने के अनुसार फ़िल्टर करें</Form.Label>
+                <Form.Label>{t("Filter by Month", "महीने के अनुसार फ़िल्टर करें")}</Form.Label>
                 <Form.Select name="month" value={filters.month} onChange={handleFilterChange}>
-                  <option value="">सभी महीने</option>
+                  <option value="">{t("All Months", "सभी महीने")}</option>
                   {uniqueMonths.map(month => <option key={month} value={month}>{month}</option>)}
                 </Form.Select>
               </Form.Group>
@@ -339,18 +344,18 @@ const BeneficiarieEntry = () => {
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>वित्तीय वर्ष</th>
-                      <th>महीना</th>
+                      <th>{t("Financial Year", "वित्तीय वर्ष")}</th>
+                      <th>{t("Month", "महीना")}</th>
                       <th>PW & LM</th>
-                      <th>बच्चे (6 महीने-3 वर्ष)</th>
-                      <th>बच्चे (3-6 वर्ष)</th>
-                      <th>किशोरी लड़कियां</th>
+                      <th>{t("Children (6 months-3 years)", "बच्चे (6 महीने-3 वर्ष)")}</th>
+                      <th>{t("Children (3-6 years)", "बच्चे (3-6 वर्ष)")}</th>
+                      <th>{t("Adolescent Girls", "किशोरी लड़कियां")}</th>
                       <th>SAM (6 महीने-3 वर्ष)</th>
                       <th>SAM (3-5 वर्ष)</th>
                       <th>SUW (6 महीने-3 वर्ष)</th>
                       <th>SUW (3-6 वर्ष)</th>
-                      <th>सेक्टर स्थिति</th>
-                      <th>क्रियाएं</th>
+                      <th>{t("Sector Status", "सेक्टर स्थिति")}</th>
+                      <th>{t("Actions", "क्रियाएं")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -383,7 +388,7 @@ const BeneficiarieEntry = () => {
                         </tr>
                       ))
                     ) : (
-                      <tr><td colSpan="13" className="text-center">कोई रिपोर्ट नहीं मिली।</td></tr>
+                      <tr><td colSpan="13" className="text-center">{t("No reports found.", "कोई रिपोर्ट नहीं मिली।")}</td></tr>
                     )}
                   </tbody>
                 </Table>
@@ -393,13 +398,13 @@ const BeneficiarieEntry = () => {
 
           <Modal show={showRemarkModal} onHide={handleCloseRemarkModal} centered>
             <Modal.Header closeButton>
-              <Modal.Title>सेक्टर टिप्पणी</Modal.Title>
+              <Modal.Title>{t("Sector Remark", "सेक्टर टिप्पणी")}</Modal.Title>
             </Modal.Header>
             <Modal.Body>
               <p>{viewingRemark}</p>
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="secondary" onClick={handleCloseRemarkModal}>बंद करें</Button>
+              <Button variant="secondary" onClick={handleCloseRemarkModal}>{t("Close", "बंद करें")}</Button>
             </Modal.Footer>
           </Modal>
           </Container>

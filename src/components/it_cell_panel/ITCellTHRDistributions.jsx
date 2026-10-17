@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Container, Row, Col, Card, Table, Button, Spinner, Alert, Modal, Form, Pagination, Dropdown } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/itcellLeftnav.css";
 import { FaEdit, FaTrash, FaEye } from "react-icons/fa";
 import ITCellLeftNav from "./ITCellLeftNav";
@@ -12,6 +13,7 @@ const ITCellTHRDistributions = () => {
   const [isTablet, setIsTablet] = useState(false);
 
   const { api } = useAuth();
+  const { t } = useLanguage();
   const [distributions, setDistributions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -63,12 +65,12 @@ const ITCellTHRDistributions = () => {
       setUniqueDistricts([...new Set(data.map(item => item.district))]);
       setUniqueProjects([...new Set(data.map(item => item.project))]);
     } catch (err) {
-      setError("Failed to fetch THR distributions.");
+      setError(t("Failed to fetch THR distributions.", "टीएचआर वितरण प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, t]);
 
   useEffect(() => {
     if (api) {
@@ -124,10 +126,10 @@ const ITCellTHRDistributions = () => {
   const validateForm = () => {
     const errors = {};
     if (!formData.total_beneficiaries || isNaN(formData.total_beneficiaries) || Number(formData.total_beneficiaries) < 0) {
-      errors.total_beneficiaries = "Must be a non-negative number.";
+      errors.total_beneficiaries = t("Must be a non-negative number.", "कृपया शून्य या उससे अधिक संख्या दर्ज करें।");
     }
     if (!formData.quantity || isNaN(formData.quantity) || Number(formData.quantity) < 0) {
-      errors.quantity = "Must be a non-negative number.";
+      errors.quantity = t("Must be a non-negative number.", "कृपया शून्य या उससे अधिक संख्या दर्ज करें।");
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -144,12 +146,12 @@ const ITCellTHRDistributions = () => {
         ...formData,
       };
       await api.put("/thr-director-distributions/", payload);
-      setSuccessMsg("Distribution updated successfully.");
+      setSuccessMsg(t("Distribution updated successfully.", "वितरण सफलतापूर्वक अपडेट किया गया।"));
       setTimeout(() => setSuccessMsg(""), 3000);
       handleCloseModal();
       fetchDistributions(); // Refresh data
     } catch (err) {
-      setFormErrors({ api: "Failed to update distribution. Please try again." });
+      setFormErrors({ api: t("Failed to update distribution. Please try again.", "वितरण अपडेट नहीं हो सका। कृपया पुनः प्रयास करें।") });
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -172,20 +174,20 @@ const ITCellTHRDistributions = () => {
 
   const handleDeleteSelected = async () => {
     if (selectedItems.length === 0) {
-      setError("Please select items to delete.");
+      setError(t("Please select items to delete.", "कृपया हटाने के लिए आइटम चुनें।"));
       setTimeout(() => setError(""), 3000);
       return;
     }
-    if (window.confirm(`Are you sure you want to delete ${selectedItems.length} selected items?`)) {
+    if (window.confirm(t(`Are you sure you want to delete ${selectedItems.length} selected items?`, `क्या आप वाकई ${selectedItems.length} चयनित आइटम हटाना चाहते हैं?`))) {
       setLoading(true);
       try {
         await api.delete("/thr-director-distributions/", { data: { id: selectedItems } });
-        setSuccessMsg("Selected distributions deleted successfully.");
+        setSuccessMsg(t("Selected distributions deleted successfully.", "चयनित वितरण सफलतापूर्वक हटाए गए।"));
         setTimeout(() => setSuccessMsg(""), 3000);
         setSelectedItems([]);
         fetchDistributions(); // Refresh data
       } catch (err) {
-        setError("Failed to delete selected distributions.");
+        setError(t("Failed to delete selected distributions.", "चयनित वितरण हटाए नहीं जा सके।"));
         console.error(err);
       } finally {
         setLoading(false);
@@ -219,25 +221,28 @@ const ITCellTHRDistributions = () => {
     return <Pagination>{items}</Pagination>;
   };
 
-  const FilterDropdown = ({ title, items, selected, onSelect }) => (
-    <Dropdown>
-      <Dropdown.Toggle variant="outline-secondary" id={`dropdown-${title.toLowerCase()}`} className="w-100">
-        {selected.length ? `${selected.length} ${title}(s) selected` : `All ${title}s`}
-      </Dropdown.Toggle>
-      <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
-        {items.map(item => (
-          <Dropdown.Item key={item} as="div">
-            <Form.Check
-              type="checkbox"
-              label={item}
-              checked={selected.includes(item)}
-              onChange={() => onSelect(item)}
-            />
-          </Dropdown.Item>
-        ))}
-      </Dropdown.Menu>
-    </Dropdown>
-  );
+  const FilterDropdown = ({ title, titleHindi, items, selected, onSelect }) => {
+    const translatedTitle = t(title, titleHindi);
+    return (
+      <Dropdown>
+        <Dropdown.Toggle variant="outline-secondary" id={`dropdown-${title.toLowerCase()}`} className="w-100">
+          {selected.length ? `${selected.length} ${translatedTitle} ${t("selected", "चयनित")}` : `${t("All", "सभी")} ${translatedTitle}`}
+        </Dropdown.Toggle>
+        <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
+          {items.map(item => (
+            <Dropdown.Item key={item} as="div">
+              <Form.Check
+                type="checkbox"
+                label={item}
+                checked={selected.includes(item)}
+                onChange={() => onSelect(item)}
+              />
+            </Dropdown.Item>
+          ))}
+        </Dropdown.Menu>
+      </Dropdown>
+    );
+  };
 
   return (
     <div className="dashboard-container">
@@ -252,14 +257,14 @@ const ITCellTHRDistributions = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="main-heading">
-            <h3 className="mb-3 fw-bold">THR Distributions Management</h3>
+            <h3 className="mb-3 fw-bold">{t("THR Distributions Management", "टीएचआर वितरण प्रबंधन")}</h3>
             <div className="d-flex justify-content-end mb-3">
               <Button
                 variant="danger"
                 onClick={handleDeleteSelected}
                 disabled={selectedItems.length === 0 || loading}
               >
-                <FaTrash className="me-2" /> Delete Selected ({selectedItems.length})
+                <FaTrash className="me-2" /> {t("Delete Selected", "चयनित हटाएं")} ({selectedItems.length})
               </Button>
             </div>
           </div>
@@ -268,10 +273,10 @@ const ITCellTHRDistributions = () => {
           {successMsg && <Alert variant="success">{successMsg}</Alert>}
 
           <Row className="mb-3 g-3">
-            <Col md={3}><FilterDropdown title="Fin. Year" items={uniqueFinYears} selected={filters.finYear} onSelect={(val) => handleMultiSelectChange('finYear', val)} /></Col>
-            <Col md={3}><FilterDropdown title="Quarter" items={uniqueQuarters} selected={filters.quarter} onSelect={(val) => handleMultiSelectChange('quarter', val)} /></Col>
-            <Col md={3}><FilterDropdown title="District" items={uniqueDistricts} selected={filters.district} onSelect={(val) => handleMultiSelectChange('district', val)} /></Col>
-            <Col md={3}><FilterDropdown title="Project" items={uniqueProjects} selected={filters.project} onSelect={(val) => handleMultiSelectChange('project', val)} /></Col>
+            <Col md={3}><FilterDropdown title="Fin. Year" titleHindi="वित्तीय वर्ष" items={uniqueFinYears} selected={filters.finYear} onSelect={(val) => handleMultiSelectChange('finYear', val)} /></Col>
+            <Col md={3}><FilterDropdown title="Quarter" titleHindi="तिमाही" items={uniqueQuarters} selected={filters.quarter} onSelect={(val) => handleMultiSelectChange('quarter', val)} /></Col>
+            <Col md={3}><FilterDropdown title="District" titleHindi="जिला" items={uniqueDistricts} selected={filters.district} onSelect={(val) => handleMultiSelectChange('district', val)} /></Col>
+            <Col md={3}><FilterDropdown title="Project" titleHindi="परियोजना" items={uniqueProjects} selected={filters.project} onSelect={(val) => handleMultiSelectChange('project', val)} /></Col>
           </Row>
 
           {loading ? (
@@ -283,14 +288,14 @@ const ITCellTHRDistributions = () => {
                   <tr>
                     <th><Form.Check type="checkbox" onChange={handleSelectAll} checked={selectedItems.length === currentItems.length && currentItems.length > 0} /></th>
                     <th>#</th>
-                    <th>AWC Name</th>
-                    <th>Food Item</th>
-                    <th>Beneficiaries</th>
-                    <th>Quantity</th>
-                    <th>Unit</th>
-                    <th>Fin. Year</th>
-                    <th>Quarter</th>
-                    <th>Action</th>
+                    <th>{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</th>
+                    <th>{t("Food Item", "खाद्य पदार्थ")}</th>
+                    <th>{t("Beneficiaries", "लाभार्थी")}</th>
+                    <th>{t("Quantity", "मात्रा")}</th>
+                    <th>{t("Unit", "इकाई")}</th>
+                    <th>{t("Fin. Year", "वित्तीय वर्ष")}</th>
+                    <th>{t("Quarter", "तिमाही")}</th>
+                    <th>{t("Action", "कार्रवाई")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -306,7 +311,7 @@ const ITCellTHRDistributions = () => {
                       <td>{item.fin_year}</td>
                       <td>{item.quarter}</td>
                       <td>
-                        <Button variant="outline-primary" size="sm" onClick={() => handleEdit(item)}>
+                        <Button variant="outline-primary" size="sm" onClick={() => handleEdit(item)} aria-label={t("Edit", "संपादित करें")}>
                           <FaEdit />
                         </Button>
                       </td>
@@ -322,17 +327,17 @@ const ITCellTHRDistributions = () => {
         </Container>
 
         <Modal show={showEditModal} onHide={handleCloseModal} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Edit THR Distribution</Modal.Title>
+          <Modal.Header closeButton closeLabel={t("Close", "बंद करें")}>
+            <Modal.Title>{t("Edit THR Distribution", "टीएचआर वितरण संपादित करें")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {editingItem && (
               <Form onSubmit={handleFormSubmit}>
-                <p><strong>AWC:</strong> {editingItem.awc_name} ({editingItem.awc_code})</p>
-                <p><strong>Food Item:</strong> {editingItem.food_item}</p>
+                <p><strong>{t("AWC:", "आंगनवाड़ी केंद्र:")}</strong> {editingItem.awc_name} ({editingItem.awc_code})</p>
+                <p><strong>{t("Food Item:", "खाद्य पदार्थ:")}</strong> {editingItem.food_item}</p>
 
                 <Form.Group className="mb-3" controlId="total_beneficiaries">
-                  <Form.Label>Total Beneficiaries</Form.Label>
+                  <Form.Label>{t("Total Beneficiaries", "कुल लाभार्थी")}</Form.Label>
                   <Form.Control
                     type="number"
                     name="total_beneficiaries"
@@ -346,7 +351,7 @@ const ITCellTHRDistributions = () => {
                 </Form.Group>
 
                 <Form.Group className="mb-3" controlId="quantity">
-                  <Form.Label>Quantity</Form.Label>
+                  <Form.Label>{t("Quantity", "मात्रा")}</Form.Label>
                   <Form.Control
                     type="number"
                     step="0.01"
@@ -364,10 +369,10 @@ const ITCellTHRDistributions = () => {
 
                 <div className="d-flex justify-content-end">
                   <Button variant="secondary" onClick={handleCloseModal} className="me-2">
-                    Cancel
+                    {t("Cancel", "रद्द करें")}
                   </Button>
                   <Button variant="primary" type="submit" disabled={submitting}>
-                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : 'Save Changes'}
+                    {submitting ? <Spinner as="span" animation="border" size="sm" /> : t("Save Changes", "परिवर्तन सहेजें")}
                   </Button>
                 </div>
               </Form>

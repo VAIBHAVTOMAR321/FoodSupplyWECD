@@ -11,6 +11,7 @@ import {
   InputGroup,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import AnganwadiLeftNav from "./AnganwadiLeftNav";
 import AnganwadiHeader from "./AnganwadiHeader";
 import "../../assets/css/dashboard.css";
@@ -18,6 +19,7 @@ import "../../assets/css/AnganwadiProfile.css";
 import { FaEye, FaEyeSlash, FaUserCircle, FaLock } from "react-icons/fa";
 
 const AnganwadiProfile = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -52,10 +54,10 @@ const AnganwadiProfile = () => {
         if (response.data.success) {
           setProfileData(response.data.data);
         } else {
-          setError("Failed to fetch profile data.");
+          setError(t("Failed to fetch profile data.", "प्रोफ़ाइल डेटा प्राप्त नहीं हो सका।"));
         }
       } catch (err) {
-        setError("An error occurred while fetching profile data.");
+        setError(t("An error occurred while fetching profile data.", "प्रोफ़ाइल डेटा प्राप्त करते समय त्रुटि हुई।"));
         console.error(err);
       } finally {
         setLoading(false);
@@ -79,11 +81,11 @@ const AnganwadiProfile = () => {
     setPasswordSuccess("");
 
     if (password !== confirmPassword) {
-      setPasswordError("Passwords do not match.");
+      setPasswordError(t("Passwords do not match.", "पासवर्ड मेल नहीं खाते।"));
       return;
     }
     if (password.length < 4) {
-      setPasswordError("Password should be at least 4 characters long.");
+      setPasswordError(t("Password should be at least 4 characters long.", "पासवर्ड कम से कम 4 अक्षर का होना चाहिए।"));
       return;
     }
 
@@ -92,11 +94,11 @@ const AnganwadiProfile = () => {
       const response = await api.put(`/anganwadi/profile/`, {
         password: password,
       });
-      setPasswordSuccess("Password updated successfully!");
+      setPasswordSuccess(t("Password updated successfully!", "पासवर्ड सफलतापूर्वक अपडेट किया गया!"));
       setPassword("");
       setConfirmPassword("");
     } catch (err) {
-      setPasswordError("Failed to update password. Please try again.");
+      setPasswordError(t("Failed to update password. Please try again.", "पासवर्ड अपडेट नहीं हो सका। कृपया पुनः प्रयास करें।"));
       console.error(err);
     } finally {
       setPasswordLoading(false);
@@ -115,7 +117,7 @@ const AnganwadiProfile = () => {
         <AnganwadiHeader toggleSidebar={toggleSidebar} />
         <Container fluid className="dashboard-box mt-3">
           <h3 className="mb-4 profile-page-title">
-            <FaUserCircle className="me-2" /> Anganwadi Profile
+            <FaUserCircle className="me-2" /> {t("Anganwadi Profile", "आंगनवाड़ी प्रोफ़ाइल")}
           </h3>
           {loading && <Spinner animation="border" />}
           {error && <Alert variant="danger">{error}</Alert>}
@@ -124,50 +126,50 @@ const AnganwadiProfile = () => {
               <Col md={8}>
                 <Card className="mb-4 profile-card">
                   <Card.Header>
-                    Profile Details
+                    {t("Profile Details", "प्रोफ़ाइल विवरण")}
                   </Card.Header>
                   <Card.Body>
                     <Form>
                       <Row>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>District</Form.Label>
+                            <Form.Label>{t("District", "ज़िला")}</Form.Label>
                             <Form.Control type="text" value={profileData.district_name || ""} disabled />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>Project</Form.Label>
+                            <Form.Label>{t("Project", "परियोजना")}</Form.Label>
                             <Form.Control type="text" value={profileData.project || ""} disabled />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>Sector</Form.Label>
+                            <Form.Label>{t("Sector", "सेक्टर")}</Form.Label>
                             <Form.Control type="text" value={profileData.sector || ""} disabled />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>AWC Code</Form.Label>
+                            <Form.Label>{t("AWC Code", "आंगनवाड़ी केंद्र कोड")}</Form.Label>
                             <Form.Control type="text" value={profileData.awc_code || ""} disabled />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>AWC Name</Form.Label>
+                            <Form.Label>{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</Form.Label>
                             <Form.Control type="text" value={profileData.awc || ""} disabled />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>AWC Name (Hindi)</Form.Label>
+                            <Form.Label>{t("AWC Name (Hindi)", "आंगनवाड़ी केंद्र का नाम (हिंदी)")}</Form.Label>
                             <Form.Control type="text" value={profileData.awc_hindi || ""} disabled />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>AWC Type</Form.Label>
+                            <Form.Label>{t("AWC Type", "आंगनवाड़ी केंद्र का प्रकार")}</Form.Label>
                             <Form.Control type="text" value={profileData.awc_type || ""} disabled />
                           </Form.Group>
                         </Col>
@@ -179,32 +181,32 @@ const AnganwadiProfile = () => {
               <Col md={4}>
                 <Card className="password-card">
                   <Card.Header>
-                    <FaLock className="me-2" /> Change Password
+                    <FaLock className="me-2" /> {t("Change Password", "पासवर्ड बदलें")}
                   </Card.Header>
                   <Card.Body>
                     {passwordError && <Alert variant="danger">{passwordError}</Alert>}
                     {passwordSuccess && <Alert variant="success">{passwordSuccess}</Alert>}
                     <Form onSubmit={handlePasswordChange}>
                       <Form.Group className="mb-3">
-                        <Form.Label>New Password</Form.Label>
+                        <Form.Label>{t("New Password", "नया पासवर्ड")}</Form.Label>
                         <InputGroup>
-                          <Form.Control type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter new password" required />
+                          <Form.Control type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("Enter new password", "नया पासवर्ड दर्ज करें")} required />
                           <Button variant="outline-secondary" onClick={() => setShowPassword(!showPassword)}>
                             {showPassword ? <FaEyeSlash /> : <FaEye />}
                           </Button>
                         </InputGroup>
                       </Form.Group>
                       <Form.Group className="mb-3">
-                        <Form.Label>Confirm Password</Form.Label>
+                        <Form.Label>{t("Confirm Password", "पासवर्ड की पुष्टि करें")}</Form.Label>
                         <InputGroup>
-                          <Form.Control type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" required />
+                          <Form.Control type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t("Confirm new password", "नए पासवर्ड की पुष्टि करें")} required />
                           <Button variant="outline-secondary" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                             {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
                           </Button>
                         </InputGroup>
                       </Form.Group>
                       <Button type="submit" variant="primary" disabled={passwordLoading}>
-                        {passwordLoading ? <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> : "Update Password"}
+                        {passwordLoading ? <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> : t("Update Password", "पासवर्ड अपडेट करें")}
                       </Button>
                     </Form>
                   </Card.Body>

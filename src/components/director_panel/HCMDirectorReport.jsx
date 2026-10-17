@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Container, Row, Col, Form, Spinner, Table, Button, Alert, Pagination, Modal, Dropdown, Badge } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import DirectorLeftNav from "./DirectorLeftNav";
 import DirectorHeader from "./DirectorHeader";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
@@ -129,6 +130,7 @@ const HCMDirectorReport = () => {
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
 
   const { api } = useAuth();
+  const { t } = useLanguage();
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -181,6 +183,26 @@ const HCMDirectorReport = () => {
   ];
 
   const [columns, setColumns] = useState(initialColumns);
+  const columnLabels = {
+    awc_name: ["AWC Name", "आंगनवाड़ी केंद्र का नाम"],
+    awc_code: ["AWC Code", "आंगनवाड़ी केंद्र कोड"],
+    awc_type: ["AWC Type", "आंगनवाड़ी केंद्र का प्रकार"],
+    sector: ["Sector", "सेक्टर"], project: ["Project", "परियोजना"],
+    district: ["District", "ज़िला"], food_item: ["Food Item", "खाद्य सामग्री"],
+    days_allotted: ["Days Allotted", "आवंटित दिन"],
+    bene_category: ["Beneficiary Category", "लाभार्थी श्रेणी"],
+    date: ["Date", "तिथि"], fin_year: ["Fin Year", "वित्तीय वर्ष"],
+    months: ["Months", "महीने"], trimester: ["Trimester", "त्रैमासिक अवधि"],
+    total_beneficiaries: ["Beneficiaries", "लाभार्थी"],
+    quantity: ["Qty", "मात्रा"], unit: ["Unit", "इकाई"],
+    anganwadi_remark: ["Anganwadi Remark", "आंगनवाड़ी केंद्र टिप्पणी"],
+    sector_status: ["Sector Status", "सेक्टर की स्थिति"],
+    sector_remark: ["Sector Remark", "सेक्टर टिप्पणी"],
+  };
+  const localizedColumns = columns.map((column) => ({
+    ...column,
+    text: columnLabels[column.dataField] ? t(...columnLabels[column.dataField]) : column.text,
+  }));
   const tableRef = useRef(null);
 
   const fetchData = useCallback(async () => {
@@ -198,12 +220,12 @@ const HCMDirectorReport = () => {
       setUniqueAwcTypes([...new Set(data.map((item) => getFieldValue(item, 'awc_type')).filter(Boolean))]);
       setUniqueSectorStatuses([...new Set(data.map((item) => getFieldValue(item, 'sector_status')).filter(Boolean))]);
     } catch (err) {
-      setError("Failed to fetch HCM report data.");
+      setError(t("Failed to fetch HCM report data.", "एचसीएम रिपोर्ट डेटा प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, t]);
 
   useEffect(() => {
     fetchData();
@@ -280,12 +302,12 @@ const HCMDirectorReport = () => {
 
   const exportToPDF = async () => {
     if (!filteredData.length) {
-      setError("No data available to export.");
+      setError(t("No data available to export.", "निर्यात के लिए कोई डेटा उपलब्ध नहीं है।"));
       return;
     }
 
     setIsPrinting(true);
-    const exportColumns = columns.filter(col => col.visible);
+    const exportColumns = localizedColumns.filter(col => col.visible);
     const exportContainer = document.createElement("div");
     Object.assign(exportContainer.style, {
       position: "fixed",
@@ -301,7 +323,7 @@ const HCMDirectorReport = () => {
 
     try {
       const title = document.createElement("h2");
-      title.textContent = "HCM Distribution Report";
+      title.textContent = t("HCM Distribution Report", "एचसीएम वितरण रिपोर्ट");
       Object.assign(title.style, { textAlign: "center", margin: "0 0 16px", fontSize: "20px" });
       exportContainer.appendChild(title);
 
@@ -356,7 +378,7 @@ const HCMDirectorReport = () => {
       exportColumns.forEach((col, index) => {
         let value = "";
         if (col.dataField === "total_beneficiaries") value = totals.beneficiaries;
-        else if (index === 0) value = "Total";
+        else if (index === 0) value = t("Total", "कुल");
         totalRow.appendChild(makeCell("td", value));
       });
       tbody.appendChild(totalRow);
@@ -410,7 +432,7 @@ const HCMDirectorReport = () => {
       pdf.save("hcm_director_report.pdf");
     } catch (err) {
       console.error("Failed to export HCM PDF:", err);
-      setError("Failed to export PDF. Please try again.");
+      setError(t("Failed to export PDF. Please try again.", "पीडीएफ निर्यात विफल हुआ। कृपया पुनः प्रयास करें।"));
     } finally {
       if (exportContainer.parentNode) exportContainer.parentNode.removeChild(exportContainer);
       setIsPrinting(false);
@@ -418,7 +440,7 @@ const HCMDirectorReport = () => {
   };
 
   const exportToExcel = () => {
-    const visibleColumns = columns.filter(col => col.visible);
+    const visibleColumns = localizedColumns.filter(col => col.visible);
     const dataToExport = filteredData.map((row, index) => {
       const newRow = {};
       visibleColumns.forEach(col => {
@@ -434,7 +456,7 @@ const HCMDirectorReport = () => {
     const totalRow = {};
     visibleColumns.forEach((col, index) => {
       if (col.dataField === "total_beneficiaries") totalRow[col.text] = totals.beneficiaries;
-      else if (index === 0) totalRow[col.text] = "Total";
+      else if (index === 0) totalRow[col.text] = t("Total", "कुल");
       else totalRow[col.text] = "";
     });
     dataToExport.push(totalRow);
@@ -473,21 +495,21 @@ const HCMDirectorReport = () => {
         <DirectorHeader toggleSidebar={toggleSidebar} />
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3 className="mb-0">HCM Distribution Report</h3>
+            <h3 className="mb-0">{t("HCM Distribution Report", "एचसीएम वितरण रिपोर्ट")}</h3>
             <div>
-              <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2"><FaFilePdf className="me-1" /> Export PDF</Button>
-              <Button variant="outline-success" size="sm" onClick={exportToExcel}><FaFileExcel className="me-1" /> Export Excel</Button>
-              <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)} className="ms-2"><FaEye className="me-1" /> Column Visibility</Button>
+              <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2"><FaFilePdf className="me-1" /> {t("Export PDF", "पीडीएफ निर्यात करें")}</Button>
+              <Button variant="outline-success" size="sm" onClick={exportToExcel}><FaFileExcel className="me-1" /> {t("Export Excel", "एक्सेल निर्यात करें")}</Button>
+              <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)} className="ms-2"><FaEye className="me-1" /> {t("Column Visibility", "कॉलम दृश्यता")}</Button>
             </div>
           </div>
 
           <Row className="mb-3">
-            <Col md={2}><Form.Control type="date" name="startDate" onChange={handleFilterChange} value={filters.startDate} /></Col>
-            <Col md={2}><Form.Control type="date" name="endDate" onChange={handleFilterChange} value={filters.endDate} /></Col>
+            <Col md={2}><Form.Control type="date" name="startDate" aria-label={t("Start Date", "आरंभ तिथि")} onChange={handleFilterChange} value={filters.startDate} /></Col>
+            <Col md={2}><Form.Control type="date" name="endDate" aria-label={t("End Date", "अंतिम तिथि")} onChange={handleFilterChange} value={filters.endDate} /></Col>
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-district-hcm" className="w-100">
-                  {filters.district.length ? `${filters.district.length} districts selected` : 'All Districts'}
+                  {filters.district.length ? t(`${filters.district.length} districts selected`, `${filters.district.length} ज़िले चयनित`) : t('All Districts', 'सभी ज़िले')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueDistricts.map(d => (<Dropdown.Item key={d} as="div"><Form.Check type="checkbox" label={d} checked={filters.district.includes(d)} onChange={() => handleMultiSelectChange('district', d)} /></Dropdown.Item>))}
@@ -497,7 +519,7 @@ const HCMDirectorReport = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-project-hcm" className="w-100">
-                  {filters.project.length ? `${filters.project.length} projects selected` : 'All Projects'}
+                  {filters.project.length ? t(`${filters.project.length} projects selected`, `${filters.project.length} परियोजनाएँ चयनित`) : t('All Projects', 'सभी परियोजनाएँ')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueProjects.map(p => (<Dropdown.Item key={p} as="div"><Form.Check type="checkbox" label={p} checked={filters.project.includes(p)} onChange={() => handleMultiSelectChange('project', p)} /></Dropdown.Item>))}
@@ -507,7 +529,7 @@ const HCMDirectorReport = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-hcm" className="w-100">
-                  {filters.sector.length ? `${filters.sector.length} sectors selected` : 'All Sectors'}
+                  {filters.sector.length ? t(`${filters.sector.length} sectors selected`, `${filters.sector.length} सेक्टर चयनित`) : t('All Sectors', 'सभी सेक्टर')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueSectors.map(s => (<Dropdown.Item key={s} as="div"><Form.Check type="checkbox" label={s} checked={filters.sector.includes(s)} onChange={() => handleMultiSelectChange('sector', s)} /></Dropdown.Item>))}
@@ -517,7 +539,7 @@ const HCMDirectorReport = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-food-item-hcm" className="w-100">
-                  {filters.food_item.length ? `${filters.food_item.length} items selected` : 'All Food Items'}
+                  {filters.food_item.length ? t(`${filters.food_item.length} items selected`, `${filters.food_item.length} खाद्य सामग्री चयनित`) : t('All Food Items', 'सभी खाद्य सामग्री')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueFoodItems.map(item => (<Dropdown.Item key={item} as="div"><Form.Check type="checkbox" label={item} checked={filters.food_item.includes(item)} onChange={() => handleMultiSelectChange('food_item', item)} /></Dropdown.Item>))}
@@ -527,7 +549,7 @@ const HCMDirectorReport = () => {
             <Col md={2} className="mt-2">
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category-hcm" className="w-100">
-                  {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
+                  {filters.bene_category.length ? t(`${filters.bene_category.length} categories selected`, `${filters.bene_category.length} श्रेणियाँ चयनित`) : t('All Bene. Categories', 'सभी लाभार्थी श्रेणियाँ')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueBeneCategories.map(cat => (<Dropdown.Item key={cat} as="div"><Form.Check type="checkbox" label={cat} checked={filters.bene_category.includes(cat)} onChange={() => handleMultiSelectChange('bene_category', cat)} /></Dropdown.Item>))}
@@ -537,7 +559,7 @@ const HCMDirectorReport = () => {
             <Col md={2} className="mt-2">
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-awc-type-hcm" className="w-100">
-                  {filters.awc_type.length ? `${filters.awc_type.length} types selected` : 'All AWC Types'}
+                  {filters.awc_type.length ? t(`${filters.awc_type.length} types selected`, `${filters.awc_type.length} प्रकार चयनित`) : t('All AWC Types', 'सभी आंगनवाड़ी केंद्र प्रकार')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueAwcTypes.map(type => <Dropdown.Item key={type} as="div"><Form.Check type="checkbox" label={type} checked={filters.awc_type.includes(type)} onChange={() => handleMultiSelectChange('awc_type', type)} /></Dropdown.Item>)}
@@ -547,7 +569,7 @@ const HCMDirectorReport = () => {
             <Col md={2} className="mt-2">
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status-hcm" className="w-100">
-                  {filters.sector_status.length ? `${filters.sector_status.length} statuses selected` : 'All Sector Statuses'}
+                  {filters.sector_status.length ? t(`${filters.sector_status.length} statuses selected`, `${filters.sector_status.length} स्थितियाँ चयनित`) : t('All Sector Statuses', 'सभी सेक्टर स्थितियाँ')}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueSectorStatuses.map(status => <Dropdown.Item key={status} as="div"><Form.Check type="checkbox" label={status} checked={filters.sector_status.includes(status)} onChange={() => handleMultiSelectChange('sector_status', status)} /></Dropdown.Item>)}
@@ -555,7 +577,7 @@ const HCMDirectorReport = () => {
               </Dropdown>
             </Col>
             <Col md={2} className="mt-2 d-flex align-items-end">
-              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ startDate: '', endDate: '', district: [], project: [], sector: [], food_item: [], bene_category: [], awc_type: [], sector_status: [] })}>Clear Filters</Button>
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ startDate: '', endDate: '', district: [], project: [], sector: [], food_item: [], bene_category: [], awc_type: [], sector_status: [] })}>{t("Clear Filters", "फ़िल्टर साफ़ करें")}</Button>
             </Col>
           </Row>
 
@@ -564,7 +586,7 @@ const HCMDirectorReport = () => {
               <Table striped bordered hover responsive className="bg-white" ref={tableRef} style={{ border: '1px solid #dee2e6' }}>
                 <thead>
                   <tr>
-                    {columns.map((col, index) => col.visible && (
+                    {localizedColumns.map((col, index) => col.visible && (
                       <th key={index}>
                         {col.dataField === 'food_item' ? (
                           <div className="food-item-cell" style={{ width: '180px' }}>{col.text}</div>
@@ -605,11 +627,11 @@ const HCMDirectorReport = () => {
                         return <td key={i}>{cellContent}</td>
                       })}
                     </tr>
-                  )) : <tr><td colSpan={columns.filter(c => c.visible).length} className="text-center">No data available</td></tr>}
+                  )) : <tr><td colSpan={columns.filter(c => c.visible).length} className="text-center">{t("No data available", "कोई डेटा उपलब्ध नहीं है")}</td></tr>}
                 </tbody>
                 <tfoot>
                   <tr className="fw-bold table-info">
-                    <td colSpan={columns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')}>Total</td>
+                    <td colSpan={localizedColumns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')}>{t("Total", "कुल")}</td>
                     {columns.filter(c => c.visible).slice(columns.filter(c => c.visible).findIndex(c => c.dataField === 'total_beneficiaries')).map(col => {
                       if (col.dataField === 'total_beneficiaries') {
                         return <td key="total_beneficiaries">{totals.beneficiaries}</td>;
@@ -617,7 +639,7 @@ const HCMDirectorReport = () => {
                       if (col.dataField === 'quantity') {
                         return (
                           <td key="total_quantity">
-                            {!isPrinting && <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>View Totals</Button>}
+                            {!isPrinting && <Button variant="link" size="sm" onClick={() => setShowQuantityModal(true)}>{t("View Totals", "कुल देखें")}</Button>}
                           </td>
                         );
                       }
@@ -632,24 +654,24 @@ const HCMDirectorReport = () => {
         </Container>
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
-          <Modal.Header closeButton><Modal.Title>Show/Hide Columns</Modal.Title></Modal.Header>
+          <Modal.Header closeButton><Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएँ/छिपाएँ")}</Modal.Title></Modal.Header>
           <Modal.Body>
-            {columns.map((col, index) => (<Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />))}
+            {localizedColumns.map((col, index) => (<Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />))}
           </Modal.Body>
-          <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button></Modal.Footer>
+          <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>{t("Close", "बंद करें")}</Button></Modal.Footer>
         </Modal>
 
         <Modal show={showQuantityModal} onHide={() => setShowQuantityModal(false)} centered>
           <Modal.Header closeButton>
-            <Modal.Title>Total Quantity by Unit</Modal.Title>
+            <Modal.Title>{t("Total Quantity by Unit", "इकाई के अनुसार कुल मात्रा")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {Object.keys(totals.quantityByUnit).length > 0 ? (
               <Table striped bordered>
                 <thead>
                   <tr>
-                    <th>Unit</th>
-                    <th>Total Quantity</th>
+                    <th>{t("Unit", "इकाई")}</th>
+                    <th>{t("Total Quantity", "कुल मात्रा")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -658,7 +680,7 @@ const HCMDirectorReport = () => {
                   ))}
                 </tbody>
               </Table>
-            ) : <p>No quantity data to display.</p>}
+            ) : <p>{t("No quantity data to display.", "दिखाने के लिए मात्रा डेटा उपलब्ध नहीं है।")}</p>}
           </Modal.Body>
         </Modal>
       </div>

@@ -43,10 +43,12 @@ import {
 } from "react-icons/fa";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 
 const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onNavClick }) => {
   const { logout, user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -132,7 +134,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
           {sidebarOpen ? (
             <div className="logo-container">
               <div className="logo">
-                  Anganwadi Panel
+                  {t("Anganwadi Panel")}
               </div>
             </div>
           ) : (
@@ -156,7 +158,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
           onClick={() => toggleSubmenu(index)}
         >
           <span className="nav-icon">{item.icon}</span>
-          <span className="nav-text">{item.label}</span>
+          <span className="nav-text">{t(item.label)}</span>
           <span className="submenu-arrow">
             {openSubmenu === index ? <FaChevronDown /> : <FaChevronRight />}
           </span>
@@ -168,7 +170,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
            onClick={(e) => handleItemClick(e, item.path, item.active)}
          >
            <span className="nav-icon">{item.icon}</span>
-           <span className="nav-text">{item.label}</span>
+           <span className="nav-text">{t(item.label)}</span>
          </Link>
       )}
 
@@ -184,7 +186,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
                    onClick={(e) => handleItemClick(e, subItem.path, false)}
                  >
                    <span className="submenu-icon">{subItem.icon}</span>
-                   <span className="nav-text br-text-sub">{subItem.label}</span>
+                   <span className="nav-text br-text-sub">{t(subItem.label)}</span>
                  </Link>
             ))}
           </div>
@@ -208,7 +210,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
             <span className="nav-icon">
               <FaSignOutAlt />
             </span>
-            <span className="nav-text">Logout</span>
+            <span className="nav-text">{t("Logout")}</span>
           </Nav.Link>
         </div>
       </div>
@@ -237,7 +239,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
               onClick={() => toggleSubmenu(index)}
             >
               <span className="nav-icon">{item.icon}</span>
-              <span className="nav-text br-nav-text-mob">{item.label}</span>
+              <span className="nav-text br-nav-text-mob">{t(item.label)}</span>
               <span className="submenu-arrow">
                 {openSubmenu === index ? <FaChevronDown /> : <FaChevronRight />}
               </span>
@@ -249,7 +251,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
                onClick={(e) => handleItemClick(e, item.path, item.active)}
              >
                <span className="nav-icon">{item.icon}</span>
-               <span className="nav-text br-nav-text-mob">{item.label}</span>
+               <span className="nav-text br-nav-text-mob">{t(item.label)}</span>
              </Link>
           )}
 
@@ -263,7 +265,7 @@ const AnganwadiLeftNav = ({ sidebarOpen, setSidebarOpen, isMobile, isTablet, onN
                      className="submenu-item nav-link"
                      onClick={(e) => handleItemClick(e, subItem.path, false)}
                    >
-                     <span className="nav-text">{subItem.label}</span>
+                     <span className="nav-text">{t(subItem.label)}</span>
                    </Link>
                 ))}
               </div>

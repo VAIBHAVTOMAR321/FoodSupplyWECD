@@ -9,6 +9,7 @@ import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
 import PacketExpiryDetails from "../PacketExpiryDetails";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -27,6 +28,25 @@ const monthLabels = {
   jan: 'January',
   feb: 'February',
   mar: 'March',
+};
+const receivingColumnTranslations = {
+  "AWC Name": "आंगनवाड़ी केंद्र का नाम",
+  "AWC Code": "आंगनवाड़ी केंद्र कोड",
+  Sector: "सेक्टर",
+  "Food Item": "खाद्य सामग्री",
+  "Beneficiary Category": "लाभार्थी श्रेणी",
+  Quantity: "मात्रा",
+  Unit: "इकाई",
+  "Fin. Year": "वित्तीय वर्ष",
+  Months: "माह",
+  Trimester: "तिमाही",
+  "Sector Status": "सेक्टर स्थिति",
+  "Current Month": "वर्तमान माह",
+  "Max Expiry Date": "अधिकतम समाप्ति तिथि",
+  "Expired Packets": "समाप्त पैकेट",
+  "Expiry Details (Date / Packets)": "समाप्ति विवरण (तिथि / पैकेट)",
+  Date: "तिथि",
+  Actions: "कार्रवाइयां",
 };
 
 const quarterToMonths = {
@@ -112,6 +132,8 @@ const getStatusVariant = (status) => {
 };
 
 const CDPOTHRReceiving = () => {
+  const { t } = useLanguage();
+  const translateColumn = (text) => t(text, receivingColumnTranslations[text] || text);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
@@ -180,7 +202,7 @@ const [columns, setColumns] = useState([
         setReports(results.data || []);
       }
     } catch (err) {
-      setError("Failed to fetch THR receiving data.");
+      setError(t("Failed to fetch THR receiving data.", "टीएचआर प्राप्ति डेटा प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -460,7 +482,7 @@ const [columns, setColumns] = useState([
       pdf.save("thr_receiving_report.pdf");
     } catch (err) {
       console.error("PDF export failed:", err);
-      setError("Unable to export the report to PDF. Please try again.");
+      setError(t("Unable to export the report to PDF. Please try again.", "रिपोर्ट पीडीएफ़ में निर्यात नहीं हो सकी। कृपया पुनः प्रयास करें।"));
     } finally {
       if (exportRoot?.parentNode) exportRoot.parentNode.removeChild(exportRoot);
       setIsPrinting(false);
@@ -501,7 +523,7 @@ const [columns, setColumns] = useState([
         <Container fluid className="dashboard-box mt-3">
           {error && <Alert variant="danger">{error}</Alert>}
           <div className="dashboard-section">
-            <h4 className="section-title">THR प्राप्ति सारांश</h4>
+            <h4 className="section-title">{t("THR Receiving Summary", "टीएचआर प्राप्ति सारांश")}</h4>
 
             {loading ? (
               <div className="text-center"><Spinner animation="border" /></div>
@@ -509,16 +531,16 @@ const [columns, setColumns] = useState([
               <Tabs defaultActiveKey="awc_report" id="thr-receiving-tabs" className="mb-3">
 
                 {/* Project Summary Tab */}
-                <Tab eventKey="project_summary" title="Project Summary">
-                  <h5 className="mt-3">Project: {summaryData.project}</h5>
+                <Tab eventKey="project_summary" title={t("Project Summary", "परियोजना सारांश")}>
+                  <h5 className="mt-3">{t("Project:", "परियोजना:")} {summaryData.project}</h5>
                   <Table striped bordered hover responsive>
                     <thead>
                       <tr>
-                        <th>Project</th>
-                        <th>Food Item</th>
-                        <th>Beneficiary Category</th>
-                        <th>Total Quantity</th>
-                        <th>Unit</th>
+                        <th>{t("Project", "परियोजना")}</th>
+                        <th>{t("Food Item", "खाद्य सामग्री")}</th>
+                        <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                        <th>{t("Total Quantity", "कुल मात्रा")}</th>
+                        <th>{t("Unit", "इकाई")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -536,15 +558,15 @@ const [columns, setColumns] = useState([
                 </Tab>
 
                 {/* Sector Summary Tab */}
-                <Tab eventKey="sector_summary" title="Sector Summary">
+                <Tab eventKey="sector_summary" title={t("Sector Summary", "सेक्टर सारांश")}>
                   <Table striped bordered hover responsive className="mt-3">
                     <thead>
                       <tr>
-                        <th>Sector</th>
-                        <th>Food Item</th>
-                        <th>Beneficiary Category</th>
-                        <th>Total Quantity</th>
-                        <th>Unit</th>
+                        <th>{t("Sector", "सेक्टर")}</th>
+                        <th>{t("Food Item", "खाद्य सामग्री")}</th>
+                        <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                        <th>{t("Total Quantity", "कुल मात्रा")}</th>
+                        <th>{t("Unit", "इकाई")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -562,9 +584,9 @@ const [columns, setColumns] = useState([
                 </Tab>
 
                 {/* AWC Report Tab */}
-                <Tab eventKey="awc_report" title="AWC Report">
+                <Tab eventKey="awc_report" title={t("AWC Report", "आंगनवाड़ी केंद्र रिपोर्ट")}>
                   <div className="d-flex justify-content-between align-items-center mb-3 mt-2">
-                    <h5 className="mb-0">AWC THR Receiving Report</h5>
+                    <h5 className="mb-0">{t("AWC THR Receiving Report", "आंगनवाड़ी केंद्र टीएचआर प्राप्ति रिपोर्ट")}</h5>
                     <div>
                       <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
                         <FaFilePdf className="me-1" /> Export PDF
@@ -603,13 +625,13 @@ const [columns, setColumns] = useState([
                   </Row>
 
                   {filteredReports.length === 0 ? (
-                    <div className="text-center py-4 text-muted">No data found for selected filters.</div>
+                    <div className="text-center py-4 text-muted">{t("No data found for selected filters.", "चयनित फ़िल्टर के लिए कोई डेटा नहीं मिला।")}</div>
                   ) : (
                     <Card className="shadow-sm">
                       <div className="table-responsive">
                         <Table striped bordered hover className="mb-0" ref={tableRef}>
                           <thead>
-                            <tr>{visibleColumns.map((col) => <th key={col.dataField}>{col.text}</th>)}</tr>
+                            <tr>{visibleColumns.map((col) => <th key={col.dataField}>{translateColumn(col.text)}</th>)}</tr>
                           </thead>
                           <tbody>
                             {currentItems.map((row, index) => (
@@ -644,7 +666,7 @@ const [columns, setColumns] = useState([
                                 {visibleColumns.map((col) => {
                                   let cellContent = '';
                                   if (col.dataField === '#') {
-                                    cellContent = <strong>Total</strong>;
+                                    cellContent = <strong>{t("Total", "कुल")}</strong>;
                                   } else if (col.dataField === 'quantity') {
                                     cellContent = (
                                       <Button variant="link" size="sm" onClick={() => setShowQtyModal(true)}>
@@ -670,27 +692,27 @@ const [columns, setColumns] = useState([
       </div>
 
       <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
-        <Modal.Header closeButton><Modal.Title>Show/Hide Columns</Modal.Title></Modal.Header>
+        <Modal.Header closeButton><Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएं/छिपाएं")}</Modal.Title></Modal.Header>
         <Modal.Body>
           {columns.map((col, i) => (
-            <Form.Check key={i} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(i)} />
+            <Form.Check key={i} type="checkbox" label={translateColumn(col.text)} checked={col.visible} onChange={() => handleColumnToggle(i)} />
           ))}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button>
+          <Button variant="secondary" onClick={() => setShowColumnModal(false)}>{t("Close", "बंद करें")}</Button>
         </Modal.Footer>
       </Modal>
 
       <Modal show={showQtyModal} onHide={() => setShowQtyModal(false)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+          <Modal.Title>{t("Quantity Breakdown by Unit", "इकाई के अनुसार मात्रा विवरण")}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Table striped bordered hover>
             <thead>
               <tr>
-                <th>Unit</th>
-                <th>Total Quantity</th>
+                <th>{t("Unit", "इकाई")}</th>
+                <th>{t("Total Quantity", "कुल मात्रा")}</th>
               </tr>
             </thead>
             <tbody>

@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Container, Row, Col, Card, Spinner, Alert, Collapse, Table, Form, Dropdown, Button, ButtonGroup, Badge } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
 import { FaUsers, FaUserFriends, FaBox, FaChevronDown, FaChevronUp, FaTruckLoading, FaFilter, FaTimes, FaSearch, FaWarehouse } from "react-icons/fa";
 
 const CDPODashboard = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -98,7 +100,7 @@ const CDPODashboard = () => {
       setHcmSummary(hcmRes.data);
       setThrSummary(thrRes.data);
     } catch (err) {
-      setError("Failed to fetch dashboard summaries.");
+      setError(t("Failed to fetch dashboard summaries.", "डैशबोर्ड सारांश प्राप्त नहीं हो सके।"));
       console.error("Dashboard summary fetch error:", err);
     }
   };
@@ -115,7 +117,7 @@ const CDPODashboard = () => {
         fetchCdpoSectorCount(),
       ]);
     } catch (err) {
-      setError("Failed to fetch supervisor distributions.");
+      setError(t("Failed to fetch supervisor distributions.", "पर्यवेक्षक वितरण प्राप्त नहीं हो सके।"));
     } finally {
       setLoading(false);
     }
@@ -215,7 +217,7 @@ useEffect(() => {
 
     if (loading) return <div className="text-center p-4"><Spinner animation="border" /></div>;
     if (error) return <Alert variant="danger">{error}</Alert>;
-    if (items.length === 0) return <div className="text-center p-4 text-muted">No food items found.</div>;
+    if (items.length === 0) return <div className="text-center p-4 text-muted">{t("No food items found.", "कोई खाद्य सामग्री नहीं मिली।")}</div>;
 
     return (
       <div className="table-responsive food-item-table-container">
@@ -223,12 +225,12 @@ useEffect(() => {
           <thead className="table-light sticky-top">
             <tr>
               <th>#</th>
-              <th>Food Item</th>
-              <th>Quantity Per Beneficiary</th>
-              <th>Unit</th>
-              <th>Beneficiary Category</th>
-              <th>Days Allotted</th>
-              <th>Total Quantity</th>
+              <th>{t("Food Item", "खाद्य सामग्री")}</th>
+              <th>{t("Quantity Per Beneficiary", "प्रति लाभार्थी मात्रा")}</th>
+              <th>{t("Unit", "इकाई")}</th>
+              <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+              <th>{t("Days Allotted", "आवंटित दिन")}</th>
+              <th>{t("Total Quantity", "कुल मात्रा")}</th>
             </tr>
           </thead>
           <tbody>
@@ -250,7 +252,7 @@ useEffect(() => {
   };
 
   const ReceivingTable = ({ items }) => { 
-    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No receiving records found.</div>;
+    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">{t("No receiving records found.", "प्राप्ति रिकॉर्ड नहीं मिले।")}</div>;
 
     return (
       <div className="table-responsive food-item-table-container">
@@ -258,8 +260,8 @@ useEffect(() => {
           <thead className="table-light sticky-top">
             <tr>
               <th>#</th>
-              <th>Quantity</th>
-              <th>Unit</th>
+              <th>{t("Quantity", "मात्रा")}</th>
+              <th>{t("Unit", "इकाई")}</th>
             </tr>
           </thead>
           <tbody>
@@ -277,7 +279,7 @@ useEffect(() => {
   };
 
   const DistributionTable = ({ items }) => { 
-    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No distribution records found.</div>;
+    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">{t("No distribution records found.", "वितरण रिकॉर्ड नहीं मिले।")}</div>;
 
     return (
       <div className="table-responsive food-item-table-container">
@@ -285,9 +287,9 @@ useEffect(() => {
           <thead className="table-light sticky-top">
             <tr>
               <th>#</th>
-              <th>Total Beneficiaries</th>
-              <th>Total Quantity</th>
-              <th>Unit</th>
+              <th>{t("Total Beneficiaries", "कुल लाभार्थी")}</th>
+              <th>{t("Total Quantity", "कुल मात्रा")}</th>
+              <th>{t("Unit", "इकाई")}</th>
             </tr>
           </thead>
           <tbody>
@@ -306,7 +308,7 @@ useEffect(() => {
   };
 
   const BeneficiarySummaryTable = ({ items }) => { 
-    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">No beneficiary summary found.</div>;
+    if (!items || items.length === 0) return <div className="text-center p-4 text-muted">{t("No beneficiary summary found.", "लाभार्थी सारांश नहीं मिला।")}</div>;
 
     return (
       <div className="table-responsive food-item-table-container">
@@ -314,8 +316,8 @@ useEffect(() => {
           <thead className="table-light sticky-top">
             <tr>
               <th>#</th>
-              <th>Category Name</th>
-              <th>Beneficiary Count</th>
+              <th>{t("Category Name", "श्रेणी का नाम")}</th>
+              <th>{t("Beneficiary Count", "लाभार्थियों की संख्या")}</th>
             </tr>
           </thead>
           <tbody>
@@ -560,7 +562,7 @@ useEffect(() => {
                   </Dropdown.Item>
 
                   {uniqueMonths.length === 0 ? (
-                    <Dropdown.Item disabled>No months available</Dropdown.Item>
+                    <Dropdown.Item disabled>{t("No months available", "कोई माह उपलब्ध नहीं")}</Dropdown.Item>
                   ) : (
                     uniqueMonths.map((month) => (
                       <Dropdown.Item
@@ -627,7 +629,7 @@ useEffect(() => {
                   </Dropdown.Item>
 
                   {uniqueFYs.length === 0 ? (
-                    <Dropdown.Item disabled>No financial years available</Dropdown.Item>
+                    <Dropdown.Item disabled>{t("No financial years available", "कोई वित्तीय वर्ष उपलब्ध नहीं")}</Dropdown.Item>
                   ) : (
                     uniqueFYs.map((fy) => (
                       <Dropdown.Item
@@ -704,7 +706,7 @@ useEffect(() => {
             <Col xs={6} md={3}>
               <Card className="bg-primary text-white">
                 <Card.Body className="py-2">
-                  <small>Allocated Beneficiaries</small>
+                  <small>{t("Allocated Beneficiaries", "आवंटित लाभार्थी")}</small>
                   <div className="fw-bold fs-5">
                     {totals.allocated_beneficiaries.toLocaleString()}
                   </div>
@@ -715,7 +717,7 @@ useEffect(() => {
             <Col xs={6} md={3}>
               <Card className="bg-info text-white">
                 <Card.Body className="py-2">
-                  <small>Received Beneficiaries</small>
+                  <small>{t("Received Beneficiaries", "प्राप्त लाभार्थी")}</small>
                   <div className="fw-bold fs-5">
                     {totals.received_beneficiaries.toLocaleString()}
                   </div>
@@ -726,7 +728,7 @@ useEffect(() => {
             <Col xs={6} md={3}>
               <Card className="bg-success text-white">
                 <Card.Body className="py-2">
-                  <small>Distributed Beneficiaries</small>
+                  <small>{t("Distributed Beneficiaries", "वितरित लाभार्थी")}</small>
                   <div className="fw-bold fs-5">
                     {totals.distributed_beneficiaries.toLocaleString()}
                   </div>
@@ -737,7 +739,7 @@ useEffect(() => {
             <Col xs={6} md={3}>
               <Card className="bg-warning text-dark">
                 <Card.Body className="py-2">
-                  <small>Balance Quantity</small>
+                  <small>{t("Balance Quantity", "शेष मात्रा")}</small>
                   <div className="fw-bold fs-5">
                     {totals.balance_quantity.toLocaleString()}
                   </div>
@@ -759,22 +761,22 @@ useEffect(() => {
             <thead className="table-light sticky-top">
               <tr>
                 <th>#</th>
-                <th>District</th>
-                <th>Project</th>
-                <th>Sector</th>
-                <th>AWC Code</th>
-                <th>AWC Name</th>
-                <th>Month</th>
-                <th>Fin. Year</th>
-                <th>Food Item</th>
-                <th>Beneficiary Category</th>
-                <th>Allocated Bene.</th>
-                <th>Received Bene.</th>
-                <th>Distributed Bene.</th>
-                <th>Allocated Qty</th>
-                <th>Received Qty</th>
-                <th>Distributed Qty</th>
-                <th>Balance Qty</th>
+                <th>{t("District", "जिला")}</th>
+                <th>{t("Project", "परियोजना")}</th>
+                <th>{t("Sector", "सेक्टर")}</th>
+                <th>{t("AWC Code", "आंगनवाड़ी केंद्र कोड")}</th>
+                <th>{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</th>
+                <th>{t("Month", "माह")}</th>
+                <th>{t("Fin. Year", "वित्तीय वर्ष")}</th>
+                <th>{t("Food Item", "खाद्य सामग्री")}</th>
+                <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                <th>{t("Allocated Bene.", "आवंटित लाभार्थी")}</th>
+                <th>{t("Received Bene.", "प्राप्त लाभार्थी")}</th>
+                <th>{t("Distributed Bene.", "वितरित लाभार्थी")}</th>
+                <th>{t("Allocated Qty", "आवंटित मात्रा")}</th>
+                <th>{t("Received Qty", "प्राप्त मात्रा")}</th>
+                <th>{t("Distributed Qty", "वितरित मात्रा")}</th>
+                <th>{t("Balance Qty", "शेष मात्रा")}</th>
               </tr>
             </thead>
 
@@ -909,7 +911,7 @@ useEffect(() => {
           {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
 
           <div className="dashboard-section">
-            <h4 className="section-title">Food Items Overview</h4>
+            <h4 className="section-title">{t("Food Items Overview", "खाद्य सामग्री अवलोकन")}</h4>
             <Row className="g-3">
               <Col md={6}>
                 <Card className="dashboard-card card-hcm expandable-card" onClick={() => handleCardClick('hcm')}>
@@ -917,7 +919,7 @@ useEffect(() => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">HCM Food Items</h6>
+                        <h6 className="dashboard-card-title">{t("HCM Food Items", "एचसीएम खाद्य सामग्री")}</h6>
                         <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}</div>
                       </div>
                       <div className="ms-auto expand-icon">
@@ -938,7 +940,7 @@ useEffect(() => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon thr-icon"><FaBox /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">THR Food Items</h6>
+                        <h6 className="dashboard-card-title">{t("THR Food Items", "टीएचआर खाद्य सामग्री")}</h6>
                         <div className="dashboard-card-value">{loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}</div>
                       </div>
                       <div className="ms-auto expand-icon">
@@ -959,7 +961,7 @@ useEffect(() => {
      
 
           <div className="dashboard-section">
-            <h4 className="section-title">THR Distribution & Received Summary</h4>
+            <h4 className="section-title">{t("THR Distribution & Received Summary", "टीएचआर वितरण एवं प्राप्ति सारांश")}</h4>
             <Row className="g-3"> 
               <Col md={4}>
                 <Card className="dashboard-card card-thr" onClick={() => navigate('/ThrCdpoDistributions')}>
@@ -967,7 +969,7 @@ useEffect(() => {
                     <div className=" d-flex align-items-center w-100">
                       <div className="dashboard-card-icon thr-icon"><FaUserFriends /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">THR Distribution</h6>
+                        <h6 className="dashboard-card-title mb-1">{t("THR Distribution", "टीएचआर वितरण")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
                         </div>
@@ -982,7 +984,7 @@ useEffect(() => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon thr-icon"><FaTruckLoading /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">THR Received</h6>
+                        <h6 className="dashboard-card-title">{t("THR Received", "टीएचआर प्राप्ति")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : 
                             thrSummary?.receiving_summary?.length || 0
@@ -1007,7 +1009,7 @@ useEffect(() => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon thr-icon"><FaBox /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">THR Quantity Records</h6>
+                        <h6 className="dashboard-card-title mb-1">{t("THR Quantity Records", "टीएचआर मात्रा रिकॉर्ड")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : thrSummary?.distribution_summary?.length || 0}
                         </div>
@@ -1027,7 +1029,7 @@ useEffect(() => {
             </Row>
           </div>
           <div className="dashboard-section">
-            <h4 className="section-title">HCM Distribution & Received Summary</h4>
+            <h4 className="section-title">{t("HCM Distribution & Received Summary", "एचसीएम वितरण एवं प्राप्ति सारांश")}</h4>
             <Row className="g-3"> 
               <Col md={4}>
                 <Card className="dashboard-card card-hcm" onClick={() => navigate('/HcmCdpoDistributions')}>
@@ -1035,7 +1037,7 @@ useEffect(() => {
                     <div className="d-flex align-items-center w-100">
                       <div className="dashboard-card-icon hcm-icon"><FaUserFriends /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">HCM Distribution</h6>
+                        <h6 className="dashboard-card-title mb-1">{t("HCM Distribution", "एचसीएम वितरण")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.reduce((sum, item) => sum + (item.total_beneficiaries || 0), 0).toLocaleString() || 0}
                         </div>
@@ -1050,7 +1052,7 @@ useEffect(() => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon hcm-icon"><FaTruckLoading /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">HCM Received</h6>
+                        <h6 className="dashboard-card-title">{t("HCM Received", "एचसीएम प्राप्ति")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : 
                             hcmSummary?.receiving_summary?.length || 0
@@ -1075,7 +1077,7 @@ useEffect(() => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon hcm-icon"><FaBox /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title mb-1">HCM Quantity Records</h6>
+                        <h6 className="dashboard-card-title mb-1">{t("HCM Quantity Records", "एचसीएम मात्रा रिकॉर्ड")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : hcmSummary?.distribution_summary?.length || 0}
                         </div>
@@ -1095,7 +1097,7 @@ useEffect(() => {
             </Row>
           </div>
                <div className="dashboard-section">
-            <h4 className="section-title">AWC / Sector Summary</h4>
+            <h4 className="section-title">{t("AWC / Sector Summary", "आंगनवाड़ी केंद्र / सेक्टर सारांश")}</h4>
             <Row className="g-3">
               <Col md={6} lg={4}>
                 <Card className="dashboard-card card-thr" onClick={() => navigate('/CdpoAWCList')}>
@@ -1103,7 +1105,7 @@ useEffect(() => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon thr-icon"><FaUsers /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">AWC List</h6>
+                        <h6 className="dashboard-card-title">{t("AWC List", "आंगनवाड़ी केंद्र सूची")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : awcCount}
                         </div>
@@ -1118,7 +1120,7 @@ useEffect(() => {
                     <div className="d-flex align-items-center">
                       <div className="dashboard-card-icon hcm-icon"><FaUsers /></div>
                       <div className="ms-3 text-start">
-                        <h6 className="dashboard-card-title">Sector List</h6>
+                        <h6 className="dashboard-card-title">{t("Sector List", "सेक्टर सूची")}</h6>
                         <div className="dashboard-card-value">
                           {loading ? <Spinner animation="border" size="sm" /> : sectorCount}
                         </div>

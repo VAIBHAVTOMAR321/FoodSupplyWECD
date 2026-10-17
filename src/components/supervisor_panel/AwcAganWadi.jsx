@@ -12,6 +12,7 @@ import "../../assets/css/dashboard.css";
 import "../../assets/css/AnganwadiProfile.css";
 import { FaFilePdf, FaFileExcel } from "react-icons/fa";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import SupervisorLeftNav from "./SupervisorLeftNav";
 import SupervisorHeader from "./SupervisorHeader";
 import jsPDF from "jspdf";
@@ -34,6 +35,7 @@ const cellValue = (value) =>
   value === null || value === undefined || value === "" ? "—" : String(value);
 
 const AwcAganWadi = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -70,7 +72,7 @@ const AwcAganWadi = () => {
       setAwcCount(Number(response.data?.count ?? rawData.length));
     } catch (err) {
       console.error("Failed to fetch AWC list:", err);
-      setAwcError("Failed to load AWC list. Please try again.");
+      setAwcError(t("Failed to load AWC list. Please try again.", "आंगनवाड़ी केंद्रों की सूची लोड नहीं हो सकी। कृपया पुनः प्रयास करें।"));
       setAwcList([]);
       setAwcCount(0);
     } finally {
@@ -170,12 +172,12 @@ const AwcAganWadi = () => {
     ].join(";");
 
     const title = document.createElement("h2");
-    title.textContent = "AWC List";
+    title.textContent = t("AWC List", "आंगनवाड़ी केंद्र सूची");
     title.style.cssText = "margin:0 0 6px;font-size:22px;font-weight:700;";
     root.appendChild(title);
 
     const count = document.createElement("p");
-    count.textContent = `Total AWC: ${Number(awcCount || awcList.length).toLocaleString()}`;
+    count.textContent = `${t("Total AWC", "कुल आंगनवाड़ी केंद्र")}: ${Number(awcCount || awcList.length).toLocaleString()}`;
     count.style.cssText = "margin:0 0 16px;font-size:12px;";
     root.appendChild(count);
 
@@ -331,7 +333,7 @@ const AwcAganWadi = () => {
       pdf.save("awc_list.pdf");
     } catch (error) {
       console.error("Failed to export AWC list PDF:", error);
-      window.alert("Failed to export PDF. Please try again.");
+      window.alert(t("Failed to export PDF. Please try again.", "PDF निर्यात नहीं हो सका। कृपया पुनः प्रयास करें।"));
     } finally {
       root.remove();
       setExportingPdf(false);
@@ -356,16 +358,16 @@ const AwcAganWadi = () => {
                 size="sm"
                 onClick={() => navigate("/SupervisorDashBoard")}
               >
-                &larr; Back to Dashboard
+                &larr; {t("Back to Dashboard", "डैशबोर्ड पर वापस जाएं")}
               </Button>
-              <h3 className="mb-0">AWC List</h3>
+              <h3 className="mb-0">{t("AWC List", "आंगनवाड़ी केंद्र सूची")}</h3>
             </div>
             <div className="d-flex align-items-center gap-2 flex-wrap">
               {awcLoading ? (
                 <Spinner animation="border" size="sm" />
               ) : (
                 <span className="text-muted">
-                  Total AWC: {awcCount.toLocaleString()}
+                  {t("Total AWC", "कुल आंगनवाड़ी केंद्र")}: {awcCount.toLocaleString()}
                 </span>
               )}
               <ButtonGroup>
@@ -376,7 +378,7 @@ const AwcAganWadi = () => {
                   disabled={awcLoading || !awcList.length || exportingPdf}
                 >
                   <FaFilePdf className="me-1" />
-                  {exportingPdf ? "Preparing PDF…" : "Export PDF"}
+                  {exportingPdf ? t("Preparing PDF…", "PDF तैयार हो रहा है…") : t("Export PDF", "PDF निर्यात करें")}
                 </Button>
                 <Button
                   variant="outline-success"
@@ -385,7 +387,7 @@ const AwcAganWadi = () => {
                   disabled={awcLoading || !awcList.length}
                 >
                   <FaFileExcel className="me-1" />
-                  Export Excel
+                  {t("Export Excel", "Excel निर्यात करें")}
                 </Button>
               </ButtonGroup>
             </div>
@@ -399,7 +401,7 @@ const AwcAganWadi = () => {
             <Alert variant="danger">{awcError}</Alert>
           ) : awcList.length === 0 ? (
             <div className="text-center py-4 text-muted">
-              No AWC data available.
+              {t("No AWC data available.", "आंगनवाड़ी केंद्र का कोई डेटा उपलब्ध नहीं है।")}
             </div>
           ) : (
             <div className="table-responsive">
@@ -407,13 +409,13 @@ const AwcAganWadi = () => {
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>District Name</th>
-                    <th>District Code</th>
-                    <th>Project</th>
-                    <th>Sector</th>
-                    <th>AWC Code</th>
-                    <th>AWC Name</th>
-                    <th>AWC Type</th>
+                    <th>{t("District Name", "ज़िले का नाम")}</th>
+                    <th>{t("District Code", "ज़िला कोड")}</th>
+                    <th>{t("Project", "परियोजना")}</th>
+                    <th>{t("Sector", "सेक्टर")}</th>
+                    <th>{t("AWC Code", "आंगनवाड़ी केंद्र कोड")}</th>
+                    <th>{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</th>
+                    <th>{t("AWC Type", "आंगनवाड़ी केंद्र का प्रकार")}</th>
                     <th>Code1</th>
                   </tr>
                 </thead>

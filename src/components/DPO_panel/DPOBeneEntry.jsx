@@ -18,6 +18,8 @@ import {
 import "../../assets/css/dpo.css";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
+import dpoHindi from "./DPOTranslations.json";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -26,6 +28,8 @@ import DPOLeftNav from "./DPOLeftNav";
 import DPOHeader from "./DPOHeader";
 
 const DPOBeneEntry = () => {
+  const { t } = useLanguage();
+  const translateLabel = (text) => t(text, dpoHindi[text] || text);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isTablet, setIsTablet] = useState(
@@ -116,7 +120,7 @@ const DPOBeneEntry = () => {
         setReports(results.data || []);
       }
     } catch (err) {
-      setError("Failed to fetch beneficiary summary.");
+      setError(t("Failed to fetch beneficiary summary.", "लाभार्थी सारांश प्राप्त करने में विफल।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -334,7 +338,7 @@ const DPOBeneEntry = () => {
           )}
 
           <div className="dashboard-section">
-            <h4 className="section-title">लाभार्थी सारांश</h4>
+            <h4 className="section-title">{t("Beneficiary Summary", "लाभार्थी सारांश")}</h4>
 
             {loading ? (
               <div className="text-center">
@@ -348,22 +352,22 @@ const DPOBeneEntry = () => {
                 id="beneficiary-summary-tabs"
                 className="mb-3"
               >
-                <Tab eventKey="district_total" title="District Total">
+                <Tab eventKey="district_total" title={t("District Total", "जिला कुल")}>
                   <h5 className="mt-4">
-                    District Total: {summaryData.district}
+                    {t("District Total", "जिला कुल")}: {summaryData.district}
                   </h5>
                       <Table striped bordered hover responsive>
                         <thead>
                           <tr>
-                            <th>District</th>
-                            <th>PW & LM</th>
-                            <th>Child (6m-3y)</th>
-                            <th>Child (3-6y)</th>
-                            <th>Adol. Girls</th>
-                            <th>SAM (6m-3y)</th>
-                            <th>SAM (3-5y)</th>
-                            <th>SUW (6m-3y)</th>
-                            <th>SUW (3-6y)</th>
+                            <th>{t("District", "जिला")}</th>
+                            <th>{t("PW & LM", "गर्भवती एवं स्तनपान कराने वाली माताएँ")}</th>
+                            <th>{t("Child (6m-3y)", "बच्चे (6 माह-3 वर्ष)")}</th>
+                            <th>{t("Child (3-6y)", "बच्चे (3-6 वर्ष)")}</th>
+                            <th>{t("Adol. Girls", "किशोरियाँ")}</th>
+                            <th>{t("SAM (6m-3y)", "SAM (6 माह-3 वर्ष)")}</th>
+                            <th>{t("SAM (3-5y)", "SAM (3-5 वर्ष)")}</th>
+                            <th>{t("SUW (6m-3y)", "SUW (6 माह-3 वर्ष)")}</th>
+                            <th>{t("SUW (3-6y)", "SUW (3-6 वर्ष)")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -382,20 +386,20 @@ const DPOBeneEntry = () => {
                       </Table>
                 </Tab>
 
-                <Tab eventKey="project_summary" title="Project Summary">
-                  <h5 className="mt-4">Project-wise Summary (Total)</h5>
+                <Tab eventKey="project_summary" title={t("Project Summary", "परियोजना सारांश")}>
+                  <h5 className="mt-4">{t("Project-wise Summary (Total)", "परियोजना-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
-                        <th>Project</th>
-                        <th>PW & LM</th>
-                        <th>Child (6m-3y)</th>
-                        <th>Child (3-6y)</th>
-                        <th>Adol. Girls</th>
-                        <th>SAM (6m-3y)</th>
-                        <th>SAM (3-5y)</th>
-                        <th>SUW (6m-3y)</th>
-                        <th>SUW (3-6y)</th>
+                        <th>{t("Project", "परियोजना")}</th>
+                        <th>{t("PW & LM", "गर्भवती एवं स्तनपान कराने वाली माताएँ")}</th>
+                        <th>{t("Child (6m-3y)", "बच्चे (6 माह-3 वर्ष)")}</th>
+                        <th>{t("Child (3-6y)", "बच्चे (3-6 वर्ष)")}</th>
+                        <th>{t("Adol. Girls", "किशोरियाँ")}</th>
+                        <th>{t("SAM (6m-3y)", "SAM (6 माह-3 वर्ष)")}</th>
+                        <th>{t("SAM (3-5y)", "SAM (3-5 वर्ष)")}</th>
+                        <th>{t("SUW (6m-3y)", "SUW (6 माह-3 वर्ष)")}</th>
+                        <th>{t("SUW (3-6y)", "SUW (3-6 वर्ष)")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -416,20 +420,20 @@ const DPOBeneEntry = () => {
                   </Table>   {/* FIX: was </Card> */}
                 </Tab>
 
-                <Tab eventKey="sector_summary" title="Sector Summary">
-                  <h5 className="mt-4">सेक्टर-वार सारांश (कुल)</h5>
+                <Tab eventKey="sector_summary" title={t("Sector Summary", "सेक्टर सारांश")}>
+                  <h5 className="mt-4">{t("Sector-wise Summary (Total)", "सेक्टर-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
-                        <th>Sector</th>
-                        <th>PW & LM</th>
-                        <th>Child (6m-3y)</th>
-                        <th>Child (3-6y)</th>
-                        <th>Adol. Girls</th>
-                        <th>SAM (6m-3y)</th>
-                        <th>SAM (3-5y)</th>
-                        <th>SUW (6m-3y)</th>
-                        <th>SUW (3-6y)</th>
+                        <th>{t("Sector", "सेक्टर")}</th>
+                        <th>{t("PW & LM", "गर्भवती एवं स्तनपान कराने वाली माताएँ")}</th>
+                        <th>{t("Child (6m-3y)", "बच्चे (6 माह-3 वर्ष)")}</th>
+                        <th>{t("Child (3-6y)", "बच्चे (3-6 वर्ष)")}</th>
+                        <th>{t("Adol. Girls", "किशोरियाँ")}</th>
+                        <th>{t("SAM (6m-3y)", "SAM (6 माह-3 वर्ष)")}</th>
+                        <th>{t("SAM (3-5y)", "SAM (3-5 वर्ष)")}</th>
+                        <th>{t("SUW (6m-3y)", "SUW (6 माह-3 वर्ष)")}</th>
+                        <th>{t("SUW (3-6y)", "SUW (3-6 वर्ष)")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -450,18 +454,18 @@ const DPOBeneEntry = () => {
                   </Table>
                 </Tab>
 
-                <Tab eventKey="awc_report" title="AWC Report">
+                <Tab eventKey="awc_report" title={t("AWC Report", "आंगनवाड़ी रिपोर्ट")}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="mb-0">AWC Beneficiary Report</h5>
+                    <h5 className="mb-0">{t("AWC Beneficiary Report", "आंगनवाड़ी लाभार्थी रिपोर्ट")}</h5>
                     <div>
                       <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
-                        <FaFilePdf className="me-1" /> Export PDF
+                        <FaFilePdf className="me-1" /> {t("Export PDF", "PDF निर्यात करें")}
                       </Button>
                       <Button variant="outline-success" size="sm" onClick={exportToExcel} className="me-2">
-                        <FaFileExcel className="me-1" /> Export Excel
+                        <FaFileExcel className="me-1" /> {t("Export Excel", "Excel निर्यात करें")}
                       </Button>
                       <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)}>
-                        <FaEye className="me-1" /> Column Visibility
+                        <FaEye className="me-1" /> {t("Column Visibility", "कॉलम दृश्यता")}
                       </Button>
                     </div>
                   </div>
@@ -470,7 +474,7 @@ const DPOBeneEntry = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.fin_year.length ? `${filters.fin_year.length} selected` : "All Fin. Years"}
+                          {filters.fin_year.length ? `${filters.fin_year.length} ${t("selected", "चयनित")}` : t("All Fin. Years", "सभी वित्तीय वर्ष")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueFinYears.map((v) => (
@@ -485,7 +489,7 @@ const DPOBeneEntry = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.month.length ? `${filters.month.length} selected` : "All Months"}
+                          {filters.month.length ? `${filters.month.length} ${t("selected", "चयनित")}` : t("All Months", "सभी महीने")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueMonths.map((v) => (
@@ -500,7 +504,7 @@ const DPOBeneEntry = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.district.length ? `${filters.district.length} selected` : "All Districts"}
+                          {filters.district.length ? `${filters.district.length} ${t("selected", "चयनित")}` : t("All Districts", "सभी जिले")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueDistricts.map((v) => (
@@ -515,7 +519,7 @@ const DPOBeneEntry = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.project.length ? `${filters.project.length} selected` : "All Projects"}
+                          {filters.project.length ? `${filters.project.length} ${t("selected", "चयनित")}` : t("All Projects", "सभी परियोजनाएँ")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueProjects.map((v) => (
@@ -530,7 +534,7 @@ const DPOBeneEntry = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.sector.length ? `${filters.sector.length} selected` : "All Sectors"}
+                          {filters.sector.length ? `${filters.sector.length} ${t("selected", "चयनित")}` : t("All Sectors", "सभी सेक्टर")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueSectors.map((v) => (
@@ -544,7 +548,7 @@ const DPOBeneEntry = () => {
 
                     <Col md={2} className="d-flex align-items-end">
                       <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], month: [], district: [], project: [], sector: [] })}>
-                        Clear Filters
+                        {t("Clear Filters", "फ़िल्टर हटाएँ")}
                       </Button>
                     </Col>
                   </Row>
@@ -560,7 +564,7 @@ const DPOBeneEntry = () => {
                           <thead>
                             <tr>
                               {visibleColumns.map((col) => (
-                                <th key={col.dataField}>{col.text}</th>
+                                <th key={col.dataField}>{translateLabel(col.text)}</th>
                               ))}
                             </tr>
                           </thead>
@@ -592,15 +596,15 @@ const DPOBeneEntry = () => {
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
           <Modal.Header closeButton>
-            <Modal.Title>Show/Hide Columns</Modal.Title>
+            <Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएँ/छिपाएँ")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {columns.map((col, index) => (
-              <Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />
+              <Form.Check key={index} type="checkbox" label={translateLabel(col.text)} checked={col.visible} onChange={() => handleColumnToggle(index)} />
             ))}
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button>
+            <Button variant="secondary" onClick={() => setShowColumnModal(false)}>{t("Close", "बंद करें")}</Button>
           </Modal.Footer>
         </Modal>
       </div>

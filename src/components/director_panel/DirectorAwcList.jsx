@@ -13,6 +13,7 @@ import {
 import { useLocation } from "react-router-dom";
 import "../../assets/css/itcellLeftnav.css";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import {
   FaUserShield,
   FaUserCog,
@@ -73,6 +74,7 @@ const DirectorAwcList = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const { api } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("dpo");
   const [roleCounts, setRoleCounts] = useState({});
   const [dpoData, setDpoData] = useState([]);
@@ -128,13 +130,18 @@ const DirectorAwcList = () => {
       if (tab === "anganwadi") setAnganwadiData(data);
       setRoleCounts((prev) => ({ ...prev, [tab]: data.length }));
     } catch (err) {
-      setError(`Failed to fetch ${config.title.toLowerCase()}.`);
+      setError(t(`Failed to fetch ${config.title.toLowerCase()}.`, ({
+        "DPO List": "डीपीओ सूची प्राप्त नहीं हो सकी।",
+        "CDPO List": "सीडीपीओ सूची प्राप्त नहीं हो सकी।",
+        "Supervisor List": "पर्यवेक्षक सूची प्राप्त नहीं हो सकी।",
+        "Anganwadi List": "आंगनवाड़ी सूची प्राप्त नहीं हो सकी।",
+      })[config.title] || "सूची प्राप्त नहीं हो सकी।"));
       console.error(`Failed to fetch ${tab} data:`, err);
     } finally {
       setLoadingCounts((prev) => ({ ...prev, [tab]: false }));
       setLoading((prev) => ({ ...prev, [tab]: false }));
     }
-  }, [api]);
+  }, [api, t]);
 
   useEffect(() => {
     if (api) {
@@ -231,7 +238,7 @@ const DirectorAwcList = () => {
       pdf.save(`Director_${activeTab}_list.pdf`);
     } catch (err) {
       console.error("Failed to export Director list PDF:", err);
-      window.alert("PDF export failed. Please try again.");
+      window.alert(t("PDF export failed. Please try again.", "पीडीएफ निर्यात नहीं हो सका। कृपया पुनः प्रयास करें।"));
     } finally {
       setExportingPdf(false);
     }
@@ -273,13 +280,13 @@ const DirectorAwcList = () => {
     }
     return (
       <Pagination className="justify-content-end mt-3">
-        <Pagination.First onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
-        <Pagination.Prev onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
+        <Pagination.First aria-label={t("First page", "पहला पृष्ठ")} onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
+        <Pagination.Prev aria-label={t("Previous page", "पिछला पृष्ठ")} onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
         {startPage > 1 && <Pagination.Ellipsis disabled />}
         {items}
         {endPage < totalPages && <Pagination.Ellipsis disabled />}
-        <Pagination.Next onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
-        <Pagination.Last onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
+        <Pagination.Next aria-label={t("Next page", "अगला पृष्ठ")} onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
+        <Pagination.Last aria-label={t("Last page", "अंतिम पृष्ठ")} onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
       </Pagination>
     );
   };
@@ -289,7 +296,7 @@ const DirectorAwcList = () => {
       return <div className="text-center p-4"><Spinner animation="border" /></div>;
     }
     if (!data || data.length === 0) {
-      return <div className="text-center p-4 text-muted">No users found for this role.</div>;
+      return <div className="text-center p-4 text-muted">{t("No users found for this role.", "इस भूमिका के लिए कोई उपयोगकर्ता नहीं मिला।")}</div>;
     }
     const totalPages = Math.ceil(data.length / itemsPerPage);
     const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -338,7 +345,7 @@ const DirectorAwcList = () => {
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <h3 className="mb-0 fw-bold">
-              <FaUserShield className="me-2" />DPO CDPO Sector &amp; AWC List
+              <FaUserShield className="me-2" />{t("DPO CDPO Sector & AWC List", "डीपीओ, सीडीपीओ, सेक्टर एवं आंगनवाड़ी सूची")}
             </h3>
             <ButtonGroup>
               <Button
@@ -348,7 +355,7 @@ const DirectorAwcList = () => {
                 disabled={loading[activeTab] || !(dataByTab[activeTab] || []).length || exportingPdf}
               >
                 <FaFilePdf className="me-1" />
-                {exportingPdf ? "Preparing PDF…" : "Export PDF"}
+                {exportingPdf ? t("Preparing PDF…", "पीडीएफ तैयार हो रही है…") : t("Export PDF", "पीडीएफ निर्यात करें")}
               </Button>
               <Button
                 variant="outline-success"
@@ -356,7 +363,7 @@ const DirectorAwcList = () => {
                 onClick={exportToExcel}
                 disabled={loading[activeTab] || !(dataByTab[activeTab] || []).length}
               >
-                <FaFileExcel className="me-1" /> Export Excel
+                <FaFileExcel className="me-1" /> {t("Export Excel", "एक्सेल निर्यात करें")}
               </Button>
             </ButtonGroup>
           </div>
@@ -375,25 +382,25 @@ const DirectorAwcList = () => {
           >
             <Tab
               eventKey="dpo"
-              title={<span><FaUserCog className="me-2" />DPO List {loadingCounts.dpo ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.dpo ?? 0})`}</span>}
+              title={<span><FaUserCog className="me-2" />{t("DPO List", "डीपीओ सूची")} {loadingCounts.dpo ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.dpo ?? 0})`}</span>}
             >
               {renderTable(dpoData, "dpo")}
             </Tab>
             <Tab
               eventKey="cdpo"
-              title={<span><FaUserShield className="me-2" />CDPO List {loadingCounts.cdpo ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.cdpo ?? 0})`}</span>}
+              title={<span><FaUserShield className="me-2" />{t("CDPO List", "सीडीपीओ सूची")} {loadingCounts.cdpo ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.cdpo ?? 0})`}</span>}
             >
               {renderTable(cdpoData, "cdpo")}
             </Tab>
             <Tab
               eventKey="supervisor"
-              title={<span><FaUserTie className="me-2" />Supervisor List {loadingCounts.supervisor ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.supervisor ?? 0})`}</span>}
+              title={<span><FaUserTie className="me-2" />{t("Supervisor List", "पर्यवेक्षक सूची")} {loadingCounts.supervisor ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.supervisor ?? 0})`}</span>}
             >
               {renderTable(supervisorData, "supervisor")}
             </Tab>
             <Tab
               eventKey="anganwadi"
-              title={<span><FaHome className="me-2" />Anganwadi List {loadingCounts.anganwadi ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.anganwadi ?? 0})`}</span>}
+              title={<span><FaHome className="me-2" />{t("Anganwadi List", "आंगनवाड़ी सूची")} {loadingCounts.anganwadi ? <Spinner as="span" size="sm" animation="border" /> : `(${roleCounts.anganwadi ?? 0})`}</span>}
             >
               {renderTable(anganwadiData, "anganwadi")}
             </Tab>

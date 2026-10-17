@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
+import dpoHindi from "./DPOTranslations.json";
 import "../../assets/css/dpo.css";
 import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
@@ -112,6 +114,8 @@ const formatTrimester = (row) => ({
 })[normalizeTrimesterKey(row)] || normalizeTrimesterKey(row);
 
 const ThrDpoDistributions = () => {
+  const { t } = useLanguage();
+  const translateLabel = (text) => t(text, dpoHindi[text] || text);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -248,7 +252,7 @@ const ThrDpoDistributions = () => {
       const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
       setDistributions(items);
     } catch (err) {
-      setError("Failed to fetch THR distributions.");
+      setError(t("Failed to fetch THR distributions.", "THR वितरण प्राप्त करने में विफल।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -310,7 +314,7 @@ const ThrDpoDistributions = () => {
        return `<td>${esc(v)}</td>`;
      }).join('')}</tr>`).join('');
      const foot = cols.map(c => `<td>${esc(c.dataField === '#' ? 'Total' : c.dataField === 'total_beneficiaries' ? totals.beneficiaries : '')}</td>`).join('');
-     container.innerHTML = `<div style="font-size:15px;font-weight:bold;margin-bottom:8px">THR DPO Distributions Report</div><table style="width:100%;border-collapse:collapse;font-size:10px;line-height:1.2"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody><tfoot><tr>${foot}</tr></tfoot></table>`;
+     container.innerHTML = `<div style="font-size:15px;font-weight:bold;margin-bottom:8px">{t("THR DPO Distributions Report", "THR DPO वितरण रिपोर्ट")}</div><table style="width:100%;border-collapse:collapse;font-size:10px;line-height:1.2"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody><tfoot><tr>${foot}</tr></tfoot></table>`;
      const style = document.createElement('style');
      style.textContent = 'th,td{border:1px solid #cfd4da;padding:4px;vertical-align:top;white-space:normal;overflow-wrap:anywhere}th{background:#eef1f4}tbody tr:nth-child(even){background:#f8f9fa}tfoot td{font-weight:bold;background:#e9ecef}';
      container.appendChild(style); document.body.appendChild(container);
@@ -328,7 +332,7 @@ const ThrDpoDistributions = () => {
        y+=h; page++; part.width=1; part.height=1;
      }
      pdf.save('thr_dpo_distributions.pdf'); canvas.width=1; canvas.height=1;
-   } catch(err) { console.error('Failed to export THR PDF:',err); setError('Failed to export PDF. Please try again.'); }
+   } catch(err) { console.error('Failed to export THR PDF:',err); setError(t("Failed to export PDF. Please try again.", "PDF निर्यात करने में विफल। कृपया पुनः प्रयास करें।")); }
    finally { if(container?.parentNode) container.parentNode.removeChild(container); setIsPrinting(false); }
  };
 
@@ -415,16 +419,16 @@ const ThrDpoDistributions = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3 className="mb-0">THR DPO Distributions</h3>
+            <h3 className="mb-0">{t("THR DPO Distributions", "THR DPO वितरण")}</h3>
             <div>
               <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
-                <FaFilePdf className="me-1" /> Export PDF
+                <FaFilePdf className="me-1" /> {t("Export PDF", "PDF निर्यात करें")}
               </Button>
               <Button variant="outline-success" size="sm" onClick={exportToExcel} className="me-2">
-                <FaFileExcel className="me-1" /> Export Excel
+                <FaFileExcel className="me-1" /> {t("Export Excel", "Excel निर्यात करें")}
               </Button>
               <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)}>
-                <FaEye className="me-1" /> Column Visibility
+                <FaEye className="me-1" /> {t("Column Visibility", "कॉलम दृश्यता")}
               </Button>
             </div>
           </div>
@@ -433,7 +437,7 @@ const ThrDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-finyear" className="w-100">
-                  {filters.finYear.length ? `${filters.finYear.length} years selected` : 'All Fin. Years'}
+                  {filters.finYear.length ? `${filters.finYear.length} ${t("years selected", "वर्ष चयनित")}` : t("All Fin. Years", "सभी वित्तीय वर्ष")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueFinYears.map(year => (
@@ -447,7 +451,7 @@ const ThrDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-months" className="w-100">
-                  {filters.months.length ? `${filters.months.length} selected` : 'All Months'}
+                  {filters.months.length ? `${filters.months.length} ${t("selected", "चयनित")}` : t("All Months", "सभी महीने")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueMonths.map(q => (
@@ -461,7 +465,7 @@ const ThrDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-district" className="w-100">
-                  {filters.district.length ? `${filters.district.length} districts selected` : 'All Districts'}
+                  {filters.district.length ? `${filters.district.length} ${t("districts selected", "जिले चयनित")}` : t("All Districts", "सभी जिले")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueDistricts.map(d => (
@@ -475,7 +479,7 @@ const ThrDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-project" className="w-100">
-                  {filters.project.length ? `${filters.project.length} projects selected` : 'All Projects'}
+                  {filters.project.length ? `${filters.project.length} ${t("projects selected", "परियोजनाएँ चयनित")}` : t("All Projects", "सभी परियोजनाएँ")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueProjects.map(p => (
@@ -489,7 +493,7 @@ const ThrDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector" className="w-100">
-                  {filters.sector.length ? `${filters.sector.length} sectors selected` : 'All Sectors'}
+                  {filters.sector.length ? `${filters.sector.length} ${t("sectors selected", "सेक्टर चयनित")}` : t("All Sectors", "सभी सेक्टर")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueSectors.map(s => (
@@ -503,7 +507,7 @@ const ThrDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-food-item" className="w-100">
-                  {filters.food_item.length ? `${filters.food_item.length} items selected` : 'All Food Items'}
+                  {filters.food_item.length ? `${filters.food_item.length} ${t("items selected", "सामग्री चयनित")}` : t("All Food Items", "सभी खाद्य सामग्री")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueFoodItems.map(item => (
@@ -517,7 +521,7 @@ const ThrDpoDistributions = () => {
             <Col md={2} className="mt-2">
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category" className="w-100">
-                  {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
+                  {filters.bene_category.length ? `${filters.bene_category.length} ${t("categories selected", "श्रेणियाँ चयनित")}` : t("All Bene. Categories", "सभी लाभार्थी श्रेणियाँ")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueBeneCategories.map(cat => (
@@ -534,7 +538,7 @@ const ThrDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-cdpo-status" className="w-100">
-                  {filters.cdpo_status.length ? `${filters.cdpo_status.length} selected` : 'All CDPO Status'}
+                  {filters.cdpo_status.length ? `${filters.cdpo_status.length} ${t("selected", "चयनित")}` : t("All CDPO Status", "सभी CDPO स्थिति")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueCdpoStatuses.map(s => (
@@ -548,7 +552,7 @@ const ThrDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status" className="w-100">
-                  {filters.sector_status.length ? `${filters.sector_status.length} selected` : 'All Sector Status'}
+                  {filters.sector_status.length ? `${filters.sector_status.length} ${t("selected", "चयनित")}` : t("All Sector Status", "सभी सेक्टर स्थिति")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueSectorStatuses.map(s => (
@@ -560,7 +564,7 @@ const ThrDpoDistributions = () => {
               </Dropdown>
             </Col>
             <Col md={2} className="d-flex align-items-end">
-              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [], cdpo_status: [] })}>Clear Filters</Button>
+              <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ finYear: [], months: [], district: [], project: [], sector: [], food_item: [], bene_category: [], sector_status: [], cdpo_status: [] })}>{t("Clear Filters", "फ़िल्टर हटाएँ")}</Button>
             </Col>
           </Row>
 
@@ -575,7 +579,7 @@ const ThrDpoDistributions = () => {
                   <Spinner animation="border" />
                 </div>
               ) : filteredData.length === 0 ? (
-                <div className="text-center py-4 text-muted">No THR distributions found.</div>
+                <div className="text-center py-4 text-muted">{t("No THR distributions found.", "कोई THR वितरण नहीं मिला।")}</div>
               ) : (
                 <div className="table-responsive">
                   <Table 
@@ -595,7 +599,7 @@ const ThrDpoDistributions = () => {
                            if (col.dataField === 'food_item') thStyle.minWidth = '200px';
                            if (col.dataField === 'bene_category') thStyle.minWidth = '200px';
                            if (col.dataField === 'anganwadi_remark' || col.dataField === 'action') thStyle.minWidth = '150px';
-                           return <th key={`th-${col.dataField}`} style={thStyle}>{col.text}</th>;
+                           return <th key={`th-${col.dataField}`} style={thStyle}>{translateLabel(col.text)}</th>;
                          })}
                        </tr>
                      </thead>
@@ -633,7 +637,7 @@ const ThrDpoDistributions = () => {
                                         size="sm"
                                         onClick={() => handleViewRemark(row)}
                                       >
-                                        View Remarks
+                                        {t("View Remarks", "टिप्पणियाँ देखें")}
                                       </Button>
                                     </div>
                                   );
@@ -654,7 +658,7 @@ const ThrDpoDistributions = () => {
                           </tr>
                         )) : (
                           <tr>
-                            <td colSpan={visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').length} className="text-center">No data available</td>
+                            <td colSpan={visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').length} className="text-center">{t("No data available", "कोई डेटा उपलब्ध नहीं")}</td>
                           </tr>
                         )}
                       </tbody>
@@ -663,7 +667,7 @@ const ThrDpoDistributions = () => {
                           {visibleColumns.filter(col => !isPrinting || col.dataField !== 'action').map((col) => {
                             let cellContent = '';
                             if (col.dataField === '#') {
-                              cellContent = <strong>Total</strong>;
+                              cellContent = <strong>{t("Total", "कुल")}</strong>;
                             } else if (col.dataField === 'total_beneficiaries') {
                               cellContent = <strong>{totals.beneficiaries}</strong>;
                             } else if (col.dataField === 'quantity') {
@@ -698,38 +702,38 @@ const ThrDpoDistributions = () => {
             {selectedRemarks && (
               <div>
                 <div className="mb-3">
-                  <h6>Sector Remark</h6>
-                  <p className="mb-1"><strong>Status:</strong>{' '}
+                  <h6>{t("Sector Remark", "सेक्टर टिप्पणी")}</h6>
+                  <p className="mb-1"><strong>{t("Status:", "स्थिति:")}</strong>{' '}
                     <Badge bg={getStatusVariant(selectedRemarks.sector_status)}>
                       {selectedRemarks.sector_status || 'pending'}
                     </Badge>
                   </p>
-                  <p className="mb-0"><strong>Remark:</strong> {selectedRemarks.sector_remark || 'No remark'}</p>
+                  <p className="mb-0"><strong>{t("Remark:", "टिप्पणी:")}</strong> {selectedRemarks.sector_remark || 'No remark'}</p>
                 </div>
                 <div className="mb-3">
-                  <h6>Anganwadi Details</h6>
-                  <p className="mb-0"><strong>Anganwadi Remark:</strong> {selectedRemarks.anganwadi_remark || 'No remark'}</p>
+                  <h6>{t("Anganwadi Details", "आंगनवाड़ी विवरण")}</h6>
+                  <p className="mb-0"><strong>{t("Anganwadi Remark:", "आंगनवाड़ी टिप्पणी:")}</strong> {selectedRemarks.anganwadi_remark || 'No remark'}</p>
                 </div>
               </div>
             )}
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={handleCloseRemarkModal}>
-              Close
+              {t("Close", "बंद करें")}
             </Button>
           </Modal.Footer>
         </Modal>
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
           <Modal.Header closeButton>
-            <Modal.Title>Show/Hide Columns</Modal.Title>
+            <Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएँ/छिपाएँ")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {columns.map((col, index) => (
               <Form.Check
                 key={index}
                 type="checkbox"
-                label={col.text}
+                label={translateLabel(col.text)}
                 checked={col.visible}
                 onChange={() => handleColumnToggle(index)}
               />
@@ -737,21 +741,21 @@ const ThrDpoDistributions = () => {
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setShowColumnModal(false)}>
-              Close
+              {t("Close", "बंद करें")}
             </Button>
           </Modal.Footer>
         </Modal>
 
         <Modal show={showQtyModal} onHide={() => setShowQtyModal(false)} centered>
           <Modal.Header closeButton>
-            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+            <Modal.Title>{t("Quantity Breakdown by Unit", "इकाई के अनुसार मात्रा विवरण")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             <Table striped bordered hover>
               <thead>
                 <tr>
-                  <th>Unit</th>
-                  <th>Total Quantity</th>
+                  <th>{t("Unit", "इकाई")}</th>
+                  <th>{t("Total Quantity", "कुल मात्रा")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -762,7 +766,7 @@ const ThrDpoDistributions = () => {
                   </tr>
                 ))}
                 {/* <tr className="table-active">
-                  <td><strong>Grand Total</strong></td>
+                  <td><strong>{t("Grand Total", "कुल योग")}</strong></td>
                   <td><strong>{totals.quantity.toFixed(2)}</strong></td>
                 </tr> */}
               </tbody>

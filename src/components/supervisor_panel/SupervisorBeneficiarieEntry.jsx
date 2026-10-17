@@ -14,6 +14,7 @@ import {
   Modal,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 import "../../assets/css/dashboard.css";
 import { FaUserCircle } from "react-icons/fa";
@@ -21,6 +22,7 @@ import SupervisorLeftNav from "./SupervisorLeftNav";
 import SupervisorHeader from "./SupervisorHeader";
 
 const SupervisorBeneficiarieEntry = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -51,7 +53,7 @@ const SupervisorBeneficiarieEntry = () => {
       const response = await api.get("/supervisor-beneficiary-registration/");
       setReports(response.data.data || []);
     } catch (err) {
-      setError("Failed to fetch beneficiary reports.");
+      setError(t("Failed to fetch beneficiary reports.", "लाभार्थी रिपोर्ट प्राप्त नहीं हो सकीं।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -125,7 +127,7 @@ const SupervisorBeneficiarieEntry = () => {
     setActionError("");
 
     if (action === "rejected" && !remark) {
-      setActionError("Please enter a remark for rejection.");
+      setActionError(t("Please enter a remark for rejection.", "अस्वीकृति के लिए कृपया टिप्पणी दर्ज करें।"));
       return;
     }
 
@@ -139,7 +141,7 @@ const SupervisorBeneficiarieEntry = () => {
       });
 
       if (response.data?.success !== false) {
-        setSuccessMsg(`Status updated to ${action} successfully.`);
+        setSuccessMsg(t(`Status updated to ${action} successfully.`, `स्थिति सफलतापूर्वक ${action === "approved" ? "स्वीकृत" : "अस्वीकृत"} की गई।`));
         setReports((prev) =>
           prev.map((d) =>
             d.id === item.id
@@ -152,10 +154,10 @@ const SupervisorBeneficiarieEntry = () => {
         setRemarkValue("");
         setTimeout(() => setSuccessMsg(""), 3000);
       } else {
-        setActionError(response.data?.message || "Failed to update status.");
+        setActionError(response.data?.message || t("Failed to update status.", "स्थिति अपडेट नहीं हो सकी।"));
       }
     } catch (err) {
-      setActionError("Failed to update status. Please try again.");
+      setActionError(t("Failed to update status. Please try again.", "स्थिति अपडेट नहीं हो सकी। कृपया पुनः प्रयास करें।"));
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -165,11 +167,11 @@ const SupervisorBeneficiarieEntry = () => {
 
   const handleBulkAction = async () => {
     if (selectedIds.length === 0) {
-      setActionError("No items selected.");
+      setActionError(t("No items selected.", "कोई आइटम चयनित नहीं है।"));
       return;
     }
     if (bulkAction === "approved" && !bulkRemark) {
-      setActionError("Please enter a remark for bulk approval.");
+      setActionError(t("Please enter a remark for bulk approval.", "सामूहिक स्वीकृति के लिए कृपया टिप्पणी दर्ज करें।"));
       return;
     }
 
@@ -182,17 +184,17 @@ const SupervisorBeneficiarieEntry = () => {
       });
 
       if (response.data?.success !== false) {
-        setSuccessMsg(`Successfully updated ${selectedIds.length} items.`);
+        setSuccessMsg(t(`Successfully updated ${selectedIds.length} items.`, `${selectedIds.length} आइटम सफलतापूर्वक अपडेट किए गए।`));
         fetchReports(); // Refetch to get updated data
         setSelectedIds([]);
         setShowBulkRemarkModal(false);
         setBulkRemark("");
         setTimeout(() => setSuccessMsg(""), 3000);
       } else {
-        setActionError(response.data?.message || "Failed to perform bulk action.");
+        setActionError(response.data?.message || t("Failed to perform bulk action.", "सामूहिक कार्रवाई नहीं की जा सकी।"));
       }
     } catch (err) {
-      setActionError("Failed to perform bulk action. Please try again.");
+      setActionError(t("Failed to perform bulk action. Please try again.", "सामूहिक कार्रवाई नहीं की जा सकी। कृपया पुनः प्रयास करें।"));
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -250,7 +252,7 @@ const SupervisorBeneficiarieEntry = () => {
         <SupervisorHeader toggleSidebar={toggleSidebar} />
         <Container fluid className="dashboard-box mt-3">
           <h3 className="mb-4 fw-bold">
-            <FaUserCircle className="me-2" /> लाभार्थी रिपोर्ट स्वीकृति
+            <FaUserCircle className="me-2" /> {t("Beneficiary Report Approval", "लाभार्थी रिपोर्ट स्वीकृति")}
           </h3>
           {successMsg && <Alert variant="success">{successMsg}</Alert>}
           {error && <Alert variant="danger">{error}</Alert>}
@@ -259,14 +261,14 @@ const SupervisorBeneficiarieEntry = () => {
           <div className="mb-3 d-flex gap-2">
             {selectedIds.length > 0 && (
               <Button variant="primary" size="sm" onClick={() => { setBulkAction("approved"); setShowBulkRemarkModal(true); }}>
-                Approve Selected ({selectedIds.length})
+                {t(`Approve Selected (${selectedIds.length})`, `चयनित स्वीकृत करें (${selectedIds.length})`)}
               </Button>
             )}
-            <Button variant="info" size="sm" onClick={handleSelectAllPending}>Select All Pending</Button>
+            <Button variant="info" size="sm" onClick={handleSelectAllPending}>{t("Select All Pending", "सभी लंबित चुनें")}</Button>
           </div>
 
 
-          <h5 className="mt-4">आंगनबाड़ियों से लाभार्थी रिपोर्ट</h5>
+          <h5 className="mt-4">{t("Beneficiary Reports from Anganwadi Centers", "आंगनबाड़ियों से लाभार्थी रिपोर्ट")}</h5>
           {loading ? (
             <div className="text-center">
               <Spinner animation="border" />
@@ -284,19 +286,19 @@ const SupervisorBeneficiarieEntry = () => {
                       />
                     </th>
                     <th>#</th>
-                    <th>AWC का नाम</th>
-                    <th>वित्तीय वर्ष</th>
-                    <th>महीना</th>
+                    <th>{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</th>
+                    <th>{t("Financial Year", "वित्तीय वर्ष")}</th>
+                    <th>{t("Month", "महीना")}</th>
                     <th>PW & LM</th>
-                    <th>बच्चे (6 महीने-3 वर्ष)</th>
-                    <th>बच्चे (3-6 वर्ष)</th>
-                    <th>किशोरी लड़कियां</th>
+                    <th>{t("Children (6 months-3 years)", "बच्चे (6 महीने-3 वर्ष)")}</th>
+                    <th>{t("Children (3-6 years)", "बच्चे (3-6 वर्ष)")}</th>
+                    <th>{t("Adolescent Girls", "किशोरी लड़कियां")}</th>
                     <th>SAM (6 महीने-3 वर्ष)</th>
                     <th>SAM (3-5 वर्ष)</th>
                     <th>SUW (6 महीने-3 वर्ष)</th>
                     <th>SUW (3-6 वर्ष)</th>
-                    <th>सेक्टर स्थिति</th>
-                    <th>क्रियाएं</th>
+                    <th>{t("Sector Status", "सेक्टर स्थिति")}</th>
+                    <th>{t("Actions", "क्रियाएं")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -329,8 +331,8 @@ const SupervisorBeneficiarieEntry = () => {
                             </Badge>
                           </td>
                           <td>
-                            <Button variant="outline-success" size="sm" className="me-2" disabled={report.sector_status === "approved" || loadingAction[report.id]} onClick={() => handleToggleRemark(report, "approved")}>स्वीकृत</Button>
-                            <Button variant="outline-danger" size="sm" disabled={report.sector_status === "rejected" || loadingAction[report.id]} onClick={() => handleToggleRemark(report, "rejected")}>अस्वीकार</Button>
+                            <Button variant="outline-success" size="sm" className="me-2" disabled={report.sector_status === "approved" || loadingAction[report.id]} onClick={() => handleToggleRemark(report, "approved")}>{t("Approve", "स्वीकृत करें")}</Button>
+                            <Button variant="outline-danger" size="sm" disabled={report.sector_status === "rejected" || loadingAction[report.id]} onClick={() => handleToggleRemark(report, "rejected")}>{t("Reject", "अस्वीकार करें")}</Button>
                           </td>
                         </tr>
                         {openRemarkId === report.id && (
@@ -340,17 +342,17 @@ const SupervisorBeneficiarieEntry = () => {
                                 <Form.Control
                                   type="text"
                                   size="sm"
-                                  placeholder="टिप्पणी दर्ज करें (अस्वीकृति के लिए आवश्यक)"
+                                  placeholder={t("Enter remark (required for rejection)", "टिप्पणी दर्ज करें (अस्वीकृति के लिए आवश्यक)")}
                                   value={remarkValue}
                                   onChange={(e) => setRemarkValue(e.target.value)}
                                   className="me-2"
                                   style={{ maxWidth: "300px" }}
                                 />
                                 <Button size="sm" variant={openRemarkAction === "approved" ? "success" : "danger"} disabled={submitting} onClick={() => handleStatusUpdate(report)}>
-                                  {submitting ? "सहेजा जा रहा है..." : "सहेजें"}
+                                  {submitting ? t("Saving...", "सहेजा जा रहा है...") : t("Save", "सहेजें")}
                                 </Button>
                                 <Button size="sm" variant="secondary" disabled={submitting} onClick={handleCancelAction}>
-                                  रद्द करें
+                                  {t("Cancel", "रद्द करें")}
                                 </Button>
                               </div>
                               {actionError && openRemarkAction === 'rejected' && <small className="text-danger ms-2">{actionError}</small>}
@@ -362,7 +364,7 @@ const SupervisorBeneficiarieEntry = () => {
                   ) : (
                     <tr>
                       <td colSpan="15" className="text-center">
-                        कोई रिपोर्ट नहीं मिली।
+                        {t("No reports found.", "कोई रिपोर्ट नहीं मिली।")}
                       </td>
                     </tr>
                   )}
@@ -377,14 +379,14 @@ const SupervisorBeneficiarieEntry = () => {
           )}
           <Modal show={showBulkRemarkModal} onHide={() => setShowBulkRemarkModal(false)} centered>
             <Modal.Header closeButton>
-              <Modal.Title>Bulk Approve Remark</Modal.Title>
+              <Modal.Title>{t("Bulk Approval Remark", "सामूहिक स्वीकृति टिप्पणी")}</Modal.Title>
             </Modal.Header>
             <Modal.Body>
               <Form.Group>
-                <Form.Label>Remark for Approval</Form.Label>
+                <Form.Label>{t("Remark for Approval", "स्वीकृति के लिए टिप्पणी")}</Form.Label>
                 <Form.Control
                   type="text"
-                  placeholder="Enter remark (e.g., approved)"
+                  placeholder={t("Enter remark (e.g., approved)", "टिप्पणी दर्ज करें (जैसे, स्वीकृत)")}
                   value={bulkRemark}
                   onChange={(e) => setBulkRemark(e.target.value)}
                 />
@@ -392,9 +394,9 @@ const SupervisorBeneficiarieEntry = () => {
               {actionError && <Alert variant="danger" className="mt-3">{actionError}</Alert>}
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="secondary" onClick={() => setShowBulkRemarkModal(false)}>Cancel</Button>
+              <Button variant="secondary" onClick={() => setShowBulkRemarkModal(false)}>{t("Cancel", "रद्द करें")}</Button>
               <Button variant="success" onClick={handleBulkAction} disabled={submitting}>
-                {submitting ? "Submitting..." : `Approve ${selectedIds.length} items`}
+                {submitting ? t("Submitting...", "जमा किया जा रहा है...") : t(`Approve ${selectedIds.length} items`, `${selectedIds.length} आइटम स्वीकृत करें`)}
               </Button>
             </Modal.Footer>
           </Modal>

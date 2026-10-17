@@ -11,6 +11,7 @@ import {
   InputGroup,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 import "../../assets/css/dashboard.css";
 import "../../assets/css/AnganwadiProfile.css";
@@ -19,6 +20,7 @@ import SupervisorLeftNav from "./SupervisorLeftNav";
 import SupervisorHeader from "./SupervisorHeader";
 
 const SectorProfile = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -61,10 +63,10 @@ const SectorProfile = () => {
           setSectorIncharge(response.data.data.sector_incharge || "");
           setInchargeMob(response.data.data.incharge_mob || "");
         } else {
-          setError("Failed to fetch profile data.");
+          setError(t("Failed to fetch profile data.", "प्रोफ़ाइल डेटा प्राप्त नहीं हो सका।"));
         }
       } catch (err) {
-        setError("An error occurred while fetching profile data.");
+        setError(t("An error occurred while fetching profile data.", "प्रोफ़ाइल डेटा प्राप्त करते समय त्रुटि हुई।"));
         console.error(err);
       } finally {
         setLoading(false);
@@ -98,12 +100,12 @@ const SectorProfile = () => {
         setProfileData(response.data.data);
         setSectorIncharge(response.data.data.sector_incharge || "");
         setInchargeMob(response.data.data.incharge_mob || "");
-        setProfileSuccess("Profile updated successfully!");
+        setProfileSuccess(t("Profile updated successfully!", "प्रोफ़ाइल सफलतापूर्वक अपडेट की गई!"));
       } else {
-        setProfileError("Failed to update profile.");
+        setProfileError(t("Failed to update profile.", "प्रोफ़ाइल अपडेट नहीं हो सकी।"));
       }
     } catch (err) {
-      setProfileError("Failed to update profile. Please try again.");
+      setProfileError(t("Failed to update profile. Please try again.", "प्रोफ़ाइल अपडेट नहीं हो सकी। कृपया पुनः प्रयास करें।"));
       console.error(err);
     } finally {
       setProfileSaving(false);
@@ -116,7 +118,7 @@ const SectorProfile = () => {
     setPasswordSuccess("");
 
     if (password !== confirmPassword) {
-      setPasswordError("Passwords do not match.");
+      setPasswordError(t("Passwords do not match.", "पासवर्ड मेल नहीं खाते।"));
       return;
     }
     // if (password.length < 3) {
@@ -131,11 +133,11 @@ const SectorProfile = () => {
         incharge_mob: inchargeMob,
         password: password,
       });
-      setPasswordSuccess("Password updated successfully!");
+      setPasswordSuccess(t("Password updated successfully!", "पासवर्ड सफलतापूर्वक अपडेट किया गया!"));
       setPassword("");
       setConfirmPassword("");
     } catch (err) {
-      setPasswordError("Failed to update password. Please try again.");
+      setPasswordError(t("Failed to update password. Please try again.", "पासवर्ड अपडेट नहीं हो सका। कृपया पुनः प्रयास करें।"));
       console.error(err);
     } finally {
       setPasswordLoading(false);
@@ -154,7 +156,7 @@ const SectorProfile = () => {
         <SupervisorHeader toggleSidebar={toggleSidebar} />
         <Container fluid className="dashboard-box mt-3">
           <h3 className="mb-4 profile-page-title">
-            <FaUserCircle className="me-2" /> Sector Profile
+            <FaUserCircle className="me-2" /> {t("Sector Profile", "सेक्टर प्रोफ़ाइल")}
           </h3>
           {loading && <Spinner animation="border" />}
           {error && <Alert variant="danger">{error}</Alert>}
@@ -163,7 +165,7 @@ const SectorProfile = () => {
               <Col md={8}>
                 <Card className="mb-4 profile-card">
                   <Card.Header>
-                    Profile Details
+                    {t("Profile Details", "प्रोफ़ाइल विवरण")}
                   </Card.Header>
                   <Card.Body>
                     {profileError && <Alert variant="danger">{profileError}</Alert>}
@@ -172,37 +174,37 @@ const SectorProfile = () => {
                       <Row>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>District</Form.Label>
+                            <Form.Label>{t("District", "ज़िला")}</Form.Label>
                             <Form.Control type="text" value={profileData.district || ""} disabled />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>Project Code</Form.Label>
+                            <Form.Label>{t("Project Code", "परियोजना कोड")}</Form.Label>
                             <Form.Control type="text" value={profileData.project_code || ""} disabled />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>Project Name</Form.Label>
+                            <Form.Label>{t("Project Name", "परियोजना का नाम")}</Form.Label>
                             <Form.Control type="text" value={profileData.project_name || ""} disabled />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>Sector</Form.Label>
+                            <Form.Label>{t("Sector", "सेक्टर")}</Form.Label>
                             <Form.Control type="text" value={profileData.sector || ""} disabled />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>Sector Incharge</Form.Label>
+                            <Form.Label>{t("Sector Incharge", "सेक्टर प्रभारी")}</Form.Label>
                             <Form.Control type="text" value={sectorIncharge} onChange={(e) => setSectorIncharge(e.target.value)} />
                           </Form.Group>
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>Incharge Mobile</Form.Label>
+                            <Form.Label>{t("Incharge Mobile", "प्रभारी का मोबाइल नंबर")}</Form.Label>
                             <Form.Control type="text" value={inchargeMob} onChange={(e) => setInchargeMob(e.target.value)} />
                           </Form.Group>
                         </Col>
@@ -216,32 +218,32 @@ const SectorProfile = () => {
               <Col md={4}>
                 <Card className="password-card">
                   <Card.Header>
-                    <FaLock className="me-2" /> Change Password
+                    <FaLock className="me-2" /> {t("Change Password", "पासवर्ड बदलें")}
                   </Card.Header>
                   <Card.Body>
                     {passwordError && <Alert variant="danger">{passwordError}</Alert>}
                     {passwordSuccess && <Alert variant="success">{passwordSuccess}</Alert>}
                     <Form onSubmit={handlePasswordChange}>
                       <Form.Group className="mb-3">
-                        <Form.Label>New Password</Form.Label>
+                        <Form.Label>{t("New Password", "नया पासवर्ड")}</Form.Label>
                         <InputGroup>
-                          <Form.Control type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter new password" />
+                          <Form.Control type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("Enter new password", "नया पासवर्ड दर्ज करें")} />
                           <Button variant="outline-secondary" onClick={() => setShowPassword(!showPassword)}>
                             {showPassword ? <FaEyeSlash /> : <FaEye />}
                           </Button>
                         </InputGroup>
                       </Form.Group>
                       <Form.Group className="mb-3">
-                        <Form.Label>Confirm Password</Form.Label>
+                        <Form.Label>{t("Confirm Password", "पासवर्ड की पुष्टि करें")}</Form.Label>
                         <InputGroup>
-                          <Form.Control type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password"  />
+                          <Form.Control type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t("Confirm new password", "नए पासवर्ड की पुष्टि करें")}  />
                           <Button variant="outline-secondary" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                             {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
                           </Button>
                         </InputGroup>
                       </Form.Group>
                       <Button type="submit" variant="primary" disabled={passwordLoading}>
-                        {passwordLoading ? <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> : "Update Password"}
+                        {passwordLoading ? <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> : t("Update Password", "पासवर्ड अपडेट करें")}
                       </Button>
                     </Form>
                   </Card.Body>

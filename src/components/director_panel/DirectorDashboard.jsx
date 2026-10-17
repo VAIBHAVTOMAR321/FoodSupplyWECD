@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Row, Col, Card, Spinner, Alert, Table, Form, Button, ButtonGroup, InputGroup, Dropdown, Pagination, Badge } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/directorleftnav.css";
 import "../../assets/css/dpo.css"; 
 
@@ -275,6 +276,13 @@ const SUMMARY_PILLS = [
 
 // Custom Multi-Select Dropdown Component
 const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
+  const { t } = useLanguage();
+  const hindiLabel = ({
+    Trimester: "त्रैमासिक अवधि",
+    "Financial Year": "वित्तीय वर्ष",
+    Project: "परियोजना",
+    Sector: "सेक्टर",
+  })[label] || label;
   const toggleOption = (opt) => {
     if (selected.includes(opt)) {
       onChange(selected.filter((o) => o !== opt));
@@ -284,14 +292,14 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
   };
 
   const getLabel = () => {
-    if (!selected || selected.length === 0) return `All ${label}s`;
+    if (!selected || selected.length === 0) return t(`All ${label}s`, `सभी ${hindiLabel}`);
     if (selected.length === 1) return selected[0];
-    return `${selected.length} ${label}s selected`;
+    return t(`${selected.length} ${label}s selected`, `${selected.length} ${hindiLabel} चयनित`);
   };
 
   return (
     <div className="dpo-filter-group" style={{ position: 'relative', zIndex: 20 }}>
-      <Form.Label className="dpo-filter-label">{label}</Form.Label>
+      <Form.Label className="dpo-filter-label">{t(label, hindiLabel)}</Form.Label>
       <Dropdown autoClose="outside">
         <Dropdown.Toggle size="sm" variant="light" className="dpo-multi-toggle">
           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getLabel()}</span>
@@ -299,7 +307,7 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
         </Dropdown.Toggle>
         <Dropdown.Menu className="dpo-multi-menu">
           {options.length === 0 ? (
-            <Dropdown.Item disabled>No options</Dropdown.Item>
+            <Dropdown.Item disabled>{t("No options", "कोई विकल्प नहीं")}</Dropdown.Item>
           ) : (
             options.map((opt) => (
               <div key={opt} className="dpo-multi-item" onClick={(e) => { e.stopPropagation(); toggleOption(opt); }}>
@@ -325,6 +333,7 @@ const DirectorDashboard = () => {
   
   const navigate = useNavigate();
   const { api } = useAuth();
+  const { t } = useLanguage();
 
   // Food Items State
   const [hcmFoodItemsCount, setHcmFoodItemsCount] = useState(0);
@@ -366,7 +375,7 @@ const DirectorDashboard = () => {
     const bar = document.createElement("div");
     const inner = document.createElement("div");
     bar.className = "director-sticky-horizontal-scroll";
-    bar.setAttribute("aria-label", "Horizontal table scrollbar");
+    bar.setAttribute("aria-label", t("Horizontal table scrollbar", "क्षैतिज तालिका स्क्रोलबार"));
     bar.style.cssText = [
       "position:fixed", "left:260px", "right:12px", "bottom:4px", "height:22px",
       "overflow-x:auto", "overflow-y:hidden", "z-index:2000",
@@ -513,7 +522,7 @@ const DirectorDashboard = () => {
       boundWrappers.forEach((wrapper) => wrapper.removeEventListener("scroll", onWrapperScroll));
       bar.remove();
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -548,7 +557,7 @@ const DirectorDashboard = () => {
       const data = Array.isArray(response.data) ? response.data : (response.data?.results || response.data?.data || []);
       setRecords(Array.isArray(data) ? data.map(normalizeRecord) : []);
     } catch (err) {
-      setError("Failed to fetch supplementary nutrition data.");
+      setError(t("Failed to fetch supplementary nutrition data.", "पूरक पोषण डेटा प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -788,8 +797,8 @@ const DirectorDashboard = () => {
     }
 
     const pages = [];
-    pages.push(<Pagination.First key="first" disabled={currentPage === 1} onClick={() => setPage(1)} />);
-    pages.push(<Pagination.Prev key="prev" disabled={currentPage === 1} onClick={() => setPage(p => Math.max(1, p - 1))} />);
+    pages.push(<Pagination.First key="first" aria-label={t("First page", "पहला पृष्ठ")} disabled={currentPage === 1} onClick={() => setPage(1)} />);
+    pages.push(<Pagination.Prev key="prev" aria-label={t("Previous page", "पिछला पृष्ठ")} disabled={currentPage === 1} onClick={() => setPage(p => Math.max(1, p - 1))} />);
     
     if (startPage > 1) {
       pages.push(<Pagination.Item key={1} onClick={() => setPage(1)}>{1}</Pagination.Item>);
@@ -805,8 +814,8 @@ const DirectorDashboard = () => {
       pages.push(<Pagination.Item key={totalPages} onClick={() => setPage(totalPages)}>{totalPages}</Pagination.Item>);
     }
 
-    pages.push(<Pagination.Next key="next" disabled={currentPage === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} />);
-    pages.push(<Pagination.Last key="last" disabled={currentPage === totalPages} onClick={() => setPage(totalPages)} />);
+    pages.push(<Pagination.Next key="next" aria-label={t("Next page", "अगला पृष्ठ")} disabled={currentPage === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} />);
+    pages.push(<Pagination.Last key="last" aria-label={t("Last page", "अंतिम पृष्ठ")} disabled={currentPage === totalPages} onClick={() => setPage(totalPages)} />);
 
     const startItem = Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, totalItems);
     const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
@@ -814,7 +823,7 @@ const DirectorDashboard = () => {
     return (
       <div className="d-flex justify-content-between align-items-center p-2 flex-wrap" style={{ borderTop: '1px solid #e2e8f0' }}>
         <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-          Showing {startItem} to {endItem} of {totalItems} entries
+          {t(`Showing ${startItem} to ${endItem} of ${totalItems} entries`, `${totalItems} में से ${startItem} से ${endItem} रिकॉर्ड दिखाए जा रहे हैं`)}
         </div>
         <Pagination size="sm" className="mb-0">{pages}</Pagination>
       </div>
@@ -901,7 +910,7 @@ const DirectorDashboard = () => {
       await downloadPDF(options);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
-      setError("Failed to generate PDF. Please try again.");
+      setError(t("Failed to generate PDF. Please try again.", "पीडीएफ बनाने में विफलता। कृपया पुनः प्रयास करें।"));
     }
   };
 
@@ -1121,11 +1130,11 @@ const DirectorDashboard = () => {
           <div className="dashboard-header-section mt-4">
             <div>
               <h4 className="dashboard-main-title">
-                <FaBoxes /> Director Dashboard
+                    <FaBoxes /> {t("Director Dashboard", "निदेशक डैशबोर्ड")}
               </h4>
             </div>
             <Button className="dpo-btn-light" onClick={fetchData} disabled={loading}>
-              <FaSyncAlt className={loading ? "fa-spin" : ""} /> Refresh Data
+              <FaSyncAlt className={loading ? "fa-spin" : ""} /> {t("Refresh Data", "डेटा रीफ़्रेश करें")}
             </Button>
           </div>
 
@@ -1142,7 +1151,7 @@ const DirectorDashboard = () => {
                     <FaBox size={18} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#6c757d', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>HCM Food Items</div>
+                    <div style={{ fontSize: '0.8rem', color: '#6c757d', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>{t("HCM Food Items", "एचसीएम खाद्य सामग्री")}</div>
                     <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1e293b' }}>
                       {loading ? <Spinner animation="border" size="sm" /> : hcmFoodItemsCount}
                     </div>
@@ -1159,7 +1168,7 @@ const DirectorDashboard = () => {
                     <FaBox size={18} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#6c757d', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>THR Food Items</div>
+                    <div style={{ fontSize: '0.8rem', color: '#6c757d', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>{t("THR Food Items", "टीएचआर खाद्य सामग्री")}</div>
                     <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1e293b' }}>
                       {loading ? <Spinner animation="border" size="sm" /> : thrFoodItemsCount}
                     </div>
@@ -1176,7 +1185,7 @@ const DirectorDashboard = () => {
             <MultiSelectDropdown label="Project" options={uniqueProjects} selected={selectedProjects} onChange={setSelectedProjects} />
             <MultiSelectDropdown label="Sector" options={uniqueSectors} selected={selectedSectors} onChange={setSelectedSectors} />
             <Button variant="outline-secondary" size="sm" className="dpo-filter-reset" onClick={() => { setSelectedQuarters([]); setSelectedFYs([]); setSelectedProjects([]); setSelectedSectors([]); }}>
-              Reset
+              {t("Reset", "रीसेट करें")}
             </Button>
           </div>
 
@@ -1196,18 +1205,18 @@ const DirectorDashboard = () => {
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
-                <FaWarehouse /> Supplies Received & Distributed Summary
+                <FaWarehouse /> {t("Supplies Received & Distributed Summary", "प्राप्त एवं वितरित सामग्री का सारांश")}
               </h5>
               <div className="d-flex align-items-center gap-3 flex-wrap">
                 <ButtonGroup className="dpo-toggle-group">
-                  <Button className={`dpo-toggle-btn ${suppliesTab === 'thr' ? 'active' : ''}`} onClick={() => { setSuppliesTab('thr'); setSelectedSupplyQuarters([]); setSelectedSupplyFYs([]); }}>THR</Button>
-                  <Button className={`dpo-toggle-btn ${suppliesTab === 'hcm' ? 'active' : ''}`} onClick={() => { setSuppliesTab('hcm'); setSelectedSupplyQuarters([]); setSelectedSupplyFYs([]); }}>HCM</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesTab === 'thr' ? 'active' : ''}`} onClick={() => { setSuppliesTab('thr'); setSelectedSupplyQuarters([]); setSelectedSupplyFYs([]); }} aria-label={t("THR supplies", "टीएचआर सामग्री")}>THR</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesTab === 'hcm' ? 'active' : ''}`} onClick={() => { setSuppliesTab('hcm'); setSelectedSupplyQuarters([]); setSelectedSupplyFYs([]); }} aria-label={t("HCM supplies", "एचसीएम सामग्री")}>HCM</Button>
                 </ButtonGroup>
                 <ButtonGroup className="dpo-toggle-group" style={{ marginLeft: '8px', marginRight: '8px' }}>
-                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'district' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('district')} title="District-wise">District</Button>
-                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'project' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('project')} title="Project-wise">Project</Button>
-                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'sector' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('sector')} title="Sector-wise">Sector</Button>
-                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'awc' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('awc')} title="AWC-wise">AWC</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'district' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('district')} title={t("District-wise", "ज़िला-वार")}>{t("District", "ज़िला")}</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'project' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('project')} title={t("Project-wise", "परियोजना-वार")}>{t("Project", "परियोजना")}</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'sector' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('sector')} title={t("Sector-wise", "सेक्टर-वार")}>{t("Sector", "सेक्टर")}</Button>
+                  <Button className={`dpo-toggle-btn ${suppliesViewMode === 'awc' ? 'active' : ''}`} onClick={() => setSuppliesViewMode('awc')} title={t("AWC-wise", "आंगनवाड़ी केंद्र-वार")} aria-label={t("AWC", "आंगनवाड़ी केंद्र")}>AWC</Button>
                 </ButtonGroup>
                 <MultiSelectDropdown
                   label="Trimester"
@@ -1232,8 +1241,8 @@ const DirectorDashboard = () => {
                   </Button>
                 )}
                 <div className="dpo-export-btns">
-                  <Button className="dpo-export-btn" onClick={exportSuppliesToExcel}><FaFileExcel className="text-success" /> Excel</Button>
-                  <Button className="dpo-export-btn" onClick={exportSuppliesToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
+                  <Button className="dpo-export-btn" onClick={exportSuppliesToExcel} aria-label={t("Export Excel", "एक्सेल निर्यात करें")}><FaFileExcel className="text-success" /> Excel</Button>
+                  <Button className="dpo-export-btn" onClick={exportSuppliesToPDF} aria-label={t("Export PDF", "पीडीएफ निर्यात करें")}><FaFilePdf className="text-danger" /> PDF</Button>
                 </div>
               </div>
             </Card.Header>
@@ -1245,24 +1254,24 @@ const DirectorDashboard = () => {
                   <Table hover className="dpo-data-table mb-0" style={{ width: "max-content", minWidth: "100%" }}>
                     <thead>
                       <tr>
-                        <th rowSpan="2">S. No.</th>
+                        <th rowSpan="2">{t("S. No.", "क्रम संख्या")}</th>
                         {suppliesViewMode === 'district' ? (
-                          <th rowSpan="2">District</th>
+                          <th rowSpan="2">{t("District", "ज़िला")}</th>
                         ) : suppliesViewMode === 'project' ? (
-                          <th rowSpan="2">Project</th>
+                          <th rowSpan="2">{t("Project", "परियोजना")}</th>
                         ) : suppliesViewMode === 'sector' ? (
-                          <th rowSpan="2">Sector</th>
+                          <th rowSpan="2">{t("Sector", "सेक्टर")}</th>
                         ) : (
                           <>
-                            <th rowSpan="2">District</th>
-                            <th rowSpan="2">Project</th>
-                            <th rowSpan="2">Sector</th>
-                            <th rowSpan="2">AWC Name</th>
-                            <th rowSpan="2">AWC Code</th>
+                            <th rowSpan="2">{t("District", "ज़िला")}</th>
+                            <th rowSpan="2">{t("Project", "परियोजना")}</th>
+                            <th rowSpan="2">{t("Sector", "सेक्टर")}</th>
+                            <th rowSpan="2">{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</th>
+                            <th rowSpan="2">{t("AWC Code", "आंगनवाड़ी केंद्र कोड")}</th>
                           </>
                         )}
-                        <th rowSpan="2">Trimester</th>
-                        <th rowSpan="2">Financial Year</th>
+                        <th rowSpan="2">{t("Trimester", "त्रैमासिक अवधि")}</th>
+                        <th rowSpan="2">{t("Financial Year", "वित्तीय वर्ष")}</th>
                         {suppliesFoodItems.map((fi, idx) => (
                           <th key={`fi-${idx}`} colSpan="3" className="text-center" style={{ borderLeft: '1px solid #e9d5ff' }}>
                             {fi}
@@ -1272,9 +1281,9 @@ const DirectorDashboard = () => {
                       <tr>
                         {suppliesFoodItems.map((fi, idx) => (
                           <React.Fragment key={`sub-${idx}`}>
-                            <th className="text-end">Rec. ({suppliesQuantityHeader})</th>
-                            <th className="text-end">Dist. ({suppliesQuantityHeader})</th>
-                            <th className="text-end">Rem. ({suppliesQuantityHeader})</th>
+                                <th className="text-end">{t("Rec.", "प्राप्त")} ({suppliesQuantityHeader})</th>
+                                <th className="text-end">{t("Dist.", "वितरित")} ({suppliesQuantityHeader})</th>
+                                <th className="text-end">{t("Rem.", "शेष")} ({suppliesQuantityHeader})</th>
                           </React.Fragment>
                         ))}
                       </tr>
@@ -1283,7 +1292,7 @@ const DirectorDashboard = () => {
                       {currentSuppliesData.length === 0 ? (
                         <tr>
                           <td colSpan={suppliesViewMode === 'awc' ? 8 + suppliesFoodItems.length * 3 : 4 + suppliesFoodItems.length * 3} className="text-center p-4 text-muted">
-                            No data available
+                            {t("No data available", "कोई डेटा उपलब्ध नहीं है")}
                           </td>
                         </tr>
                       ) : currentSuppliesData.map((row, i) => (
@@ -1324,14 +1333,14 @@ const DirectorDashboard = () => {
                         <tr>
                           <th></th>
                           {suppliesViewMode === 'district' ? (
-                            <th>Total</th>
+                            <th>{t("Total", "कुल")}</th>
                           ) : suppliesViewMode === 'project' ? (
-                            <th>Total</th>
+                            <th>{t("Total", "कुल")}</th>
                           ) : suppliesViewMode === 'sector' ? (
-                            <th>Total</th>
+                            <th>{t("Total", "कुल")}</th>
                           ) : (
                             <>
-                              <th>Total</th>
+                              <th>{t("Total", "कुल")}</th>
                               <th></th>
                               <th></th>
                               <th></th>
@@ -1362,17 +1371,17 @@ const DirectorDashboard = () => {
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
-                <FaLayerGroup /> {aggregateView === "sector" ? "Sector-wise" : aggregateView === "project" ? "Project-wise" : "District-wise"} Aggregated Summary
+                <FaLayerGroup /> {t(aggregateView === "sector" ? "Sector-wise Aggregated Summary" : aggregateView === "project" ? "Project-wise Aggregated Summary" : "District-wise Aggregated Summary", aggregateView === "sector" ? "सेक्टर-वार समेकित सारांश" : aggregateView === "project" ? "परियोजना-वार समेकित सारांश" : "ज़िला-वार समेकित सारांश")}
               </h5>
               <div className="d-flex align-items-center gap-3 flex-wrap">
                 <ButtonGroup className="dpo-toggle-group">
-                  <Button className={`dpo-toggle-btn ${aggregateView === 'district' ? 'active' : ''}`} onClick={() => setAggregateView('district')}>District-wise</Button>
-                  <Button className={`dpo-toggle-btn ${aggregateView === 'project' ? 'active' : ''}`} onClick={() => setAggregateView('project')}>Project-wise</Button>
-                  <Button className={`dpo-toggle-btn ${aggregateView === 'sector' ? 'active' : ''}`} onClick={() => setAggregateView('sector')}>Sector-wise</Button>
+                  <Button className={`dpo-toggle-btn ${aggregateView === 'district' ? 'active' : ''}`} onClick={() => setAggregateView('district')}>{t("District-wise", "ज़िला-वार")}</Button>
+                  <Button className={`dpo-toggle-btn ${aggregateView === 'project' ? 'active' : ''}`} onClick={() => setAggregateView('project')}>{t("Project-wise", "परियोजना-वार")}</Button>
+                  <Button className={`dpo-toggle-btn ${aggregateView === 'sector' ? 'active' : ''}`} onClick={() => setAggregateView('sector')}>{t("Sector-wise", "सेक्टर-वार")}</Button>
                 </ButtonGroup>
                 <div className="dpo-export-btns">
-                  <Button className="dpo-export-btn" onClick={exportAggToExcel}><FaFileExcel className="text-success" /> Excel</Button>
-                  <Button className="dpo-export-btn" onClick={exportAggToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
+                  <Button className="dpo-export-btn" onClick={exportAggToExcel} aria-label={t("Export Excel", "एक्सेल निर्यात करें")}><FaFileExcel className="text-success" /> Excel</Button>
+                  <Button className="dpo-export-btn" onClick={exportAggToPDF} aria-label={t("Export PDF", "पीडीएफ निर्यात करें")}><FaFilePdf className="text-danger" /> PDF</Button>
                 </div>
               </div>
             </Card.Header>
@@ -1382,16 +1391,22 @@ const DirectorDashboard = () => {
                   <Table hover className="dpo-data-table mb-0" style={{ width: "max-content", minWidth: "100%" }}>
                     <thead>
                       <tr>
-                        <th>S. No.</th>
-                        <th style={{textTransform: 'capitalize'}}>{aggregateView}</th>
-                        <th>Trimesters</th>
-                        <th>Fin. Years</th>
-                        {NUMERIC_AGG_FIELDS.map((col, i) => <th key={i} className="text-end">{col.label}</th>)}
+                        <th>{t("S. No.", "क्रम संख्या")}</th>
+                        <th style={{textTransform: 'capitalize'}}>{t(aggregateView, aggregateView === "district" ? "ज़िला" : aggregateView === "project" ? "परियोजना" : "सेक्टर")}</th>
+                        <th>{t("Trimesters", "त्रैमासिक अवधियाँ")}</th>
+                        <th>{t("Fin. Years", "वित्तीय वर्ष")}</th>
+                        {NUMERIC_AGG_FIELDS.map((col, i) => <th key={i} className="text-end">{t(col.label, ({
+                          "Pregnant/Lactating": "गर्भवती/धात्री",
+                          "Children 6m-3y": "6 माह–3 वर्ष के बच्चे",
+                          "SAM 6m-5y / SUW 6m-6y": "एसएएम 6–5 वर्ष / एसयूडब्ल्यू 6–6 वर्ष",
+                          "SAM 3y-5y / SUW 3y-6y": "एसएएम 3–5 वर्ष / एसयूडब्ल्यू 3–6 वर्ष",
+                          "HCM 3y-6y": "एचसीएम 3–6 वर्ष",
+                        })[col.label] || col.label)}</th>)}
                       </tr>
                     </thead>
                     <tbody>
                       {currentAggregated.length === 0 ? (
-                        <tr><td colSpan={NUMERIC_AGG_FIELDS.length + 4} className="text-center p-4 text-muted">No data available</td></tr>
+                        <tr><td colSpan={NUMERIC_AGG_FIELDS.length + 4} className="text-center p-4 text-muted">{t("No data available", "कोई डेटा उपलब्ध नहीं है")}</td></tr>
                       ) : currentAggregated.map((row, i) => (
                         <tr key={i}>
                           <td>{(aggPage - 1) * ITEMS_PER_PAGE + i + 1}</td>
@@ -1406,7 +1421,7 @@ const DirectorDashboard = () => {
                       <tfoot>
                         <tr>
                           <th></th>
-                          <th>Total</th><th></th><th></th>
+                          <th>{t("Total", "कुल")}</th><th></th><th></th>
                           {NUMERIC_AGG_FIELDS.map((col, c) => <th key={c} className="text-end">{totalAggregated[col.key]?.toLocaleString() || 0}</th>)}
                         </tr>
                       </tfoot>
@@ -1422,20 +1437,21 @@ const DirectorDashboard = () => {
           <Card className="dpo-table-card">
             <Card.Header className="dpo-table-header">
               <h5 className="dpo-section-title">
-                <FaChartBar /> Detailed Records
+                <FaChartBar /> {t("Detailed Records", "विस्तृत रिकॉर्ड")}
               </h5>
               <div className="d-flex align-items-center gap-3 flex-wrap">
                 <InputGroup style={{maxWidth: '300px'}}>
                   <InputGroup.Text><FaSearch /></InputGroup.Text>
                   <Form.Control 
-                    placeholder="Search AWC, District, Trimester..." 
+                    placeholder={t("Search AWC, District, Trimester...", "आंगनवाड़ी केंद्र, ज़िला, त्रैमासिक अवधि खोजें...")}
+                  aria-label={t("Search detailed records", "विस्तृत रिकॉर्ड खोजें")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </InputGroup>
                 <div className="dpo-export-btns">
-                  <Button className="dpo-export-btn" onClick={exportDetailsToExcel}><FaFileExcel className="text-success" /> Excel</Button>
-                  <Button className="dpo-export-btn" onClick={exportDetailsToPDF}><FaFilePdf className="text-danger" /> PDF</Button>
+                  <Button className="dpo-export-btn" onClick={exportDetailsToExcel} aria-label={t("Export Excel", "एक्सेल निर्यात करें")}><FaFileExcel className="text-success" /> Excel</Button>
+                  <Button className="dpo-export-btn" onClick={exportDetailsToPDF} aria-label={t("Export PDF", "पीडीएफ निर्यात करें")}><FaFilePdf className="text-danger" /> PDF</Button>
                 </div>
               </div>
             </Card.Header>
@@ -1445,20 +1461,30 @@ const DirectorDashboard = () => {
                   <Table hover className="dpo-data-table mb-0 dpo-grant-master-table" style={{ width: "max-content", minWidth: "2400px", borderCollapse: "separate", borderSpacing: 0 }}>
                     <thead>
                       <tr>
-                        <th rowSpan={2} className="text-center align-middle">S. No.</th>
+                        <th rowSpan={2} className="text-center align-middle">{t("S. No.", "क्रम संख्या")}</th>
                         {EXCEL_META_COLUMNS.map((col) => (
-                          <th key={col.key} rowSpan={2} className="text-center align-middle">{col.header}</th>
+                          <th key={col.key} rowSpan={2} className="text-center align-middle">{t(col.header, ({
+                            DISTRICT: "ज़िला", PROJECT: "परियोजना", SECTOR: "सेक्टर",
+                            "AWC NAME": "आंगनवाड़ी केंद्र का नाम", "AWC CODE": "आंगनवाड़ी केंद्र कोड",
+                            TRIMESTER: "त्रैमासिक अवधि", "FINANCIAL YEAR": "वित्तीय वर्ष",
+                          })[col.header] || col.header)}</th>
                         ))}
                         {GRANT_CATEGORIES.map((cat) => (
-                          <th key={cat.countKey} colSpan={4 + getCategoryFoodFields(cat).length} className="text-center align-middle dpo-grant-group-header">{cat.title}</th>
+                          <th key={cat.countKey} colSpan={4 + getCategoryFoodFields(cat).length} className="text-center align-middle dpo-grant-group-header">{t(cat.title, ({
+                            "Pregnant Woman and Lactating Mother": "गर्भवती एवं धात्री माताएँ",
+                            "Children 6m-3y": "6 माह–3 वर्ष के बच्चे",
+                            "SAM 6M-5Y / SUW 6M-6Y": "एसएएम 6–5 वर्ष / एसयूडब्ल्यू 6–6 वर्ष",
+                            "SAM 3Y-5Y / SUW 3Y-6Y": "एसएएम 3–5 वर्ष / एसयूडब्ल्यू 3–6 वर्ष",
+                            "HCM Beneficiaries 3Y-6Y (Normal Children)": "एचसीएम लाभार्थी 3–6 वर्ष (सामान्य बच्चे)",
+                          })[cat.title] || cat.title)}</th>
                         ))}
                       </tr>
                       <tr>
                         {GRANT_CATEGORIES.flatMap((cat) => [
                           ...[15, 30, 31].map((grantId) => (
-                            <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
+                            <th key={`${cat.countKey}-${grantId}`} className="text-center">{t(`Grant ${grantId}`, `अनुदान ${grantId}`)}</th>
                           )),
-                          <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>,
+                          <th key={`${cat.countKey}-total`} className="text-center">{t("TOTAL", "कुल")}</th>,
                           ...getCategoryFoodFields(cat).map((food) => (
                             <th key={`${cat.countKey}-${food.key}`} className="text-center dpo-food-group-header">{food.header}</th>
                           )),
@@ -1469,7 +1495,7 @@ const DirectorDashboard = () => {
                       {currentDetailed.length === 0 ? (
                         <tr>
                           <td colSpan={1 + EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4 + FOOD_FIELDS.length} className="text-center py-5 text-muted">
-                            No records found.
+                            {t("No records found.", "कोई रिकॉर्ड नहीं मिला।")}
                           </td>
                         </tr>
                       ) : currentDetailed.map((record, index) => (
@@ -1507,7 +1533,7 @@ const DirectorDashboard = () => {
                         <tr>
                           <th></th>
                           {EXCEL_META_COLUMNS.map((col, idx) => (
-                            <th key={col.key}>{idx === 0 ? "TOTAL" : ""}</th>
+                            <th key={col.key}>                            {idx === 0 ? t("TOTAL", "कुल") : ""}</th>
                           ))}
                           {GRANT_CATEGORIES.flatMap((cat) => [
                             <th key={`${cat.countKey}-g15`}></th>,

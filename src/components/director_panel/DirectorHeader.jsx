@@ -18,10 +18,13 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import LanguageToggle from "../all_login/LanguageToggle";
+import { useLanguage } from "../all_login/LanguageContext";
 
 
 function DirectorHeader({ toggleSidebar }) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   // State to track if the API itself failed (404/500)
   const [apiError, setApiError] = useState(null);
@@ -83,8 +86,7 @@ function DirectorHeader({ toggleSidebar }) {
           
           <Col xs="auto">
              <div className="header-actions d-flex align-items-center">
-                
-              
+                <LanguageToggle />
 
                 {/* User Profile Dropdown */}
                 <Dropdown align="end">
@@ -120,7 +122,7 @@ function DirectorHeader({ toggleSidebar }) {
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
                     <Dropdown.Item onClick={handleLogout}>
-                      <FaSignOutAlt className="me-2" /> Logout
+                      <FaSignOutAlt className="me-2" /> {t("Logout")}
                     </Dropdown.Item>
                   </Dropdown.Menu>
                 </Dropdown>

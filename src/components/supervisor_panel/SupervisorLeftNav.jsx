@@ -40,6 +40,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { FaInfoCircle, FaBullseye } from "react-icons/fa";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 const SupervisorLeftNav = ({
   sidebarOpen,
@@ -49,6 +50,7 @@ const SupervisorLeftNav = ({
   onNavClick,
 }) => {
   const { logout, user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -155,7 +157,7 @@ const SupervisorLeftNav = ({
         <div className="sidebar-header">
           {sidebarOpen ? (
             <div className="logo-container">
-              <div className="logo">Supervisor Panel</div>
+              <div className="logo">{t("Supervisor Panel")}</div>
             </div>
           ) : (
             <div className="logo-container logo-collapsed"></div>
@@ -176,7 +178,7 @@ const SupervisorLeftNav = ({
                     onClick={() => toggleSubmenu(index)}
                   >
                     <span className="nav-icon">{item.icon}</span>
-                    <span className="nav-text">{item.label}</span>
+                    <span className="nav-text">{t(item.label)}</span>
                     <span className="submenu-arrow">
                       {openSubmenu === index ? (
                         <FaChevronDown />
@@ -192,7 +194,7 @@ const SupervisorLeftNav = ({
                     onClick={(e) => handleItemClick(e, item.path, item.active)}
                   >
                     <span className="nav-icon">{item.icon}</span>
-                    <span className="nav-text">{item.label}</span>
+                    <span className="nav-text">{t(item.label)}</span>
                   </Link>
                 )}
 
@@ -211,7 +213,7 @@ const SupervisorLeftNav = ({
                         >
                           <span className="submenu-icon">{subItem.icon}</span>
                           <span className="nav-text br-text-sub">
-                            {subItem.label}
+                            {t(subItem.label)}
                           </span>
                         </Link>
                       ))}
@@ -235,7 +237,7 @@ const SupervisorLeftNav = ({
             <span className="nav-icon">
               <FaSignOutAlt />
             </span>
-            <span className="nav-text">Logout</span>
+            <span className="nav-text">{t("Logout")}</span>
           </Nav.Link>
         </div>
       </div>
@@ -265,7 +267,7 @@ const SupervisorLeftNav = ({
                   >
                     <span className="nav-icon">{item.icon}</span>
                     <span className="nav-text br-nav-text-mob">
-                      {item.label}
+                      {t(item.label)}
                     </span>
                     <span className="submenu-arrow">
                       {openSubmenu === index ? (
@@ -283,7 +285,7 @@ const SupervisorLeftNav = ({
                   >
                     <span className="nav-icon">{item.icon}</span>
                     <span className="nav-text br-nav-text-mob">
-                      {item.label}
+                      {t(item.label)}
                     </span>
                   </Link>
                 )}
@@ -300,7 +302,7 @@ const SupervisorLeftNav = ({
                             handleItemClick(e, subItem.path, false)
                           }
                         >
-                          <span className="nav-text">{subItem.label}</span>
+                          <span className="nav-text">{t(subItem.label)}</span>
                         </Link>
                       ))}
                     </div>

@@ -12,6 +12,7 @@ import {
   ButtonGroup,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/dashboard.css";
 import "../../assets/css/dpo.css";
 import DirectorHeader from "./DirectorHeader";
@@ -57,6 +58,7 @@ const displayValue = (value) =>
 
 const DirectorMaterSupplementary = () => {
   const { api } = useAuth();
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -66,6 +68,17 @@ const DirectorMaterSupplementary = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [filters, setFilters] = useState({ financial_year: "", quarter: "" });
+  const localizedColumns = COLUMNS.map((column) => ({
+    ...column,
+    label: t(column.label, ({
+      District: "ज़िला", Project: "परियोजना", Trimester: "त्रैमासिक अवधि",
+      "Financial Year": "वित्तीय वर्ष", "PW & LM": "गर्भवती एवं धात्री माताएँ",
+      "Children 6m-3y": "6 माह–3 वर्ष के बच्चे",
+      "SAM 6M-5Y/SUW 6M-6Y": "एसएएम 6–5 वर्ष/एसयूडब्ल्यू 6–6 वर्ष",
+      "SAM 3Y-5Y/SUW 3Y-6Y": "एसएएम 3–5 वर्ष/एसयूडब्ल्यू 3–6 वर्ष",
+      "HCM 3Y-6Y": "एचसीएम 3–6 वर्ष",
+    })[column.label] || column.label),
+  }));
 
   useEffect(() => {
     let isActive = true;
@@ -76,14 +89,14 @@ const DirectorMaterSupplementary = () => {
       .catch((err) => {
         console.error("Fetch supplementary nutrition records error:", err);
         if (isActive) {
-          setError("Failed to fetch supplementary nutrition records. Please try again.");
+          setError(t("Failed to fetch supplementary nutrition records. Please try again.", "पूरक पोषण रिकॉर्ड प्राप्त नहीं हो सके। कृपया पुनः प्रयास करें।"));
         }
       })
       .finally(() => {
         if (isActive) setLoading(false);
       });
     return () => { isActive = false; };
-  }, [api]);
+  }, [api, t]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -142,15 +155,15 @@ const DirectorMaterSupplementary = () => {
 
   const exportToExcel = useCallback(() => {
     const rows = filteredReports.map((report, index) =>
-      Object.fromEntries(COLUMNS.map((column) => [
+      Object.fromEntries(localizedColumns.map((column) => [
         column.label,
         column.key === "serial" ? index + 1 : displayValue(report[column.key]),
       ])),
     );
     const worksheet = XLSX.utils.json_to_sheet(rows, {
-      header: COLUMNS.map((column) => column.label),
+      header: localizedColumns.map((column) => column.label),
     });
-    worksheet["!cols"] = COLUMNS.map((column) => {
+    worksheet["!cols"] = localizedColumns.map((column) => {
       const longest = Math.max(
         column.label.length,
         ...rows.map((row) => String(row[column.label] ?? "").length),
@@ -171,7 +184,7 @@ const DirectorMaterSupplementary = () => {
     XLSX.writeFile(workbook, "Director_Supplementary_Nutrition.xlsx", {
       compression: true,
     });
-  }, [filteredReports]);
+  }, [filteredReports, localizedColumns]);
 
   const exportToPDF = useCallback(async () => {
     if (!filteredReports.length || exportingPdf) return;
@@ -185,18 +198,18 @@ const DirectorMaterSupplementary = () => {
       });
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(15);
-      pdf.text("Supplementary Nutrition Master", 10, 12);
+      pdf.text(t("Supplementary Nutrition Master", "पूरक पोषण मास्टर"), 10, 12);
       pdf.setFontSize(9);
-      pdf.text(`Records: ${filteredReports.length}`, 10, 18);
+      pdf.text(`${t("Records", "रिकॉर्ड")}: ${filteredReports.length}`, 10, 18);
 
       const body = filteredReports.map((report, index) =>
-        COLUMNS.map((column) =>
+        localizedColumns.map((column) =>
           String(column.key === "serial" ? index + 1 : displayValue(report[column.key])),
         ),
       );
       autoTable(pdf, {
         startY: 23,
-        head: [COLUMNS.map((column) => column.label)],
+        head: [localizedColumns.map((column) => column.label)],
         body,
         theme: "grid",
         margin: { top: 10, right: 8, bottom: 12, left: 8 },
@@ -219,11 +232,11 @@ const DirectorMaterSupplementary = () => {
       pdf.save("Director_Supplementary_Nutrition.pdf");
     } catch (err) {
       console.error("Failed to export supplementary nutrition PDF:", err);
-      window.alert("Failed to export PDF. Please try again.");
+      window.alert(t("Failed to export PDF. Please try again.", "पीडीएफ निर्यात नहीं हो सका। कृपया पुनः प्रयास करें।"));
     } finally {
       setExportingPdf(false);
     }
-  }, [filteredReports, exportingPdf]);
+  }, [filteredReports, exportingPdf, localizedColumns, t]);
 
   return (
     <div className="dashboard-container">
@@ -237,7 +250,7 @@ const DirectorMaterSupplementary = () => {
         <DirectorHeader toggleSidebar={toggleSidebar} />
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-            <h3 className="fw-bold mb-0">Supplementary Nutrition Master</h3>
+            <h3 className="fw-bold mb-0">{t("Supplementary Nutrition Master", "पूरक पोषण मास्टर")}</h3>
             <ButtonGroup>
               <Button
                 variant="outline-danger"
@@ -246,7 +259,7 @@ const DirectorMaterSupplementary = () => {
                 disabled={loading || !filteredReports.length || exportingPdf}
               >
                 <FaFilePdf className="me-1" />
-                {exportingPdf ? "Preparing PDF…" : "Export PDF"}
+                {exportingPdf ? t("Preparing PDF…", "पीडीएफ तैयार हो रही है…") : t("Export PDF", "पीडीएफ निर्यात करें")}
               </Button>
               <Button
                 variant="outline-success"
@@ -255,7 +268,7 @@ const DirectorMaterSupplementary = () => {
                 disabled={loading || !filteredReports.length}
               >
                 <FaFileExcel className="me-1" />
-                Export Excel
+                {t("Export Excel", "एक्सेल निर्यात करें")}
               </Button>
             </ButtonGroup>
           </div>
@@ -264,13 +277,13 @@ const DirectorMaterSupplementary = () => {
           <Row className="mb-3">
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Financial Year</Form.Label>
+                <Form.Label>{t("Filter by Financial Year", "वित्तीय वर्ष से फ़िल्टर करें")}</Form.Label>
                 <Form.Select
                   name="financial_year"
                   value={filters.financial_year}
                   onChange={handleFilterChange}
                 >
-                  <option value="">All Years</option>
+                  <option value="">{t("All Years", "सभी वर्ष")}</option>
                   {uniqueFinYears.map((year) => (
                     <option key={year} value={year}>{year}</option>
                   ))}
@@ -279,13 +292,13 @@ const DirectorMaterSupplementary = () => {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Filter by Trimester</Form.Label>
+                <Form.Label>{t("Filter by Trimester", "त्रैमासिक अवधि से फ़िल्टर करें")}</Form.Label>
                 <Form.Select
                   name="quarter"
                   value={filters.quarter}
                   onChange={handleFilterChange}
                 >
-                  <option value="">All Trimester</option>
+                  <option value="">{t("All Trimester", "सभी त्रैमासिक अवधि")}</option>
                   {uniqueQuarters.map((quarter) => (
                     <option key={quarter} value={quarter}>{quarter}</option>
                   ))}
@@ -298,13 +311,13 @@ const DirectorMaterSupplementary = () => {
             {loading ? (
               <div className="text-center my-5">
                 <Spinner animation="border" variant="primary" />
-                <p className="mt-2 text-muted">Fetching records, please wait...</p>
+                <p className="mt-2 text-muted">{t("Fetching records, please wait...", "रिकॉर्ड प्राप्त हो रहे हैं, कृपया प्रतीक्षा करें...")}</p>
               </div>
             ) : (
               <Table striped bordered hover responsive size="sm">
                 <thead>
                   <tr>
-                    {COLUMNS.map((column) => (
+                    {localizedColumns.map((column) => (
                       <th key={column.key}>{column.label}</th>
                     ))}
                   </tr>
@@ -327,7 +340,7 @@ const DirectorMaterSupplementary = () => {
                   ) : (
                     <tr>
                       <td colSpan={COLUMNS.length} className="text-center">
-                        No supplementary nutrition records found.
+                        {t("No supplementary nutrition records found.", "पूरक पोषण का कोई रिकॉर्ड नहीं मिला।")}
                       </td>
                     </tr>
                   )}

@@ -15,6 +15,7 @@ import {
   ListGroup,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/dashboard.css";
 import { FaUserCircle, FaFilePdf, FaFileExcel, FaEye, FaCalendarCheck } from "react-icons/fa";
 import jsPDF from "jspdf";
@@ -118,6 +119,7 @@ const exportValue = (item, col, index) => {
 };
 
 const ThrSupervisorReceiving = () => {
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -175,8 +177,8 @@ const ThrSupervisorReceiving = () => {
     { dataField: "months", text: "Months", visible: true },
     { dataField: "curr_month", text: "Current Month", visible: true },
     { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
-    { dataField: "expired_packets", text: "Expired Packets / समाप्त पैकेट", visible: true },
-    { dataField: "expiry_breakdown", text: "Expiry Details / समाप्ति विवरण", visible: true },
+    { dataField: "expired_packets", text: "Expired Packets", visible: true },
+    { dataField: "expiry_breakdown", text: "Expiry Details", visible: true },
     { dataField: "sector_status", text: "Sector Status", visible: true },
     { dataField: "sector_remark", text: "Sector Remark", visible: true },
     { dataField: "actions", text: "Actions", visible: true },
@@ -187,6 +189,20 @@ const ThrSupervisorReceiving = () => {
   const [modalData, setModalData] = useState({ title: "", totals: {} });
 
   const visibleColumns = columns.filter((c) => c.visible);
+
+  const getColumnLabel = (col) => {
+    const hindiLabels = {
+      "Select": "?????", "District": "?????", "Sector": "??????", "Project": "????????",
+      "AWC Name": "????????? ?????? ?? ???", "AWC Code": "????????? ?????? ???", "AWC Type": "????????? ?????? ?? ??????",
+      "Food Item": "????? ???????", "Quantity": "??????", "Unit": "????", "Beneficiary Category": "???????? ??????",
+      "Date": "??????", "Fin. Year": "??????? ????", "Fin Year": "??????? ????", "Financial Year": "??????? ????",
+      "Trimester": "????????? ????", "Months": "?????", "Current Month": "??????? ?????", "Max Expiry Date": "?????? ??????? ????",
+      "Expired Packets": "?????? ?????", "Expiry Details": "??????? ?????", "Packet Expiry Details": "????? ??????? ?????",
+      "Sector Remark": "?????? ???????", "Sector Status": "?????? ??????", "Actions": "????????", "Action": "????????",
+      "Days Allotted": "?????? ???", "Beneficiaries": "????????", "Qty": "??????", "Remark": "???????"
+    };
+    return t(col.text, hindiLabels[col.text] || col.text);
+  };
 
   // ── NEW: Helper to check if a record has packet_expiry data ──
   const hasPacketExpiry = (rec) => {
@@ -223,7 +239,7 @@ const ThrSupervisorReceiving = () => {
     if (receivingResult.status === "fulfilled") {
       setReceivings(receivingResult.value.data.data || []);
     } else {
-      setError("Failed to fetch THR receiving data.");
+      setError(t("Failed to fetch THR receiving data.", "THR प्राप्ति डेटा प्राप्त नहीं हो सका।"));
       console.error("Failed to fetch THR receiving data:", receivingResult.reason);
     }
 
@@ -234,11 +250,11 @@ const ThrSupervisorReceiving = () => {
         setAllocations(allocationRows);
       } else {
         setAllocations([]);
-        setAllocationError("Stock allocation data is unavailable; receiving rows cannot be compared.");
+        setAllocationError(t("Stock allocation data is unavailable; receiving rows cannot be compared.", "स्टॉक आवंटन डेटा उपलब्ध नहीं है; प्राप्ति रिकॉर्ड की तुलना नहीं की जा सकती।"));
       }
     } else {
       setAllocations([]);
-      setAllocationError("Failed to fetch stock allocation data; receiving rows cannot be compared.");
+      setAllocationError(t("Failed to fetch stock allocation data; receiving rows cannot be compared.", "स्टॉक आवंटन डेटा प्राप्त नहीं हो सका; प्राप्ति रिकॉर्ड की तुलना नहीं की जा सकती।"));
       console.error("Failed to fetch stock allocation data:", allocationResult.reason);
     }
     if (foodItemResult.status === "fulfilled") {
@@ -246,11 +262,11 @@ const ThrSupervisorReceiving = () => {
       const options = getFoodItemOptions(payload);
       setFoodItemOptions(options);
       if (payload?.success === false || options.length === 0) {
-        setAllocationError("Food item mappings are unavailable; receiving rows cannot be compared.");
+        setAllocationError(t("Food item mappings are unavailable; receiving rows cannot be compared.", "खाद्य सामग्री मैपिंग उपलब्ध नहीं है; प्राप्ति रिकॉर्ड की तुलना नहीं की जा सकती।"));
       }
     } else {
       setFoodItemOptions([]);
-      setAllocationError("Failed to fetch food item mappings; receiving rows cannot be compared.");
+      setAllocationError(t("Failed to fetch food item mappings; receiving rows cannot be compared.", "खाद्य सामग्री मैपिंग प्राप्त नहीं हो सकी; प्राप्ति रिकॉर्ड की तुलना नहीं की जा सकती।"));
       console.error("Failed to fetch food item allocation mappings:", foodItemResult.reason);
     }
     setLoading(false);
@@ -414,11 +430,11 @@ const ThrSupervisorReceiving = () => {
 
   const handleBulkAction = async () => {
     if (selectedIds.length === 0) {
-      setActionError("No items selected for bulk action.");
+      setActionError(t("No items selected for bulk action.", "सामूहिक कार्रवाई के लिए कोई आइटम चयनित नहीं है।"));
       return;
     }
     if (bulkAction === "rejected" && !bulkRemark) {
-      setActionError("Remark is required for rejection.");
+      setActionError(t("Remark is required for rejection.", "अस्वीकृति के लिए टिप्पणी आवश्यक है।"));
       return;
     }
 
@@ -433,13 +449,13 @@ const ThrSupervisorReceiving = () => {
         sector_remark: bulkRemark,
       });
 
-      setSuccessMsg(`Successfully ${bulkAction} ${selectedIds.length} items.`);
+      setSuccessMsg(t(`Successfully ${bulkAction} ${selectedIds.length} items.`, `${selectedIds.length} आइटम सफलतापूर्वक ${bulkAction === "approved" ? "स्वीकृत" : "अस्वीकृत"} किए गए।`));
       fetchReceivings();
       setSelectedIds([]);
       setShowBulkActionModal(false);
       setBulkRemark("");
     } catch (err) {
-      setActionError("Failed to perform bulk action. Please try again.");
+      setActionError(t("Failed to perform bulk action. Please try again.", "सामूहिक कार्रवाई नहीं की जा सकी। कृपया पुनः प्रयास करें।"));
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -559,7 +575,7 @@ const ThrSupervisorReceiving = () => {
       let page = 1;
       for (const rows of reportChunks) {
         await addHtmlPage("THR Supervisor Receiving Report / टीएचआर प्राप्ति रिपोर्ट",
-          exportColumns.map((col) => col.text), rows, page++, totalPages);
+          exportColumns.map((col) => getColumnLabel(col)), rows, page++, totalPages);
       }
       for (const rows of expiryChunks) {
         await addHtmlPage("Packet Expiry Details / पैकेट की समाप्ति जानकारी",
@@ -586,7 +602,7 @@ const ThrSupervisorReceiving = () => {
       pdf.save("thr-supervisor-receiving.pdf");
     } catch (err) {
       console.error("THR receiving PDF export failed:", err);
-      setError(`PDF export failed: ${err?.message || "Please try again."}`);
+      setError(t(`PDF export failed: ${err?.message || "Please try again."}`, `PDF निर्यात विफल: ${err?.message || "कृपया पुनः प्रयास करें।"}`));
     } finally {
       if (exportRoot?.parentNode) exportRoot.parentNode.removeChild(exportRoot);
       setIsPrinting(false);
@@ -598,7 +614,7 @@ const ThrSupervisorReceiving = () => {
       const exportColumns = visibleColumns.filter((col) => !["select", "actions"].includes(col.dataField));
       const dataToExport = filteredReceivings.map((item, index) => {
         const row = {};
-        exportColumns.forEach((col) => { row[col.text] = exportValue(item, col, index); });
+        exportColumns.forEach((col) => { row[getColumnLabel(col)] = exportValue(item, col, index); });
         return row;
       });
       const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
@@ -639,17 +655,17 @@ const ThrSupervisorReceiving = () => {
       XLSX.writeFile(workbook, "thr-supervisor-receiving.xlsx", { bookType: "xlsx", compression: true });
     } catch (err) {
       console.error("THR receiving Excel export failed:", err);
-      setError(`Excel export failed: ${err?.message || "Please try again."}`);
+      setError(t(`Excel export failed: ${err?.message || "Please try again."}`, `Excel निर्यात विफल: ${err?.message || "कृपया पुनः प्रयास करें।"}`));
     }
   };
 
   const renderColumnModal = () => (
     <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
       <Modal.Header closeButton>
-        <Modal.Title>Show/Hide Columns</Modal.Title>
+        <Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएं/छिपाएं")}</Modal.Title>
       </Modal.Header>
-      <Modal.Body>{columns.map((col, index) => (col.dataField !== 'select' && <Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />))}</Modal.Body>
-      <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button></Modal.Footer>
+      <Modal.Body>{columns.map((col, index) => (col.dataField !== 'select' && <Form.Check key={index} type="checkbox" label={getColumnLabel(col)} checked={col.visible} onChange={() => handleColumnToggle(index)} />))}</Modal.Body>
+      <Modal.Footer><Button variant="secondary" onClick={() => setShowColumnModal(false)}>{t("Close", "बंद करें")}</Button></Modal.Footer>
     </Modal>
   );
 
@@ -682,7 +698,7 @@ const ThrSupervisorReceiving = () => {
         <SupervisorHeader toggleSidebar={toggleSidebar} />
         <Container fluid className="dashboard-box mt-3">
           <h3 className="mb-4 profile-page-title">
-            <FaUserCircle className="me-2" /> THR Supervisor Receiving
+            <FaUserCircle className="me-2" /> {t("THR Supervisor Receiving", "THR पर्यवेक्षक प्राप्ति")}
           </h3>
           {successMsg && <Alert variant="success">{successMsg}</Alert>}
           {error && <Alert variant="danger">{error}</Alert>}
@@ -691,54 +707,54 @@ const ThrSupervisorReceiving = () => {
           <Row className="mb-3 g-2 align-items-center justify-content-between">
             <Col md>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.district.length ? `${filters.district.length} selected` : 'All Districts'}</Dropdown.Toggle>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.district.length ? t(`${filters.district.length} selected`, `${filters.district.length} चयनित`) : t('All Districts', 'सभी ज़िले')}</Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.district.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.district.includes(v)} onChange={() => handleMultiSelectChange('district', v)} /></Dropdown.Item>))}</Dropdown.Menu>
               </Dropdown>
             </Col>
             <Col md>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.sector.length ? `${filters.sector.length} selected` : 'All Sectors'}</Dropdown.Toggle>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.sector.length ? t(`${filters.sector.length} selected`, `${filters.sector.length} चयनित`) : t('All Sectors', 'सभी सेक्टर')}</Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.sector.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.sector.includes(v)} onChange={() => handleMultiSelectChange('sector', v)} /></Dropdown.Item>))}</Dropdown.Menu>
               </Dropdown>
             </Col>
             <Col md>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.project.length ? `${filters.project.length} selected` : 'All Projects'}</Dropdown.Toggle>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.project.length ? t(`${filters.project.length} selected`, `${filters.project.length} चयनित`) : t('All Projects', 'सभी परियोजनाएं')}</Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.project.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.project.includes(v)} onChange={() => handleMultiSelectChange('project', v)} /></Dropdown.Item>))}</Dropdown.Menu>
               </Dropdown>
             </Col>
             <Col md>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.awc_name.length ? `${filters.awc_name.length} selected` : 'All AWC Names'}</Dropdown.Toggle>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.awc_name.length ? t(`${filters.awc_name.length} selected`, `${filters.awc_name.length} चयनित`) : t('All AWC Names', 'सभी आंगनवाड़ी केंद्रों के नाम')}</Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.awc_name.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.awc_name.includes(v)} onChange={() => handleMultiSelectChange('awc_name', v)} /></Dropdown.Item>))}</Dropdown.Menu>
               </Dropdown>
             </Col>
             <Col md>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.food_item.length ? `${filters.food_item.length} selected` : 'All Food Items'}</Dropdown.Toggle>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.food_item.length ? t(`${filters.food_item.length} selected`, `${filters.food_item.length} चयनित`) : t('All Food Items', 'सभी खाद्य सामग्री')}</Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.food_item.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.food_item.includes(v)} onChange={() => handleMultiSelectChange('food_item', v)} /></Dropdown.Item>))}</Dropdown.Menu>
               </Dropdown>
             </Col>
             <Col md>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.fin_year.length ? `${filters.fin_year.length} selected` : 'All Fin. Years'}</Dropdown.Toggle>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.fin_year.length ? t(`${filters.fin_year.length} selected`, `${filters.fin_year.length} चयनित`) : t('All Fin. Years', 'सभी वित्तीय वर्ष')}</Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.fin_year.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.fin_year.includes(v)} onChange={() => handleMultiSelectChange('fin_year', v)} /></Dropdown.Item>))}</Dropdown.Menu>
               </Dropdown>
             </Col>
             <Col md>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? `${filters.months.length} selected` : 'All Months'}</Dropdown.Toggle>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.months.length ? t(`${filters.months.length} selected`, `${filters.months.length} चयनित`) : t('All Months', 'सभी महीने')}</Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.months.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.months.includes(v)} onChange={() => handleMultiSelectChange('months', v)} /></Dropdown.Item>))}</Dropdown.Menu>
               </Dropdown>
             </Col>
             <Col md>
               <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.bene_category.length ? `${filters.bene_category.length} selected` : 'All Bene. Categories'}</Dropdown.Toggle>
+                <Dropdown.Toggle variant="outline-secondary" className="w-100">{filters.bene_category.length ? t(`${filters.bene_category.length} selected`, `${filters.bene_category.length} चयनित`) : t('All Bene. Categories', 'सभी लाभार्थी श्रेणियां')}</Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>{uniqueValues.bene_category.map(v => (<Dropdown.Item key={v} as="div"><Form.Check type="checkbox" label={v} checked={filters.bene_category.includes(v)} onChange={() => handleMultiSelectChange('bene_category', v)} /></Dropdown.Item>))}</Dropdown.Menu>
               </Dropdown>
             </Col>
             <Col xs="auto">
-              <Button variant="secondary" onClick={resetFilters}>Reset Filters</Button>
+              <Button variant="secondary" onClick={resetFilters}>{t("Reset Filters", "फ़िल्टर रीसेट करें")}</Button>
             </Col>
           </Row>
           <Row className="mb-3">
@@ -746,10 +762,10 @@ const ThrSupervisorReceiving = () => {
               {selectedIds.length > 0 && (
                 <div className="d-flex gap-2">
                   <Button variant="success" size="sm" onClick={() => { setBulkAction("approved"); setShowBulkActionModal(true); }} disabled={!canApprove}>
-                    Approve Selected ({selectedIds.length})
+                    {t(`Approve Selected (${selectedIds.length})`, `चयनित स्वीकृत करें (${selectedIds.length})`)}
                   </Button>
                   <Button variant="danger" size="sm" onClick={() => { setBulkAction("rejected"); setShowBulkActionModal(true); }} disabled={!canReject}>
-                    Reject Selected ({selectedIds.length})
+                    {t(`Reject Selected (${selectedIds.length})`, `चयनित अस्वीकार करें (${selectedIds.length})`)}
                   </Button>
                 </div>
               )}
@@ -758,7 +774,7 @@ const ThrSupervisorReceiving = () => {
           <div className="d-flex justify-content-end mb-3">
             <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2"><FaFilePdf /> PDF</Button>
             <Button variant="outline-success" size="sm" onClick={exportToExcel} className="me-2"><FaFileExcel /> Excel</Button>
-            <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)}><FaEye /> Columns</Button>
+            <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)}><FaEye /> {t("Columns", "कॉलम")}</Button>
           </div>
           <div className="table-responsive">
             {loading ? (
@@ -774,7 +790,7 @@ const ThrSupervisorReceiving = () => {
                         {col.dataField === "select" ? (
                           <Form.Check type="checkbox" onChange={handleSelectAll} checked={areAllPendingSelected} />
                         ) : (
-                          col.text 
+                          getColumnLabel(col) 
                         )}
                       </th>
                     ))}
@@ -831,17 +847,17 @@ const ThrSupervisorReceiving = () => {
                               return (
                                 <td key="actions" style={comparisonStyle}>
                                   <div className="d-flex gap-1 flex-wrap">
-                                    <Button variant="outline-success" size="sm" disabled={item.sector_status === 'approved'} onClick={() => { setBulkAction("approved"); setSelectedIds([item.id]); setShowBulkActionModal(true); }}>Approve</Button>
-                                    <Button variant="outline-danger" size="sm" disabled={item.sector_status === 'rejected'} onClick={() => { setBulkAction("rejected"); setSelectedIds([item.id]); setShowBulkActionModal(true); }}>Reject</Button>
+                                    <Button variant="outline-success" size="sm" disabled={item.sector_status === 'approved'} onClick={() => { setBulkAction("approved"); setSelectedIds([item.id]); setShowBulkActionModal(true); }}>{t("Approve", "स्वीकृत करें")}</Button>
+                                    <Button variant="outline-danger" size="sm" disabled={item.sector_status === 'rejected'} onClick={() => { setBulkAction("rejected"); setSelectedIds([item.id]); setShowBulkActionModal(true); }}>{t("Reject", "अस्वीकार करें")}</Button>
                                     {/* ── NEW: Expiry button ── */}
                                     {hasPacketExpiry(item) && (
                                       <Button
                                         variant="outline-warning"
                                         size="sm"
                                         onClick={() => handleOpenExpiryModal(item)}
-                                        title="View Packet Expiry Details"
+                                        title={t("View Packet Expiry Details", "पैकेट समाप्ति विवरण देखें")}
                                       >
-                                        <FaCalendarCheck /> Expiry
+                                        <FaCalendarCheck /> {t("Expiry", "समाप्ति")}
                                       </Button>
                                     )}
                                   </div>
@@ -858,19 +874,19 @@ const ThrSupervisorReceiving = () => {
                   ) : (
                     <tr>
                       <td colSpan={visibleColumns.length} className="text-center">
-                        No receiving records found.
+                        {t("No receiving records found.", "प्राप्ति का कोई रिकॉर्ड नहीं मिला।")}
                       </td>
                     </tr>
                   )}
                 </tbody>
                 <tfoot>
                   <tr className="fw-bold table-info">
-                    <td colSpan={visibleColumns.findIndex(c => c.dataField === 'quantity')}>Total</td>
+                    <td colSpan={visibleColumns.findIndex(c => c.dataField === 'quantity')}>{t("Total", "कुल")}</td>
                     {visibleColumns.slice(visibleColumns.findIndex(c => c.dataField === 'quantity')).map(col => {
                       if (col.dataField === 'quantity') {
                         return (
                           <td key="total_quantity">
-                            {!isPrinting && <Button variant="link" size="sm" onClick={() => handleViewTotals(filteredReceivings, 'THR Supervisor Receiving Totals')}>View Totals</Button>}
+                            {!isPrinting && <Button variant="link" size="sm" onClick={() => handleViewTotals(filteredReceivings, t('THR Supervisor Receiving Totals', 'THR पर्यवेक्षक प्राप्ति कुल'))}>{t("View Totals", "कुल देखें")}</Button>}
                           </td>
                         );
                       }
@@ -885,15 +901,15 @@ const ThrSupervisorReceiving = () => {
           {renderColumnModal()}
           <Modal show={showBulkActionModal} onHide={() => setShowBulkActionModal(false)} centered>
             <Modal.Header closeButton>
-              <Modal.Title>Bulk Action: {bulkAction.charAt(0).toUpperCase() + bulkAction.slice(1)}</Modal.Title>
+              <Modal.Title>{t("Bulk Action", "सामूहिक कार्रवाई")}: {t(bulkAction.charAt(0).toUpperCase() + bulkAction.slice(1), bulkAction === "approved" ? "स्वीकृति" : "अस्वीकृति")}</Modal.Title>
             </Modal.Header>
             <Modal.Body>
               <Form.Group>
-                <Form.Label>Remark {bulkAction === 'rejected' && '(Required)'}</Form.Label>
+                <Form.Label>{t("Remark", "टिप्पणी")} {bulkAction === 'rejected' && t("(Required)", "(आवश्यक)")}</Form.Label>
                 <Form.Control
                   as="textarea"
                   rows={3}
-                  placeholder="Enter remark"
+                  placeholder={t("Enter remark", "टिप्पणी दर्ज करें")}
                   value={bulkRemark}
                   onChange={(e) => setBulkRemark(e.target.value)}
                 />
@@ -901,8 +917,8 @@ const ThrSupervisorReceiving = () => {
               {actionError && <Alert variant="danger" className="mt-3">{actionError}</Alert>}
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="secondary" onClick={() => setShowBulkActionModal(false)}>Cancel</Button>
-              <Button variant={bulkAction === 'approved' ? 'success' : 'danger'} onClick={handleBulkAction} disabled={submitting}>{submitting ? "Submitting..." : `Confirm ${bulkAction.charAt(0).toUpperCase() + bulkAction.slice(1)}`}</Button>
+              <Button variant="secondary" onClick={() => setShowBulkActionModal(false)}>{t("Cancel", "रद्द करें")}</Button>
+              <Button variant={bulkAction === 'approved' ? 'success' : 'danger'} onClick={handleBulkAction} disabled={submitting}>{submitting ? t("Submitting...", "जमा किया जा रहा है...") : `${t("Confirm", "पुष्टि करें")} ${t(bulkAction.charAt(0).toUpperCase() + bulkAction.slice(1), bulkAction === "approved" ? "स्वीकृति" : "अस्वीकृति")}`}</Button>
             </Modal.Footer>
           </Modal>
 
@@ -915,8 +931,8 @@ const ThrSupervisorReceiving = () => {
                 <Table striped bordered>
                   <thead>
                     <tr>
-                      <th>Unit</th>
-                      <th>Total Quantity</th>
+                      <th>{t("Unit", "इकाई")}</th>
+                      <th>{t("Total Quantity", "कुल मात्रा")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -925,7 +941,7 @@ const ThrSupervisorReceiving = () => {
                     ))}
                   </tbody>
                 </Table>
-              ) : <p>No quantity data to display.</p>}
+              ) : <p>{t("No quantity data to display.", "दिखाने के लिए मात्रा का डेटा उपलब्ध नहीं है।")}</p>}
             </Modal.Body>
           </Modal>
 
@@ -935,44 +951,44 @@ const ThrSupervisorReceiving = () => {
               <Modal.Header closeButton className="view-modal-header">
                 <Modal.Title>
                   <FaCalendarCheck className="me-2" />
-                  Packet Expiry Details: {expiryViewItem.food_item}
+                  {t("Packet Expiry Details", "पैकेट समाप्ति विवरण")}: {expiryViewItem.food_item}
                 </Modal.Title>
               </Modal.Header>
               <Modal.Body className="view-modal-body">
                 <ListGroup variant="flush">
                   <ListGroup.Item>
-                    <strong>AWC Name:</strong> {expiryViewItem.awc_name}
+                    <strong>{t("AWC Name:", "आंगनवाड़ी केंद्र का नाम:")}</strong> {expiryViewItem.awc_name}
                   </ListGroup.Item>
                   <ListGroup.Item>
-                    <strong>AWC Code:</strong> {expiryViewItem.awc_code}
+                    <strong>{t("AWC Code:", "आंगनवाड़ी केंद्र कोड:")}</strong> {expiryViewItem.awc_code}
                   </ListGroup.Item>
                   <ListGroup.Item>
-                    <strong>Food Item:</strong> {expiryViewItem.food_item}
+                    <strong>{t("Food Item:", "खाद्य सामग्री:")}</strong> {expiryViewItem.food_item}
                   </ListGroup.Item>
                   <ListGroup.Item>
-                    <strong>Total Packets:</strong> {expiryViewItem.quantity} {expiryViewItem.unit}
+                    <strong>{t("Total Packets:", "कुल पैकेट:")}</strong> {expiryViewItem.quantity} {expiryViewItem.unit}
                   </ListGroup.Item>
                   <ListGroup.Item>
-                    <strong>Date of Receiving:</strong>{' '}
+                    <strong>{t("Date of Receiving:", "प्राप्ति की तिथि:")}</strong>{' '}
                     {expiryViewItem.date ? new Date(expiryViewItem.date).toLocaleDateString() : '-'}
                   </ListGroup.Item>
                   <ListGroup.Item>
-                    <strong>Months:</strong>{' '}
+                    <strong>{t("Months:", "महीने:")}</strong>{' '}
                     {(expiryViewItem.months || []).map(m => monthLabels[m] || m).join(', ')}
                   </ListGroup.Item>
                   <ListGroup.Item>
-                    <strong>Max Expiry Date:</strong>{' '}
+                    <strong>{t("Max Expiry Date:", "अधिकतम समाप्ति तिथि:")}</strong>{' '}
                     {expiryViewItem.max_expirydate ? new Date(expiryViewItem.max_expirydate).toLocaleDateString() : '-'}
                   </ListGroup.Item>
                   <ListGroup.Item>
-                    <strong>Sector Status:</strong>{' '}
+                    <strong>{t("Sector Status:", "सेक्टर स्थिति:")}</strong>{' '}
                     <Badge bg={getStatusVariant(expiryViewItem.sector_status)}>
                       {expiryViewItem.sector_status || 'pending'}
                     </Badge>
                   </ListGroup.Item>
                   {expiryViewItem.sector_remark && (
                     <ListGroup.Item>
-                      <strong>Sector Remark:</strong> {expiryViewItem.sector_remark}
+                      <strong>{t("Sector Remark:", "सेक्टर टिप्पणी:")}</strong> {expiryViewItem.sector_remark}
                     </ListGroup.Item>
                   )}
                 </ListGroup>
@@ -980,15 +996,15 @@ const ThrSupervisorReceiving = () => {
                 <hr />
 
                 <h6 className="mb-2">
-                  <FaCalendarCheck className="me-1" /> Packet-wise Expiry List
+                  <FaCalendarCheck className="me-1" /> {t("Packet-wise Expiry List", "पैकेट-वार समाप्ति सूची")}
                 </h6>
                 <Table bordered striped size="sm" className="mb-0">
                   <thead>
                     <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
-                      <th className="text-center" style={{ width: '50px' }}>S. No.</th>
-                      <th className="text-center">Packets</th>
-                      <th className="text-center">Expiry Date</th>
-                      <th className="text-center">Remarks</th>
+                      <th className="text-center" style={{ width: '50px' }}>{t("S. No.", "क्रम संख्या")}</th>
+                      <th className="text-center">{t("Packets", "पैकेट")}</th>
+                      <th className="text-center">{t("Expiry Date", "समाप्ति तिथि")}</th>
+                      <th className="text-center">{t("Remarks", "टिप्पणियां")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1011,7 +1027,7 @@ const ThrSupervisorReceiving = () => {
                     ) : (
                       <tr>
                         <td colSpan={4} className="text-center text-muted p-3">
-                          No packet expiry details available.
+                          {t("No packet expiry details available.", "पैकेट समाप्ति का कोई विवरण उपलब्ध नहीं है।")}
                         </td>
                       </tr>
                     )}
@@ -1019,7 +1035,7 @@ const ThrSupervisorReceiving = () => {
                   {Array.isArray(expiryViewItem.packet_expiry) && expiryViewItem.packet_expiry.length > 0 && (
                     <tfoot>
                       <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
-                        <td className="text-end">Total:</td>
+                        <td className="text-end">{t("Total:", "कुल:")}</td>
                         <td className="text-center">
                           {expiryViewItem.packet_expiry.reduce((sum, pe) => {
                             const c = Array.isArray(pe) ? pe[0] : (pe && pe.count);
@@ -1034,7 +1050,7 @@ const ThrSupervisorReceiving = () => {
                 </Table>
               </Modal.Body>
               <Modal.Footer>
-                <Button variant="secondary" onClick={handleCloseExpiryModal}>Close</Button>
+                <Button variant="secondary" onClick={handleCloseExpiryModal}>{t("Close", "बंद करें")}</Button>
               </Modal.Footer>
             </Modal>
           )}

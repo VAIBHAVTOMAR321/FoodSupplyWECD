@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Card, Spinner, Table, Button, Alert, Badge, Form, Modal, Pagination, Dropdown, Row, Col } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
+import dpoHindi from "./DPOTranslations.json";
 import "../../assets/css/dpo.css";
 import DPOHeader from "./DPOHeader";
 import DPOLeftNav from "./DPOLeftNav";
@@ -113,6 +115,8 @@ const formatTrimester = (row) => ({
 })[normalizeTrimesterKey(row)] || normalizeTrimesterKey(row);
 
 const HcmDpoDistributions = () => {
+  const { t } = useLanguage();
+  const translateLabel = (text) => t(text, dpoHindi[text] || text);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -236,7 +240,7 @@ const HcmDpoDistributions = () => {
       setDistributions(Array.isArray(raw) ? raw : raw ? [raw] : []);
     } catch (err) {
       setDistributions([]);
-      setError("Failed to fetch HCM DPO distributions.");
+      setError(t("Failed to fetch HCM DPO distributions.", "HCM DPO वितरण प्राप्त करने में विफल।"));
       console.error("Failed to fetch HCM DPO distributions:", err);
     } finally {
       setLoading(false);
@@ -395,7 +399,7 @@ const HcmDpoDistributions = () => {
       pdf.save("hcm_dpo_distributions.pdf");
     } catch (err) {
       console.error("Failed to export HCM DPO distributions PDF:", err);
-      setError("PDF export failed. Please try again.");
+      setError(t("PDF export failed. Please try again.", "PDF निर्यात विफल रहा। कृपया पुनः प्रयास करें।"));
     } finally {
       document.body.removeChild(exportRoot);
       setIsPrinting(false);
@@ -489,16 +493,16 @@ const HcmDpoDistributions = () => {
 
         <Container fluid className="dashboard-box mt-3">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3 className="mb-0">HCM DPO Distributions</h3>
+            <h3 className="mb-0">{t("HCM DPO Distributions", "HCM DPO वितरण")}</h3>
             <div>
               <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
-                <FaFilePdf className="me-1" /> Export PDF
+                <FaFilePdf className="me-1" /> {t("Export PDF", "PDF निर्यात करें")}
               </Button>
               <Button variant="outline-success" size="sm" onClick={exportToExcel} className="me-2">
-                <FaFileExcel className="me-1" /> Export Excel
+                <FaFileExcel className="me-1" /> {t("Export Excel", "Excel निर्यात करें")}
               </Button>
               <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)}>
-                <FaEye className="me-1" /> Column Visibility
+                <FaEye className="me-1" /> {t("Column Visibility", "कॉलम दृश्यता")}
               </Button>
             </div>
           </div>
@@ -507,7 +511,7 @@ const HcmDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-district" className="w-100">
-                  {filters.district.length ? `${filters.district.length} districts selected` : 'All Districts'}
+                  {filters.district.length ? `${filters.district.length} ${t("districts selected", "जिले चयनित")}` : t("All Districts", "सभी जिले")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueDistricts.map(d => (
@@ -521,7 +525,7 @@ const HcmDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-project" className="w-100">
-                  {filters.project.length ? `${filters.project.length} projects selected` : 'All Projects'}
+                  {filters.project.length ? `${filters.project.length} ${t("projects selected", "परियोजनाएँ चयनित")}` : t("All Projects", "सभी परियोजनाएँ")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueProjects.map(p => (
@@ -535,7 +539,7 @@ const HcmDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector" className="w-100">
-                  {filters.sector.length ? `${filters.sector.length} sectors selected` : 'All Sectors'}
+                  {filters.sector.length ? `${filters.sector.length} ${t("sectors selected", "सेक्टर चयनित")}` : t("All Sectors", "सभी सेक्टर")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueSectors.map(s => (
@@ -549,7 +553,7 @@ const HcmDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-food-item" className="w-100">
-                  {filters.food_item.length ? `${filters.food_item.length} items selected` : 'All Food Items'}
+                  {filters.food_item.length ? `${filters.food_item.length} ${t("items selected", "सामग्री चयनित")}` : t("All Food Items", "सभी खाद्य सामग्री")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueFoodItems.map(item => (
@@ -563,7 +567,7 @@ const HcmDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-awc-type" className="w-100">
-                  {filters.awc_type.length ? `${filters.awc_type.length} types selected` : 'All AWC Types'}
+                  {filters.awc_type.length ? `${filters.awc_type.length} ${t("types selected", "प्रकार चयनित")}` : t("All AWC Types", "आंगनवाड़ी केंद्र के सभी प्रकार")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {uniqueAwcTypes.map(t => (
@@ -577,7 +581,7 @@ const HcmDpoDistributions = () => {
             <Col md={2}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-bene-category" className="w-100">
-                  {filters.bene_category.length ? `${filters.bene_category.length} categories selected` : 'All Bene. Categories'}
+                  {filters.bene_category.length ? `${filters.bene_category.length} ${t("categories selected", "श्रेणियाँ चयनित")}` : t("All Bene. Categories", "सभी लाभार्थी श्रेणियाँ")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {beneficiaryCategories.map(cat => (
@@ -594,7 +598,7 @@ const HcmDpoDistributions = () => {
             <Col md={3}>
               <Dropdown>
                 <Dropdown.Toggle variant="outline-secondary" id="dropdown-sector-status" className="w-100">
-                  {filters.sector_status.length ? `${filters.sector_status.length} statuses selected` : "All Sector Statuses"}
+                  {filters.sector_status.length ? `${filters.sector_status.length} ${t("statuses selected", "स्थितियाँ चयनित")}` : t("All Sector Statuses", "सभी सेक्टर स्थितियाँ")}
                 </Dropdown.Toggle>
                 <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                   {uniqueSectorStatuses.map((status) => (
@@ -614,16 +618,16 @@ const HcmDpoDistributions = () => {
 
           <Row className="mb-3">
             <Col md={2}>
-              <Form.Label>Start Date</Form.Label>
+              <Form.Label>{t("Start Date", "आरंभ तिथि")}</Form.Label>
               <Form.Control type="date" value={filters.startDate} onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))} />
             </Col>
             <Col md={2}>
-              <Form.Label>End Date</Form.Label>
+              <Form.Label>{t("End Date", "समाप्ति तिथि")}</Form.Label>
               <Form.Control type="date" value={filters.endDate} onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))} />
             </Col>
             <Col md={3} className="d-flex align-items-end">
               <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ district: [], project: [], sector: [], food_item: [], awc_type: [], bene_category: [], sector_status: [], startDate: '', endDate: '' })} className="me-2">
-                Clear Filters
+                {t("Clear Filters", "फ़िल्टर हटाएँ")}
               </Button>
             </Col>
           </Row>
@@ -636,7 +640,7 @@ const HcmDpoDistributions = () => {
                 <Spinner animation="border" />
               </div>
             ) : filteredData.length === 0 ? (
-              <div className="text-center py-4 text-muted">No HCM distributions found.</div>
+              <div className="text-center py-4 text-muted">{t("No HCM distributions found.", "कोई HCM वितरण नहीं मिला।")}</div>
             ) : (
               <div className="table-responsive">
                 <Table 
@@ -650,7 +654,7 @@ const HcmDpoDistributions = () => {
                 >
                   <thead>
                     <tr>
-                      {visibleColumns.map((col) => <th key={`th-${col.dataField}`}>{col.text}</th>)}
+                      {visibleColumns.map((col) => <th key={`th-${col.dataField}`}>{translateLabel(col.text)}</th>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -678,7 +682,7 @@ const HcmDpoDistributions = () => {
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={visibleColumns.length} className="text-center">No data available</td>
+                        <td colSpan={visibleColumns.length} className="text-center">{t("No data available", "कोई डेटा उपलब्ध नहीं")}</td>
                       </tr>
                     )}
                   </tbody>
@@ -687,7 +691,7 @@ const HcmDpoDistributions = () => {
                       {visibleColumns.map((col) => {
                         let cellContent = '';
                         if (col.dataField === '#') {
-                          cellContent = <strong>Total</strong>;
+                          cellContent = <strong>{t("Total", "कुल")}</strong>;
                         } else if (col.dataField === "total_beneficiaries") {
                           cellContent = <strong>{totals.beneficiaries}</strong>;
                         } else if (col.dataField === 'quantity') {
@@ -714,14 +718,14 @@ const HcmDpoDistributions = () => {
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
           <Modal.Header closeButton>
-            <Modal.Title>Show/Hide Columns</Modal.Title>
+            <Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएँ/छिपाएँ")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {columns.map((col, index) => (
               <Form.Check
                 key={index}
                 type="checkbox"
-                label={col.text}
+                label={translateLabel(col.text)}
                 checked={col.visible}
                 onChange={() => handleColumnToggle(index)}
               />
@@ -729,21 +733,21 @@ const HcmDpoDistributions = () => {
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setShowColumnModal(false)}>
-              Close
+              {t("Close", "बंद करें")}
             </Button>
           </Modal.Footer>
         </Modal>
 
         <Modal show={showQtyModal} onHide={() => setShowQtyModal(false)} centered>
           <Modal.Header closeButton>
-            <Modal.Title>Quantity Breakdown by Unit</Modal.Title>
+            <Modal.Title>{t("Quantity Breakdown by Unit", "इकाई के अनुसार मात्रा विवरण")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             <Table striped bordered hover>
               <thead>
                 <tr>
-                  <th>Unit</th>
-                  <th>Total Quantity</th>
+                  <th>{t("Unit", "इकाई")}</th>
+                  <th>{t("Total Quantity", "कुल मात्रा")}</th>
                 </tr>
               </thead>
               <tbody>

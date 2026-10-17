@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Container, Row, Col, Card, Spinner, Table, Button, Modal, Form, Alert, Tabs, Tab } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 
 import { FaPlus, FaEdit, FaTrash, FaUpload, FaFileExcel } from "react-icons/fa";
 import "../../assets/css/itcellLeftnav.css";
@@ -19,6 +20,7 @@ const ITCellFoodItem = () => {
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
 
   const { api } = useAuth();
+  const { t } = useLanguage();
 
   const [hcmItems, setHcmItems] = useState([]);
   const [thrItems, setThrItems] = useState([]);
@@ -53,12 +55,12 @@ const ITCellFoodItem = () => {
         setThrItems(Array.isArray(data) ? data : []);
       }
     } catch (err) {
-      setError(prev => ({ ...prev, [scheme]: `Failed to fetch ${scheme.toUpperCase()} items.` }));
+      setError(prev => ({ ...prev, [scheme]: t(`Failed to fetch ${scheme.toUpperCase()} items.`, `${scheme.toUpperCase()} आइटम प्राप्त नहीं हो सके।`) }));
       console.error(err);
     } finally {
       setLoading(prev => ({ ...prev, [scheme]: false }));
     }
-  }, [api]);
+  }, [api, t]);
 
   const fetchBeneficiaryCategories = useCallback(async () => {
     try {
@@ -66,9 +68,9 @@ const ITCellFoodItem = () => {
         setBeneficiaryCategories(response.data || []);
     } catch (err) {
         console.error("Failed to fetch beneficiary categories:", err);
-        setError(prev => ({ ...prev, thr: "Failed to load beneficiary categories." }));
+        setError(prev => ({ ...prev, thr: t("Failed to load beneficiary categories.", "लाभार्थी श्रेणियां लोड नहीं हो सकीं।") }));
     }
-  }, [api]);
+  }, [api, t]);
 
   useEffect(() => {
     fetchData('hcm');
@@ -108,12 +110,12 @@ const ITCellFoodItem = () => {
 
   const validateForm = (scheme) => {
     const errors = {};
-    if (!formData.food_item.trim()) errors.food_item = "Food item is required.";
-    if (!formData.bene_category.trim()) errors.bene_category = "Beneficiary category is required.";
-    if (!formData.days_allotted) errors.days_allotted = "Days allotted is required.";
-    if (!formData.qty_per_ben) errors.qty_per_ben = "Quantity is required.";
-    else if (isNaN(formData.qty_per_ben)) errors.qty_per_ben = "Quantity must be a number.";
-    if (!formData.unit.trim()) errors.unit = "Unit is required.";
+    if (!formData.food_item.trim()) errors.food_item = t("Food item is required.", "खाद्य पदार्थ आवश्यक है।");
+    if (!formData.bene_category.trim()) errors.bene_category = t("Beneficiary category is required.", "लाभार्थी श्रेणी आवश्यक है।");
+    if (!formData.days_allotted) errors.days_allotted = t("Days allotted is required.", "आवंटित दिन आवश्यक हैं।");
+    if (!formData.qty_per_ben) errors.qty_per_ben = t("Quantity is required.", "मात्रा आवश्यक है।");
+    else if (isNaN(formData.qty_per_ben)) errors.qty_per_ben = t("Quantity must be a number.", "मात्रा संख्या में होनी चाहिए।");
+    if (!formData.unit.trim()) errors.unit = t("Unit is required.", "इकाई आवश्यक है।");
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -137,7 +139,7 @@ const ITCellFoodItem = () => {
       handleCloseModal();
       fetchData(scheme);
     } catch (err) {
-      setFormErrors({ api: `Failed to ${item ? 'update' : 'add'} item. Please try again.` });
+      setFormErrors({ api: t(`Failed to ${item ? 'update' : 'add'} item. Please try again.`, `आइटम ${item ? "अपडेट" : "जोड़"} नहीं हो सका। कृपया पुनः प्रयास करें।`) });
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -145,12 +147,12 @@ const ITCellFoodItem = () => {
   };
 
   const handleDelete = async (scheme, itemId) => {
-    if (window.confirm("Are you sure you want to delete this item?")) {
+    if (window.confirm(t("Are you sure you want to delete this item?", "क्या आप वाकई इस आइटम को हटाना चाहते हैं?"))) {
       try {
         await api.delete(API_URLS[scheme], { data: { id: itemId } });
         fetchData(scheme);
       } catch (err) {
-        alert(`Failed to delete item. Please try again.`);
+        alert(t("Failed to delete item. Please try again.", "आइटम हटाया नहीं जा सका। कृपया पुनः प्रयास करें।"));
         console.error(err);
       }
     }
@@ -169,7 +171,7 @@ const ITCellFoodItem = () => {
   
   const handleBulkUpload = async () => {
     if (!bulkFile) {
-      setBulkUploadError("Please select a file to upload.");
+      setBulkUploadError(t("Please select a file to upload.", "कृपया अपलोड करने के लिए फ़ाइल चुनें।"));
       return;
     }
     setBulkUploading(true);
@@ -177,7 +179,7 @@ const ITCellFoodItem = () => {
     
     try {
       if (bulkValidationErrors.length > 0) {
-        setBulkUploadError("Cannot upload. Please fix the errors in the file.");
+        setBulkUploadError(t("Cannot upload. Please fix the errors in the file.", "अपलोड नहीं किया जा सकता। कृपया फ़ाइल की त्रुटियां ठीक करें।"));
         return;
       }
       
@@ -225,7 +227,7 @@ const ITCellFoodItem = () => {
         const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
         if (json.length === 0) {
-          setBulkUploadError("The Excel file is empty.");
+          setBulkUploadError(t("The Excel file is empty.", "Excel फ़ाइल खाली है।"));
           return;
         }
         
@@ -295,15 +297,15 @@ const ITCellFoodItem = () => {
         setBulkPreviewData(previewData);
         setBulkValidationErrors(validationErrorList);
         if (validationErrorList.length > 0) {
-          setBulkUploadError("Your file contains errors. Please fix them before uploading.");
+          setBulkUploadError(t("Your file contains errors. Please fix them before uploading.", "फ़ाइल में त्रुटियां हैं। कृपया अपलोड करने से पहले उन्हें ठीक करें।"));
         }
       } catch (err) {
-        setBulkUploadError("Failed to parse the Excel file. Please ensure it's a valid .xlsx or .xls file.");
+        setBulkUploadError(t("Failed to parse the Excel file. Please ensure it's a valid .xlsx or .xls file.", "Excel फ़ाइल पढ़ी नहीं जा सकी। कृपया सुनिश्चित करें कि यह मान्य .xlsx या .xls फ़ाइल है।"));
         console.error(err);
       }
     };
     reader.onerror = () => {
-      setBulkUploadError("Failed to read the file.");
+      setBulkUploadError(t("Failed to read the file.", "फ़ाइल पढ़ी नहीं जा सकी।"));
       setBulkUploading(false);
     };
     reader.readAsArrayBuffer(file);
@@ -323,13 +325,13 @@ const ITCellFoodItem = () => {
   const renderTable = (scheme, items) => (
     <div className="food-items-table-container">
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h5 className="mb-0">{scheme.toUpperCase()} Food Items</h5>
+        <h5 className="mb-0">{scheme.toUpperCase()} {t("Food Items", "खाद्य पदार्थ")}</h5>
         <div>
           <Button variant="success" size="sm" onClick={() => handleShowBulkUploadModal(scheme)} className="me-2">
-            <FaUpload className="me-2" /> Bulk Upload
+            <FaUpload className="me-2" /> {t("Bulk Upload", "बल्क अपलोड")}
           </Button>
           <Button variant="primary" size="sm" onClick={() => handleShowModal(scheme)}>
-            <FaPlus className="me-2" /> Add New Item
+            <FaPlus className="me-2" /> {t("Add New Item", "नया आइटम जोड़ें")}
           </Button>
         </div>
       </div>
@@ -338,18 +340,18 @@ const ITCellFoodItem = () => {
         ) : error[scheme] ? (
           <Alert variant="danger">{error[scheme]}</Alert>
         ) : items.length === 0 ? (
-          <div className="empty-state">No items found for {scheme.toUpperCase()}.</div>
+          <div className="empty-state">{t("No items found for", "के लिए कोई आइटम नहीं मिला")} {scheme.toUpperCase()}.</div>
         ) : (
           <Table striped bordered hover responsive>
             <thead>
               <tr>
                 <th>#</th>
-                <th>Food Item</th>
-                <th>Qty Per Beneficiary</th>
-                <th>Beneficiary Category</th>
-                <th>Days Allotted</th>
-                <th>Unit</th>
-                <th>Action</th>
+                <th>{t("Food Item", "खाद्य पदार्थ")}</th>
+                <th>{t("Qty Per Beneficiary", "प्रति लाभार्थी मात्रा")}</th>
+                <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
+                <th>{t("Days Allotted", "आवंटित दिन")}</th>
+                <th>{t("Unit", "इकाई")}</th>
+                <th>{t("Action", "कार्रवाई")}</th>
               </tr>
             </thead>
             <tbody>
@@ -363,10 +365,10 @@ const ITCellFoodItem = () => {
                   <td>{item.unit}</td>
                   <td>
                     <Button variant="outline-primary" size="sm" className="btn-action" onClick={() => handleShowModal(scheme, item)}>
-                      <FaEdit />
+                      <FaEdit aria-label={t("Edit", "संपादित करें")} />
                     </Button>
                     <Button variant="outline-danger" size="sm" className="btn-action" onClick={() => handleDelete(scheme, item.id)}>
-                      <FaTrash />
+                      <FaTrash aria-label={t("Delete", "हटाएं")} />
                     </Button>
                   </td>
                 </tr>
@@ -384,12 +386,12 @@ const ITCellFoodItem = () => {
         <ITCellHeader toggleSidebar={toggleSidebar} />
         <div className="food-items-container">
           <Container fluid className="dashboard-box food-items-content">
-            <h3 className="page-title-heading">Food Items Management</h3>
+            <h3 className="page-title-heading">{t("Food Items Management", "खाद्य पदार्थ प्रबंधन")}</h3>
             <Tabs defaultActiveKey="hcm" id="food-items-tabs" className="mb-4 food-items-tabs">
-              <Tab eventKey="hcm" title="HCM Food Items">
+              <Tab eventKey="hcm" title={t("HCM Food Items", "एचसीएम खाद्य पदार्थ")}>
                 {renderTable('hcm', hcmItems)}
               </Tab>
-              <Tab eventKey="thr" title="THR Food Items">
+              <Tab eventKey="thr" title={t("THR Food Items", "टीएचआर खाद्य पदार्थ")}>
                 {renderTable('thr', thrItems)}
               </Tab>
             </Tabs>
@@ -397,17 +399,17 @@ const ITCellFoodItem = () => {
         </div>
 
         <Modal show={showModal} onHide={handleCloseModal} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>{modalConfig.item ? 'Edit' : 'Add'} {modalConfig.scheme.toUpperCase()} Food Item</Modal.Title>
+          <Modal.Header closeButton closeLabel={t("Close", "बंद करें")}>
+            <Modal.Title>{t(modalConfig.item ? "Edit" : "Add", modalConfig.item ? "संपादित करें" : "जोड़ें")} {modalConfig.scheme.toUpperCase()} {t("Food Item", "खाद्य पदार्थ")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {formErrors.api && <Alert variant="danger">{formErrors.api}</Alert>}
             <Form onSubmit={handleFormSubmit}>
               <Form.Group className="mb-3" controlId="food_item">
-                <Form.Label>Food Item</Form.Label>
+                <Form.Label>{t("Food Item", "खाद्य पदार्थ")}</Form.Label>
                 <Form.Control
                   type="text"
-                  placeholder="Enter food item name"
+                  placeholder={t("Enter food item name", "खाद्य पदार्थ का नाम दर्ज करें")}
                   value={formData.food_item}
                   onChange={(e) => setFormData({ ...formData, food_item: e.target.value })}
                   isInvalid={!!formErrors.food_item}
@@ -419,13 +421,13 @@ const ITCellFoodItem = () => {
 
               <>
                 <Form.Group className="mb-3" controlId="bene_category">
-                  <Form.Label>Beneficiary Category</Form.Label>                    
+                  <Form.Label>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</Form.Label>
                   <Form.Select
                     value={formData.bene_category}
                     onChange={(e) => setFormData({ ...formData, bene_category: e.target.value })}
                     isInvalid={!!formErrors.bene_category}
                   >
-                    <option value="">Select a category</option>
+                    <option value="">{t("Select a category", "श्रेणी चुनें")}</option>
                     {beneficiaryCategories.map(cat => (
                       <option key={cat.id} value={cat.category_name}>{cat.category_name}</option>
                     ))}
@@ -436,10 +438,10 @@ const ITCellFoodItem = () => {
                 </Form.Group>
 
                 <Form.Group className="mb-3" controlId="days_allotted">
-                  <Form.Label>Days Allotted</Form.Label>
+                  <Form.Label>{t("Days Allotted", "आवंटित दिन")}</Form.Label>
                   <Form.Control
                     type="number"
-                    placeholder="Enter days allotted"
+                    placeholder={t("Enter days allotted", "आवंटित दिन दर्ज करें")}
                     value={formData.days_allotted}
                     onChange={(e) => setFormData({ ...formData, days_allotted: e.target.value })}
                     isInvalid={!!formErrors.days_allotted}
@@ -451,10 +453,10 @@ const ITCellFoodItem = () => {
               </>
 
               <Form.Group className="mb-3" controlId="qty_per_ben">
-                <Form.Label>Quantity Per Beneficiary</Form.Label>
+                <Form.Label>{t("Quantity Per Beneficiary", "प्रति लाभार्थी मात्रा")}</Form.Label>
                 <Form.Control
                   type="text"
-                  placeholder="Enter quantity"
+                  placeholder={t("Enter quantity", "मात्रा दर्ज करें")}
                   value={formData.qty_per_ben}
                   onChange={(e) => setFormData({ ...formData, qty_per_ben: e.target.value })}
                   isInvalid={!!formErrors.qty_per_ben}
@@ -465,10 +467,10 @@ const ITCellFoodItem = () => {
               </Form.Group>
 
               <Form.Group className="mb-3" controlId="unit">
-                <Form.Label>Unit</Form.Label>
+                <Form.Label>{t("Unit", "इकाई")}</Form.Label>
                 <Form.Control
                   type="text"
-                  placeholder="Enter unit (e.g., grams, ml)"
+                  placeholder={t("Enter unit (e.g., grams, ml)", "इकाई दर्ज करें (जैसे, ग्राम, मिलीलीटर)")}
                   value={formData.unit}
                   onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                   isInvalid={!!formErrors.unit}
@@ -479,10 +481,10 @@ const ITCellFoodItem = () => {
               </Form.Group>
 
               <Button variant="secondary" onClick={handleCloseModal} className="me-2">
-                Cancel
+                {t("Cancel", "रद्द करें")}
               </Button>
               <Button variant="primary" type="submit" disabled={submitting}>
-                {submitting ? <Spinner as="span" animation="border" size="sm" /> : 'Save Changes'}
+                {submitting ? <Spinner as="span" animation="border" size="sm" /> : t("Save Changes", "परिवर्तन सहेजें")}
               </Button>
             </Form>
           </Modal.Body>
@@ -490,17 +492,17 @@ const ITCellFoodItem = () => {
       </div>
 
       <Modal show={showBulkUploadModal} onHide={handleCloseBulkUploadModal} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Bulk Upload {bulkUploadScheme.toUpperCase()} Food Items</Modal.Title>
+        <Modal.Header closeButton closeLabel={t("Close", "बंद करें")}>
+          <Modal.Title>{t("Bulk Upload", "बल्क अपलोड")} {bulkUploadScheme.toUpperCase()} {t("Food Items", "खाद्य पदार्थ")}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {bulkUploadError && <Alert variant="danger">{bulkUploadError}</Alert>}
-          <p>Upload an Excel file with columns: <strong>food_item</strong>, <strong>qty_per_ben</strong>, <strong>unit</strong>, <strong>bene_category</strong>, <strong>days_allotted</strong>.</p>
+          <p>{t("Upload an Excel file with columns:", "इन कॉलम वाली Excel फ़ाइल अपलोड करें:")} <strong>food_item</strong>, <strong>qty_per_ben</strong>, <strong>unit</strong>, <strong>bene_category</strong>, <strong>days_allotted</strong>.</p>
           <Button variant="link" onClick={downloadSampleFile} className="p-0 mb-3">
-            <FaFileExcel className="me-1" /> Download Sample File
+            <FaFileExcel className="me-1" /> {t("Download Sample File", "नमूना फ़ाइल डाउनलोड करें")}
           </Button>
           <Form.Group controlId="formFile" className="mb-3">
-            <Form.Label>Select Excel File</Form.Label>
+            <Form.Label>{t("Select Excel File", "Excel फ़ाइल चुनें")}</Form.Label>
             <Form.Control 
               type="file" 
               accept=".xlsx, .xls" 
@@ -510,17 +512,17 @@ const ITCellFoodItem = () => {
 
           {bulkPreviewData.length > 0 && (
             <div className="mt-4">
-              <h6>File Preview</h6>
+              <h6>{t("File Preview", "फ़ाइल पूर्वावलोकन")}</h6>
               <Table striped bordered hover responsive size="sm">
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Food Item</th>
-                    <th>Qty Per Ben</th>
-                    <th>Bene. Category</th>
-                    <th>Days Allotted</th>
-                    <th>Unit</th>
-                    <th>Status</th>
+                    <th>{t("Food Item", "खाद्य पदार्थ")}</th>
+                    <th>{t("Qty Per Ben", "प्रति लाभार्थी मात्रा")}</th>
+                    <th>{t("Bene. Category", "लाभार्थी श्रेणी")}</th>
+                    <th>{t("Days Allotted", "आवंटित दिन")}</th>
+                    <th>{t("Unit", "इकाई")}</th>
+                    <th>{t("Status", "स्थिति")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -532,7 +534,7 @@ const ITCellFoodItem = () => {
                       <td>{item.data.bene_category}</td>
                       <td>{item.data.days_allotted}</td>
                       <td>{item.data.unit}</td>
-                      <td>{item.errors.length > 0 ? <span className="text-danger">Error</span> : <span className="text-success">OK</span>}</td>
+                      <td>{item.errors.length > 0 ? <span className="text-danger">{t("Error", "त्रुटि")}</span> : <span className="text-success">{t("OK", "ठीक है")}</span>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -549,7 +551,7 @@ const ITCellFoodItem = () => {
             {bulkUploading ? (
               <>
                 <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
-                <span className="ms-2">Uploading...</span>
+                <span className="ms-2">{t("Uploading...", "अपलोड हो रहा है...")}</span>
               </>
             ) : (
               "Upload"

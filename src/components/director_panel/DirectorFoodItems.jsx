@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import {
   Container,
   Table,
@@ -24,10 +25,10 @@ const FOOD_ITEMS_API =
   "https://mahadevaaya.com/angfoodproject/angfoodproject_backend/api/categoryandfooditem/";
 
 const FOOD_COLUMNS = [
-  { key: "serial", label: "क्रम संख्या" },
-  { key: "category", label: "श्रेणी" },
-  { key: "food_item", label: "खाद्य सामग्री" },
-  { key: "beneficiary_category", label: "लाभार्थी श्रेणी" },
+  { key: "serial", label: "Serial No." },
+  { key: "category", label: "Category" },
+  { key: "food_item", label: "Food Item" },
+  { key: "beneficiary_category", label: "Beneficiary Category" },
 ];
 
 const normalizeFoodData = (foodData) =>
@@ -49,11 +50,21 @@ const DirectorFoodItems = () => {
     window.innerWidth >= 768 && window.innerWidth < 1024,
   );
   const { api } = useAuth();
+  const { t } = useLanguage();
 
   const [foodItems, setFoodItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exportingPdf, setExportingPdf] = useState(false);
+  const localizedFoodColumns = FOOD_COLUMNS.map((column) => ({
+    ...column,
+    label: t(column.label, ({
+      "Serial No.": "क्रम संख्या",
+      Category: "श्रेणी",
+      "Food Item": "खाद्य सामग्री",
+      "Beneficiary Category": "लाभार्थी श्रेणी",
+    })[column.label]),
+  }));
 
   const fetchFoodItems = useCallback(async () => {
     setLoading(true);
@@ -66,9 +77,10 @@ const DirectorFoodItems = () => {
 
       if (result?.success !== true || !Array.isArray(result?.food_data)) {
         console.error("Unexpected categoryandfooditem API response:", result);
-        throw new Error(
-          "API response में success=true और food_data array नहीं मिला।",
-        );
+        throw new Error(t(
+          "The API response did not include success=true and a food_data array.",
+          "एपीआई प्रतिक्रिया में success=true और food_data array शामिल नहीं है।",
+        ));
       }
 
       const normalizedItems = normalizeFoodData(result.food_data);
@@ -88,18 +100,21 @@ const DirectorFoodItems = () => {
       setFoodItems([]);
       const status = err?.response?.status;
       if (status === 401 || status === 403) {
-        setError(`API access denied (HTTP ${status}). कृपया login/token permissions जाँचें।`);
+        setError(t(`API access denied (HTTP ${status}). Please check login/token permissions.`, `एपीआई पहुँच अस्वीकृत (HTTP ${status})। कृपया लॉगिन/टोकन अनुमतियाँ जाँचें।`));
       } else if (status) {
-        setError(`खाद्य सामग्री प्राप्त नहीं हो सकी (HTTP ${status})। API response के लिए Console जाँचें।`);
+        setError(t(`Food items could not be loaded (HTTP ${status}). Check the Console for the API response.`, `खाद्य सामग्री प्राप्त नहीं हो सकी (HTTP ${status})। एपीआई प्रतिक्रिया के लिए कंसोल देखें।`));
       } else if (err?.message?.toLowerCase().includes("network")) {
-        setError("API से कनेक्शन नहीं बन सका। यदि Console में CORS error है, तो backend में frontend domain को अनुमति देनी होगी।");
+        setError(t(
+          "Could not connect to the API. If the Console shows a CORS error, the backend must allow the frontend domain.",
+          "एपीआई से कनेक्ट नहीं हो सका। यदि कंसोल में CORS त्रुटि दिखती है, तो बैकएंड में फ़्रंटएंड डोमेन को अनुमति दें।",
+        ));
       } else {
-        setError(err?.message || "खाद्य सामग्री प्राप्त नहीं हो सकी। API connection जाँचें और पुनः प्रयास करें।");
+        setError(err?.message || t("Food items could not be loaded. Check the API connection and try again.", "खाद्य सामग्री प्राप्त नहीं हो सकी। एपीआई कनेक्शन जाँचें और पुनः प्रयास करें।"));
       }
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, t]);
 
   useEffect(() => {
     fetchFoodItems();
@@ -127,13 +142,13 @@ const DirectorFoodItems = () => {
 
     ["HCM", "THR"].forEach((category) => {
       const rows = groupedItems[category].map((item, index) => ({
-        "क्रम संख्या": index + 1,
-        श्रेणी: category,
-        "खाद्य सामग्री": item.food_item || "—",
-        "लाभार्थी श्रेणी": item.beneficiary_category || "—",
+        [localizedFoodColumns[0].label]: index + 1,
+        [localizedFoodColumns[1].label]: category,
+        [localizedFoodColumns[2].label]: item.food_item || "—",
+        [localizedFoodColumns[3].label]: item.beneficiary_category || "—",
       }));
       const worksheet = XLSX.utils.json_to_sheet(rows, {
-        header: FOOD_COLUMNS.map((column) => column.label),
+        header: localizedFoodColumns.map((column) => column.label),
       });
       worksheet["!cols"] = [
         { wch: 14 },
@@ -156,7 +171,7 @@ const DirectorFoodItems = () => {
     XLSX.writeFile(workbook, "Director_HCM_THR_Food_Items.xlsx", {
       compression: true,
     });
-  }, [groupedItems]);
+  }, [groupedItems, localizedFoodColumns]);
 
   const exportToPDF = useCallback(async () => {
     if (!foodItems.length || exportingPdf) return;
@@ -190,8 +205,10 @@ const DirectorFoodItems = () => {
 
     const addSection = (category, items) => {
       const heading = document.createElement("h2");
-      heading.textContent =
-        category === "HCM" ? "HCM खाद्य सामग्री" : "THR खाद्य सामग्री";
+      heading.textContent = t(
+        category === "HCM" ? "HCM Food Items" : "THR Food Items",
+        category === "HCM" ? "एचसीएम खाद्य सामग्री" : "टीएचआर खाद्य सामग्री",
+      );
       heading.style.cssText =
         "font-size:20px;margin:0 0 10px;font-weight:700;line-height:1.5;";
       root.appendChild(heading);
@@ -209,7 +226,7 @@ const DirectorFoodItems = () => {
 
       const thead = document.createElement("thead");
       const headerRow = document.createElement("tr");
-      FOOD_COLUMNS.forEach((column) => {
+      localizedFoodColumns.forEach((column) => {
         const th = document.createElement("th");
         th.textContent = column.label;
         th.style.cssText =
@@ -242,7 +259,7 @@ const DirectorFoodItems = () => {
         const tr = document.createElement("tr");
         const td = document.createElement("td");
         td.colSpan = FOOD_COLUMNS.length;
-        td.textContent = "कोई खाद्य सामग्री उपलब्ध नहीं है।";
+        td.textContent = t("No food items available.", "कोई खाद्य सामग्री उपलब्ध नहीं है।");
         td.style.cssText = "border:1px solid #cbd5e1;padding:10px;";
         tr.appendChild(td);
         tbody.appendChild(tr);
@@ -348,12 +365,12 @@ const DirectorFoodItems = () => {
       pdf.save("Director_HCM_THR_Food_Items.pdf");
     } catch (err) {
       console.error("Failed to export food items PDF:", err);
-      window.alert("PDF export failed. Please try again.");
+      window.alert(t("PDF export failed. Please try again.", "पीडीएफ निर्यात विफल हुआ। कृपया पुनः प्रयास करें।"));
     } finally {
       root.remove();
       setExportingPdf(false);
     }
-  }, [foodItems, groupedItems, exportingPdf]);
+  }, [foodItems, groupedItems, exportingPdf, localizedFoodColumns, t]);
 
   const renderFoodItems = (category) => {
     const items = groupedItems[category];
@@ -362,7 +379,7 @@ const DirectorFoodItems = () => {
       return (
         <div className="text-center p-5">
           <Spinner animation="border" role="status" />
-          <div className="mt-2">खाद्य सामग्री लोड हो रही है...</div>
+          <div className="mt-2">{t("Loading food items...", "खाद्य सामग्री लोड हो रही है...")}</div>
         </div>
       );
     }
@@ -374,7 +391,7 @@ const DirectorFoodItems = () => {
             className="btn btn-sm btn-outline-danger mt-2"
             onClick={fetchFoodItems}
           >
-            पुनः प्रयास करें
+            {t("Try Again", "पुनः प्रयास करें")}
           </button>
         </Alert>
       );
@@ -382,7 +399,7 @@ const DirectorFoodItems = () => {
     if (items.length === 0) {
       return (
         <div className="empty-state mt-3">
-          कोई {category} खाद्य सामग्री उपलब्ध नहीं है।
+          {t(`No ${category} food items available.`, `कोई ${category} खाद्य सामग्री उपलब्ध नहीं है।`)}
         </div>
       );
     }
@@ -390,17 +407,17 @@ const DirectorFoodItems = () => {
     return (
       <div className="food-items-table-container mt-3">
         <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-          <h5 className="mb-0">{category} खाद्य सामग्री विवरण</h5>
+          <h5 className="mb-0">{t(`${category} Food Items Details`, `${category} खाद्य सामग्री विवरण`)}</h5>
           <Badge bg={category === "THR" ? "primary" : "success"}>
-            कुल सामग्री: {items.length}
+            {t("Total Items", "कुल सामग्री")}: {items.length}
           </Badge>
         </div>
         <Table striped bordered hover responsive>
           <thead>
             <tr>
-              <th style={{ width: "75px" }}>क्रम संख्या</th>
-              <th>खाद्य सामग्री</th>
-              <th>लाभार्थी श्रेणी</th>
+              <th style={{ width: "75px" }}>{t("Serial No.", "क्रम संख्या")}</th>
+              <th>{t("Food Item", "खाद्य सामग्री")}</th>
+              <th>{t("Beneficiary Category", "लाभार्थी श्रेणी")}</th>
             </tr>
           </thead>
           <tbody>
@@ -430,7 +447,7 @@ const DirectorFoodItems = () => {
         <div className="food-items-container">
           <Container fluid className="dashboard-box food-items-content">
             <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-              <h3 className="page-title-heading mb-0">THR एवं HCM खाद्य सामग्री</h3>
+              <h3 className="page-title-heading mb-0">{t("THR & HCM Food Items", "टीएचआर एवं एचसीएम खाद्य सामग्री")}</h3>
               <div className="d-flex gap-2 flex-wrap">
                 <Button
                   variant="outline-danger"
@@ -438,7 +455,7 @@ const DirectorFoodItems = () => {
                   disabled={loading || !foodItems.length || exportingPdf}
                 >
                   <FaFilePdf className="me-2" />
-                  {exportingPdf ? "PDF तैयार हो रहा है…" : "PDF"}
+                  {exportingPdf ? t("Preparing PDF…", "पीडीएफ तैयार हो रही है…") : "PDF"}
                 </Button>
                 <Button
                   variant="outline-success"
@@ -453,7 +470,7 @@ const DirectorFoodItems = () => {
                   onClick={fetchFoodItems}
                   disabled={loading}
                 >
-                  {loading ? "लोड हो रहा है..." : "डेटा रिफ्रेश करें"}
+                  {loading ? t("Loading...", "लोड हो रहा है...") : t("Refresh Data", "डेटा रीफ़्रेश करें")}
                 </Button>
               </div>
             </div>
@@ -462,10 +479,10 @@ const DirectorFoodItems = () => {
               id="food-items-tabs"
               className="mb-4 food-items-tabs"
             >
-              <Tab eventKey="HCM" title="HCM Food Items">
+              <Tab eventKey="HCM" title={t("HCM Food Items", "एचसीएम खाद्य सामग्री")}>
                 {renderFoodItems("HCM")}
               </Tab>
-              <Tab eventKey="THR" title="THR Food Items">
+              <Tab eventKey="THR" title={t("THR Food Items", "टीएचआर खाद्य सामग्री")}>
                 {renderFoodItems("THR")}
               </Tab>
             </Tabs>

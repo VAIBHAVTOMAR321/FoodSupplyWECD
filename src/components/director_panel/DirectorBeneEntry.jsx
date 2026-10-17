@@ -18,6 +18,7 @@ import {
 import "../../assets/css/dpo.css";
 
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -33,6 +34,7 @@ const DirectorBeneEntry = () => {
     window.innerWidth >= 768 && window.innerWidth < 1024
   );
   const { api } = useAuth();
+  const { t } = useLanguage();
   const [summaryData, setSummaryData] = useState(null);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +83,18 @@ const DirectorBeneEntry = () => {
     { dataField: "sector_remark", text: "Sector Remark", visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const localizedColumns = columns.map((column) => ({
+    ...column,
+    text: t(column.text, ({
+      "AWC Name": "आंगनवाड़ी केंद्र का नाम", District: "ज़िला", Project: "परियोजना",
+      Sector: "सेक्टर", "Fin. Year": "वित्तीय वर्ष", Month: "महीना",
+      "PW & LM": "गर्भवती एवं धात्री माताएँ", "Child (6m-3y)": "बच्चे (6 माह–3 वर्ष)",
+      "Child (3-6y)": "बच्चे (3–6 वर्ष)", "Adol. Girls": "किशोरियाँ",
+      "SAM (6m-3y)": "एसएएम (6 माह–3 वर्ष)", "SAM (3-5y)": "एसएएम (3–5 वर्ष)",
+      "SUW (6m-3y)": "एसयूडब्ल्यू (6 माह–3 वर्ष)", "SUW (3-6y)": "एसयूडब्ल्यू (3–6 वर्ष)",
+      "Sector Status": "सेक्टर की स्थिति", "Sector Remark": "सेक्टर टिप्पणी",
+    })[column.text] || column.text),
+  }));
 
   useEffect(() => {
     const handleResize = () => {
@@ -123,12 +137,12 @@ const DirectorBeneEntry = () => {
         setReports(results.data || []);
       }
     } catch (err) {
-      setError("Failed to fetch beneficiary summary.");
+      setError(t("Failed to fetch beneficiary summary.", "लाभार्थी सारांश प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, t]);
 
   const fetchMonthWiseStateTotal = useCallback(async () => {
     setMonthWiseLoading(true);
@@ -142,15 +156,15 @@ const DirectorBeneEntry = () => {
           setSelectedFinYear(data[0].fin_year);
         }
       } else {
-        setMonthWiseError(response.data.message || "Failed to fetch month-wise state total.");
+        setMonthWiseError(response.data.message || t("Failed to fetch month-wise state total.", "माह-वार राज्य कुल डेटा प्राप्त नहीं हो सका।"));
       }
     } catch (err) {
-      setMonthWiseError("Failed to fetch month-wise state total.");
+      setMonthWiseError(t("Failed to fetch month-wise state total.", "माह-वार राज्य कुल डेटा प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setMonthWiseLoading(false);
     }
-  }, [api, selectedFinYear]);
+  }, [api, selectedFinYear, t]);
 
   useEffect(() => {
     fetchBeneficiarySummary();
@@ -302,6 +316,7 @@ const DirectorBeneEntry = () => {
     items.push(
       <Pagination.First
         key="first"
+        aria-label={t("First page", "पहला पृष्ठ")}
         onClick={() => handlePageChange(1)}
         disabled={currentPage === 1}
       />
@@ -309,6 +324,7 @@ const DirectorBeneEntry = () => {
     items.push(
       <Pagination.Prev
         key="prev"
+        aria-label={t("Previous page", "पिछला पृष्ठ")}
         onClick={() => handlePageChange(currentPage - 1)}
         disabled={currentPage === 1}
       />
@@ -361,6 +377,7 @@ const DirectorBeneEntry = () => {
     items.push(
       <Pagination.Next
         key="next"
+        aria-label={t("Next page", "अगला पृष्ठ")}
         onClick={() => handlePageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
       />
@@ -368,6 +385,7 @@ const DirectorBeneEntry = () => {
     items.push(
       <Pagination.Last
         key="last"
+        aria-label={t("Last page", "अंतिम पृष्ठ")}
         onClick={() => handlePageChange(totalPages)}
         disabled={currentPage === totalPages}
       />
@@ -396,7 +414,7 @@ const DirectorBeneEntry = () => {
           )}
 
           <div className="dashboard-section">
-            <h4 className="section-title">लाभार्थी सारांश</h4>
+            <h4 className="section-title">{t("Beneficiary Summary", "लाभार्थी सारांश")}</h4>
 
             {loading ? (
               <div className="text-center">
@@ -410,19 +428,19 @@ const DirectorBeneEntry = () => {
                 id="beneficiary-summary-tabs"
                 className="mb-3"
               >
-                <Tab eventKey="state_total" title="State Total">
-                  <h5 className="mt-4">State-wise Summary (Total)</h5>
+                <Tab eventKey="state_total" title={t("State Total", "राज्य कुल")}>
+                  <h5 className="mt-4">{t("State-wise Summary (Total)", "राज्य-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive>
                     <thead>
                       <tr>
-                        <th>PW & LM</th>
-                        <th>Child (6m-3y)</th>
-                        <th>Child (3-6y)</th>
-                        <th>Adol. Girls</th>
-                        <th>SAM (6m-3y)</th>
-                        <th>SAM (3-5y)</th>
-                        <th>SUW (6m-3y)</th>
-                        <th>SUW (3-6y)</th>
+                        <th>{t("PW & LM", "गर्भवती एवं धात्री माताएँ")}</th>
+                        <th>{t("Child (6m-3y)", "बच्चे (6 माह–3 वर्ष)")}</th>
+                        <th>{t("Child (3-6y)", "बच्चे (3–6 वर्ष)")}</th>
+                        <th>{t("Adol. Girls", "किशोरियाँ")}</th>
+                        <th>{t("SAM (6m-3y)", "एसएएम (6 माह–3 वर्ष)")}</th>
+                        <th>{t("SAM (3-5y)", "एसएएम (3–5 वर्ष)")}</th>
+                        <th>{t("SUW (6m-3y)", "एसयूडब्ल्यू (6 माह–3 वर्ष)")}</th>
+                        <th>{t("SUW (3-6y)", "एसयूडब्ल्यू (3–6 वर्ष)")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -440,8 +458,8 @@ const DirectorBeneEntry = () => {
                   </Table>
                 </Tab>
 
-                <Tab eventKey="month_wise_summary" title="Month-wise State Summary">
-                  <h5 className="mt-4">Month-wise State Beneficiary Summary</h5>
+                <Tab eventKey="month_wise_summary" title={t("Month-wise State Summary", "माह-वार राज्य सारांश")}>
+                  <h5 className="mt-4">{t("Month-wise State Beneficiary Summary", "माह-वार राज्य लाभार्थी सारांश")}</h5>
                   {monthWiseLoading ? (
                     <div className="text-center"><Spinner animation="border" /></div>
                   ) : monthWiseError ? (
@@ -451,7 +469,7 @@ const DirectorBeneEntry = () => {
                       <Row className="mb-3 g-3 align-items-center">
                         <Col md={3}>
                           <Form.Group>
-                            <Form.Label>Financial Year</Form.Label>
+                            <Form.Label>{t("Financial Year", "वित्तीय वर्ष")}</Form.Label>
                             <Form.Select
                               value={selectedFinYear}
                               onChange={(e) => {
@@ -467,15 +485,15 @@ const DirectorBeneEntry = () => {
                         </Col>
                         <Col md={3}>
                           <Form.Group>
-                            <Form.Label>Months</Form.Label>
+                            <Form.Label>{t("Months", "महीने")}</Form.Label>
                             <Dropdown>
                               <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                                {selectedMonths.length ? `${selectedMonths.length} selected` : "All Months"}
+                                {selectedMonths.length ? t(`${selectedMonths.length} selected`, `${selectedMonths.length} चयनित`) : t("All Months", "सभी महीने")}
                               </Dropdown.Toggle>
                               <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                                 <Dropdown.Item as="div" className="d-flex justify-content-between">
-                                  <Button variant="link" size="sm" onClick={handleSelectAllMonths}>Select All</Button>
-                                  <Button variant="link" size="sm" onClick={handleDeselectAllMonths}>Deselect All</Button>
+                                  <Button variant="link" size="sm" onClick={handleSelectAllMonths}>{t("Select All", "सभी चुनें")}</Button>
+                                  <Button variant="link" size="sm" onClick={handleDeselectAllMonths}>{t("Deselect All", "सभी हटाएँ")}</Button>
                                 </Dropdown.Item>
                                 <Dropdown.Divider />
                                 {monthsForSelectedFinYear.map((month) => (
@@ -491,8 +509,8 @@ const DirectorBeneEntry = () => {
                       <Table striped bordered hover responsive>
                         <thead>
                           <tr>
-                            <th>Month</th>
-                            <th>Total Beneficiaries</th>
+                            <th>{t("Month", "महीना")}</th>
+                            <th>{t("Total Beneficiaries", "कुल लाभार्थी")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -505,20 +523,20 @@ const DirectorBeneEntry = () => {
                   )}
                 </Tab>
 
-                <Tab eventKey="district_summary" title="District Summary">
-                  <h5 className="mt-4">District-wise Summary (Total)</h5>
+                <Tab eventKey="district_summary" title={t("District Summary", "ज़िला सारांश")}>
+                  <h5 className="mt-4">{t("District-wise Summary (Total)", "ज़िला-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
-                        <th>District</th>
-                        <th>PW & LM</th>
-                        <th>Child (6m-3y)</th>
-                        <th>Child (3-6y)</th>
-                        <th>Adol. Girls</th>
-                        <th>SAM (6m-3y)</th>
-                        <th>SAM (3-5y)</th>
-                        <th>SUW (6m-3y)</th>
-                        <th>SUW (3-6y)</th>
+                        <th>{t("District", "ज़िला")}</th>
+                        <th>{t("PW & LM", "गर्भवती एवं धात्री माताएँ")}</th>
+                        <th>{t("Child (6m-3y)", "बच्चे (6 माह–3 वर्ष)")}</th>
+                        <th>{t("Child (3-6y)", "बच्चे (3–6 वर्ष)")}</th>
+                        <th>{t("Adol. Girls", "किशोरियाँ")}</th>
+                        <th>{t("SAM (6m-3y)", "एसएएम (6 माह–3 वर्ष)")}</th>
+                        <th>{t("SAM (3-5y)", "एसएएम (3–5 वर्ष)")}</th>
+                        <th>{t("SUW (6m-3y)", "एसयूडब्ल्यू (6 माह–3 वर्ष)")}</th>
+                        <th>{t("SUW (3-6y)", "एसयूडब्ल्यू (3–6 वर्ष)")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -539,20 +557,20 @@ const DirectorBeneEntry = () => {
                   </Table>
                 </Tab>
 
-                <Tab eventKey="project_summary" title="Project Summary">
-                  <h5 className="mt-4">Project-wise Summary (Total)</h5>
+                <Tab eventKey="project_summary" title={t("Project Summary", "परियोजना सारांश")}>
+                  <h5 className="mt-4">{t("Project-wise Summary (Total)", "परियोजना-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
-                        <th>Project</th>
-                        <th>PW & LM</th>
-                        <th>Child (6m-3y)</th>
-                        <th>Child (3-6y)</th>
-                        <th>Adol. Girls</th>
-                        <th>SAM (6m-3y)</th>
-                        <th>SAM (3-5y)</th>
-                        <th>SUW (6m-3y)</th>
-                        <th>SUW (3-6y)</th>
+                        <th>{t("Project", "परियोजना")}</th>
+                        <th>{t("PW & LM", "गर्भवती एवं धात्री माताएँ")}</th>
+                        <th>{t("Child (6m-3y)", "बच्चे (6 माह–3 वर्ष)")}</th>
+                        <th>{t("Child (3-6y)", "बच्चे (3–6 वर्ष)")}</th>
+                        <th>{t("Adol. Girls", "किशोरियाँ")}</th>
+                        <th>{t("SAM (6m-3y)", "एसएएम (6 माह–3 वर्ष)")}</th>
+                        <th>{t("SAM (3-5y)", "एसएएम (3–5 वर्ष)")}</th>
+                        <th>{t("SUW (6m-3y)", "एसयूडब्ल्यू (6 माह–3 वर्ष)")}</th>
+                        <th>{t("SUW (3-6y)", "एसयूडब्ल्यू (3–6 वर्ष)")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -573,20 +591,20 @@ const DirectorBeneEntry = () => {
                   </Table>
                 </Tab>
 
-                <Tab eventKey="sector_summary" title="Sector Summary">
-                  <h5 className="mt-4">सेक्टर-वार सारांश (कुल)</h5>
+                <Tab eventKey="sector_summary" title={t("Sector Summary", "सेक्टर सारांश")}>
+                  <h5 className="mt-4">{t("Sector-wise Summary (Total)", "सेक्टर-वार सारांश (कुल)")}</h5>
                   <Table striped bordered hover responsive className="mb-4">
                     <thead>
                       <tr>
-                        <th>Sector</th>
-                        <th>PW & LM</th>
-                        <th>Child (6m-3y)</th>
-                        <th>Child (3-6y)</th>
-                        <th>Adol. Girls</th>
-                        <th>SAM (6m-3y)</th>
-                        <th>SAM (3-5y)</th>
-                        <th>SUW (6m-3y)</th>
-                        <th>SUW (3-6y)</th>
+                        <th>{t("Sector", "सेक्टर")}</th>
+                        <th>{t("PW & LM", "गर्भवती एवं धात्री माताएँ")}</th>
+                        <th>{t("Child (6m-3y)", "बच्चे (6 माह–3 वर्ष)")}</th>
+                        <th>{t("Child (3-6y)", "बच्चे (3–6 वर्ष)")}</th>
+                        <th>{t("Adol. Girls", "किशोरियाँ")}</th>
+                        <th>{t("SAM (6m-3y)", "एसएएम (6 माह–3 वर्ष)")}</th>
+                        <th>{t("SAM (3-5y)", "एसएएम (3–5 वर्ष)")}</th>
+                        <th>{t("SUW (6m-3y)", "एसयूडब्ल्यू (6 माह–3 वर्ष)")}</th>
+                        <th>{t("SUW (3-6y)", "एसयूडब्ल्यू (3–6 वर्ष)")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -607,18 +625,18 @@ const DirectorBeneEntry = () => {
                   </Table>
                 </Tab>
 
-                <Tab eventKey="awc_report" title="AWC Report">
+                <Tab eventKey="awc_report" title={t("AWC Report", "आंगनवाड़ी केंद्र रिपोर्ट")}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="mb-0">AWC Beneficiary Report</h5>
+                    <h5 className="mb-0">{t("AWC Beneficiary Report", "आंगनवाड़ी केंद्र लाभार्थी रिपोर्ट")}</h5>
                     <div>
                       <Button variant="outline-danger" size="sm" onClick={exportToPDF} className="me-2">
-                        <FaFilePdf className="me-1" /> Export PDF
+                        <FaFilePdf className="me-1" /> {t("Export PDF", "पीडीएफ निर्यात करें")}
                       </Button>
                       <Button variant="outline-success" size="sm" onClick={exportToExcel} className="me-2">
-                        <FaFileExcel className="me-1" /> Export Excel
+                        <FaFileExcel className="me-1" /> {t("Export Excel", "एक्सेल निर्यात करें")}
                       </Button>
                       <Button variant="outline-secondary" size="sm" onClick={() => setShowColumnModal(true)}>
-                        <FaEye className="me-1" /> Column Visibility
+                        <FaEye className="me-1" /> {t("Column Visibility", "कॉलम दृश्यता")}
                       </Button>
                     </div>
                   </div>
@@ -627,7 +645,7 @@ const DirectorBeneEntry = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.fin_year.length ? `${filters.fin_year.length} selected` : "All Fin. Years"}
+                          {filters.fin_year.length ? t(`${filters.fin_year.length} selected`, `${filters.fin_year.length} चयनित`) : t("All Fin. Years", "सभी वित्तीय वर्ष")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueFinYears.map((v) => (
@@ -642,7 +660,7 @@ const DirectorBeneEntry = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.month.length ? `${filters.month.length} selected` : "All Months"}
+                          {filters.month.length ? t(`${filters.month.length} selected`, `${filters.month.length} चयनित`) : t("All Months", "सभी महीने")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueMonths.map((v) => (
@@ -657,7 +675,7 @@ const DirectorBeneEntry = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.district.length ? `${filters.district.length} selected` : "All Districts"}
+                          {filters.district.length ? t(`${filters.district.length} selected`, `${filters.district.length} चयनित`) : t("All Districts", "सभी ज़िले")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueDistricts.map((v) => (
@@ -672,7 +690,7 @@ const DirectorBeneEntry = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.project.length ? `${filters.project.length} selected` : "All Projects"}
+                          {filters.project.length ? t(`${filters.project.length} selected`, `${filters.project.length} चयनित`) : t("All Projects", "सभी परियोजनाएँ")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueProjects.map((v) => (
@@ -687,7 +705,7 @@ const DirectorBeneEntry = () => {
                     <Col md={2}>
                       <Dropdown>
                         <Dropdown.Toggle variant="outline-secondary" className="w-100">
-                          {filters.sector.length ? `${filters.sector.length} selected` : "All Sectors"}
+                          {filters.sector.length ? t(`${filters.sector.length} selected`, `${filters.sector.length} चयनित`) : t("All Sectors", "सभी सेक्टर")}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ maxHeight: "200px", overflowY: "auto" }}>
                           {uniqueSectors.map((v) => (
@@ -701,14 +719,14 @@ const DirectorBeneEntry = () => {
 
                     <Col md={2} className="d-flex align-items-end">
                       <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ fin_year: [], month: [], district: [], project: [], sector: [] })}>
-                        Clear Filters
+                        {t("Clear Filters", "फ़िल्टर साफ़ करें")}
                       </Button>
                     </Col>
                   </Row>
 
                   {filteredReports.length === 0 ? (
                     <div className="text-center py-4 text-muted">
-                      No beneficiary reports found for the selected filters.
+                      {t("No beneficiary reports found for the selected filters.", "चुने गए फ़िल्टर के लिए कोई लाभार्थी रिपोर्ट नहीं मिली।")}
                     </div>
                   ) : (
                     <Card className="shadow-sm">
@@ -716,7 +734,7 @@ const DirectorBeneEntry = () => {
                         <Table striped bordered hover responsive className="mb-0" ref={tableRef}>
                           <thead>
                             <tr>
-                              {visibleColumns.map((col) => (
+                              {localizedColumns.filter((col) => col.visible).map((col) => (
                                 <th key={col.dataField}>{col.text}</th>
                               ))}
                             </tr>
@@ -749,15 +767,15 @@ const DirectorBeneEntry = () => {
 
         <Modal show={showColumnModal} onHide={() => setShowColumnModal(false)}>
           <Modal.Header closeButton>
-            <Modal.Title>Show/Hide Columns</Modal.Title>
+            <Modal.Title>{t("Show/Hide Columns", "कॉलम दिखाएँ/छिपाएँ")}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            {columns.map((col, index) => (
+            {localizedColumns.map((col, index) => (
               <Form.Check key={index} type="checkbox" label={col.text} checked={col.visible} onChange={() => handleColumnToggle(index)} />
             ))}
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowColumnModal(false)}>Close</Button>
+            <Button variant="secondary" onClick={() => setShowColumnModal(false)}>{t("Close", "बंद करें")}</Button>
           </Modal.Footer>
         </Modal>
       </div>

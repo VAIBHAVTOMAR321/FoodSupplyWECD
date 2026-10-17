@@ -25,6 +25,7 @@ import {
   Tab,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/cdpo.css";
 import "../../assets/css/foodSupplementary.css";
 import CDPOHeader from "./CDPOHeader";
@@ -79,6 +80,86 @@ const quarterOptions = [
   "Oct-Nov-Dec",
   "Jan-Feb-Mar",
 ];
+
+const supplementaryUiTranslations = {
+  "No options": "कोई विकल्प नहीं",
+  "S. No.": "क्रम संख्या",
+  "District": "जिला",
+  "Project": "परियोजना",
+  "Sector": "सेक्टर",
+  "AWC Name": "आंगनवाड़ी केंद्र का नाम",
+  "AWC Code": "आंगनवाड़ी केंद्र कोड",
+  "Trimester": "तिमाही",
+  "Fin. Year": "वित्तीय वर्ष",
+  "Pregnant/Lactating": "गर्भवती/धात्री",
+  "Children 6m-3y": "बच्चे 6 माह-3 वर्ष",
+  "SAM 6m-5y / SUW 6m-6y": "एसएएम 6 माह-5 वर्ष / कम वजन 6 माह-6 वर्ष",
+  "SAM 3y-5y / SUW 3y-6y": "एसएएम 3-5 वर्ष / कम वजन 3-6 वर्ष",
+  "HCM 3y-6y": "एचसीएम 3-6 वर्ष",
+  "Preg/Lact": "गर्भवती/धात्री",
+  "SAM/SUW 6m-6y": "एसएएम/कम वजन 6 माह-6 वर्ष",
+  "SAM/SUW 3y-6y": "एसएएम/कम वजन 3-6 वर्ष",
+  Actions: "कार्रवाइयां",
+  "All Years": "सभी वर्ष",
+  "All Quarters": "सभी तिमाहियां",
+  "Fetching records, please wait...": "रिकॉर्ड प्राप्त किए जा रहे हैं, कृपया प्रतीक्षा करें...",
+  "Supplementary Nutrition Master": "पूरक पोषण मास्टर",
+  "Filter by Financial Year": "वित्तीय वर्ष के अनुसार फ़िल्टर करें",
+  "Filter by Trimester": "तिमाही के अनुसार फ़िल्टर करें",
+  "CDPO Dashboard - Supplementary Nutrition Records": "सीडीपीओ डैशबोर्ड - पूरक पोषण रिकॉर्ड",
+  Search: "खोजें",
+  "Search quarter, year, district, AWC...": "तिमाही, वर्ष, जिला, आंगनवाड़ी केंद्र खोजें...",
+  Template: "टेम्पलेट",
+  Upload: "अपलोड करें",
+  Refresh: "रीफ़्रेश करें",
+  "Loading data...": "डेटा लोड हो रहा है...",
+  "View Food Items": "खाद्य सामग्री देखें",
+  Reset: "रीसेट करें",
+  "Supplies Received & Distributed Summary": "प्राप्त एवं वितरित सामग्री सारांश",
+  "No data available": "कोई डेटा उपलब्ध नहीं",
+  Total: "कुल",
+  "Rec.": "प्राप्त",
+  "Dist.": "वितरित",
+  "Rem.": "शेष",
+  Excel: "एक्सेल",
+  PDF: "पीडीएफ़",
+  "Sector-wise": "सेक्टर-वार",
+  "AWC-wise": "आंगनवाड़ी केंद्र-वार",
+  "Edit Supplementary Record": "पूरक रिकॉर्ड संपादित करें",
+  Back: "वापस",
+  "Basic Information": "मूल जानकारी",
+  "Beneficiary Counts": "लाभार्थियों की संख्या",
+  "Supplementary Nutrition Details": "पूरक पोषण विवरण",
+  Cancel: "रद्द करें",
+  "Saving...": "सहेजा जा रहा है...",
+  "Update Record": "रिकॉर्ड अपडेट करें",
+  "Upload Complete": "अपलोड पूरा हुआ",
+  "Uploading Records...": "रिकॉर्ड अपलोड हो रहे हैं...",
+  File: "फ़ाइल",
+  Uploaded: "अपलोड किया गया",
+  Failed: "विफल",
+  "Error Details": "त्रुटि विवरण",
+  "All records uploaded successfully!": "सभी रिकॉर्ड सफलतापूर्वक अपलोड किए गए!",
+  Close: "बंद करें",
+  "Confirm Delete": "हटाने की पुष्टि करें",
+  Delete: "हटाएं",
+  "View Record Details": "रिकॉर्ड विवरण देखें",
+  "Beneficiary Counts and Grants": "लाभार्थियों की संख्या एवं अनुदान",
+  "Food Items List": "खाद्य सामग्री सूची",
+  "Food Item": "खाद्य सामग्री",
+  "No records found. Click": "कोई रिकॉर्ड नहीं मिला। जोड़ने के लिए क्लिक करें",
+  "DISTRICT": "जिला",
+  "PROJECT": "परियोजना",
+  "SECTOR": "सेक्टर",
+  "AWC NAME": "आंगनवाड़ी केंद्र का नाम",
+  "AWC CODE": "आंगनवाड़ी केंद्र कोड",
+  "TRIMESTER": "तिमाही",
+  "FINANCIAL YEAR": "वित्तीय वर्ष",
+  "Pregnant Woman and Lactating Mother": "गर्भवती एवं धात्री महिला",
+  "SAM 6M-5Y / SUW 6M-6Y": "एसएएम 6 माह-5 वर्ष / कम वजन 6 माह-6 वर्ष",
+  "SAM 3Y-5Y / SUW 3Y-6Y": "एसएएम 3-5 वर्ष / कम वजन 3-6 वर्ष",
+  "HCM Beneficiaries 3Y-6Y (Normal Children)": "एचसीएम लाभार्थी 3-6 वर्ष (सामान्य बच्चे)",
+};
 
 // Reconciliation APIs may return a month instead of the trimester label.
 const getSupplyTrimester = (record = {}) => {
@@ -207,6 +288,7 @@ const initialFormData = {
 
 // --- Custom Multi-Select Dropdown Component ---
 const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
+  const { t } = useLanguage();
   const toggleOption = (opt) => {
     if (selected.includes(opt)) {
       onChange(selected.filter((o) => o !== opt));
@@ -233,7 +315,7 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
         </Dropdown.Toggle>
         <Dropdown.Menu className="fs-multi-menu">
           {options.length === 0 ? (
-            <Dropdown.Item disabled>No options</Dropdown.Item>
+            <Dropdown.Item disabled>{t("No options", supplementaryUiTranslations["No options"])}</Dropdown.Item>
           ) : (
             options.map((opt) => (
               <div key={opt} className="fs-multi-item" onClick={(e) => { e.stopPropagation(); toggleOption(opt); }}>
@@ -248,6 +330,8 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
 };
 
 const FoodSupplementary = () => {
+  const { t } = useLanguage();
+  const translateLabel = (text) => t(text, supplementaryUiTranslations[text] || text);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -458,7 +542,7 @@ const FoodSupplementary = () => {
       const data = Array.isArray(response.data) ? response.data : response.data?.results || response.data?.data || [];
       setRecords(data);
     } catch (err) {
-      setError("Failed to fetch supplementary nutrition data.");
+      setError(t("Failed to fetch supplementary nutrition data.", "पूरक पोषण डेटा प्राप्त नहीं हो सका।"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -757,7 +841,7 @@ const FoodSupplementary = () => {
     const file = e.target.files[0];
     if (!file) return;
     if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
-      setError("Please upload a valid Excel (.xlsx, .xls) or CSV file.");
+      setError(t("Please upload a valid Excel (.xlsx, .xls) or CSV file.", "कृपया मान्य एक्सेल (.xlsx, .xls) या CSV फ़ाइल अपलोड करें।"));
       return;
     }
     processExcelFile(file);
@@ -863,7 +947,7 @@ const FoodSupplementary = () => {
         if (uploadedCount) setSuccess(`${uploadedCount} record(s) uploaded successfully.`);
         await fetchData();
       } catch (err) {
-        setError("Failed to process Excel file: " + (err.message || "Unknown error"));
+        setError(`${t("Failed to process Excel file:", "एक्सेल फ़ाइल संसाधित नहीं हो सकी:")} ${err.message || t("Unknown error", "अज्ञात त्रुटि")}`);
         console.error(err);
       }
     };
@@ -945,12 +1029,12 @@ const FoodSupplementary = () => {
         const payload = { ...formData };
         delete payload.district; delete payload.project; delete payload.sector; delete payload.awc_name; delete payload.created_at; delete payload.updated_at;
         await api.put("/supplementary-nutrition-details/", payload);
-        setSuccess("Record updated successfully.");
+        setSuccess(t("Record updated successfully.", "रिकॉर्ड सफलतापूर्वक अपडेट किया गया।"));
       }
       setView("list");
       fetchData();
     } catch (err) {
-      setError("Failed to update record.");
+      setError(t("Failed to update record.", "रिकॉर्ड अपडेट नहीं हो सका।"));
       console.error(err);
     } finally {
       setFormLoading(false);
@@ -961,12 +1045,12 @@ const FoodSupplementary = () => {
     if (!deleteTarget) return;
     try {
       await api.delete("/supplementary-nutrition-details/", { data: { ids: [deleteTarget.id] } });
-      setSuccess("Record deleted successfully.");
+      setSuccess(t("Record deleted successfully.", "रिकॉर्ड सफलतापूर्वक हटाया गया।"));
       setShowDeleteModal(false);
       setDeleteTarget(null);
       fetchData();
     } catch (err) {
-      setError("Failed to delete record.");
+      setError(t("Failed to delete record.", "रिकॉर्ड हटाया नहीं जा सका।"));
       console.error(err);
     }
   };
@@ -975,7 +1059,7 @@ const FoodSupplementary = () => {
     const isSelect = type === "select";
     return (
       <Form.Group className="mb-3">
-        <Form.Label className="fs-field-label">{label}</Form.Label>
+        <Form.Label className="fs-field-label">{translateLabel(label)}</Form.Label>
         {isSelect ? (
           <Form.Select name={name} value={formData[name] ?? ""} onChange={handleInputChange} className={formErrors[name] ? "is-invalid" : ""}>
             {(name === "quarter" ? quarterOptions : monthNames).map((option) => (<option key={option} value={option}>{option}</option>))}
@@ -1498,27 +1582,27 @@ const FoodSupplementary = () => {
               <div className="dashboard-section">
                 <div className="fs-page-header">
                   <h4 className="fs-page-title">
-                    <FaChartBar className="me-2" /> CDPO Dashboard - Supplementary Nutrition Records
+                    <FaChartBar className="me-2" /> {t("CDPO Dashboard - Supplementary Nutrition Records", supplementaryUiTranslations["CDPO Dashboard - Supplementary Nutrition Records"])}
                   </h4>
                   <div className="fs-header-actions">
                     <input type="file" ref={fileInputRef} style={{ display: "none" }} accept=".xlsx,.xls,.csv" onChange={handleFileSelect} />
                     <Dropdown className="fs-search-dropdown">
                       <Dropdown.Toggle variant="light" size="sm">
-                        <FaSearch className="me-1" /> Search
+                        <FaSearch className="me-1" /> {t("Search", "खोजें")}
                       </Dropdown.Toggle>
                       <Dropdown.Menu style={{ minWidth: "300px", padding: "12px" }}>
-                        <Form.Control type="text" placeholder="Search quarter, year, district, AWC..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="mb-2" />
-                        {searchTerm && <div className="text-muted small">Results: {searchedRecords.length}</div>}
+                        <Form.Control type="text" placeholder={t("Search quarter, year, district, AWC...", supplementaryUiTranslations["Search quarter, year, district, AWC..."])} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="mb-2" />
+                        {searchTerm && <div className="text-muted small">{t("Results:", "परिणाम:")} {searchedRecords.length}</div>}
                       </Dropdown.Menu>
                     </Dropdown>
                     <Button variant="success" size="sm" onClick={handleDownloadTemplate} className="fs-btn-light" style={{ background: "linear-gradient(135deg, #059669, #10b981)", border: "none", color: "#fff" }}>
-                      <FaFileDownload className="me-1" /> Template
+                      <FaFileDownload className="me-1" /> {t("Template", "टेम्पलेट")}
                     </Button>
                     <Button variant="primary" size="sm" onClick={() => fileInputRef.current?.click()} className="fs-btn-primary">
-                      <FaUpload className="me-1" /> Upload
+                      <FaUpload className="me-1" /> {t("Upload", "अपलोड करें")}
                     </Button>
                     <Button variant="light" size="sm" onClick={() => { setRefreshing(true); setTimeout(() => { setRefreshing(false); fetchData(); }, 500); }} disabled={refreshing} className="fs-btn-light">
-                      <FaSyncAlt className={`me-1 ${refreshing ? "fs-spin" : ""}`} /> Refresh
+                      <FaSyncAlt className={`me-1 ${refreshing ? "fs-spin" : ""}`} /> {t("Refresh", "रीफ़्रेश करें")}
                     </Button>
                   </div>
                 </div>
@@ -1527,16 +1611,16 @@ const FoodSupplementary = () => {
               {loading ? (
                 <div className="text-center py-5">
                   <Spinner animation="border" variant="primary" />
-                  <p className="mt-3 text-muted">Loading data...</p>
+                  <p className="mt-3 text-muted">{t("Loading data...", supplementaryUiTranslations["Loading data..."])}</p>
                 </div>
               ) : (
                 <>
                   {/* ─── Multi-Select Filter Bar ─── */}
                   <div className="fs-filter-bar">
-                    <MultiSelectDropdown label="Trimester" options={uniqueQuarters} selected={selectedMonths} onChange={setSelectedMonths} />
-                    <MultiSelectDropdown label="Financial Year" options={uniqueFYs} selected={selectedFYs} onChange={setSelectedFYs} />
-                    <MultiSelectDropdown label="Project" options={uniqueProjects} selected={selectedProjects} onChange={setSelectedProjects} />
-                    <MultiSelectDropdown label="Sector" options={uniqueSectors} selected={selectedSectors} onChange={setSelectedSectors} />
+                    <MultiSelectDropdown label={t("Trimester", "तिमाही")} options={uniqueQuarters} selected={selectedMonths} onChange={setSelectedMonths} />
+                    <MultiSelectDropdown label={t("Financial Year", "वित्तीय वर्ष")} options={uniqueFYs} selected={selectedFYs} onChange={setSelectedFYs} />
+                    <MultiSelectDropdown label={t("Project", "परियोजना")} options={uniqueProjects} selected={selectedProjects} onChange={setSelectedProjects} />
+                    <MultiSelectDropdown label={t("Sector", "सेक्टर")} options={uniqueSectors} selected={selectedSectors} onChange={setSelectedSectors} />
                     
                     {/* Added View Food Items Button */}
                     <Button 
@@ -1546,11 +1630,11 @@ const FoodSupplementary = () => {
                       className="me-2" 
                       style={{ height: '31px', alignSelf: 'flex-end', display: 'flex', alignItems: 'center' }}
                     >
-                      <FaUtensils className="me-1" /> View Food Items
+                      <FaUtensils className="me-1" /> {t("View Food Items", supplementaryUiTranslations["View Food Items"])}
                     </Button>
 
                     <Button variant="outline-secondary" size="sm" className="fs-filter-reset" onClick={() => { setSelectedMonths([]); setSelectedFYs([]); setSelectedProjects([]); setSelectedSectors([]); }}>
-                      Reset
+                      {t("Reset", "रीसेट करें")}
                     </Button>
                   </div>
 
@@ -1560,7 +1644,7 @@ const FoodSupplementary = () => {
                       {SUMMARY_PILLS.map((field) => (
                         <div key={field.key} className="fs-stat-pill">
                           <span className="fs-stat-pill-icon">{field.icon}</span>
-                          <span className="fs-stat-pill-label">{field.label}</span>
+                          <span className="fs-stat-pill-label">{translateLabel(field.label)}</span>
                           <span className="fs-stat-pill-value">{summary[field.key]?.toLocaleString() || 0}</span>
                         </div>
                       ))}
@@ -1573,17 +1657,17 @@ const FoodSupplementary = () => {
                       <Card.Header className="fs-table-card-header">
                         <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
                           <h5 className="fs-section-title mb-0">
-                            <FaWarehouse className="me-2" /> Supplies Received & Distributed Summary
+                            <FaWarehouse className="me-2" /> {t("Supplies Received & Distributed Summary", supplementaryUiTranslations["Supplies Received & Distributed Summary"])}
                           </h5>
                           <div className="d-flex align-items-end gap-3 flex-wrap">
                             <MultiSelectDropdown
-                              label="Trimester"
+                              label={t("Trimester", "तिमाही")}
                               options={suppliesQuarters}
                               selected={selectedSupplyQuarters}
                               onChange={setSelectedSupplyQuarters}
                             />
                             <MultiSelectDropdown
-                              label="Financial Year"
+                              label={t("Financial Year", "वित्तीय वर्ष")}
                               options={suppliesFinancialYears}
                               selected={selectedSupplyFYs}
                               onChange={setSelectedSupplyFYs}
@@ -1598,7 +1682,7 @@ const FoodSupplementary = () => {
                                   setSelectedSupplyFYs([]);
                                 }}
                               >
-                                Reset
+                                {t("Reset", "रीसेट करें")}
                               </Button>
                             )}
                             <ButtonGroup className="fs-toggle-group" style={{ marginRight: "8px" }}>
@@ -1607,18 +1691,18 @@ const FoodSupplementary = () => {
                             </ButtonGroup>
                             <ButtonGroup className="fs-toggle-group" style={{ marginRight: "8px" }}>
                               <Button className={`fs-toggle-btn ${suppliesViewMode === "sector" ? "active" : ""}`} onClick={() => setSuppliesViewMode("sector")} title="Sector-wise">
-                                <FaLayerGroup className="me-1" /> Sector
+                                <FaLayerGroup className="me-1" /> {t("Sector", "सेक्टर")}
                               </Button>
                               <Button className={`fs-toggle-btn ${suppliesViewMode === "awc" ? "active" : ""}`} onClick={() => setSuppliesViewMode("awc")} title="AWC-wise">
-                                <FaWarehouse className="me-1" /> AWC
+                                <FaWarehouse className="me-1" /> {t("AWC", "आंगनवाड़ी केंद्र")}
                               </Button>
                             </ButtonGroup>
                             <div className="fs-export-btns">
                               <Button variant="light" size="sm" className="fs-export-btn" onClick={exportSuppliesToExcel}>
-                                <FaFileExcel className="text-success" /> Excel
+                                <FaFileExcel className="text-success" /> {t("Excel", "एक्सेल")}
                               </Button>
                               <Button variant="light" size="sm" className="fs-export-btn" onClick={exportSuppliesToPDF}>
-                                <FaFilePdf className="text-danger" /> PDF
+                                <FaFilePdf className="text-danger" /> {t("PDF", "पीडीएफ़")}
                               </Button>
                             </div>
                           </div>
@@ -1636,8 +1720,8 @@ const FoodSupplementary = () => {
                                 <Table hover className="fs-data-table mb-0">
                                   <thead>
                                     <tr>
-                                      <th rowSpan="2">S. No.</th>
-                                      <th rowSpan="2">Sector</th>
+                                      <th rowSpan="2">{t("S. No.", "क्रम संख्या")}</th>
+                                      <th rowSpan="2">{t("Sector", "सेक्टर")}</th>
                                       {suppliesFoodItems.map((fi, idx) => (
                                         <th key={`fi-${idx}`} colSpan="3" className="text-center" style={{ borderLeft: "1px solid #e9d5ff" }}>
                                           {fi}
@@ -1647,9 +1731,9 @@ const FoodSupplementary = () => {
                                     <tr>
                                       {suppliesFoodItems.map((fi, idx) => (
                                         <React.Fragment key={`sub-${idx}`}>
-                                          <th className="text-end">Rec. ({supplyQuantityUnit})</th>
-                                          <th className="text-end">Dist. ({supplyQuantityUnit})</th>
-                                          <th className="text-end">Rem. ({supplyQuantityUnit})</th>
+                                          <th className="text-end">{t("Rec.", "प्राप्त")} ({supplyQuantityUnit})</th>
+                                          <th className="text-end">{t("Dist.", "वितरित")} ({supplyQuantityUnit})</th>
+                                          <th className="text-end">{t("Rem.", "शेष")} ({supplyQuantityUnit})</th>
                                         </React.Fragment>
                                       ))}
                                     </tr>
@@ -1658,7 +1742,7 @@ const FoodSupplementary = () => {
                                     {suppliesData.length === 0 ? (
                                       <tr>
                                         <td colSpan={2 + suppliesFoodItems.length * 3} className="text-center p-4 text-muted">
-                                          No data available
+                                          {t("No data available", supplementaryUiTranslations["No data available"])}
                                         </td>
                                       </tr>
                                     ) : (
@@ -1684,7 +1768,7 @@ const FoodSupplementary = () => {
                                     <tfoot>
                                       <tr>
                                         <th></th>
-                                        <th>Total</th>
+                                        <th>{t("Total", supplementaryUiTranslations.Total)}</th>
                                         {suppliesFoodItems.map((fi, idx) => {
                                           const t = suppliesTotals[fi] || { received: 0, distributed: 0, balance: 0 };
                                           return (
@@ -1703,10 +1787,10 @@ const FoodSupplementary = () => {
                                 <Table hover className="fs-data-table mb-0">
                                   <thead>
                                     <tr>
-                                      <th rowSpan="2">S. No.</th>
-                                      <th rowSpan="2">Sector</th>
-                                      <th rowSpan="2">AWC Name</th>
-                                      <th rowSpan="2">AWC Code</th>
+                                      <th rowSpan="2">{t("S. No.", "क्रम संख्या")}</th>
+                                      <th rowSpan="2">{t("Sector", "सेक्टर")}</th>
+                                      <th rowSpan="2">{t("AWC Name", "आंगनवाड़ी केंद्र का नाम")}</th>
+                                      <th rowSpan="2">{t("AWC Code", "आंगनवाड़ी केंद्र कोड")}</th>
                                       {suppliesFoodItems.map((fi, idx) => (
                                         <th key={`fi-awc-${idx}`} colSpan="3" className="text-center" style={{ borderLeft: "1px solid #e9d5ff" }}>
                                           {fi}
@@ -1716,9 +1800,9 @@ const FoodSupplementary = () => {
                                     <tr>
                                       {suppliesFoodItems.map((fi, idx) => (
                                         <React.Fragment key={`sub-awc-${idx}`}>
-                                          <th className="text-end">Rec. ({supplyQuantityUnit})</th>
-                                          <th className="text-end">Dist. ({supplyQuantityUnit})</th>
-                                          <th className="text-end">Rem. ({supplyQuantityUnit})</th>
+                                          <th className="text-end">{t("Rec.", "प्राप्त")} ({supplyQuantityUnit})</th>
+                                          <th className="text-end">{t("Dist.", "वितरित")} ({supplyQuantityUnit})</th>
+                                          <th className="text-end">{t("Rem.", "शेष")} ({supplyQuantityUnit})</th>
                                         </React.Fragment>
                                       ))}
                                     </tr>
@@ -1727,7 +1811,7 @@ const FoodSupplementary = () => {
                                     {awcSuppliesData.length === 0 ? (
                                       <tr>
                                         <td colSpan={4 + suppliesFoodItems.length * 3} className="text-center p-4 text-muted">
-                                          No data available
+                                          {t("No data available", supplementaryUiTranslations["No data available"])}
                                         </td>
                                       </tr>
                                     ) : (
@@ -1755,7 +1839,7 @@ const FoodSupplementary = () => {
                                     <tfoot>
                                       <tr>
                                         <th></th>
-                                        <th>Total</th>
+                                        <th>{t("Total", supplementaryUiTranslations.Total)}</th>
                                         <th></th>
                                         <th></th>
                                         {suppliesFoodItems.map((fi, idx) => {
@@ -1787,14 +1871,14 @@ const FoodSupplementary = () => {
                         <Card.Header className="fs-table-card-header">
                           <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
                             <h5 className="fs-section-title mb-0">
-                              <FaLayerGroup className="me-2" /> Sector-wise Aggregated Summary
+                              <FaLayerGroup className="me-2" /> {t("Sector-wise Aggregated Summary", "सेक्टर-वार समेकित सारांश")}
                             </h5>
                             <div className="fs-export-btns">
                               <Button variant="light" size="sm" className="fs-export-btn" onClick={exportAggToExcel}>
-                                <FaFileExcel className="text-success" /> Excel
+                                <FaFileExcel className="text-success" /> {t("Excel", "एक्सेल")}
                               </Button>
                               <Button variant="light" size="sm" className="fs-export-btn" onClick={exportAggToPDF}>
-                                <FaFilePdf className="text-danger" /> PDF
+                                <FaFilePdf className="text-danger" /> {t("PDF", "पीडीएफ़")}
                               </Button>
                             </div>
                           </div>
@@ -1804,12 +1888,12 @@ const FoodSupplementary = () => {
                             <Table hover className="fs-data-table mb-0">
                               <thead>
                                 <tr>
-                                  <th>S. No.</th>
-                                  <th>Sector</th>
-                                  <th>Trimester</th>
-                                  <th>Fin. Years</th>
+                                  <th>{t("S. No.", "क्रम संख्या")}</th>
+                                  <th>{t("Sector", "सेक्टर")}</th>
+                                  <th>{t("Trimester", "तिमाही")}</th>
+                                  <th>{t("Fin. Years", "वित्तीय वर्ष")}</th>
                                   {NUMERIC_AGG_FIELDS.map((col, idx) => (
-                                    <th key={idx} className="text-end">{col.label}</th>
+                                    <th key={idx} className="text-end">{translateLabel(col.label)}</th>
                                   ))}
                                 </tr>
                               </thead>
@@ -1817,7 +1901,7 @@ const FoodSupplementary = () => {
                                 {aggregatedData.length === 0 ? (
                                   <tr>
                                     <td colSpan={NUMERIC_AGG_FIELDS.length + 4} className="text-center py-4 text-muted">
-                                      No data available for aggregation
+                                      {t("No data available for aggregation", "समेकन के लिए कोई डेटा उपलब्ध नहीं")}
                                     </td>
                                   </tr>
                                 ) : (
@@ -1840,7 +1924,7 @@ const FoodSupplementary = () => {
                                 <tfoot>
                                   <tr>
                                     <th></th>
-                                    <th>Total</th>
+                                    <th>{t("Total", "कुल")}</th>
                                     <th></th>
                                     <th></th>
                                     {NUMERIC_AGG_FIELDS.map((col, cIdx) => (
@@ -1864,18 +1948,18 @@ const FoodSupplementary = () => {
                       <Card.Header className="fs-table-card-header">
                         <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
                           <h5 className="fs-section-title mb-0">
-                            <FaChartBar className="me-2" /> Supplementary Nutrition Records
+                            <FaChartBar className="me-2" /> {t("Supplementary Nutrition Records", "पूरक पोषण रिकॉर्ड")}
                           </h5>
                           <div className="d-flex align-items-center gap-2">
                             <Badge bg="primary" pill className="fs-count-badge">
-                              {searchedRecords.length} entries
+                              {searchedRecords.length} {t("entries", "प्रविष्टियां")}
                             </Badge>
                             <div className="fs-export-btns">
                               <Button variant="light" size="sm" className="fs-export-btn" onClick={exportDetailsToExcel}>
-                                <FaFileExcel className="text-success" /> Excel
+                                <FaFileExcel className="text-success" /> {t("Excel", "एक्सेल")}
                               </Button>
                               <Button variant="light" size="sm" className="fs-export-btn" onClick={exportDetailsToPDF}>
-                                <FaFilePdf className="text-danger" /> PDF
+                                <FaFilePdf className="text-danger" /> {t("PDF", "पीडीएफ़")}
                               </Button>
                             </div>
                           </div>
@@ -1889,21 +1973,21 @@ const FoodSupplementary = () => {
                           <Table hover className="fs-data-table mb-0 fs-grant-master-table" style={{ minWidth: "2400px", borderCollapse: "separate", borderSpacing: 0 }}>
                             <thead>
                               <tr>
-                                <th rowSpan={2} className="text-center align-middle">S. No.</th>
+                                <th rowSpan={2} className="text-center align-middle">{t("S. No.", "क्रम संख्या")}</th>
                                 {EXCEL_META_COLUMNS.map((col) => (
-                                  <th key={col.key} rowSpan={2} className="text-center align-middle">{col.header}</th>
+                                  <th key={col.key} rowSpan={2} className="text-center align-middle">{translateLabel(col.header)}</th>
                                 ))}
                                 {GRANT_CATEGORIES.map((cat, index) => (
-                                  <th key={cat.countKey} colSpan={4 + getFoodForCategory(index).length} className="text-center align-middle fs-grant-group-header">{cat.title}</th>
+                                  <th key={cat.countKey} colSpan={4 + getFoodForCategory(index).length} className="text-center align-middle fs-grant-group-header">{translateLabel(cat.title)}</th>
                                 ))}
-                                <th rowSpan={2} className="text-center align-middle">Actions</th>
+                                <th rowSpan={2} className="text-center align-middle">{t("Actions", "कार्रवाइयां")}</th>
                               </tr>
                               <tr>
                                 {GRANT_CATEGORIES.flatMap((cat, index) => [
                                   ...[15, 30, 31].map((grantId) => (
-                                    <th key={`${cat.countKey}-${grantId}`} className="text-center">Grant {grantId}</th>
+                                    <th key={`${cat.countKey}-${grantId}`} className="text-center">{t("Grant", "अनुदान")} {grantId}</th>
                                   )),
-                                  <th key={`${cat.countKey}-total`} className="text-center">TOTAL</th>,
+                                  <th key={`${cat.countKey}-total`} className="text-center">{t("TOTAL", "कुल")}</th>,
                                   ...getFoodForCategory(index).map((food) => (
                                     <th key={food.key} className="text-center fs-food-subheader">{food.header}</th>
                                   )),
@@ -1914,7 +1998,7 @@ const FoodSupplementary = () => {
                               {paginatedRecords.length === 0 ? (
                                 <tr>
                                   <td colSpan={1 + EXCEL_META_COLUMNS.length + GRANT_CATEGORIES.length * 4 + FOOD_FIELDS.length + 1} className="text-center py-5 text-muted">
-                                    No records found. Click <strong>Upload Excel</strong> to add records.
+                                    {t("No records found. Click", "कोई रिकॉर्ड नहीं मिला।")} <strong>{t("Upload Excel", "एक्सेल अपलोड करें")}</strong> {t("to add records.", "रिकॉर्ड जोड़ने के लिए।")}
                                   </td>
                                 </tr>
                               ) : (
@@ -1948,9 +2032,9 @@ const FoodSupplementary = () => {
                                     })}
                                     <td className="text-center">
                                       <div className="fs-action-btns">
-                                        <Button variant="light" size="sm" className="fs-action-btn" style={{ color: "#0ea5e9", background: "#f0f9ff", borderColor: "#bae6fd" }} onClick={() => handleViewClick(record)} title="View"><FaEye /></Button>
-                                        <Button variant="light" size="sm" className="fs-action-btn fs-edit-btn" onClick={() => handleEdit(record)} title="Edit"><FaEdit /></Button>
-                                        <Button variant="light" size="sm" className="fs-action-btn fs-delete-btn" onClick={() => handleDeleteClick(record)} title="Delete"><FaTrash /></Button>
+                                        <Button variant="light" size="sm" className="fs-action-btn" style={{ color: "#0ea5e9", background: "#f0f9ff", borderColor: "#bae6fd" }} onClick={() => handleViewClick(record)} title={t("View", "देखें")} aria-label={t("View", "देखें")}><FaEye /></Button>
+                                        <Button variant="light" size="sm" className="fs-action-btn fs-edit-btn" onClick={() => handleEdit(record)} title={t("Edit", "संपादित करें")} aria-label={t("Edit", "संपादित करें")}><FaEdit /></Button>
+                                        <Button variant="light" size="sm" className="fs-action-btn fs-delete-btn" onClick={() => handleDeleteClick(record)} title={t("Delete", "हटाएं")} aria-label={t("Delete", "हटाएं")}><FaTrash /></Button>
                                       </div>
                                     </td>
                                   </tr>
@@ -1962,7 +2046,7 @@ const FoodSupplementary = () => {
                                 <tr>
                                   <th></th>
                                   {EXCEL_META_COLUMNS.map((col, idx) => (
-                                    <th key={col.key}>{idx === 0 ? "TOTAL" : ""}</th>
+                                    <th key={col.key}>{idx === 0 ? t("TOTAL", "कुल") : ""}</th>
                                   ))}
                                   {GRANT_CATEGORIES.flatMap((cat, categoryIndex) => [
                                     <th key={`${cat.countKey}-g15`}></th>,
@@ -1983,7 +2067,7 @@ const FoodSupplementary = () => {
                       {totalRecords > 0 && (
                         <Card.Footer className="d-flex justify-content-between align-items-center flex-wrap gap-2 py-3 px-4">
                           <span className="small text-muted">
-                            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalRecords)} of {totalRecords} entries
+                            {t("Showing", "दिखाए जा रहे हैं")} {(currentPage - 1) * itemsPerPage + 1} {t("to", "से")} {Math.min(currentPage * itemsPerPage, totalRecords)} {t("of", "में से")} {totalRecords} {t("entries", "प्रविष्टियां")}
                           </span>
                           <Pagination size="sm" className="mb-0">
                             <Pagination.Prev disabled={currentPage === 1} onClick={() => handlePageChange(currentPage - 1)} />
@@ -2015,15 +2099,15 @@ const FoodSupplementary = () => {
                 <Form onSubmit={handleSubmit}>
                   <Card.Header className="fs-form-header">
                     <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
-                      <h5 className="mb-0"><FaEdit className="me-2" /> Edit Supplementary Record</h5>
+                      <h5 className="mb-0"><FaEdit className="me-2" /> {t("Edit Supplementary Record", "पूरक रिकॉर्ड संपादित करें")}</h5>
                       <Button variant="light" size="sm" onClick={() => setView("list")} className="fs-btn-light">
-                        <FaArrowLeft className="me-1" /> Back
+                        <FaArrowLeft className="me-1" /> {t("Back", "वापस")}
                       </Button>
                     </div>
                   </Card.Header>
                   <Card.Body className="p-4">
                     <div className="fs-form-section mb-4">
-                      <h6 className="fs-section-subtitle">Basic Information</h6>
+                      <h6 className="fs-section-subtitle">{t("Basic Information", "मूल जानकारी")}</h6>
                       <Row>
                         <Col md={6} lg={4}>{renderFormField("AWC Code", "awc_code", "text", "5064010220")}</Col>
                         <Col md={6} lg={4}>{renderFormField("Trimester", "quarter", "select")}</Col>
@@ -2031,22 +2115,22 @@ const FoodSupplementary = () => {
                       </Row>
                     </div>
                     <div className="fs-form-section mb-4">
-                      <h6 className="fs-section-subtitle">Beneficiary Counts</h6>
+                      <h6 className="fs-section-subtitle">{t("Beneficiary Counts", "लाभार्थियों की संख्या")}</h6>
                       <Row>
                         {GRANT_CATEGORIES.map((cat) => <Col md={6} lg={4} key={cat.countKey}>{renderFormField(cat.title, cat.countKey, "number", "0")}</Col>)}
                       </Row>
                     </div>
                     <div className="fs-form-section">
-                      <h6 className="fs-section-subtitle">Supplementary Nutrition Details</h6>
+                      <h6 className="fs-section-subtitle">{t("Supplementary Nutrition Details", "पूरक पोषण विवरण")}</h6>
                       <Row>
                         {FOOD_FIELDS.map((food) => <Col md={6} lg={4} key={food.key}>{renderFormField(food.header, food.key, "number", "0")}</Col>)}
                       </Row>
                     </div>
                   </Card.Body>
                   <Card.Footer className="fs-form-footer">
-                    <Button variant="light" onClick={() => setView("list")} className="fs-btn-light px-4"><FaTimes className="me-1" /> Cancel</Button>
+                    <Button variant="light" onClick={() => setView("list")} className="fs-btn-light px-4"><FaTimes className="me-1" /> {t("Cancel", "रद्द करें")}</Button>
                     <Button variant="primary" type="submit" disabled={formLoading} className="fs-btn-primary px-4">
-                      {formLoading ? (<><Spinner as="span" animation="border" size="sm" className="me-1" /> Saving...</>) : (<><FaSave className="me-1" /> Update Record</>)}
+                      {formLoading ? (<><Spinner as="span" animation="border" size="sm" className="me-1" /> {t("Saving...", "सहेजा जा रहा है...")}</>) : (<><FaSave className="me-1" /> {t("Update Record", "रिकॉर्ड अपडेट करें")}</>)}
                     </Button>
                   </Card.Footer>
                 </Form>
@@ -2060,18 +2144,20 @@ const FoodSupplementary = () => {
       <Modal show={showUploadModal} onHide={closeUploadModal} centered backdrop={uploadProgress.isUploading ? "static" : true} className="fs-modal">
         <Modal.Header closeButton={!uploadProgress.isUploading} className="fs-modal-header">
           <Modal.Title>
-            {uploadProgress.isComplete ? (<><FaCheckCircle className="me-2 text-success" /> Upload Complete</>) : (<><FaUpload className="me-2" /> Uploading Records...</>)}
+            {uploadProgress.isComplete ? (<><FaCheckCircle className="me-2 text-success" /> {t("Upload Complete", "अपलोड पूरा हुआ")}</>) : (<><FaUpload className="me-2" /> {t("Uploading Records...", "रिकॉर्ड अपलोड हो रहे हैं...")}</>)}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <div className="mb-3">
-            <small className="text-muted d-block mb-1">File:</small>
+            <small className="text-muted d-block mb-1">{t("File:", "फ़ाइल:")}</small>
             <strong style={{ wordBreak: "break-all" }}>{uploadProgress.fileName}</strong>
           </div>
           <div className="mb-3">
             <div className="d-flex justify-content-between mb-1">
               <span className="fw-bold">
-                {uploadProgress.isUploading ? `Uploading ${uploadProgress.currentRow} of ${uploadProgress.total}...` : `Processed ${uploadProgress.total} of ${uploadProgress.total} records`}
+                {uploadProgress.isUploading
+                  ? `${t("Uploading", "अपलोड हो रहा है")} ${uploadProgress.currentRow} ${t("of", "में से")} ${uploadProgress.total}...`
+                  : `${t("Processed", "प्रसंस्कृत")} ${uploadProgress.total} ${t("of", "में से")} ${uploadProgress.total} ${t("records", "रिकॉर्ड")}`}
               </span>
               <span className="fw-bold text-primary">
                 {uploadProgress.total > 0 ? Math.round(((uploadProgress.uploaded + uploadProgress.failed) / uploadProgress.total) * 100) : 0}%
@@ -2084,21 +2170,21 @@ const FoodSupplementary = () => {
               <div className="text-center p-2 rounded border" style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}>
                 <FaCheckCircle className="text-success mb-1" />
                 <div className="fw-bold text-success" style={{ fontSize: "1.3rem" }}>{uploadProgress.uploaded}</div>
-                <small className="text-muted">Uploaded</small>
+                <small className="text-muted">{t("Uploaded", "अपलोड किया गया")}</small>
               </div>
             </Col>
             <Col xs={4}>
               <div className="text-center p-2 rounded border" style={{ background: "#fef2f2", borderColor: "#fecaca" }}>
                 <FaTimesCircle className="text-danger mb-1" />
                 <div className="fw-bold text-danger" style={{ fontSize: "1.3rem" }}>{uploadProgress.failed}</div>
-                <small className="text-muted">Failed</small>
+                <small className="text-muted">{t("Failed", "विफल")}</small>
               </div>
             </Col>
             <Col xs={4}>
               <div className="text-center p-2 rounded border" style={{ background: "#eff6ff", borderColor: "#bfdbfe" }}>
                 <FaFileExcel className="text-primary mb-1" />
                 <div className="fw-bold text-primary" style={{ fontSize: "1.3rem" }}>{uploadProgress.total}</div>
-                <small className="text-muted">Total</small>
+                <small className="text-muted">{t("Total", "कुल")}</small>
               </div>
             </Col>
           </Row>
@@ -2106,12 +2192,12 @@ const FoodSupplementary = () => {
             <div>
               <div className="d-flex align-items-center mb-2">
                 <FaExclamationTriangle className="text-warning me-2" />
-                <strong>Error Details ({uploadProgress.errors.length}):</strong>
+                <strong>{t("Error Details", "त्रुटि विवरण")} ({uploadProgress.errors.length}):</strong>
               </div>
               <div style={{ maxHeight: "200px", overflowY: "auto", border: "1px solid #fecaca", borderRadius: "8px", background: "#fef2f2" }}>
                 {uploadProgress.errors.map((err, i) => (
                   <div key={i} className="px-3 py-2" style={{ borderBottom: i < uploadProgress.errors.length - 1 ? "1px solid #fecaca" : "none", fontSize: "0.8rem" }}>
-                    <div><strong>Row {err.row}</strong>{err.awcCode !== "—" && <span className="text-muted"> — AWC: {err.awcCode}</span>}</div>
+                    <div><strong>{t("Row", "पंक्ति")} {err.row}</strong>{err.awcCode !== "—" && <span className="text-muted"> — {t("AWC", "आंगनवाड़ी केंद्र")}: {err.awcCode}</span>}</div>
                     <div className="text-danger">{err.error}</div>
                   </div>
                 ))}
@@ -2119,67 +2205,67 @@ const FoodSupplementary = () => {
             </div>
           )}
           {uploadProgress.isComplete && uploadProgress.failed === 0 && (
-            <Alert variant="success" className="mt-3 mb-0"><FaCheckCircle className="me-2" /> All {uploadProgress.uploaded} records uploaded successfully!</Alert>
+            <Alert variant="success" className="mt-3 mb-0"><FaCheckCircle className="me-2" /> {t("All", "सभी")} {uploadProgress.uploaded} {t("records uploaded successfully!", "रिकॉर्ड सफलतापूर्वक अपलोड किए गए!")}</Alert>
           )}
           {uploadProgress.isComplete && uploadProgress.failed > 0 && (
-            <Alert variant="warning" className="mt-3 mb-0"><FaExclamationTriangle className="me-2" /> {uploadProgress.uploaded} succeeded, {uploadProgress.failed} failed. Check error details above.</Alert>
+            <Alert variant="warning" className="mt-3 mb-0"><FaExclamationTriangle className="me-2" /> {uploadProgress.uploaded} {t("succeeded,", "सफल हुए,")} {uploadProgress.failed} {t("failed. Check error details above.", "विफल। ऊपर त्रुटि विवरण देखें।")}</Alert>
           )}
         </Modal.Body>
         <Modal.Footer className="fs-modal-footer">
-          <Button variant="light" onClick={closeUploadModal} disabled={uploadProgress.isUploading} className="fs-btn-light px-4"><FaTimes className="me-1" /> Close</Button>
+          <Button variant="light" onClick={closeUploadModal} disabled={uploadProgress.isUploading} className="fs-btn-light px-4"><FaTimes className="me-1" /> {t("Close", "बंद करें")}</Button>
         </Modal.Footer>
       </Modal>
 
       {/* ─── Delete Confirmation Modal ─── */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered className="fs-modal">
         <Modal.Header closeButton className="fs-modal-header fs-delete-header">
-          <Modal.Title><FaTrash className="me-2" /> Confirm Delete</Modal.Title>
+          <Modal.Title><FaTrash className="me-2" /> {t("Confirm Delete", "हटाने की पुष्टि करें")}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p>Are you sure you want to delete this record?</p>
+          <p>{t("Are you sure you want to delete this record?", "क्या आप वाकई इस रिकॉर्ड को हटाना चाहते हैं?")}</p>
           {deleteTarget && (
             <div className="fs-delete-detail">
-              <strong>AWC Code:</strong> {deleteTarget.awc_code} &nbsp;|&nbsp;
-              <strong>Trimester:</strong> {deleteTarget.quarter} &nbsp;|&nbsp;
-              <strong>Year:</strong> {deleteTarget.financial_year} &nbsp;|&nbsp;
-              <strong>Pregnant/Lactating Count:</strong> {deleteTarget.pregnant_woman_lactating_mother}
+              <strong>{t("AWC Code:", "आंगनवाड़ी केंद्र कोड:")}</strong> {deleteTarget.awc_code} &nbsp;|&nbsp;
+              <strong>{t("Trimester:", "तिमाही:")}</strong> {deleteTarget.quarter} &nbsp;|&nbsp;
+              <strong>{t("Year:", "वर्ष:")}</strong> {deleteTarget.financial_year} &nbsp;|&nbsp;
+              <strong>{t("Pregnant/Lactating Count:", "गर्भवती/धात्री संख्या:")}</strong> {deleteTarget.pregnant_woman_lactating_mother}
             </div>
           )}
         </Modal.Body>
         <Modal.Footer className="fs-modal-footer">
-          <Button variant="light" onClick={() => setShowDeleteModal(false)} className="fs-btn-light"><FaTimes className="me-1" /> Cancel</Button>
-          <Button variant="danger" onClick={confirmDelete} className="fs-btn-danger"><FaTrash className="me-1" /> Delete</Button>
+          <Button variant="light" onClick={() => setShowDeleteModal(false)} className="fs-btn-light"><FaTimes className="me-1" /> {t("Cancel", "रद्द करें")}</Button>
+          <Button variant="danger" onClick={confirmDelete} className="fs-btn-danger"><FaTrash className="me-1" /> {t("Delete", "हटाएं")}</Button>
         </Modal.Footer>
       </Modal>
 
       {/* ─── View Record Modal ─── */}
       <Modal show={showViewModal} onHide={handleCloseViewModal} centered className="fs-modal" size="lg">
         <Modal.Header closeButton className="fs-modal-header">
-          <Modal.Title><FaEye className="me-2 text-primary" /> View Record Details</Modal.Title>
+          <Modal.Title><FaEye className="me-2 text-primary" /> {t("View Record Details", "रिकॉर्ड विवरण देखें")}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {viewRecord && (
             <div>
               <div className="fs-form-section mb-3">
-                <h6 className="fs-section-subtitle">Basic Information</h6>
+                <h6 className="fs-section-subtitle">{t("Basic Information", "मूल जानकारी")}</h6>
                 <Row>
-                  <Col md={6}><strong>District:</strong> {viewRecord.district || "—"}</Col>
-                  <Col md={6}><strong>Project:</strong> {viewRecord.project || "—"}</Col>
-                  <Col md={6}><strong>Sector:</strong> {viewRecord.sector || "—"}</Col>
-                  <Col md={6}><strong>AWC Name:</strong> {viewRecord.awc_name || "—"}</Col>
-                  <Col md={6}><strong>AWC Code:</strong> {viewRecord.awc_code}</Col>
-                  <Col md={6}><strong>Trimester:</strong> {viewRecord.quarter}</Col>
-                  <Col md={6}><strong>Financial Year:</strong> {viewRecord.financial_year}</Col>
+                  <Col md={6}><strong>{t("District:", "जिला:")}</strong> {viewRecord.district || "—"}</Col>
+                  <Col md={6}><strong>{t("Project:", "परियोजना:")}</strong> {viewRecord.project || "—"}</Col>
+                  <Col md={6}><strong>{t("Sector:", "सेक्टर:")}</strong> {viewRecord.sector || "—"}</Col>
+                  <Col md={6}><strong>{t("AWC Name:", "आंगनवाड़ी केंद्र का नाम:")}</strong> {viewRecord.awc_name || "—"}</Col>
+                  <Col md={6}><strong>{t("AWC Code:", "आंगनवाड़ी केंद्र कोड:")}</strong> {viewRecord.awc_code}</Col>
+                  <Col md={6}><strong>{t("Trimester:", "तिमाही:")}</strong> {viewRecord.quarter}</Col>
+                  <Col md={6}><strong>{t("Financial Year:", "वित्तीय वर्ष:")}</strong> {viewRecord.financial_year}</Col>
                 </Row>
               </div>
               <div className="fs-form-section mb-3">
-                <h6 className="fs-section-subtitle">Beneficiary Counts and Grants</h6>
+                <h6 className="fs-section-subtitle">{t("Beneficiary Counts and Grants", "लाभार्थियों की संख्या एवं अनुदान")}</h6>
                 <Row>
-                  {GRANT_CATEGORIES.map((cat) => <Col md={6} key={cat.countKey} className="mb-2"><strong>{cat.title}:</strong> {Number(viewRecord[cat.countKey] || 0).toLocaleString()}<div className="small text-muted">Grants: {(viewRecord[cat.grantKey] || []).join(", ") || "—"}</div></Col>)}
+                  {GRANT_CATEGORIES.map((cat) => <Col md={6} key={cat.countKey} className="mb-2"><strong>{translateLabel(cat.title)}:</strong> {Number(viewRecord[cat.countKey] || 0).toLocaleString()}<div className="small text-muted">{t("Grants:", "अनुदान:")} {(viewRecord[cat.grantKey] || []).join(", ") || "—"}</div></Col>)}
                 </Row>
               </div>
               <div className="fs-form-section">
-                <h6 className="fs-section-subtitle">Supplementary Nutrition Details</h6>
+                <h6 className="fs-section-subtitle">{t("Supplementary Nutrition Details", "पूरक पोषण विवरण")}</h6>
                 <Row>
                   {FOOD_FIELDS.map((food) => <Col md={6} key={food.key} className="mb-2"><strong>{food.header}:</strong> {Number(viewRecord[food.key] || 0).toLocaleString()}</Col>)}
                 </Row>
@@ -2188,34 +2274,34 @@ const FoodSupplementary = () => {
           )}
         </Modal.Body>
         <Modal.Footer className="fs-modal-footer">
-          <Button variant="light" onClick={handleCloseViewModal} className="fs-btn-light px-4"><FaTimes className="me-1" /> Close</Button>
+          <Button variant="light" onClick={handleCloseViewModal} className="fs-btn-light px-4"><FaTimes className="me-1" /> {t("Close", "बंद करें")}</Button>
         </Modal.Footer>
       </Modal>
 
       {/* ─── Food Items Modal ─── */}
       <Modal show={showFoodItemModal} onHide={handleCloseFoodItemModal} centered className="fs-modal" size="lg">
         <Modal.Header closeButton className="fs-modal-header">
-          <Modal.Title><FaUtensils className="me-2 text-primary" /> Food Items List</Modal.Title>
+          <Modal.Title><FaUtensils className="me-2 text-primary" /> {t("Food Items List", "खाद्य सामग्री सूची")}</Modal.Title>
         </Modal.Header>
         <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
           {loadingFoodItems ? (
             <div className="text-center py-5">
               <Spinner animation="border" variant="primary" />
-              <p className="mt-3 text-muted">Loading food items...</p>
+              <p className="mt-3 text-muted">{t("Loading food items...", "खाद्य सामग्री लोड हो रही है...")}</p>
             </div>
           ) : (
             <Tabs defaultActiveKey="hcm" id="food-items-modal-tabs" className="mb-3">
-              <Tab eventKey="hcm" title={`HCM Food Items (${foodItems.hcm?.length || 0})`}>
+              <Tab eventKey="hcm" title={`${t("HCM Food Items", "एचसीएम खाद्य सामग्री")} (${foodItems.hcm?.length || 0})`}>
                 <Table striped bordered hover size="sm">
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Food Item</th>
+                      <th>{t("Food Item", "खाद्य सामग्री")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {foodItems.hcm?.length === 0 ? (
-                      <tr><td colSpan="3" className="text-center text-muted p-4">No HCM items found.</td></tr>
+                      <tr><td colSpan="3" className="text-center text-muted p-4">{t("No HCM items found.", "एचसीएम खाद्य सामग्री नहीं मिली।")}</td></tr>
                     ) : (
                       foodItems.hcm?.map((item, idx) => (
                         <tr key={idx}>
@@ -2227,17 +2313,17 @@ const FoodSupplementary = () => {
                   </tbody>
                 </Table>
               </Tab>
-              <Tab eventKey="thr" title={`THR Food Items (${foodItems.thr?.length || 0})`}>
+              <Tab eventKey="thr" title={`${t("THR Food Items", "टीएचआर खाद्य सामग्री")} (${foodItems.thr?.length || 0})`}>
                 <Table striped bordered hover size="sm">
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Food Item</th>
+                      <th>{t("Food Item", "खाद्य सामग्री")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {foodItems.thr?.length === 0 ? (
-                      <tr><td colSpan="3" className="text-center text-muted p-4">No THR items found.</td></tr>
+                      <tr><td colSpan="3" className="text-center text-muted p-4">{t("No THR items found.", "टीएचआर खाद्य सामग्री नहीं मिली।")}</td></tr>
                     ) : (
                       foodItems.thr?.map((item, idx) => (
                         <tr key={idx}>
@@ -2253,7 +2339,7 @@ const FoodSupplementary = () => {
           )}
         </Modal.Body>
         <Modal.Footer className="fs-modal-footer">
-          <Button variant="light" onClick={handleCloseFoodItemModal} className="fs-btn-light px-4"><FaTimes className="me-1" /> Close</Button>
+          <Button variant="light" onClick={handleCloseFoodItemModal} className="fs-btn-light px-4"><FaTimes className="me-1" /> {t("Close", "बंद करें")}</Button>
         </Modal.Footer>
       </Modal>
     </div>
