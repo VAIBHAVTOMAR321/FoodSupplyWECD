@@ -143,20 +143,41 @@ const CDPOFoodSupplementary = () => {
     if (totalPages > 0 && currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
+  const HINDI_LABELS = {
+    "#": "सं. ",
+    "District": "जिला",
+    "Project": "परियोजना",
+    "Quarter": "तिमाही",
+    "Financial Year": "वित्तीय वर्ष",
+    "PW & LM": "गर्भवती एवं धात्री महिलाएं",
+    "Poushik Sattu": "पौषिक सटू",
+    "Children 6m-3y": "बच्चे 6 माह-3 वर्ष",
+    "Panjeeri 6m-3y": "पंजीरी 6 माह-3 वर्ष",
+    "SAM 6M-5Y/SUW 6M-6Y": "एसएएम 6M-5Y/एसयूडब्ल्यू 6M-6Y",
+    "Panjeeri SAM": "पंजीरी एसएएम",
+    "SAM 3Y-5Y/SUW 3Y-6Y": "एसएएम 3Y-5Y/एसयूडब्ल्यू 3Y-6Y",
+    "Sattu SAM": "सटू एसएएम",
+    "HCM 3Y-6Y": "एचसीएम 3Y-6Y",
+    "Mung Dal Khichdi": "मूंग दाल खिचड़ी",
+    "Multi Grain Aata": "मल्टीग्रेन आटा",
+  };
+
+  const translatedLabel = (label) => t(label, HINDI_LABELS[label] || label);
+
   const exportToExcel = useCallback(() => {
     const rows = filteredReports.map((report, index) =>
       Object.fromEntries(COLUMNS.map((column) => [
-        column.label,
+        translatedLabel(column.label),
         displayValue(column.key === "serial" ? index + 1 : report[column.key]),
       ])),
     );
     const worksheet = XLSX.utils.json_to_sheet(rows, {
-      header: COLUMNS.map((column) => column.label),
+      header: COLUMNS.map((column) => translatedLabel(column.label)),
     });
     worksheet["!cols"] = COLUMNS.map((column) => {
       const longest = Math.max(
-        column.label.length,
-        ...rows.map((row) => String(row[column.label] ?? "").length),
+        translatedLabel(column.label).length,
+        ...rows.map((row) => String(row[translatedLabel(column.label)] ?? "").length),
       );
       return { wch: Math.min(Math.max(longest + 2, 10), 30) };
     });
@@ -186,9 +207,9 @@ const CDPOFoodSupplementary = () => {
       });
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(15);
-      pdf.text("Supplementary Nutrition Master", 10, 12);
+      pdf.text(t("Supplementary Nutrition Master", "पूरक पोषण मास्टर"), 10, 12);
       pdf.setFontSize(9);
-      pdf.text(`Records: ${filteredReports.length}`, 10, 18);
+      pdf.text(`${t("Records", "रिकॉर्ड")}: ${filteredReports.length}`, 10, 18);
       const body = filteredReports.map((report, index) =>
         COLUMNS.map((column) =>
           String(displayValue(column.key === "serial" ? index + 1 : report[column.key])),
@@ -196,7 +217,7 @@ const CDPOFoodSupplementary = () => {
       );
       autoTable(pdf, {
         startY: 23,
-        head: [COLUMNS.map((column) => column.label)],
+        head: [COLUMNS.map((column) => translatedLabel(column.label))],
         body,
         theme: "grid",
         margin: { top: 10, right: 8, bottom: 12, left: 8 },
@@ -246,7 +267,7 @@ const CDPOFoodSupplementary = () => {
                 disabled={loading || !filteredReports.length || exportingPdf}
               >
                 <FaFilePdf className="me-1" />
-                {exportingPdf ? "Preparing PDF…" : "Export PDF"}
+                {exportingPdf ? t("Preparing PDF…", "पीडीएफ़ तैयार किया जा रहा है...") : t("Export PDF", "पीडीएफ़ निर्यात करें")}
               </Button>
               <Button
                 variant="outline-success"
@@ -255,7 +276,7 @@ const CDPOFoodSupplementary = () => {
                 disabled={loading || !filteredReports.length}
               >
                 <FaFileExcel className="me-1" />
-                Export Excel
+                {t("Export Excel", "एक्सेल निर्यात करें")}
               </Button>
             </ButtonGroup>
           </div>
@@ -306,7 +327,7 @@ const CDPOFoodSupplementary = () => {
                 <thead>
                   <tr>
                     {COLUMNS.map((column) => (
-                      <th key={column.key}>{column.label}</th>
+                      <th key={column.key}>{translatedLabel(column.label)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -328,7 +349,7 @@ const CDPOFoodSupplementary = () => {
                   ) : (
                     <tr>
                       <td colSpan={COLUMNS.length} className="text-center">
-                        No supplementary nutrition records found.
+                        {t("No supplementary nutrition records found.", "कोई पूरक पोषण रिकॉर्ड नहीं मिले।")}
                       </td>
                     </tr>
                   )}
