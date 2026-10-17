@@ -564,6 +564,16 @@ const FoodItemReceiving = () => {
     return { ok: false, message: `List total (${listTotal}). Required: ${totalQty}. Remaining: ${totalQty - listTotal}`, variant: 'warning' };
   }, [packetExpiryTotal, formData.quantity]);
 
+  // Expiry batch details are optional. Only enforce the packet-total match
+  // when the user has entered at least one value in the expiry table.
+  const packetExpiryHasInput = useMemo(() => {
+    const rows = Array.isArray(formData.packet_expiry) ? formData.packet_expiry : [];
+    return rows.some((row) =>
+      Array.isArray(row) &&
+      row.some((value) => String(value ?? "").trim() !== "")
+    );
+  }, [formData.packet_expiry]);
+
   const fetchData = async () => {
     setLoading(true);
     setError("");
@@ -855,6 +865,13 @@ const FoodItemReceiving = () => {
       return;
     }
 
+    // At least one receiving month is mandatory; expiry details are optional.
+    if (selectedMonths.length === 0) {
+      setFormErrorAndScroll('कृपया receiving के लिए कम से कम एक महीना चुनें।');
+      setSubmitting(false);
+      return;
+    }
+
     if (!selectedTrimesterHasData) {
       setFormErrorAndScroll(`इस trimester (${trimesterValue}) के लिए Supplementary Nutrition में data उपलब्ध नहीं है। कृपया दूसरा trimester चुनें।`);
       setSubmitting(false);
@@ -908,6 +925,8 @@ const FoodItemReceiving = () => {
       return;
     }
 
+    // Packet-wise expiry details are optional for both THR and HCM receiving.
+    // If the user enters any batch rows, validate those rows; otherwise allow saving.
     const peRows = Array.isArray(formData.packet_expiry) ? formData.packet_expiry : [];
     const cleanedPacketExpiry = peRows
       .map(r => {
@@ -918,16 +937,12 @@ const FoodItemReceiving = () => {
           String(c[2] == null ? '' : c[2]).trim()
         ];
       })
-      .filter(r => r[0] !== '' || r[1] !== '' || r[2] !== '');
+      .filter(r => r.some(value => value !== ''));
 
     const peTotal = cleanedPacketExpiry.reduce((s, r) => s + (parseFloat(r[0]) || 0), 0);
 
-    if (parsedQuantity > 0) {
-      if (cleanedPacketExpiry.length === 0) {
-        setFormErrorAndScroll("कृपया Packet Details में कम से कम एक पंक्ति भरें।");
-        setSubmitting(false);
-        return;
-      }
+    // Only validate batch totals when packet details have actually been entered.
+    if (cleanedPacketExpiry.length > 0) {
       if (peTotal > parsedQuantity) {
         setFormErrorAndScroll(`Packet details का योग (${peTotal}) quantity (${parsedQuantity}) से अधिक नहीं हो सकता।`);
         setSubmitting(false);
@@ -942,7 +957,7 @@ const FoodItemReceiving = () => {
       }
       const incomplete = cleanedPacketExpiry.find(r => r[0] === '' || r[1] === '');
       if (incomplete) {
-        setFormErrorAndScroll("कृपया हर packet row में packets और expiry date दोनों भरें।");
+        setFormErrorAndScroll("यदि Packet Details भर रहे हैं, तो हर batch में packet count और expiry date दोनों भरें।");
         setSubmitting(false);
         return;
       }
@@ -959,7 +974,7 @@ const FoodItemReceiving = () => {
       quarter: trimesterValue,
       curr_month: formData.curr_month || getCurrentMonth(),
       max_expirydate: formData.max_expirydate || null,
-      packet_expiry: cleanedPacketExpiry.length > 0 ? cleanedPacketExpiry : [['', '', '']],
+      packet_expiry: cleanedPacketExpiry,
     };
 
     if (editingItem) {
@@ -1781,7 +1796,7 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Select Trimester</Form.Label>
+                    <Form.Label>Select Trimester <span className="text-danger">*</span></Form.Label>
                     <Form.Select name="quarter" value={normalizeTrimester(formData.quarter) || ''} onChange={handleFormChange} required>
                       <option value="">Select Trimester</option>
                       {TRIMESTER_OPTIONS.map(q => <option key={q.value} value={q.value}>{q.label}</option>)}
@@ -1795,7 +1810,7 @@ const FoodItemReceiving = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Trimester Packets Distribution</Form.Label>
+                    <Form.Label>Trimester Packets Distribution <span className="text-danger">*</span></Form.Label>
                     <Form.Select
                       name="food_item"
                       value={formData.food_item_value || ''}
@@ -1822,7 +1837,7 @@ const FoodItemReceiving = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Packets (Auto-fetched from Supplementary Nutrition)</Form.Label>
+                    <Form.Label>Packets (Auto-fetched from Supplementary Nutrition) <span className="text-danger">*</span></Form.Label>
                     <InputGroup>
                       <Form.Control
                         type="number"
@@ -1897,7 +1912,7 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Date of Receiving</Form.Label>
+                    <Form.Label>Date of Receiving <span className="text-danger">*</span></Form.Label>
                     <Form.Control
                       type="date"
                       name="date"
@@ -1937,7 +1952,7 @@ const FoodItemReceiving = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Max Expiry Date (Safe to distribute till)</Form.Label>
+                    <Form.Label>Max Expiry Date (Safe to distribute till) <span className="text-muted">(Optional)</span></Form.Label>
                     <Form.Control
                       type="date"
                       name="max_expirydate"
@@ -1951,7 +1966,7 @@ const FoodItemReceiving = () => {
               <Row>
                 <Col md={12}>
                   <Form.Group className="mb-3">
-                    <h6 className="mt-2 mb-3">Select Months (Only months in the selected trimester)</h6>
+                    <h6 className="mt-2 mb-3">Select Months (Only months in the selected trimester) <span className="text-danger">*</span></h6>
                     <div className="month-checkbox-group d-flex flex-wrap gap-2">
                       {availableMonthsForSelectedFoodItem.map((monthValue) => {
                         const month = monthOptions.find(m => m.value === monthValue) || { value: monthValue, label: monthValue };
@@ -1987,7 +2002,12 @@ const FoodItemReceiving = () => {
                 <Col md={12}>
                   <Form.Group className="mb-3">
                     <div className="d-flex justify-content-between align-items-center mb-2">
-                      <h6 className="mb-0">Packet Details (Per Expiry Batch)</h6>
+                      <div>
+                        <h6 className="mb-0">Packet Details (Per Expiry Batch) <span className="text-muted">(Optional)</span></h6>
+                        <small className="text-muted">
+                          Optional — receiving can be saved without packet-wise expiry details.
+                        </small>
+                      </div>
                       <Button
                         variant="success"
                         size="sm"
@@ -2083,7 +2103,7 @@ const FoodItemReceiving = () => {
                 <Button
                   variant="primary"
                   type="submit"
-                  disabled={submitting || !packetExpiryMatchInfo.ok || (!!formData.quarter && !selectedTrimesterHasData) || (!!formData.field_name && !!formData.food_item && !!formData.quarter && remainingAllocation <= 0 && !editingItem)}
+                  disabled={submitting || (packetExpiryHasInput && !packetExpiryMatchInfo.ok) || (!!formData.quarter && !selectedTrimesterHasData) || (!!formData.field_name && !!formData.food_item && !!formData.quarter && remainingAllocation <= 0 && !editingItem)}
                 >
                   {submitting ? <Spinner as="span" animation="border" size="sm" /> : (editingItem ? 'Update' : 'Submit')}
                 </Button>
