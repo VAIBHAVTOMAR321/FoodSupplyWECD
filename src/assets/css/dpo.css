@@ -215,15 +215,131 @@
 .dashboard-header {
   background: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 999;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1050;
+  transition: left 0.3s ease, width 0.3s ease;
+  display: flex;
+  align-items: center;
 }
 
+/* When sidebar is open, header should start after sidebar */
+.sidebar-open ~ .main-content-dash .dashboard-header,
+.dashboard-container.sidebar-open .dashboard-header {
+  left: 260px;
+  width: calc(100% - 260px);
+  z-index: 1050;
+}
+
+/* Mobile: header always full width, sidebar overlays */
+@media (max-width: 1023.98px) {
+  .dashboard-header {
+    left: 0 !important;
+    width: 100% !important;
+    z-index: 1050;
+  }
+}
+
+/* Desktop: when sidebar is closed, header full width */
+@media (min-width: 1024px) {
+  .sidebar-closed ~ .main-content-dash .dashboard-header,
+  .dashboard-container.sidebar-closed .dashboard-header {
+    left: 0;
+    width: 100%;
+    z-index: 1050;
+  }
+}
+
+/* Ensure main content doesn't get hidden behind fixed header */
+.main-content-dash {
+  padding-top: 70px;
+  transition: margin-left 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .main-content-dash {
+    padding-top: 60px;
+  }
+}
+
+/* Ensure toggle button is always visible and clickable */
 .sidebar-toggle {
   border: none;
   padding: 0.5rem;
   font-size: 1.2rem;
+  background: white;
+  color: #333;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 40px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1051;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-toggle:hover {
+  background: #f8f9fa;
+  color: #000;
+  transform: scale(1.05);
+}
+
+.sidebar-toggle:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.sidebar-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Ensure header actions are always visible */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px !important;
+  padding: 0px !important;
+  z-index: 1051;
+  position: relative;
+}
+
+/* Make sure toggle button doesn't get hidden on smaller screens */
+@media (max-width: 768px) {
+  .sidebar-toggle {
+    padding: 0.4rem;
+    font-size: 1rem;
+    min-width: 36px;
+  }
+}
+
+/* Desktop sidebar toggle area */
+@media (min-width: 1024px) {
+  /* When sidebar is closed, ensure toggle button is still accessible */
+  .sidebar-closed ~ .main-content-dash .sidebar-toggle {
+    margin-left: 0;
+  }
+  
+  /* Ensure toggle button is above sidebar when sidebar is open */
+  .sidebar-open ~ .main-content-dash .sidebar-toggle {
+    z-index: 1051;
+  }
+}
+
+/* Fix for sidebar covering toggle button */
+.dpo-left-nav {
+  z-index: 1000;
+}
+
+/* Ensure toggle button container is above sidebar */
+.col-xs-auto .sidebar-toggle {
+  z-index: 1051;
 }
 .search-bar {
   position: relative;
@@ -701,3 +817,95 @@
           font-size: 0.7rem;
           font-weight: 600;
         }
+
+/* Fix for mobile/tablet blank display */
+.dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Ensure content is visible on mobile/tablet */
+@media (max-width: 1023.98px) {
+  .dashboard-container {
+    flex-direction: column;
+  }
+  
+  .main-content-dash {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-top: 60px;
+    min-height: calc(100vh - 60px);
+  }
+  
+  /* Ensure dashboard content is visible */
+  .dashboard-box {
+    margin-top: 12px;
+    padding: 15px;
+  }
+  
+  /* Fix for offcanvas z-index */
+  .offcanvas {
+    z-index: 1040 !important;
+  }
+  
+  .offcanvas-backdrop {
+    z-index: 1039 !important;
+  }
+}
+
+/* Fix for tablet views */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .main-content-dash {
+    padding-top: 60px;
+    min-height: calc(100vh - 60px);
+  }
+  
+  .dashboard-box {
+    margin-top: 12px;
+    padding: 15px;
+  }
+}
+
+/* Ensure dashboard cards are visible */
+.dashboard-card {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 15px;
+}
+
+/* Fix for empty states */
+.dashboard-section {
+  margin-bottom: 20px;
+  padding: 0 10px;
+}
+
+.section-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+/* Ensure tables are responsive */
+.table-responsive {
+  overflow-x: auto;
+  width: 100%;
+}
+
+/* Fix for bootstrap container on mobile */
+.container-fluid {
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+@media (max-width: 767.98px) {
+  .container-fluid {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
