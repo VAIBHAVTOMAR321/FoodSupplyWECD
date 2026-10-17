@@ -364,11 +364,11 @@ const ITCellFoodItem = () => {
                   <td>{item.days_allotted}</td>
                   <td>{item.unit}</td>
                   <td>
-                    <Button variant="outline-primary" size="sm" className="btn-action" onClick={() => handleShowModal(scheme, item)}>
-                      <FaEdit aria-label={t("Edit", "संपादित करें")} />
+                    <Button variant="outline-primary" size="sm" className="btn-action" onClick={() => handleShowModal(scheme, item)} aria-label={t("Edit", "संपादित करें")}>
+                      <FaEdit />
                     </Button>
-                    <Button variant="outline-danger" size="sm" className="btn-action" onClick={() => handleDelete(scheme, item.id)}>
-                      <FaTrash aria-label={t("Delete", "हटाएं")} />
+                    <Button variant="outline-danger" size="sm" className="btn-action" onClick={() => handleDelete(scheme, item.id)} aria-label={t("Delete", "हटाएं")}>
+                      <FaTrash />
                     </Button>
                   </td>
                 </tr>

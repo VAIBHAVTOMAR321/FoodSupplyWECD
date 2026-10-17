@@ -470,7 +470,7 @@ const ITCellTHRReceiving = () => {
                                 {visibleColumns.map((col) => {
                                   let cellContent = '';
                                   if (col.dataField === '#') {
-                                    cellContent = <strong>Total</strong>;
+                                    cellContent = <strong>{t("Total", "कुल")}</strong>;
                                   } else if (col.dataField === 'quantity') {
                                     cellContent = (
                                       <Button variant="link" size="sm" onClick={() => setShowQtyModal(true)}>
