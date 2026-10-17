@@ -6,3 +6,9 @@
  
   cursor: pointer !important;
 }
+@media (max-width: 768px) {
+  .food-tem-receving {
+    margin-top: 12px;
+  }
+}
+

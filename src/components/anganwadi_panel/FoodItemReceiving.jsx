@@ -1589,7 +1589,7 @@ const FoodItemReceiving = () => {
             </Dropdown>
           </Form.Group>
         </Col>
-        <Col md={4} className="d-flex align-items-end gap-2 flex-wrap">
+        <Col md={4} className="d-flex align-items-end gap-2 flex-wrap food-tem-receving">
           <Button variant="secondary" onClick={resetFilters}>{t("Reset", "रीसेट करें")}</Button>
           <Button variant="outline-success" onClick={exportReceivingToExcel} disabled={!(activeTab === 'thr' ? filteredThrReceivings : filteredHcmReceivings).length}>
             <FaFileExcel className="me-1" /> Excel
