@@ -12,12 +12,11 @@ import {
   Dropdown,
   Button,
   Modal,
-  ListGroup,
 } from "react-bootstrap";
 import { useAuth } from "../all_login/AuthContext";
 import { useLanguage } from "../all_login/LanguageContext";
 import "../../assets/css/dashboard.css";
-import { FaUserCircle, FaFilePdf, FaFileExcel, FaEye, FaCalendarCheck } from "react-icons/fa";
+import { FaUserCircle, FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import "jspdf-autotable";
@@ -46,29 +45,6 @@ const monthLabels = {
 };
 
 
-// Packet-expiry helpers: support [packetCount, expiryDate, remarks] and object API records.
-const getPacketExpiryEntries = (record) => {
-  const raw = record?.packet_expiry ?? record?.expiry_details ?? record?.expiry_data ??
-    record?.packets_expiry ?? record?.expiry_records ?? [];
-  if (!Array.isArray(raw)) return [];
-  return raw.map((entry) => {
-    if (Array.isArray(entry)) {
-      return { packets: entry[0] ?? "", date: entry[1] ?? "", remarks: entry[2] ?? "" };
-    }
-    if (entry && typeof entry === "object") {
-      return {
-        packets: entry.expired_packets ?? entry.expired_quantity ?? entry.packet_count ??
-          entry.no_of_packets ?? entry.packets_count ?? entry.quantity ?? entry.qty ??
-          entry.count ?? (typeof entry.packets === "number" ? entry.packets : ""),
-        date: entry.expiry_date ?? entry.expirydate ?? entry.expiryDate ??
-          entry.exp_date ?? entry.date_of_expiry ?? entry.expiry ?? entry.date ?? "",
-        remarks: entry.remarks ?? entry.remark ?? entry.notes ?? "",
-      };
-    }
-    return { packets: "", date: "", remarks: "" };
-  }).filter((entry) => entry.packets !== "" || entry.date || entry.remarks);
-};
-
 const formatDateForReport = (value) => {
   if (!value) return "-";
   const raw = String(value).trim();
@@ -79,38 +55,10 @@ const formatDateForReport = (value) => {
     `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
 };
 
-const isPacketExpiryPast = (value) => {
-  if (!value) return false;
-  const raw = String(value).trim();
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  const date = iso ? new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])) : new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  date.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return date < today;
-};
-
-const getExpirySummary = (record) => {
-  const entries = getPacketExpiryEntries(record);
-  const expiredPackets = entries.reduce((sum, entry) => {
-    const qty = Number(entry.packets);
-    return sum + (isPacketExpiryPast(entry.date) && Number.isFinite(qty) ? qty : 0);
-  }, 0);
-  const details = entries.map((entry) => {
-    const status = entry.date ? (isPacketExpiryPast(entry.date) ? "EXPIRED / समाप्त" : "Not expired / समाप्त नहीं") : "Expiry date unavailable / समाप्ति तिथि उपलब्ध नहीं";
-    return `${formatDateForReport(entry.date)}: ${entry.packets === "" ? "-" : entry.packets} packet(s) [${status}]${entry.remarks ? ` — ${entry.remarks}` : ""}`;
-  }).join("; ");
-  return { entries, expiredPackets, details: details || "No expiry details available / समाप्ति जानकारी उपलब्ध नहीं" };
-};
-
 const exportValue = (item, col, index) => {
   switch (col.dataField) {
     case "#": return index + 1;
     case "date": return formatDateForReport(item.date);
-    case "max_expirydate": return formatDateForReport(item.max_expirydate ?? item.max_expiry_date ?? item.maxExpiryDate);
-    case "expired_packets": return getExpirySummary(item).expiredPackets;
-    case "expiry_breakdown": return getExpirySummary(item).details;
     case "months": return (item.months || []).map(m => monthLabels[m] || m).join(", ");
     case "quarter": return item.quarter || "";
     case "sector_status": return item.sector_status || "pending";
@@ -142,12 +90,7 @@ const ThrSupervisorReceiving = () => {
   const [bulkRemark, setBulkRemark] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
-
-  // ── NEW: Expiry details modal state ──
-  const [showExpiryModal, setShowExpiryModal] = useState(false);
-  const [expiryViewItem, setExpiryViewItem] = useState(null);
-
-  const [filters, setFilters] = useState({
+const [filters, setFilters] = useState({
     awc_name: [],
     food_item: [],
     fin_year: [],
@@ -176,9 +119,6 @@ const ThrSupervisorReceiving = () => {
     { dataField: "quarter", text: "Trimester", visible: true },
     { dataField: "months", text: "Months", visible: true },
     { dataField: "curr_month", text: "Current Month", visible: true },
-    { dataField: "max_expirydate", text: "Max Expiry Date", visible: true },
-    { dataField: "expired_packets", text: "Expired Packets", visible: true },
-    { dataField: "expiry_breakdown", text: "Expiry Details", visible: true },
     { dataField: "sector_status", text: "Sector Status", visible: true },
     { dataField: "sector_remark", text: "Sector Remark", visible: true },
     { dataField: "actions", text: "Actions", visible: true },
@@ -196,34 +136,11 @@ const ThrSupervisorReceiving = () => {
       "AWC Name": "आंगनवाड़ी केंद्र का नाम", "AWC Code": "आंगनवाड़ी केंद्र कोड", "AWC Type": "आंगनवाड़ी केंद्र प्रकार",
       "Food Item": "खाद्य सामग्री", "Quantity": "मात्रा", "Unit": "इकाई", "Beneficiary Category": "लाभार्थी श्रेणी",
       "Date": "तारीख", "Fin. Year": "वित्तीय वर्ष", "Fin Year": "वित्तीय वर्ष", "Financial Year": "वित्तीय वर्ष",
-      "Trimester": "त्रैमासिक", "Months": "महीने", "Current Month": "वर्तमान महीना", "Max Expiry Date": "अधिकतम समाप्ति तारीख",
-      "Expired Packets": "समाप्त पैकेट", "Expiry Details": "समाप्ति विवरण", "Packet Expiry Details": "पैकेट समाप्ति विवरण",
+      "Trimester": "त्रैमासिक", "Months": "महीने", "Current Month": "वर्तमान महीना",
       "Sector Remark": "क्षेटर टिप्पणी", "Sector Status": "क्षेत्र स्थिति", "Actions": "कार्रवाई", "Action": "कार्रवाई",
       "Days Allotted": "आवंटित दिन", "Beneficiaries": "लाभार्थी", "Qty": "मात्रा", "Remark": "टिप्पणी"
     };
     return t(col.text, hindiLabels[col.text] || col.text);
-  };
-
-  // ── NEW: Helper to check if a record has packet_expiry data ──
-  const hasPacketExpiry = (rec) => {
-    if (!rec) return false;
-    if (!Array.isArray(rec.packet_expiry) || rec.packet_expiry.length === 0) return false;
-    return rec.packet_expiry.some(pe => {
-      const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
-      const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
-      return (count !== '' && count != null) || (date !== '' && date != null);
-    });
-  };
-
-  // ── NEW: Expiry modal handlers ──
-  const handleOpenExpiryModal = (record) => {
-    setExpiryViewItem(record);
-    setShowExpiryModal(true);
-  };
-
-  const handleCloseExpiryModal = () => {
-    setShowExpiryModal(false);
-    setExpiryViewItem(null);
   };
 
   const fetchReceivings = useCallback(async () => {
@@ -483,20 +400,6 @@ const ThrSupervisorReceiving = () => {
       const reportRows = filteredReceivings.map((item, index) =>
         exportColumns.map((col) => String(exportValue(item, col, index) ?? "-"))
       );
-      const expiryRows = filteredReceivings.flatMap((item, index) => {
-        const entries = getExpirySummary(item).entries;
-        return (entries.length ? entries : [{ packets: "", date: "", remarks: "" }]).map((entry) => [
-          index + 1, item.district ?? "-", item.project ?? "-", item.sector ?? "-",
-          item.awc_name ?? "-", item.awc_code ?? "-", item.food_item ?? "-",
-          item.bene_category ?? "-", formatDateForReport(item.date),
-          formatDateForReport(item.max_expirydate ?? item.max_expiry_date ?? item.maxExpiryDate),
-          formatDateForReport(entry.date), entry.packets || "-",
-          entry.date ? (isPacketExpiryPast(entry.date) ? "EXPIRED / समाप्त" : "Not expired / समाप्त नहीं")
-            : "Expiry date unavailable / समाप्ति तिथि उपलब्ध नहीं",
-          entry.remarks || "-",
-        ]);
-      });
-
       // Browser-rendered text preserves Hindi/Devanagari; jsPDF's default font does not.
       exportRoot = document.createElement("div");
       exportRoot.style.cssText = [
@@ -570,20 +473,11 @@ const ThrSupervisorReceiving = () => {
         return result.length ? result : [[]];
       };
       const reportChunks = chunk(reportRows, 22);
-      const expiryChunks = chunk(expiryRows, 24);
-      const totalPages = reportChunks.length + expiryChunks.length + 1;
+const totalPages = reportChunks.length + 1;
       let page = 1;
       for (const rows of reportChunks) {
         await addHtmlPage("THR Supervisor Receiving Report / टीएचआर प्राप्ति रिपोर्ट",
           exportColumns.map((col) => getColumnLabel(col)), rows, page++, totalPages);
-      }
-      for (const rows of expiryChunks) {
-        await addHtmlPage("Packet Expiry Details / पैकेट की समाप्ति जानकारी",
-          ["#", "District / जिला", "Project / परियोजना", "Sector / सेक्टर", "AWC Name / आंगनवाड़ी केंद्र",
-            "AWC Code", "Food Item / खाद्य सामग्री", "Beneficiary Category / लाभार्थी श्रेणी",
-            "Date of Receiving / प्राप्ति तिथि", "Max Expiry Date / अधिकतम समाप्ति तिथि",
-            "Expiry Date / समाप्ति तिथि", "Packet Count / पैकेट संख्या", "Status / स्थिति", "Remarks / टिप्पणी"],
-          rows, page++, totalPages);
       }
 
       exportRoot.replaceChildren();
@@ -620,29 +514,6 @@ const ThrSupervisorReceiving = () => {
       const quantityTotalsData = Object.entries(totals.quantityByUnit).map(([unit, total]) => ({
         "Unit / इकाई": unit, "Total Quantity / कुल मात्रा": Number(total.toFixed(2)),
       }));
-      const expiryData = filteredReceivings.flatMap((item, index) => {
-        const entries = getExpirySummary(item).entries;
-        return (entries.length ? entries : [{ packets: "", date: "", remarks: "" }]).map((entry) => ({
-          "#": index + 1,
-          "District / जिला": item.district ?? "",
-          "Project / परियोजना": item.project ?? "",
-          "Sector / सेक्टर": item.sector ?? "",
-          "AWC Name / आंगनवाड़ी केंद्र": item.awc_name ?? "",
-          "AWC Code": item.awc_code ?? "",
-          "Food Item / खाद्य सामग्री": item.food_item ?? "",
-          "Beneficiary Category / लाभार्थी श्रेणी": item.bene_category ?? "",
-          "Quantity / मात्रा": item.quantity ?? "",
-          "Unit / इकाई": item.unit ?? "",
-          "Date of Receiving / प्राप्ति तिथि": formatDateForReport(item.date),
-          "Max Expiry Date / अधिकतम समाप्ति तिथि": formatDateForReport(item.max_expirydate ?? item.max_expiry_date ?? item.maxExpiryDate),
-          "Expiry Date / समाप्ति तिथि": formatDateForReport(entry.date),
-          "Packet Count / पैकेट संख्या": entry.packets,
-          "Expiry Status / स्थिति": entry.date ? (isPacketExpiryPast(entry.date) ? "EXPIRED / समाप्त" : "Not expired / समाप्त नहीं") : "Expiry date unavailable / समाप्ति तिथि उपलब्ध नहीं",
-          "Remarks / टिप्पणी": entry.remarks ?? "",
-          "Sector Status": item.sector_status || "pending",
-          "Sector Remark / सेक्टर टिप्पणी": item.sector_remark ?? "",
-        }));
-      });
       const workbook = XLSX.utils.book_new();
       const addSheet = (rows, name) => {
         const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -650,7 +521,6 @@ const ThrSupervisorReceiving = () => {
         XLSX.utils.book_append_sheet(workbook, worksheet, name);
       };
       addSheet(dataToExport, "THR Receiving Report");
-      addSheet(expiryData, "Packet Expiry Details");
       addSheet(quantityTotalsData, "Quantity Totals");
       XLSX.writeFile(workbook, "thr-supervisor-receiving.xlsx", { bookType: "xlsx", compression: true });
     } catch (err) {
@@ -821,15 +691,6 @@ const ThrSupervisorReceiving = () => {
                             case "date":
                               cellContent = formatDateForReport(item.date);
                               break;
-                            case "max_expirydate":
-                              cellContent = formatDateForReport(item.max_expirydate ?? item.max_expiry_date ?? item.maxExpiryDate);
-                              break;
-                            case "expired_packets":
-                              cellContent = getExpirySummary(item).expiredPackets;
-                              break;
-                            case "expiry_breakdown":
-                              cellContent = getExpirySummary(item).details;
-                              break;
                             case "months":
                               cellContent = (item.months || []).map(m => monthLabels[m] || m).join(', ');
                               break;
@@ -849,17 +710,7 @@ const ThrSupervisorReceiving = () => {
                                   <div className="d-flex gap-1 flex-wrap">
                                     <Button variant="outline-success" size="sm" disabled={item.sector_status === 'approved'} onClick={() => { setBulkAction("approved"); setSelectedIds([item.id]); setShowBulkActionModal(true); }}>{t("Approve", "स्वीकृत करें")}</Button>
                                     <Button variant="outline-danger" size="sm" disabled={item.sector_status === 'rejected'} onClick={() => { setBulkAction("rejected"); setSelectedIds([item.id]); setShowBulkActionModal(true); }}>{t("Reject", "अस्वीकार करें")}</Button>
-                                    {/* ── NEW: Expiry button ── */}
-                                    {hasPacketExpiry(item) && (
-                                      <Button
-                                        variant="outline-warning"
-                                        size="sm"
-                                        onClick={() => handleOpenExpiryModal(item)}
-                                        title={t("View Packet Expiry Details", "पैकेट समाप्ति विवरण देखें")}
-                                      >
-                                        <FaCalendarCheck /> {t("Expiry", "समाप्ति")}
-                                      </Button>
-                                    )}
+
                                   </div>
                                 </td>
                               );
@@ -945,115 +796,7 @@ const ThrSupervisorReceiving = () => {
             </Modal.Body>
           </Modal>
 
-          {/* ── NEW: Expiry Details Modal ── */}
-          {expiryViewItem && (
-            <Modal show={showExpiryModal} onHide={handleCloseExpiryModal} centered>
-              <Modal.Header closeButton className="view-modal-header">
-                <Modal.Title>
-                  <FaCalendarCheck className="me-2" />
-                  {t("Packet Expiry Details", "पैकेट समाप्ति विवरण")}: {expiryViewItem.food_item}
-                </Modal.Title>
-              </Modal.Header>
-              <Modal.Body className="view-modal-body">
-                <ListGroup variant="flush">
-                  <ListGroup.Item>
-                    <strong>{t("AWC Name:", "आंगनवाड़ी केंद्र का नाम:")}</strong> {expiryViewItem.awc_name}
-                  </ListGroup.Item>
-                  <ListGroup.Item>
-                    <strong>{t("AWC Code:", "आंगनवाड़ी केंद्र कोड:")}</strong> {expiryViewItem.awc_code}
-                  </ListGroup.Item>
-                  <ListGroup.Item>
-                    <strong>{t("Food Item:", "खाद्य सामग्री:")}</strong> {expiryViewItem.food_item}
-                  </ListGroup.Item>
-                  <ListGroup.Item>
-                    <strong>{t("Total Packets:", "कुल पैकेट:")}</strong> {expiryViewItem.quantity} {expiryViewItem.unit}
-                  </ListGroup.Item>
-                  <ListGroup.Item>
-                    <strong>{t("Date of Receiving:", "प्राप्ति की तिथि:")}</strong>{' '}
-                    {expiryViewItem.date ? new Date(expiryViewItem.date).toLocaleDateString() : '-'}
-                  </ListGroup.Item>
-                  <ListGroup.Item>
-                    <strong>{t("Months:", "महीने:")}</strong>{' '}
-                    {(expiryViewItem.months || []).map(m => monthLabels[m] || m).join(', ')}
-                  </ListGroup.Item>
-                  <ListGroup.Item>
-                    <strong>{t("Max Expiry Date:", "अधिकतम समाप्ति तिथि:")}</strong>{' '}
-                    {expiryViewItem.max_expirydate ? new Date(expiryViewItem.max_expirydate).toLocaleDateString() : '-'}
-                  </ListGroup.Item>
-                  <ListGroup.Item>
-                    <strong>{t("Sector Status:", "सेक्टर स्थिति:")}</strong>{' '}
-                    <Badge bg={getStatusVariant(expiryViewItem.sector_status)}>
-                      {expiryViewItem.sector_status || 'pending'}
-                    </Badge>
-                  </ListGroup.Item>
-                  {expiryViewItem.sector_remark && (
-                    <ListGroup.Item>
-                      <strong>{t("Sector Remark:", "सेक्टर टिप्पणी:")}</strong> {expiryViewItem.sector_remark}
-                    </ListGroup.Item>
-                  )}
-                </ListGroup>
 
-                <hr />
-
-                <h6 className="mb-2">
-                  <FaCalendarCheck className="me-1" /> {t("Packet-wise Expiry List", "पैकेट-वार समाप्ति सूची")}
-                </h6>
-                <Table bordered striped size="sm" className="mb-0">
-                  <thead>
-                    <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
-                      <th className="text-center" style={{ width: '50px' }}>{t("S. No.", "क्रम संख्या")}</th>
-                      <th className="text-center">{t("Packets", "पैकेट")}</th>
-                      <th className="text-center">{t("Expiry Date", "समाप्ति तिथि")}</th>
-                      <th className="text-center">{t("Remarks", "टिप्पणियां")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Array.isArray(expiryViewItem.packet_expiry) && expiryViewItem.packet_expiry.length > 0 ? (
-                      expiryViewItem.packet_expiry.map((pe, i) => {
-                        const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
-                        const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
-                        const remark = Array.isArray(pe) ? pe[2] : (pe && (pe.remark || pe.remarks));
-                        return (
-                          <tr key={i}>
-                            <td className="text-center">{i + 1}</td>
-                            <td className="text-center fw-semibold">{count == null || count === '' ? '-' : count}</td>
-                            <td className="text-center">
-                              {date ? new Date(date).toLocaleDateString() : '-'}
-                            </td>
-                            <td>{remark || '-'}</td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="text-center text-muted p-3">
-                          {t("No packet expiry details available.", "पैकेट समाप्ति का कोई विवरण उपलब्ध नहीं है।")}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                  {Array.isArray(expiryViewItem.packet_expiry) && expiryViewItem.packet_expiry.length > 0 && (
-                    <tfoot>
-                      <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
-                        <td className="text-end">{t("Total:", "कुल:")}</td>
-                        <td className="text-center">
-                          {expiryViewItem.packet_expiry.reduce((sum, pe) => {
-                            const c = Array.isArray(pe) ? pe[0] : (pe && pe.count);
-                            return sum + (parseFloat(c) || 0);
-                          }, 0)}
-                        </td>
-                        <td></td>
-                        <td></td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </Table>
-              </Modal.Body>
-              <Modal.Footer>
-                <Button variant="secondary" onClick={handleCloseExpiryModal}>{t("Close", "बंद करें")}</Button>
-              </Modal.Footer>
-            </Modal>
-          )}
 
         </Container>
       </div>
