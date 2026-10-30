@@ -20,13 +20,6 @@ import "../../assets/css/directorleftnav.css";
 import { useAuth } from "../all_login/AuthContext";
 import { useLanguage } from "../all_login/LanguageContext";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import * as XLSX from "xlsx";
-
-import DirectorLeftNav from "./DirectorLeftNav";
-import DirectorHeader from "./DirectorHeader";
-import PacketExpiryDetails from "../PacketExpiryDetails";
 
 const monthLabels = {
   apr: 'April',
@@ -170,9 +163,6 @@ const getRecordDate = (row) => firstAvailableValue(row, [
 const getCurrentMonth = (row) => firstAvailableValue(row, [
   "curr_month", "current_month", "currentMonth", "month_current", "monthCurrent",
 ]);
-const getMaxExpiryDate = (row) => firstAvailableValue(row, [
-  "max_expirydate", "max_expiry_date", "maxExpiryDate", "expiry_date", "expiryDate",
-]);
 const getReportField = (row, field) => {
   const aliases = {
     awc_name: ["awc_name", "awcName", "anganwadi_name", "anganwadiName"],
@@ -191,53 +181,6 @@ const getReportField = (row, field) => {
   return firstAvailableValue(row, aliases[field] || [field]);
 };
 
-const getExpiryRows = (payload) => {
-  if (!payload) return [];
-  if (Array.isArray(payload)) {
-    // Supports [packet count, expiry date, remarks] entries as well as arrays of objects.
-    if (payload.length >= 2 && !Array.isArray(payload[0]) &&
-        (typeof payload[1] === "string" || payload[1] instanceof Date)) {
-      return [{ count: payload[0], date: payload[1], remarks: payload[2] ?? "" }];
-    }
-    return payload.flatMap(getExpiryRows);
-  }
-  if (typeof payload !== "object") return [];
-  for (const key of ["results", "data", "expiry_details", "expiry_data", "packet_expiry", "packets", "details", "expiry_records"]) {
-    if (Array.isArray(payload[key])) return payload[key].flatMap(getExpiryRows);
-  }
-  const date = payload.expiry_date ?? payload.expirydate ?? payload.expiryDate ??
-    payload.exp_date ?? payload.date_of_expiry ?? payload.expiry ?? payload.date;
-  const qty = payload.expired_packets ?? payload.expired_quantity ?? payload.packet_count ??
-    payload.no_of_packets ?? payload.packets_count ?? payload.quantity ?? payload.qty ??
-    payload.count ?? (typeof payload.packets === "number" ? payload.packets : undefined);
-  if (date || qty !== undefined) return [payload];
-  return Object.values(payload).flatMap(v =>
-    (Array.isArray(v) || (v && typeof v === "object")) ? getExpiryRows(v) : []
-  );
-};
-const expiryDateOf = (item) => Array.isArray(item) ? (item[1] ?? "") :
-  (item?.expiry_date ?? item?.expirydate ?? item?.expiryDate ?? item?.exp_date ??
-   item?.date_of_expiry ?? item?.expiry ?? item?.date ?? "");
-const expiryPacketsOf = (item) => Array.isArray(item) ? (item[0] ?? "") :
-  (item?.expired_packets ?? item?.expired_quantity ?? item?.packet_count ??
-   item?.no_of_packets ?? item?.packets_count ?? item?.quantity ?? item?.qty ??
-   item?.count ?? (typeof item?.packets === "number" ? item.packets : undefined) ?? "");
-const expiryRemarksOf = (item) => Array.isArray(item) ? (item[2] ?? "") :
-  (item?.remarks ?? item?.remark ?? item?.notes ?? "");
-const isExpiryPast = (value) => {
-  if (!value) return false;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  date.setHours(0, 0, 0, 0);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  return date < today;
-};
-
-const expiryRowKey = (row) => String(
-  row?.id ?? row?.awc_code ??
-  `${row?.district ?? ""}|${row?.project ?? ""}|${row?.sector ?? ""}|${row?.food_item ?? ""}|${row?.bene_category ?? ""}|${row?.date ?? ""}`
-);
-
 const DirectorTHRReceiving = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -248,7 +191,6 @@ const DirectorTHRReceiving = () => {
   const { t } = useLanguage();
   const [summaryData, setSummaryData] = useState(null);
   const [reports, setReports] = useState([]);
-  const [expiryDetailsByRow, setExpiryDetailsByRow] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -291,10 +233,7 @@ const DirectorTHRReceiving = () => {
     { dataField: "months", text: t("Months", "महीने"), visible: true },
     { dataField: "quarter", text: t("Trimester", "त्रैमासिक अवधि"), visible: true },
     { dataField: "curr_month", text: t("Current Month", "वर्तमान महीना"), visible: true },
-    { dataField: "max_expirydate", text: t("Max Expiry Date", "अधिकतम समाप्ति तिथि"), visible: true },
     { dataField: "sector_status", text: t("Sector Status", "सेक्टर की स्थिति"), visible: true },
-    { dataField: "expired_packets", text: t("Expired Packets", "समाप्त पैकेट"), visible: true },
-    { dataField: "expiry_breakdown", text: t("Expiry Details", "समाप्ति विवरण"), visible: true },
     { dataField: "actions", text: t("Actions", "कार्रवाई"), visible: true },
   ]);
   const [showColumnModal, setShowColumnModal] = useState(false);
@@ -438,9 +377,8 @@ const DirectorTHRReceiving = () => {
     food_item: ["Food Item", "खाद्य सामग्री"], bene_category: ["Beneficiary Category", "लाभार्थी श्रेणी"],
     quantity: ["Quantity", "मात्रा"], unit: ["Unit", "इकाई"], fin_year: ["Fin. Year", "वित्तीय वर्ष"],
     months: ["Months", "महीने"], quarter: ["Trimester", "त्रैमासिक अवधि"],
-    curr_month: ["Current Month", "वर्तमान महीना"], max_expirydate: ["Max Expiry Date", "अधिकतम समाप्ति तिथि"],
-    sector_status: ["Sector Status", "सेक्टर की स्थिति"], expired_packets: ["Expired Packets", "समाप्त पैकेट"],
-    expiry_breakdown: ["Expiry Details", "समाप्ति विवरण"], actions: ["Actions", "कार्रवाई"],
+    curr_month: ["Current Month", "वर्तमान महीना"], sector_status: ["Sector Status", "सेक्टर की स्थिति"],
+    actions: ["Actions", "कार्रवाई"],
   };
   const localizedColumns = columns.map((column) => ({
     ...column,
@@ -450,45 +388,8 @@ const DirectorTHRReceiving = () => {
 
 
 
-  const handleExpiryDetailsLoaded = useCallback((row, payload) => {
-    const key = expiryRowKey(row);
-    setExpiryDetailsByRow((previous) => ({
-      ...previous,
-      [key]: getExpiryRows(payload),
-    }));
-  }, []);
-
-  const getRowExpiryRows = (row) => {
-    const cached = expiryDetailsByRow[expiryRowKey(row)];
-    if (Array.isArray(cached) && cached.length) return cached;
-    // Some summary APIs already return expiry detail rows directly.
-    return getExpiryRows(
-      row?.packet_expiry ?? row?.expiry_details ?? row?.expiry_data ??
-      row?.packets_expiry ?? row?.expiry_records ?? row?.expiry ?? []
-    );
-  };
-
-  const getExpiryExportValues = (row) => {
-    const entries = getRowExpiryRows(row);
-    const expiredPackets = entries
-      .filter((entry) => isExpiryPast(expiryDateOf(entry)))
-      .reduce((sum, entry) => {
-        const qty = Number(expiryPacketsOf(entry));
-        return sum + (Number.isFinite(qty) ? qty : 0);
-      }, 0);
-    const breakdown = entries.map((entry) => {
-      const date = formatDateValue(expiryDateOf(entry));
-      const packets = expiryPacketsOf(entry);
-      const status = isExpiryPast(expiryDateOf(entry)) ? t("EXPIRED", "समाप्त") : t("Not expired", "समाप्त नहीं");
-      const remarks = expiryRemarksOf(entry);
-      return `${date || t("Date unavailable", "तिथि उपलब्ध नहीं")}: ${packets === "" ? t("Packet count unavailable", "पैकेट संख्या उपलब्ध नहीं") : packets} ${t("packet(s)", "पैकेट")} [${status}]${remarks ? ` — ${remarks}` : ""}`;
-    });
-    return { entries, expiredPackets, breakdown: breakdown.join("; ") };
-  };
-
-  // Refresh summary rows immediately before exporting; retain already loaded expiry details.
-
   const fetchLatestExportReports = async () => {
+
     try {
       const response = await api.get("/director/thr-receiving-summary/?page=1");
       const results = response?.data?.results;
@@ -505,32 +406,24 @@ const DirectorTHRReceiving = () => {
   };
 
   const makeExportRecord = (row, index, exportColumns) => {
-    const expiry = getExpiryExportValues(row);
     const record = { "#": index + 1 };
     exportColumns.forEach((col) => {
       const value = row[col.dataField];
-      if (col.dataField === "months") record[col.text] = formatMonths(row);
+      if (col.dataField === "months") record[col.text] = formatRecordMonths(row);
       else if (col.dataField === "quarter") record[col.text] = formatRecordTrimester(row);
       else if (col.dataField === "date") record[col.text] = formatDateValue(getRecordDate(row));
-      else if (col.dataField === "max_expirydate") record[col.text] = formatDateValue(getMaxExpiryDate(row));
       else if (col.dataField === "curr_month") record[col.text] = getCurrentMonth(row) || "";
-      else if (col.dataField === "expired_packets") record[col.text] = expiry.expiredPackets;
-      else if (col.dataField === "expiry_breakdown") record[col.text] = expiry.breakdown || t("No expiry details loaded / expiry data unavailable", "समाप्ति विवरण लोड नहीं हुआ / डेटा उपलब्ध नहीं");
       else if (col.dataField === "actions") return;
       else record[col.text] = value ?? "";
     });
     return record;
   };
 
+
   const exportToExcel = async () => {
     try {
       const exportReports = await fetchLatestExportReports();
       const exportColumns = localizedColumns.filter((col) => col.visible && col.dataField !== "#" && col.dataField !== "actions");
-      // Keep the expiry columns in the export even if a user has hidden them in the table.
-      for (const field of ["expired_packets", "expiry_breakdown"]) {
-        const column = localizedColumns.find((col) => col.dataField === field);
-        if (column && !exportColumns.some((col) => col.dataField === field)) exportColumns.push(column);
-      }
       const data = exportReports.map((row, index) => makeExportRecord(row, index, exportColumns));
       const worksheet = XLSX.utils.json_to_sheet(data);
       const headers = Object.keys(data[0] || { "#": "" });
@@ -540,38 +433,6 @@ const DirectorTHRReceiving = () => {
       if (worksheet["!ref"]) worksheet["!autofilter"] = { ref: worksheet["!ref"] };
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "THR Receiving");
-
-      // Detailed expiry worksheet: one line per packet-expiry record.
-      const expiryRows = [];
-      exportReports.forEach((row, index) => {
-        const expiry = getExpiryExportValues(row);
-        const common = {
-          "#": index + 1,
-          "District": row.district ?? "",
-          "Project": row.project ?? "",
-          "Sector": row.sector ?? "",
-          "AWC Name": row.awc_name ?? "",
-          "AWC Code": row.awc_code ?? "",
-          "Food Item": row.food_item ?? "",
-          "Beneficiary Category": row.bene_category ?? "",
-        };
-        if (expiry.entries.length) {
-          expiry.entries.forEach((entry) => expiryRows.push({
-            ...common,
-            "Expiry Date": formatDateValue(expiryDateOf(entry)),
-            "Packet Count": expiryPacketsOf(entry),
-            "Expiry Status": isExpiryPast(expiryDateOf(entry)) ? "EXPIRED / समाप्त" : "Not expired / समाप्त नहीं",
-            "Remarks": expiryRemarksOf(entry),
-          }));
-        } else {
-          expiryRows.push({ ...common, "Expiry Date": "", "Packet Count": "", "Expiry Status": "No expiry details loaded", "Remarks": "" });
-        }
-      });
-      const expirySheet = XLSX.utils.json_to_sheet(expiryRows);
-      const expiryHeaders = Object.keys(expiryRows[0] || {"Expiry Date": ""});
-      expirySheet["!cols"] = expiryHeaders.map((header) => ({ wch: Math.min(32, Math.max(header.length + 2, 14)) }));
-      if (expirySheet["!ref"]) expirySheet["!autofilter"] = { ref: expirySheet["!ref"] };
-      XLSX.utils.book_append_sheet(workbook, expirySheet, "Expiry Details");
 
       const totalsRows = Object.entries(totals.quantityByUnit).map(([unit, quantity]) => ({
         "Unit / इकाई": unit, "Total Quantity / कुल मात्रा": Number(quantity.toFixed(2))
@@ -591,10 +452,6 @@ const DirectorTHRReceiving = () => {
     try {
       const exportReports = await fetchLatestExportReports();
       const exportColumns = localizedColumns.filter((col) => col.visible && col.dataField !== "actions");
-      for (const field of ["expired_packets", "expiry_breakdown"]) {
-        const column = localizedColumns.find((col) => col.dataField === field);
-        if (column && !exportColumns.some((col) => col.dataField === field)) exportColumns.push(column);
-      }
       const headers = exportColumns.map((col) => col.text);
       const body = exportReports.map((row, index) => {
         const record = makeExportRecord(row, index, exportColumns);
@@ -654,50 +511,8 @@ const DirectorTHRReceiving = () => {
       });
       exportRoot.appendChild(totalsTable);
 
-      const expiryTitle = document.createElement("h3");
-      expiryTitle.textContent = t("Packet Expiry Details", "पैकेट की समाप्ति जानकारी");
-      expiryTitle.style.cssText = "font-size:15px;margin:18px 0 8px;";
-      exportRoot.appendChild(expiryTitle);
-      const expiryTable = document.createElement("table");
-      expiryTable.style.cssText = "width:100%;border-collapse:collapse;font-size:10px;table-layout:auto;";
-      const expiryHeaders = [
-        t("District", "ज़िला"), t("Project", "परियोजना"), t("Sector", "सेक्टर"),
-        t("AWC Name", "आंगनवाड़ी केंद्र का नाम"), t("Food Item", "खाद्य सामग्री"),
-        t("Expiry Date", "समाप्ति तिथि"), t("Packet Count", "पैकेट संख्या"),
-        t("Status", "स्थिति"), t("Remarks", "टिप्पणियाँ"),
-      ];
-      const expiryHead = document.createElement("tr");
-      expiryHeaders.forEach((label) => {
-        const th = document.createElement("th");
-        th.textContent = label;
-        th.style.cssText = "border:1px solid #777;background:#e9eef5;padding:5px;text-align:left;";
-        expiryHead.appendChild(th);
-      });
-      expiryTable.appendChild(expiryHead);
-      exportReports.forEach((row) => {
-        const expiry = getExpiryExportValues(row);
-        const entries = expiry.entries.length ? expiry.entries : [null];
-        entries.forEach((entry) => {
-          const vals = [
-            row.district ?? "-", row.project ?? "-", row.sector ?? "-", row.awc_name ?? "-",
-            row.food_item ?? "-", entry ? formatDateValue(expiryDateOf(entry)) : t("No expiry details loaded", "समाप्ति विवरण लोड नहीं हुआ"),
-            entry ? expiryPacketsOf(entry) : "-", entry ? (isExpiryPast(expiryDateOf(entry)) ? t("EXPIRED", "समाप्त") : t("Not expired", "समाप्त नहीं")) : "-",
-            entry ? expiryRemarksOf(entry) : "-"
-          ];
-          const tr = document.createElement("tr");
-          vals.forEach((value) => {
-            const td = document.createElement("td");
-            td.textContent = String(value ?? "-");
-            td.style.cssText = "border:1px solid #999;padding:4px;vertical-align:top;white-space:normal;overflow-wrap:anywhere;";
-            tr.appendChild(td);
-          });
-          expiryTable.appendChild(tr);
-        });
-      });
-      exportRoot.appendChild(expiryTable);
-
       document.body.appendChild(exportRoot);
-      const canvas = await html2canvas(exportRoot, { scale: 1.15, useCORS: true, backgroundColor: "#ffffff", windowWidth: 1900, logging: false });
+
       const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3", compress: true });
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
@@ -1125,17 +940,12 @@ const DirectorTHRReceiving = () => {
                                       ? formatDateValue(getRecordDate(report))
                                       : col.dataField === "curr_month"
                                       ? (getCurrentMonth(report) || "-")
-                                      : col.dataField === "max_expirydate"
-                                      ? formatDateValue(getMaxExpiryDate(report))
-                                      : col.dataField === "expired_packets"
-                                      ? getExpiryExportValues(report).expiredPackets
-                                      : col.dataField === "expiry_breakdown"
-                                      ? (getExpiryExportValues(report).breakdown || t("Expiry details load when available", "उपलब्ध होने पर समाप्ति विवरण लोड होगा"))
                                       : col.dataField === "actions"
-                                      ? <PacketExpiryDetails record={report} onDetailsLoaded={(payload) => handleExpiryDetailsLoaded(report, payload)} />
+                                      ? null
                                       : col.dataField === "created_at" || col.dataField === "updated_at"
                                       ? (report[col.dataField] ? new Date(report[col.dataField]).toLocaleString() : "-")
                                       : (getReportField(report, col.dataField) || "-")}
+
                                   </td>
                                 ))}
                               </tr>
