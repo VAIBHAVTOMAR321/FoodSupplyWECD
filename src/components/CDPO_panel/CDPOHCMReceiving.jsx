@@ -98,7 +98,7 @@ const CDPOHCMReceiving = () => {
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQtyModal, setShowQtyModal] = useState(false);
   
-  // Updated columns state to include 'curr_month' and 'max_expirydate'
+  // Receiving report columns.
   const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
     { dataField: "awc_name", text: "AWC Name", visible: true },
@@ -248,7 +248,7 @@ const CDPOHCMReceiving = () => {
            if (col.dataField === "months") record[col.text] = formatMonths(row.months || row.quarter) || "";
            else if (col.dataField === "quarter") record[col.text] = row.quarter || "";
            else if (col.dataField === "sector_status") record[col.text] = row.sector_status || "pending";
-           else if (col.dataField === "max_expirydate" || col.dataField === "date") record[col.text] = value ? formatDate(value) : "";
+           else if (col.dataField === "date") record[col.text] = value ? formatDate(value) : "";
            else record[col.text] = value ?? "";
          });
          return record;
@@ -291,7 +291,7 @@ const CDPOHCMReceiving = () => {
            if (col.dataField === "months") return String(formatMonths(row.months || row.quarter) || "");
            if (col.dataField === "quarter") return String(row.quarter || "-");
            if (col.dataField === "sector_status") return String(row.sector_status || "pending");
-           if (col.dataField === "max_expirydate" || col.dataField === "date") return formatDate(row[col.dataField]) || "-";
+           if (col.dataField === "date") return formatDate(row.date) || "-";
            const value = row[col.dataField];
            return value === null || value === undefined || value === "" ? "-" : String(value);
          });

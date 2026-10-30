@@ -7,6 +7,8 @@ import {
 import "../../assets/css/cdpo.css";
 import CDPOHeader from "./CDPOHeader";
 import CDPOLeftNav from "./CDPOLeftNav";
+import { useAuth } from "../all_login/AuthContext";
+import { useLanguage } from "../all_login/LanguageContext";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -95,7 +97,6 @@ const CDPOTHRReceiving = () => {
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showQtyModal, setShowQtyModal] = useState(false);
   
-  // Updated columns state to include 'curr_month' and 'max_expirydate'
 const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
     { dataField: "awc_name", text: "AWC Name", visible: true },
@@ -245,7 +246,7 @@ const [columns, setColumns] = useState([
           record[col.text] = row.quarter || "";
         } else if (col.dataField === "sector_status") {
           record[col.text] = row.sector_status || "pending";
-        } else if (col.dataField === "max_expirydate" || col.dataField === "date") {
+        } else if (col.dataField === "date") {
           record[col.text] = value ? formatDate(value) : "";
         } else {
           record[col.text] = value ?? "";
@@ -293,7 +294,7 @@ const [columns, setColumns] = useState([
            if (col.dataField === "months") return String(formatMonths(row.months || row.quarter) || "");
            if (col.dataField === "quarter") return String(row.quarter || "-");
            if (col.dataField === "sector_status") return String(row.sector_status || "pending");
-           if (col.dataField === "max_expirydate" || col.dataField === "date") return formatDate(row[col.dataField]) || "-";
+           if (col.dataField === "date") return formatDate(row[col.dataField]) || "-";
            const value = row[col.dataField];
            return value === null || value === undefined || value === "" ? "-" : String(value);
          });
