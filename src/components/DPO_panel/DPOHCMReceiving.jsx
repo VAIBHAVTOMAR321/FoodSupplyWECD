@@ -16,6 +16,11 @@ import {
   Tab,
 } from "react-bootstrap";
 import "../../assets/css/dpo.css";
+import DPOHeader from "./DPOHeader";
+import DPOLeftNav from "./DPOLeftNav";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import * as XLSX from "xlsx";
 
 import { useAuth } from "../all_login/AuthContext";
 import { useLanguage } from "../all_login/LanguageContext";
@@ -196,7 +201,6 @@ const DPOHCMReceiving = () => {
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
 
-  // Updated columns state to include 'curr_month' and 'max_expirydate'
   const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
     { dataField: "date", text: "Date", visible: true },
@@ -355,9 +359,15 @@ const DPOHCMReceiving = () => {
       const response = await api.get("/dpo/hcm-receiving-summary/?page=1");
       const results = response?.data?.results;
       const latest = results?.success && Array.isArray(results.data) ? results.data : reports;
-      const byKey = new Map(latest.map((item) => [expiryRowKey(item), item]));
+      const getReceivingRowKey = (row) =>
+        String(
+          row?.id ??
+          `${row?.awc_code ?? ""}|${row?.sector ?? ""}|${row?.food_item ?? ""}|${row?.bene_category ?? ""}|${getRecordDate(row) ?? ""}`
+        );
+
+      const byKey = new Map(latest.map((item) => [getReceivingRowKey(item), item]));
       return filteredReports.map((row) => {
-        const fresh = byKey.get(expiryRowKey(row));
+        const fresh = byKey.get(getReceivingRowKey(row));
         return fresh ? { ...row, ...fresh } : row;
       });
     } catch (err) {
@@ -472,6 +482,12 @@ const DPOHCMReceiving = () => {
       exportRoot.appendChild(totalsTable);
 
       document.body.appendChild(exportRoot);
+      const canvas = await html2canvas(exportRoot, {
+        scale: 1.5,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
 
       const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3", compress: true });
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -631,7 +647,7 @@ const DPOHCMReceiving = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {summaryData.district_summary.map((item, index) => (
+                      {(summaryData.district_summary || []).map((item, index) => (
                         <tr key={index}>
                           <td>{summaryData.district}</td>
                           <td>{item.food_item}</td>
@@ -657,7 +673,7 @@ const DPOHCMReceiving = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {summaryData.project_summary.map((project) => (
+                      {(summaryData.project_summary || []).map((project) => (
                         <tr key={project.project}>
                           <td>{project.project}</td>
                           <td>{project.food_item}</td>
@@ -683,7 +699,7 @@ const DPOHCMReceiving = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {summaryData.sector_summary.map((sector, index) => (
+                      {(summaryData.sector_summary || []).map((sector, index) => (
                         <tr key={`${sector.sector}-${index}`}>
                           <td>{sector.sector}</td>
                           <td>{sector.food_item}</td>
