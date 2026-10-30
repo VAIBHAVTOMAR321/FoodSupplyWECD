@@ -654,8 +654,8 @@ const HcmSupervisorDistributions = () => {
       "AWC Name": "आंगनवाड़ी केंद्र का नाम", "AWC Code": "आंगनवाड़ी केंद्र कोड", "AWC Type": "आंगनवाड़ी केंद्र प्रकार",
       "Food Item": "खाद्य सामग्री", "Quantity": "मात्रा", "Unit": "इकाई", "Beneficiary Category": "लाभार्थी श्रेणी",
       "Date": "तारीख", "Fin. Year": "वित्तीय वर्ष", "Fin Year": "वित्तीय वर्ष", "Financial Year": "वित्तीय वर्ष",
-      "Trimester": "त्रैमासिक", "Months": "महीने", "Current Month": "वर्तमान महीना", "Max Expiry Date": "अधिकतम समाप्ति तारीख",
-      "Expired Packets": "समाप्त पैकेट", "Expiry Details": "समाप्ति विवरण", "Packet Expiry Details": "पैकेट समाप्ति विवरण",
+      "Trimester": "त्रैमासिक", "Months": "महीने",
+      "Current Month": "वर्तमान महीना",
       "Sector Remark": "क्षेटर टिप्पणी", "Sector Status": "क्षेत्र स्थिति", "Actions": "कार्रवाई", "Action": "कार्रवाई",
       "Days Allotted": "आवंटित दिन", "Beneficiaries": "लाभार्थी", "Qty": "मात्रा", "Remark": "टिप्पणी"
     };
@@ -1736,13 +1736,7 @@ const HcmSupervisorDistributions = () => {
 
                 <div className="mb-3">
                   <h6>{t("Anganwadi Details", "आंगनवाड़ी विवरण")}</h6>
-
-                  <p className="mb-1">
-                    <strong>{t("Expired Quantity:", "समाप्त मात्रा:")}</strong>{" "}
-                    {selectedRemarks.expired_quantity || 0}
-                  </p>
-
-                  <p className="mb-0">
+<p className="mb-0">
                     <strong>{t("Anganwadi Remark:", "आंगनवाड़ी टिप्पणी:")}</strong>{" "}
                     {selectedRemarks.anganwadi_remark || t("No remark", "कोई टिप्पणी नहीं")}
                   </p>
