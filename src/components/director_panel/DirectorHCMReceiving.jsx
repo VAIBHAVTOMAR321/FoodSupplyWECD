@@ -20,6 +20,11 @@ import "../../assets/css/directorleftnav.css";
 import { useAuth } from "../all_login/AuthContext";
 import { useLanguage } from "../all_login/LanguageContext";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
+import DirectorLeftNav from "./DirectorLeftNav";
+import DirectorHeader from "./DirectorHeader";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
 const monthLabels = {
   apr: 'April',
@@ -160,7 +165,7 @@ const getCurrentMonth = (row) => firstAvailableValue(row, [
 ]);
 
 
-const expiryRowKey = (row) => String(
+const getReportRowKey = (row) => String(
   row?.id ?? row?.awc_code ??
   `${row?.district ?? ""}|${row?.project ?? ""}|${row?.sector ?? ""}|${row?.food_item ?? ""}|${row?.bene_category ?? ""}|${row?.date ?? ""}`
 );
@@ -198,7 +203,7 @@ const DirectorHCMReceiving = () => {
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
 
-  // Updated columns state to include 'curr_month' and 'max_expirydate'
+  // Report columns include the current month; expiry fields are not displayed.
   const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
     { dataField: "date", text: t("Date", "तिथि"), visible: true },
@@ -263,9 +268,9 @@ const DirectorHCMReceiving = () => {
 
       if (results && results.success) {
         setSummaryData({
-          district_summary: results.district_summary,
-          project_summary: results.project_summary,
-          sector_summary: results.sector_summary,
+          district_summary: Array.isArray(results.district_summary) ? results.district_summary : [],
+          project_summary: Array.isArray(results.project_summary) ? results.project_summary : [],
+          sector_summary: Array.isArray(results.sector_summary) ? results.sector_summary : [],
         });
         setReports(results.data || []);
       }
@@ -390,16 +395,16 @@ const DirectorHCMReceiving = () => {
 
 
 
-  // Refresh summary rows immediately before exporting; retain already loaded expiry details.
+  // Refresh summary rows immediately before exporting.
 
   const fetchLatestExportReports = async () => {
     try {
       const response = await api.get("/director/hcm-receiving-summary/?page=1");
       const results = response?.data?.results;
       const latest = results?.success && Array.isArray(results.data) ? results.data : reports;
-      const byKey = new Map(latest.map((item) => [expiryRowKey(item), item]));
+      const byKey = new Map(latest.map((item) => [getReportRowKey(item), item]));
       return filteredReports.map((row) => {
-        const fresh = byKey.get(expiryRowKey(row));
+        const fresh = byKey.get(getReportRowKey(row));
         return fresh ? { ...row, ...fresh } : row;
       });
     } catch (err) {

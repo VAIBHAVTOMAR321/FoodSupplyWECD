@@ -20,6 +20,11 @@ import "../../assets/css/directorleftnav.css";
 import { useAuth } from "../all_login/AuthContext";
 import { useLanguage } from "../all_login/LanguageContext";
 import { FaFilePdf, FaFileExcel, FaEye } from "react-icons/fa";
+import DirectorLeftNav from "./DirectorLeftNav";
+import DirectorHeader from "./DirectorHeader";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
 const monthLabels = {
   apr: 'April',
@@ -163,6 +168,10 @@ const getRecordDate = (row) => firstAvailableValue(row, [
 const getCurrentMonth = (row) => firstAvailableValue(row, [
   "curr_month", "current_month", "currentMonth", "month_current", "monthCurrent",
 ]);
+const getReportRowKey = (row) => String(
+  row?.id ?? row?.awc_code ??
+  `${row?.district ?? ""}|${row?.project ?? ""}|${row?.sector ?? ""}|${row?.food_item ?? ""}|${row?.bene_category ?? ""}|${row?.date ?? ""}`
+);
 const getReportField = (row, field) => {
   const aliases = {
     awc_name: ["awc_name", "awcName", "anganwadi_name", "anganwadiName"],
@@ -215,7 +224,7 @@ const DirectorTHRReceiving = () => {
   const [uniqueFoodItems, setUniqueFoodItems] = useState([]);
   const [uniqueBeneCategories, setUniqueBeneCategories] = useState([]);
 
-  // Updated columns state to include 'curr_month' and 'max_expirydate'
+  // Report columns include the current month; expiry fields are not displayed.
   const [columns, setColumns] = useState([
     { dataField: "#", text: "#", visible: true },
     { dataField: "date", text: t("Date", "तिथि"), visible: true },
@@ -279,11 +288,11 @@ const DirectorTHRReceiving = () => {
 
       if (results && results.success) {
         setSummaryData({
-          district_summary: results.district_summary,
-          project_summary: results.project_summary,
-          sector_summary: results.sector_summary,
+          district_summary: Array.isArray(results.district_summary) ? results.district_summary : [],
+          project_summary: Array.isArray(results.project_summary) ? results.project_summary : [],
+          sector_summary: Array.isArray(results.sector_summary) ? results.sector_summary : [],
         });
-        setReports(results.data || []);
+        setReports(Array.isArray(results.data) ? results.data : []);
       }
     } catch (err) {
       setError(t("Failed to fetch THR receiving summary.", "टीएचआर प्राप्ति सारांश प्राप्त नहीं हो सका।"));
@@ -394,9 +403,9 @@ const DirectorTHRReceiving = () => {
       const response = await api.get("/director/thr-receiving-summary/?page=1");
       const results = response?.data?.results;
       const latest = results?.success && Array.isArray(results.data) ? results.data : reports;
-      const byKey = new Map(latest.map((item) => [expiryRowKey(item), item]));
+      const byKey = new Map(latest.map((item) => [getReportRowKey(item), item]));
       return filteredReports.map((row) => {
-        const fresh = byKey.get(expiryRowKey(row));
+        const fresh = byKey.get(getReportRowKey(row));
         return fresh ? { ...row, ...fresh } : row;
       });
     } catch (err) {
@@ -409,7 +418,7 @@ const DirectorTHRReceiving = () => {
     const record = { "#": index + 1 };
     exportColumns.forEach((col) => {
       const value = row[col.dataField];
-      if (col.dataField === "months") record[col.text] = formatRecordMonths(row);
+      if (col.dataField === "months") record[col.text] = formatMonths(row);
       else if (col.dataField === "quarter") record[col.text] = formatRecordTrimester(row);
       else if (col.dataField === "date") record[col.text] = formatDateValue(getRecordDate(row));
       else if (col.dataField === "curr_month") record[col.text] = getCurrentMonth(row) || "";
@@ -512,6 +521,13 @@ const DirectorTHRReceiving = () => {
       exportRoot.appendChild(totalsTable);
 
       document.body.appendChild(exportRoot);
+      const canvas = await html2canvas(exportRoot, {
+        scale: 1.15,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        windowWidth: 1900,
+        logging: false,
+      });
 
       const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a3", compress: true });
       const pdfWidth = pdf.internal.pageSize.getWidth();
