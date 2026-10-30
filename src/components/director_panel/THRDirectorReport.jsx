@@ -55,7 +55,6 @@ const fieldAliases = {
   total_beneficiaries: ["total_beneficiaries", "totalBeneficiaries", "beneficiaries", "beneficiary_count", "beneficiaryCount"],
   quantity: ["quantity", "total_quantity", "totalQuantity", "qty", "distributed_quantity", "distributedQuantity"],
   unit: ["unit", "quantity_unit", "quantityUnit"],
-  expired_quantity: ["expired_quantity", "expiredQuantity", "expiry_quantity", "expiryQuantity"],
   anganwadi_remark: ["anganwadi_remark", "anganwadiRemark", "awc_remark", "awcRemark", "remark", "remarks"],
   sector_status: ["sector_status", "sectorStatus", "status"],
   cdpo_status: ["cdpo_status", "cdpoStatus", "project_status", "projectStatus"],
