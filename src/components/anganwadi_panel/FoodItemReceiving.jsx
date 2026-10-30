@@ -205,28 +205,6 @@ const normalizeSuppMonth = (rawMonth) => {
   return partial ? partial.value : str.toLowerCase();
 };
 
-const normalizePacketExpiry = (raw) => {
-  if (!Array.isArray(raw) || raw.length === 0) return [['', '', '']];
-  const out = raw.map(row => {
-    if (Array.isArray(row)) {
-      return [
-        String(row[0] == null ? '' : row[0]),
-        String(row[1] == null ? '' : row[1]),
-        String(row[2] == null ? '' : row[2])
-      ];
-    }
-    if (row && typeof row === 'object') {
-      return [
-        String(row.count == null ? '' : row.count),
-        String(row.date == null ? '' : row.date),
-        String(row.remark == null ? (row.remarks == null ? '' : row.remarks) : row.remark)
-      ];
-    }
-    return ['', '', ''];
-  });
-  return out.length > 0 ? out : [['', '', '']];
-};
-
 let hindiPdfFontPromise;
 const loadHindiPdfFont = async () => {
   if (!hindiPdfFontPromise) {
@@ -372,9 +350,6 @@ const FoodItemReceiving = () => {
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewItem, setViewItem] = useState(null);
-
-  const [showExpiryModal, setShowExpiryModal] = useState(false);
-  const [expiryViewItem, setExpiryViewItem] = useState(null);
 
   const [suppFilters, setSuppFilters] = useState({ quarter: '', financial_year: '' });
   const [filters, setFilters] = useState({ fin_year: '', months: [] });
@@ -546,36 +521,6 @@ const FoodItemReceiving = () => {
     });
   }, [formData.field_name, formData.quarter, formData.food_item, formData.bene_category, formData.fin_year, editingItem, activeTab, suppNutritionData, hcmReceivings, thrReceivings]);
 
-  const packetExpiryTotal = useMemo(() => {
-    const rows = formData.packet_expiry || [];
-    return rows.reduce((sum, row) => sum + (parseFloat(row && row[0]) || 0), 0);
-  }, [formData.packet_expiry]);
-
-  const packetExpiryMatchInfo = useMemo(() => {
-    const totalQty = parseFloat(formData.quantity) || 0;
-    const listTotal = packetExpiryTotal;
-    if (!totalQty && !listTotal) {
-      return { ok: false, message: t('Enter quantity & packet details.', 'मात्रा और पैकेट विवरण दर्ज करें।'), variant: 'muted' };
-    }
-    if (listTotal > totalQty) {
-      return { ok: false, message: t(`List total (${listTotal}) exceeds quantity (${totalQty}).`, `सूची का कुल (${listTotal}) मात्रा (${totalQty}) से अधिक है।`), variant: 'danger' };
-    }
-    if (listTotal === totalQty) {
-      return { ok: true, message: t(`List total (${listTotal}) matches quantity ✓`, `सूची का कुल (${listTotal}) मात्रा से मेल खाता है ✓`), variant: 'success' };
-    }
-    return { ok: false, message: t(`List total (${listTotal}). Required: ${totalQty}. Remaining: ${totalQty - listTotal}`, `सूची का कुल (${listTotal})। आवश्यक: ${totalQty}। शेष: ${totalQty - listTotal}`), variant: 'warning' };
-  }, [packetExpiryTotal, formData.quantity]);
-
-  // Expiry batch details are optional. Only enforce the packet-total match
-  // when the user has entered at least one value in the expiry table.
-  const packetExpiryHasInput = useMemo(() => {
-    const rows = Array.isArray(formData.packet_expiry) ? formData.packet_expiry : [];
-    return rows.some((row) =>
-      Array.isArray(row) &&
-      row.some((value) => String(value ?? "").trim() !== "")
-    );
-  }, [formData.packet_expiry]);
-
   const fetchData = async () => {
     setLoading(true);
     setError("");
@@ -684,26 +629,22 @@ const FoodItemReceiving = () => {
       setFormData({
         ...item,
         date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
-        max_expirydate: item.max_expirydate ? new Date(item.max_expirydate).toISOString().split('T')[0] : '',
         curr_month: item.curr_month || getCurrentMonth(),
         months: parsedMonths.filter(month => (trimesterToMonths[normalizeTrimester(item.quarter)] || []).includes(month)),
         quarter: normalizeTrimester(item.quarter) || item.quarter || '',
         food_item_value: foodItemValue,
         field_name: fieldName,
         quantity: String(item.quantity == null ? '' : item.quantity),
-        packet_expiry: normalizePacketExpiry(item.packet_expiry),
       });
     } else {
       setFormData({
         food_item: '', food_item_value: '', quantity: '', bene_category: '', unit: '',
         date: new Date().toISOString().split('T')[0],
-        max_expirydate: '',
         curr_month: getCurrentMonth(),
         fin_year: getCurrentFinancialYear(),
         months: [],
         quarter: '',
         field_name: '',
-        packet_expiry: [['', '', '']],
       });
     }
     setFormError('');
@@ -725,16 +666,6 @@ const FoodItemReceiving = () => {
     setViewItem(null);
   };
 
-  const handleOpenExpiryModal = (record) => {
-    setExpiryViewItem(record);
-    setShowExpiryModal(true);
-  };
-
-  const handleCloseExpiryModal = () => {
-    setShowExpiryModal(false);
-    setExpiryViewItem(null);
-  };
-
   const availableFoodItems = useMemo(() => {
     const tabCategory = activeTab.toUpperCase();
     return foodItemOptions.filter(item => item.category === tabCategory);
@@ -752,7 +683,6 @@ const FoodItemReceiving = () => {
         quantity: prev.field_name && prev.food_item
           ? String(getRemainingAllocatedPackets({ trimester: value, fieldName: prev.field_name, finYear: prev.fin_year || getCurrentFinancialYear(), foodItem: prev.food_item, beneCategory: prev.bene_category, excludeId: editingItem ? editingItem.id : null }))
           : '',
-        packet_expiry: [['', '', '']],
       }));
     } else if (name === 'food_item') {
       const parts = value.split('|||');
@@ -779,7 +709,6 @@ const FoodItemReceiving = () => {
           ? String(getRemainingAllocatedPackets({ trimester: prev.quarter, fieldName: autoFieldName, finYear: prev.fin_year || getCurrentFinancialYear(), foodItem: selectedFoodItem, beneCategory: autoBeneCategory, excludeId: editingItem ? editingItem.id : null }))
           : '',
         months: (prev.months || []).filter(month => (trimesterToMonths[normalizeTrimester(prev.quarter)] || []).includes(month)),
-        packet_expiry: [['', '', '']],
       }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
@@ -800,55 +729,6 @@ const FoodItemReceiving = () => {
       return { ...prev, months: nextMonths };
     });
     if (formError) setFormError('');
-  };
-
-  const handlePacketExpiryChange = (index, field, value) => {
-    setFormData(prev => {
-      const rows = Array.isArray(prev.packet_expiry) ? prev.packet_expiry.map(r => [...r]) : [['', '', '']];
-      const current = rows[index] || ['', '', ''];
-      if (field === 'count') {
-        const totalQty = parseFloat(prev.quantity) || 0;
-        const sumWithoutThis = rows.reduce((sum, row, i) => {
-          if (i === index) return sum;
-          return sum + (parseFloat(row && row[0]) || 0);
-        }, 0);
-        const entered = parseFloat(value) || 0;
-        if (totalQty > 0 && sumWithoutThis + entered > totalQty) {
-          const allowed = Math.max(0, totalQty - sumWithoutThis);
-          rows[index] = [String(allowed), current[1] || '', current[2] || ''];
-        } else {
-          rows[index] = [String(value), current[1] || '', current[2] || ''];
-        }
-      } else if (field === 'date') {
-        rows[index] = [current[0] || '', String(value), current[2] || ''];
-      } else if (field === 'remarks') {
-        rows[index] = [current[0] || '', current[1] || '', String(value)];
-      }
-      return { ...prev, packet_expiry: rows };
-    });
-    if (formError) setFormError('');
-  };
-
-  const handleAddPacketRow = () => {
-    setFormData(prev => {
-      const rows = Array.isArray(prev.packet_expiry) ? prev.packet_expiry.map(r => [...r]) : [];
-      const totalQty = parseFloat(prev.quantity) || 0;
-      const currentSum = rows.reduce((s, r) => s + (parseFloat(r && r[0]) || 0), 0);
-      if (totalQty > 0 && currentSum >= totalQty) {
-        return prev;
-      }
-      rows.push(['', '', '']);
-      return { ...prev, packet_expiry: rows };
-    });
-  };
-
-  const handleRemovePacketRow = (index) => {
-    setFormData(prev => {
-      const rows = Array.isArray(prev.packet_expiry) ? prev.packet_expiry.map(r => [...r]) : [];
-      rows.splice(index, 1);
-      if (rows.length === 0) rows.push(['', '', '']);
-      return { ...prev, packet_expiry: rows };
-    });
   };
 
   const handleSubmit = async (e) => {
@@ -927,44 +807,6 @@ const FoodItemReceiving = () => {
       return;
     }
 
-    // Packet-wise expiry details are optional for both THR and HCM receiving.
-    // If the user enters any batch rows, validate those rows; otherwise allow saving.
-    const peRows = Array.isArray(formData.packet_expiry) ? formData.packet_expiry : [];
-    const cleanedPacketExpiry = peRows
-      .map(r => {
-        const c = Array.isArray(r) ? r : ['', '', ''];
-        return [
-          String(c[0] == null ? '' : c[0]).trim(),
-          String(c[1] == null ? '' : c[1]).trim(),
-          String(c[2] == null ? '' : c[2]).trim()
-        ];
-      })
-      .filter(r => r.some(value => value !== ''));
-
-    const peTotal = cleanedPacketExpiry.reduce((s, r) => s + (parseFloat(r[0]) || 0), 0);
-
-    // Only validate batch totals when packet details have actually been entered.
-    if (cleanedPacketExpiry.length > 0) {
-      if (peTotal > parsedQuantity) {
-        setFormErrorAndScroll(t(`Packet details total (${peTotal}) cannot exceed quantity (${parsedQuantity}).`, `पैकेट विवरण का कुल (${peTotal}) मात्रा (${parsedQuantity}) से अधिक नहीं हो सकता।`));
-        setSubmitting(false);
-        return;
-      }
-      if (peTotal !== parsedQuantity) {
-        setFormErrorAndScroll(
-          t(`Packet details total (${peTotal}) must equal quantity (${parsedQuantity}). Remaining: ${parsedQuantity - peTotal}`, `पैकेट विवरण का कुल (${peTotal}) मात्रा (${parsedQuantity}) के बराबर होना चाहिए। शेष: ${parsedQuantity - peTotal}`)
-        );
-        setSubmitting(false);
-        return;
-      }
-      const incomplete = cleanedPacketExpiry.find(r => r[0] === '' || r[1] === '');
-      if (incomplete) {
-        setFormErrorAndScroll(t("If you enter Packet Details, provide both packet count and expiry date for every batch.", "यदि पैकेट विवरण भरते हैं, तो हर बैच के लिए पैकेट संख्या और समाप्ति तिथि दोनों भरें।"));
-        setSubmitting(false);
-        return;
-      }
-    }
-
     let payload = {
       food_item: formData.food_item || '',
       quantity: parsedQuantity,
@@ -975,8 +817,6 @@ const FoodItemReceiving = () => {
       months: selectedMonths,
       quarter: trimesterValue,
       curr_month: formData.curr_month || getCurrentMonth(),
-      max_expirydate: formData.max_expirydate || null,
-      packet_expiry: cleanedPacketExpiry,
     };
 
     if (editingItem) {
@@ -1041,34 +881,6 @@ const FoodItemReceiving = () => {
     }
   };
 
-  const hasPacketExpiry = (rec) => {
-    if (!rec) return false;
-    if (!Array.isArray(rec.packet_expiry) || rec.packet_expiry.length === 0) return false;
-    return rec.packet_expiry.some(pe => {
-      const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
-      const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
-      return (count !== '' && count != null) || (date !== '' && date != null);
-    });
-  };
-
-
-  // Shared packet-expiry helpers for the receiving table and its PDF/Excel exports.
-  const getPacketExpiryRows = (record) => {
-    if (!Array.isArray(record?.packet_expiry)) return [];
-    return record.packet_expiry.filter((entry) => {
-      const count = Array.isArray(entry) ? entry[0] : entry?.count;
-      const date = Array.isArray(entry) ? entry[1] : entry?.date;
-      const remark = Array.isArray(entry) ? entry[2] : (entry?.remark ?? entry?.remarks);
-      return [count, date, remark].some(value => value !== null && value !== undefined && String(value).trim() !== '');
-    });
-  };
-
-  const getExpiryEntry = (entry) => ({
-    count: Array.isArray(entry) ? entry[0] : (entry?.count ?? ''),
-    date: Array.isArray(entry) ? entry[1] : (entry?.date ?? ''),
-    remark: Array.isArray(entry) ? entry[2] : (entry?.remark ?? entry?.remarks ?? ''),
-  });
-
   const formatExportDate = (value) => {
     if (!value) return '';
     const raw = String(value).trim();
@@ -1077,25 +889,6 @@ const FoodItemReceiving = () => {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? raw : date.toLocaleDateString('en-GB');
   };
-
-  const getExpiredPacketCount = (record) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return getPacketExpiryRows(record).reduce((total, entry) => {
-      const { count, date } = getExpiryEntry(entry);
-      if (!date) return total;
-      const expiryDate = new Date(date);
-      if (Number.isNaN(expiryDate.getTime())) return total;
-      expiryDate.setHours(0, 0, 0, 0);
-      return expiryDate < today ? total + (Number(count) || 0) : total;
-    }, 0);
-  };
-
-  const getExpiryBreakdown = (record) => getPacketExpiryRows(record).map((entry) => {
-    const { count, date, remark } = getExpiryEntry(entry);
-    const expired = date && !Number.isNaN(new Date(date).getTime()) && new Date(date).setHours(0, 0, 0, 0) < new Date(new Date().setHours(0, 0, 0, 0));
-    return `${count === '' ? '—' : count} packets | Expiry: ${formatExportDate(date) || '—'} | ${expired ? 'EXPIRED / समाप्त' : 'Not expired / समाप्त नहीं'}${remark ? ` | ${remark}` : ''}`;
-  }).join(' ; ');
 
   const makeReceivingExportRows = (records) => records.map((rec, index) => ({
     'S. No.': index + 1,
@@ -1111,11 +904,8 @@ const FoodItemReceiving = () => {
     'Unit': rec.unit ?? '',
     'Fin. Year': rec.fin_year ?? '',
     'Current Month': rec.curr_month ?? '',
-    'Max Expiry Date': formatExportDate(rec.max_expirydate),
     'Trimester': normalizeTrimester(rec.quarter) || rec.quarter || '',
     'Months': formatMonths(getMonthsArray(rec)),
-    'Expired Packets': getExpiredPacketCount(rec),
-    'Expiry Details': getExpiryBreakdown(rec) || 'No expiry details / समाप्ति विवरण उपलब्ध नहीं',
     'Sector Status': rec.sector_status || 'pending',
     'Sector Remark': rec.sector_remark ?? '',
   }));
