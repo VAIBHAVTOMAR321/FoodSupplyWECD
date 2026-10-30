@@ -16,7 +16,7 @@ import {
   FaEdit, FaTrash, FaEye, FaBuilding, FaHashtag, FaUtensils, FaUsers,
   FaWeightHanging, FaCalendarDay, FaMapMarkerAlt, FaCubes,
   FaProjectDiagram, FaInfoCircle, FaClock, FaFileExcel, FaFilePdf,
-  FaBoxes, FaPlus, FaMinus, FaCalendarCheck
+  FaBoxes
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import html2pdf from "html2pdf.js";
@@ -747,7 +747,7 @@ const FoodItemReceiving = () => {
       return;
     }
 
-    // At least one receiving month is mandatory; expiry details are optional.
+    // At least one receiving month is mandatory.
     if (selectedMonths.length === 0) {
       setFormErrorAndScroll(t('Please select at least one month for receiving.', 'कृपया प्राप्ति के लिए कम से कम एक महीना चुनें।'));
       setSubmitting(false);
@@ -979,37 +979,6 @@ const FoodItemReceiving = () => {
     if (!records.length) return;
     try {
       const mainRows = makeReceivingExportRows(records);
-      const expiryRows = [];
-      records.forEach((rec, index) => {
-        const entries = getPacketExpiryRows(rec);
-        const common = {
-          'S. No.': index + 1,
-          'District': rec.district ?? '',
-          'Project': rec.project ?? '',
-          'Sector': rec.sector ?? '',
-          'AWC Name': rec.awc_name ?? '',
-          'AWC Code': rec.awc_code ?? '',
-          'Food Item': rec.food_item ?? '',
-          'Beneficiary Category': rec.bene_category ?? '',
-          'Receiving Date': formatExportDate(rec.date),
-        };
-        if (entries.length) {
-          entries.forEach((entry) => {
-            const { count, date, remark } = getExpiryEntry(entry);
-            const expiryDate = date ? new Date(date) : null;
-            const expired = expiryDate && !Number.isNaN(expiryDate.getTime()) && expiryDate.setHours(0, 0, 0, 0) < new Date(new Date().setHours(0, 0, 0, 0));
-            expiryRows.push({
-              ...common,
-              'Expiry Date': formatExportDate(date),
-              'Packet Count': count,
-              'Expiry Status': expired ? 'EXPIRED / समाप्त' : 'Not expired / समाप्त नहीं',
-              'Remarks': remark,
-            });
-          });
-        } else {
-          expiryRows.push({ ...common, 'Expiry Date': '', 'Packet Count': '', 'Expiry Status': 'No expiry details / समाप्ति विवरण उपलब्ध नहीं', 'Remarks': '' });
-        }
-      });
 
       const quantityTotals = Object.entries(records.reduce((acc, rec) => {
         const unit = rec.unit || 'N/A';
@@ -1019,15 +988,12 @@ const FoodItemReceiving = () => {
 
       const workbook = XLSX.utils.book_new();
       const mainSheet = XLSX.utils.json_to_sheet(mainRows);
-      const expirySheet = XLSX.utils.json_to_sheet(expiryRows);
       const totalsSheet = XLSX.utils.json_to_sheet(quantityTotals);
-      [mainSheet, expirySheet, totalsSheet].forEach((sheet) => {
+      [mainSheet, totalsSheet].forEach((sheet) => {
         if (sheet['!ref']) sheet['!autofilter'] = { ref: sheet['!ref'] };
       });
       mainSheet['!cols'] = Object.keys(mainRows[0] || {}).map(key => ({ wch: Math.min(42, Math.max(14, key.length + 2)) }));
-      expirySheet['!cols'] = Object.keys(expiryRows[0] || {}).map(key => ({ wch: Math.min(36, Math.max(14, key.length + 2)) }));
       XLSX.utils.book_append_sheet(workbook, mainSheet, `${activeTab.toUpperCase()} Receiving`);
-      XLSX.utils.book_append_sheet(workbook, expirySheet, 'Packet Expiry Details');
       XLSX.utils.book_append_sheet(workbook, totalsSheet, 'Quantity Totals');
       XLSX.writeFile(workbook, `${activeTab}-anganwadi-receiving.xlsx`, { compression: true });
     } catch (err) {
@@ -1087,20 +1053,6 @@ const FoodItemReceiving = () => {
       const mainHeaders = Object.keys(rows[0] || {});
       appendTable('प्राप्ति विवरण / Receiving Details', mainHeaders, rows.map(row => mainHeaders.map(header => row[header])));
 
-      const expiryHeaders = ['S. No.', 'District', 'Project', 'Sector', 'AWC Name', 'Food Item', 'Expiry Date', 'Packet Count', 'Expiry Status', 'Remarks'];
-      const expiryRows = [];
-      records.forEach((rec, index) => {
-        const entries = getPacketExpiryRows(rec);
-        const common = [index + 1, rec.district ?? '—', rec.project ?? '—', rec.sector ?? '—', rec.awc_name ?? '—', rec.food_item ?? '—'];
-        if (entries.length) entries.forEach(entry => {
-          const { count, date, remark } = getExpiryEntry(entry);
-          const expiryDate = date ? new Date(date) : null;
-          const expired = expiryDate && !Number.isNaN(expiryDate.getTime()) && expiryDate.setHours(0, 0, 0, 0) < new Date(new Date().setHours(0, 0, 0, 0));
-          expiryRows.push([...common, formatExportDate(date) || '—', count || '—', expired ? 'EXPIRED / समाप्त' : 'Not expired / समाप्त नहीं', remark || '—']);
-        });
-        else expiryRows.push([...common, '—', '—', 'No expiry details / समाप्ति विवरण उपलब्ध नहीं', '—']);
-      });
-      appendTable('पैकेट की समाप्ति जानकारी / Packet Expiry Details', expiryHeaders, expiryRows);
 
       const totals = Object.entries(records.reduce((acc, rec) => {
         const unit = rec.unit || 'N/A';
@@ -1141,11 +1093,8 @@ const FoodItemReceiving = () => {
             <th>{t("Unit", "इकाई")}</th>
             <th>{t("Fin. Year", "वित्तीय वर्ष")}</th>
             <th>{t("Current Month", "वर्तमान महीना")}</th>
-            <th>{t("Max Expiry Date", "अधिकतम समाप्ति तिथि")}</th>
             <th>{t("Trimester", "त्रैमासिक अवधि")}</th>
             <th>{t("Months", "महीने")}</th>
-            <th>{t("Expired Packets", "समाप्त पैकेट")}</th>
-            <th>{t("Expiry Details", "समाप्ति विवरण")}</th>
             <th>{t("Sector Status", "सेक्टर स्थिति")}</th>
             <th>{t("Actions", "कार्रवाई")}</th>
           </tr>
@@ -1161,11 +1110,8 @@ const FoodItemReceiving = () => {
               <td>{rec.unit}</td>
               <td>{rec.fin_year}</td>
               <td>{rec.curr_month || '-'}</td>
-              <td>{rec.max_expirydate ? new Date(rec.max_expirydate).toLocaleDateString() : '-'}</td>
               <td>{normalizeTrimester(rec.quarter) || rec.quarter || '-'}</td>
               <td>{formatMonths(getMonthsArray(rec))}</td>
-              <td className="text-center">{getExpiredPacketCount(rec).toLocaleString()}</td>
-              <td style={{ minWidth: '260px', whiteSpace: 'normal', verticalAlign: 'top', overflowWrap: 'anywhere', lineHeight: 1.5, height: 'auto' }}>{getExpiryBreakdown(rec) || t('No expiry details available.', 'समाप्ति विवरण उपलब्ध नहीं है।')}</td>
               <td>
                 <Badge bg={getStatusVariant(rec.sector_status)}>{rec.sector_status || 'pending'}</Badge>
               </td>
@@ -1185,21 +1131,11 @@ const FoodItemReceiving = () => {
                       </Button>
                     </>
                   )}
-                  {hasPacketExpiry(rec) && (
-                    <Button
-                      variant="outline-warning"
-                      size="sm"
-                      onClick={() => handleOpenExpiryModal(rec)}
-                      title={t("View Packet Expiry Details", "पैकेट समाप्ति विवरण देखें")}
-                    >
-                      <FaCalendarCheck /> {t("Expiry", "समाप्ति")}
-                    </Button>
-                  )}
                 </div>
               </td>
             </tr>
           )) : (
-            <tr><td colSpan="15" className="text-center">{t("No records found.", "कोई रिकॉर्ड नहीं मिला।")}</td></tr>
+            <tr><td colSpan="12" className="text-center">{t("No records found.", "कोई रिकॉर्ड नहीं मिला।")}</td></tr>
           )}
         </tbody>
         {records.length > 0 && (
@@ -1207,7 +1143,7 @@ const FoodItemReceiving = () => {
             <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
               <td colSpan="4" className="text-end">{t("Total Quantity:", "कुल मात्रा:")}</td>
               <td>{totalQuantity}</td>
-              <td colSpan="10"></td>
+              <td colSpan="7"></td>
             </tr>
           </tfoot>
         )}
@@ -1752,17 +1688,6 @@ const FoodItemReceiving = () => {
                     />
                   </Form.Group>
                 </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>{t("Max Expiry Date (Safe to distribute till)", "अधिकतम समाप्ति तिथि (इस तिथि तक वितरण सुरक्षित है)")} <span className="text-muted">({t("Optional", "वैकल्पिक")})</span></Form.Label>
-                    <Form.Control
-                      type="date"
-                      name="max_expirydate"
-                      value={formData.max_expirydate || ''}
-                      onChange={handleFormChange}
-                    />
-                  </Form.Group>
-                </Col>
               </Row>
 
               <Row>
@@ -1800,103 +1725,6 @@ const FoodItemReceiving = () => {
                 </Col>
               </Row>
 
-              <Row>
-                <Col md={12}>
-                  <Form.Group className="mb-3">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <div>
-                        <h6 className="mb-0">{t("Packet Details (Per Expiry Batch)", "पैकेट विवरण (प्रत्येक समाप्ति बैच के लिए)")} <span className="text-muted">({t("Optional", "वैकल्पिक")})</span></h6>
-                        <small className="text-muted">
-                          {t("Optional — receiving can be saved without packet-wise expiry details.", "वैकल्पिक — पैकेट-वार समाप्ति विवरण के बिना भी प्राप्ति सहेजी जा सकती है।")}
-                        </small>
-                      </div>
-                      <Button
-                        variant="success"
-                        size="sm"
-                        onClick={handleAddPacketRow}
-                        disabled={
-                          (parseFloat(formData.quantity) || 0) > 0 &&
-                          packetExpiryTotal >= (parseFloat(formData.quantity) || 0)
-                        }
-                      >
-                        <FaPlus className="me-1" /> {t("Add Row", "पंक्ति जोड़ें")}
-                      </Button>
-                    </div>
-
-                    <Table bordered responsive size="sm" className="mb-2">
-                      <thead>
-                        <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
-                          <th style={{ width: '40px' }}>#</th>
-                          <th style={{ width: '120px' }}>{t("Packets", "पैकेट")}</th>
-                          <th style={{ width: '160px' }}>{t("Expiry Date", "समाप्ति तिथि")}</th>
-                          <th>{t("Remarks", "टिप्पणियां")}</th>
-                          <th style={{ width: '80px' }}>{t("Action", "कार्रवाई")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(formData.packet_expiry || [['', '', '']]).map((row, idx) => (
-                          <tr key={idx}>
-                            <td className="text-center">{idx + 1}</td>
-                            <td>
-                              <Form.Control
-                                type="number"
-                                min="0"
-                                value={row ? row[0] : ''}
-                                onChange={(e) => handlePacketExpiryChange(idx, 'count', e.target.value)}
-                                placeholder={t("Packets", "पैकेट")}
-                                isInvalid={
-                                  (parseFloat(formData.quantity) || 0) > 0 &&
-                                  (parseFloat(row && row[0]) || 0) > 0 &&
-                                  packetExpiryTotal > (parseFloat(formData.quantity) || 0)
-                                }
-                              />
-                            </td>
-                            <td>
-                              <Form.Control
-                                type="date"
-                                value={row ? row[1] : ''}
-                                onChange={(e) => handlePacketExpiryChange(idx, 'date', e.target.value)}
-                              />
-                            </td>
-                            <td>
-                              <Form.Control
-                                type="text"
-                                value={row ? row[2] : ''}
-                                onChange={(e) => handlePacketExpiryChange(idx, 'remarks', e.target.value)}
-                                placeholder={t("Enter remarks for this batch", "इस बैच के लिए टिप्पणियां दर्ज करें")}
-                              />
-                            </td>
-                            <td className="text-center">
-                              <Button
-                                variant="outline-danger"
-                                size="sm"
-                                onClick={() => handleRemovePacketRow(idx)}
-                                disabled={(formData.packet_expiry || []).length <= 1}
-                              >
-                                <FaMinus />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
-                          <td className="text-end">{t("Total:", "कुल:")}</td>
-                          <td>{packetExpiryTotal}</td>
-                          <td colSpan={3}>
-                            <small className={`text-${packetExpiryMatchInfo.variant}`}>
-                              {packetExpiryMatchInfo.message}
-                            </small>
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </Table>
-                    <small className="text-muted d-block">
-                      {t("Note: Packet details total must equal the auto-fetched packet count and cannot exceed it.", "ध्यान दें: पैकेट विवरण का कुल स्वतः प्राप्त पैकेट संख्या के बराबर होना चाहिए और उससे अधिक नहीं हो सकता।")}
-                    </small>
-                  </Form.Group>
-                </Col>
-              </Row>
 
               <div className="d-flex justify-content-end">
                 <Button variant="secondary" onClick={handleCloseModal} className="me-2">
@@ -1905,7 +1733,7 @@ const FoodItemReceiving = () => {
                 <Button
                   variant="primary"
                   type="submit"
-                  disabled={submitting || (packetExpiryHasInput && !packetExpiryMatchInfo.ok) || (!!formData.quarter && !selectedTrimesterHasData) || (!!formData.field_name && !!formData.food_item && !!formData.quarter && remainingAllocation <= 0 && !editingItem)}
+                  disabled={submitting || (!!formData.quarter && !selectedTrimesterHasData) || (!!formData.field_name && !!formData.food_item && !!formData.quarter && remainingAllocation <= 0 && !editingItem)}
                 >
                   {submitting ? <Spinner as="span" animation="border" size="sm" /> : t(editingItem ? 'Update' : 'Submit', editingItem ? 'अपडेट करें' : 'जमा करें')}
                 </Button>
@@ -1937,33 +1765,6 @@ const FoodItemReceiving = () => {
                 {viewItem.curr_month && (
                   <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>{t("Current Month:", "वर्तमान महीना:")}</strong> {viewItem.curr_month}</ListGroup.Item>
                 )}
-                {viewItem.max_expirydate && (
-                  <ListGroup.Item><FaCalendarDay className="view-modal-icon" /> <strong>{t("Max Expiry Date:", "अधिकतम समाप्ति तिथि:")}</strong> {new Date(viewItem.max_expirydate).toLocaleDateString()}</ListGroup.Item>
-                )}
-                {Array.isArray(viewItem.packet_expiry) && viewItem.packet_expiry.length > 0 && (
-                  <ListGroup.Item>
-                    <FaInfoCircle className="view-modal-icon" /> <strong>{t("Packet Details:", "पैकेट विवरण:")}</strong>
-                    <Table bordered size="sm" className="mt-2 mb-0">
-                      <thead>
-                        <tr><th>{t("Packets", "पैकेट")}</th><th>{t("Expiry Date", "समाप्ति तिथि")}</th><th>{t("Remarks", "टिप्पणियां")}</th></tr>
-                      </thead>
-                      <tbody>
-                        {viewItem.packet_expiry.map((pe, i) => {
-                          const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
-                          const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
-                          const remark = Array.isArray(pe) ? pe[2] : (pe && (pe.remark || pe.remarks));
-                          return (
-                            <tr key={i}>
-                              <td>{count == null ? '-' : count}</td>
-                              <td>{date ? new Date(date).toLocaleDateString() : '-'}</td>
-                              <td>{remark || '-'}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </Table>
-                  </ListGroup.Item>
-                )}
                 <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>{t("Sector:", "सेक्टर:")}</strong> {viewItem.sector}</ListGroup.Item>
                 <ListGroup.Item><FaProjectDiagram className="view-modal-icon" /> <strong>{t("Project:", "परियोजना:")}</strong> {viewItem.project}</ListGroup.Item>
                 <ListGroup.Item><FaMapMarkerAlt className="view-modal-icon" /> <strong>{t("District:", "जिला:")}</strong> {viewItem.district}</ListGroup.Item>
@@ -1981,104 +1782,6 @@ const FoodItemReceiving = () => {
           </Modal>
         )}
 
-        {expiryViewItem && (
-          <Modal show={showExpiryModal} onHide={handleCloseExpiryModal} centered>
-            <Modal.Header closeButton className="view-modal-header">
-              <Modal.Title>
-                <FaCalendarCheck className="me-2" />
-                {t("Packet Expiry Details:", "पैकेट समाप्ति विवरण:")} {expiryViewItem.food_item}
-              </Modal.Title>
-            </Modal.Header>
-            <Modal.Body className="view-modal-body">
-              <ListGroup variant="flush">
-                <ListGroup.Item>
-                  <FaUtensils className="view-modal-icon" />
-                  <strong>{t("Food Item:", "खाद्य सामग्री:")}</strong> {expiryViewItem.food_item}
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <FaWeightHanging className="view-modal-icon" />
-                  <strong>{t("Total Packets:", "कुल पैकेट:")}</strong> {expiryViewItem.quantity} {expiryViewItem.unit}
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <FaCalendarDay className="view-modal-icon" />
-                  <strong>{t("Date of Receiving:", "प्राप्ति की तिथि:")}</strong>{' '}
-                  {expiryViewItem.date ? new Date(expiryViewItem.date).toLocaleDateString() : '-'}
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <FaCubes className="view-modal-icon" />
-                  <strong>{t("Trimester:", "त्रैमासिक अवधि:")}</strong> {normalizeTrimester(expiryViewItem.quarter) || expiryViewItem.quarter || '-'}<br />
-                  <strong>{t("Months:", "महीने:")}</strong> {formatMonths(getMonthsArray(expiryViewItem))}
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <FaInfoCircle className="view-modal-icon" />
-                  <strong>{t("Sector Status:", "सेक्टर स्थिति:")}</strong>{' '}
-                  <Badge bg={getStatusVariant(expiryViewItem.sector_status)}>
-                    {expiryViewItem.sector_status || 'pending'}
-                  </Badge>
-                </ListGroup.Item>
-              </ListGroup>
-
-              <hr />
-
-              <h6 className="mb-2">
-                <FaCalendarCheck className="me-1" /> {t("Packet-wise Expiry List", "पैकेट-वार समाप्ति सूची")}
-              </h6>
-              <Table bordered striped size="sm" className="mb-0">
-                <thead>
-                  <tr style={{ backgroundColor: '#073f73', color: 'white' }}>
-                    <th className="text-center" style={{ width: '50px' }}>{t("S. No.", "क्रम सं.")}</th>
-                    <th className="text-center">{t("Packets", "पैकेट")}</th>
-                    <th className="text-center">{t("Expiry Date", "समाप्ति तिथि")}</th>
-                    <th className="text-center">{t("Remarks", "टिप्पणियां")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.isArray(expiryViewItem.packet_expiry) && expiryViewItem.packet_expiry.length > 0 ? (
-                    expiryViewItem.packet_expiry.map((pe, i) => {
-                      const count = Array.isArray(pe) ? pe[0] : (pe && pe.count);
-                      const date = Array.isArray(pe) ? pe[1] : (pe && pe.date);
-                      const remark = Array.isArray(pe) ? pe[2] : (pe && (pe.remark || pe.remarks));
-                      return (
-                        <tr key={i}>
-                          <td className="text-center">{i + 1}</td>
-                          <td className="text-center fw-semibold">{count == null || count === '' ? '-' : count}</td>
-                          <td className="text-center">
-                            {date ? new Date(date).toLocaleDateString() : '-'}
-                          </td>
-                          <td>{remark || '-'}</td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="text-center text-muted p-3">
-                        {t("No packet expiry details available.", "पैकेट समाप्ति विवरण उपलब्ध नहीं है।")}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-                {Array.isArray(expiryViewItem.packet_expiry) && expiryViewItem.packet_expiry.length > 0 && (
-                  <tfoot>
-                    <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
-                      <td className="text-end">{t("Total:", "कुल:")}</td>
-                      <td className="text-center">
-                        {expiryViewItem.packet_expiry.reduce((sum, pe) => {
-                          const c = Array.isArray(pe) ? pe[0] : (pe && pe.count);
-                          return sum + (parseFloat(c) || 0);
-                        }, 0)}
-                      </td>
-                      <td></td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                )}
-              </Table>
-            </Modal.Body>
-            <Modal.Footer className="view-modal-footer">
-              <Button variant="secondary" onClick={handleCloseExpiryModal}>{t("Close", "बंद करें")}</Button>
-            </Modal.Footer>
-          </Modal>
-        )}
 
       </div>
     </div>
